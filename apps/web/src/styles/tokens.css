@@ -1,0 +1,49 @@
+/*
+ * Lexilexi 语义化 design tokens
+ *
+ * 规则：
+ * - 组件中禁止硬编码颜色，一律引用这里的语义 token（浅色/深色两套）
+ * - token 命名表达「用途」而非「颜色值」：--lex-bg / --lex-text / --lex-primary ...
+ * - 深色模式通过 <html data-theme="dark"> 切换（见 useTheme）
+ */
+:root {
+  color-scheme: light;
+
+  /* 背景与表面 */
+  --lex-bg: #fafaf9;
+  --lex-surface: #ffffff;
+  --lex-surface-raised: #f5f5f4;
+  --lex-border: #e7e5e4;
+
+  /* 文本 */
+  --lex-text: #1c1917;
+  --lex-text-muted: #78716c;
+
+  /* 品牌与状态 */
+  --lex-primary: #4f46e5;
+  --lex-primary-contrast: #ffffff;
+  --lex-accent: #d97706;
+  --lex-danger: #dc2626;
+  --lex-focus-ring: #6366f1;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* 背景与表面 */
+  --lex-bg: #0c0a09;
+  --lex-surface: #1c1917;
+  --lex-surface-raised: #292524;
+  --lex-border: #292524;
+
+  /* 文本 */
+  --lex-text: #f5f5f4;
+  --lex-text-muted: #a8a29e;
+
+  /* 品牌与状态 */
+  --lex-primary: #818cf8;
+  --lex-primary-contrast: #1e1b4b;
+  --lex-accent: #f59e0b;
+  --lex-danger: #f87171;
+  --lex-focus-ring: #818cf8;
+}
