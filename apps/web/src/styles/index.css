@@ -1,0 +1,26 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+/* 深色模式以 <html data-theme="dark"> 为准（由 useTheme 维护） */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+ * 将语义 token 映射为 Tailwind 工具类：
+ * --color-bg          → bg-bg / text-bg / border-bg ...
+ * --color-surface     → bg-surface ...
+ * --color-primary     → bg-primary / text-primary ...
+ * 组件中一律使用这些语义工具类，不直接写十六进制颜色。
+ */
+@theme inline {
+  --color-bg: var(--lex-bg);
+  --color-surface: var(--lex-surface);
+  --color-surface-raised: var(--lex-surface-raised);
+  --color-border: var(--lex-border);
+  --color-text: var(--lex-text);
+  --color-text-muted: var(--lex-text-muted);
+  --color-primary: var(--lex-primary);
+  --color-primary-contrast: var(--lex-primary-contrast);
+  --color-accent: var(--lex-accent);
+  --color-danger: var(--lex-danger);
+  --color-focus-ring: var(--lex-focus-ring);
+}
