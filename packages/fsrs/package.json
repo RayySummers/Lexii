@@ -1,0 +1,27 @@
+﻿{
+  "name": "@lexilexi/fsrs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Lexilexi FSRS-7 调度算法包（骨架，算法实现待后续迭代）",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

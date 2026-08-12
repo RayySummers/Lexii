@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+coverage/
+.vite/
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.local
+
+# Multica task scaffolding (not part of the repository)
+AGENTS.md
+.opencode/
+.multica/
+.agent_context/
+.codegraph/
