@@ -41,6 +41,8 @@ Lexilexi/
 
 分层约束：`apps/web` 只做界面；算法逻辑一律在 `packages/`；跨包引用走公开 API。
 
+> packages 的打包约定与未来发布 checklist 见 [packages/README.md](./packages/README.md)。
+
 ## 快速开始
 
 ```bash
