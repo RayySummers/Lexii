@@ -2,34 +2,14 @@
  * 评分预览与到期标签（纯函数，UI 副文案用）。
  *
  * 调度计算全部委托 @lexilexi/fsrs 的公开 API（Scheduler.preview），
- * 本模块只做：领域字段 → 调度器输入的结构换算（docs/domain-model.md §6），
- * 以及到期时间的中文相对标签格式化（纯展示）。
+ * 领域字段 → 调度器输入的换算直接复用 @lexilexi/core 的公开函数
+ * memoryFieldsToCardInput（docs/domain-model.md §6），
+ * 本模块只做：到期时间的中文相对标签格式化（纯展示）。
  */
-import type { CardInput, DateInput } from "@lexilexi/fsrs";
+import type { DateInput } from "@lexilexi/fsrs";
 import { Scheduler } from "@lexilexi/fsrs";
+import { memoryFieldsToCardInput } from "@lexilexi/core";
 import type { IsoDate, MemoryStateFields, ReviewRating } from "@lexilexi/core";
-
-/**
- * MemoryStateFields → 调度器卡片输入（docs/domain-model.md §6 换算约定）。
- *
- * 与 packages/core/src/studyLoop.ts 内部的 fieldsToCard 语义一致（学习步骤
- * 游标不在领域模型单独持久化，`scheduled_days` 只存在于调度过程中，输入恒为
- * 0；旧版记录缺 `learningSteps` 时防御性兜底为 0）。若 core 未来公开该换算
- * 函数，应替换本实现以免两处漂移。
- */
-export function memoryFieldsToCardInput(fields: MemoryStateFields): CardInput {
-  return {
-    due: new Date(fields.due),
-    stability: fields.stabilityDays,
-    difficulty: fields.difficulty,
-    scheduled_days: 0,
-    learning_steps: fields.learningSteps ?? 0,
-    reps: fields.reps,
-    lapses: fields.lapses,
-    state: fields.status,
-    last_review: fields.lastReviewAt ? new Date(fields.lastReviewAt) : undefined,
-  };
-}
 
 /** 四档评分的到期时间预览（评分按钮副文案，如 Again → 10分钟） */
 export interface GradeDueLabels {

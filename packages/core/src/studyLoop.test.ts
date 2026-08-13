@@ -1,4 +1,5 @@
 import type { DexieOptions } from "dexie";
+import { newCardFields } from "@lexilexi/fsrs";
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
 import { importCsvWordlist } from "./importWords";
@@ -6,7 +7,7 @@ import { makeLearningItem, makeMemoryState, makeSense } from "./helpers";
 import type { MemoryStateFields } from "./memory";
 import { openDatabase } from "./persistence";
 import type { LexilexiDatabase } from "./persistence";
-import { getDueItemIds, gradeReview } from "./studyLoop";
+import { getDueItemIds, gradeReview, memoryFieldsToCardInput } from "./studyLoop";
 
 /** 每个用例用独立的 fake-indexeddb 实例（互不干扰） */
 function makeOptions(): DexieOptions {
@@ -389,5 +390,49 @@ describe("gradeReview（学习回路：评分 → FSRS 排期 → 事件落库�
     });
     expect(reviewEvent.response?.length).toBeLessThan(longResponse.length);
     expect(reviewEvent.response?.length).toBeLessThanOrEqual(200);
+  });
+});
+
+describe("memoryFieldsToCardInput（公开字段换算 API，RAY-237 评审建议 C1）", () => {
+  it("按 domain-model §6 换算：字段直映射、时间转 Date、scheduled_days 恒为 0", () => {
+    const fields: MemoryStateFields = {
+      status: "review",
+      due: "2026-08-10T12:00:00.000Z",
+      stabilityDays: 3.5,
+      difficulty: 6,
+      elapsedDays: 3,
+      learningSteps: 2,
+      reps: 4,
+      lapses: 1,
+      lastReviewAt: "2026-08-07T12:00:00.000Z",
+      lastRating: "good",
+    };
+
+    expect(memoryFieldsToCardInput(fields)).toEqual({
+      due: new Date("2026-08-10T12:00:00.000Z"),
+      stability: 3.5,
+      difficulty: 6,
+      scheduled_days: 0,
+      learning_steps: 2,
+      reps: 4,
+      lapses: 1,
+      state: "review",
+      last_review: new Date("2026-08-07T12:00:00.000Z"),
+    });
+  });
+
+  it("旧版记录缺 learningSteps 时兜底为 0，lastReviewAt 为 null 时不传 last_review", () => {
+    const legacyOverrides: Partial<MemoryStateFields> = {
+      learningSteps: undefined,
+      lastReviewAt: null,
+    };
+    const fields: MemoryStateFields = {
+      ...newCardFields({ now: "2026-08-10T12:00:00.000Z" }),
+      ...legacyOverrides,
+    };
+
+    const input = memoryFieldsToCardInput(fields);
+    expect(input.learning_steps).toBe(0);
+    expect(input.last_review).toBeUndefined();
   });
 });

@@ -2,7 +2,7 @@
  * 复习卡片：正面词条、背面释义，点击整卡（或空格）翻面。
  *
  * 可访问性：
- * - 整卡是一个可聚焦的 <button>（内容仅 phrasing 元素），aria-pressed 表达翻面状态；
+ * - 整卡是一个可聚焦的 <button>，aria-expanded 表达翻面（展开/收起）状态；
  * - 背面初始不可见且 aria-hidden，翻面后互换，屏幕阅读器只读到当前面；
  * - 翻面动画尊重 prefers-reduced-motion（motion-reduce 下无过渡）。
  */
@@ -21,9 +21,9 @@ export function ReviewCard({ sense, flipped, onFlip }: ReviewCardProps) {
       <button
         type="button"
         onClick={onFlip}
-        aria-pressed={flipped}
+        aria-expanded={flipped}
         aria-label={flipped ? `隐藏 ${sense.term} 的释义` : `显示 ${sense.term} 的释义`}
-        className="group grid w-full cursor-pointer text-left [transform-style:preserve-3d] transition-transform duration-300 ease-out motion-reduce:transition-none [transform:rotateY(0deg)] aria-pressed:[transform:rotateY(180deg)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        className="group grid w-full cursor-pointer text-left [transform-style:preserve-3d] transition-transform duration-300 ease-out motion-reduce:transition-none [transform:rotateY(0deg)] aria-expanded:[transform:rotateY(180deg)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
       >
         <CardFace hidden={flipped}>
           <div className="flex flex-1 flex-col items-center justify-center gap-3">
@@ -38,9 +38,9 @@ export function ReviewCard({ sense, flipped, onFlip }: ReviewCardProps) {
             </span>
             {sense.tags.length > 0 ? (
               <span className="flex flex-wrap justify-center gap-1">
-                {sense.tags.map((tag) => (
+                {sense.tags.map((tag, index) => (
                   <span
-                    key={tag}
+                    key={`${index}:${tag}`}
                     className="rounded-full border border-border px-2 py-0.5 text-xs text-text-muted"
                   >
                     {tag}
@@ -60,7 +60,7 @@ export function ReviewCard({ sense, flipped, onFlip }: ReviewCardProps) {
             </span>
             <span className="flex flex-col gap-1.5">
               {sense.definitions.map((definition, index) => (
-                <span key={definition} className="text-base leading-relaxed">
+                <span key={`${index}:${definition}`} className="text-base leading-relaxed">
                   {index > 0 ? <span className="text-text-muted">{index + 1}. </span> : null}
                   {definition}
                 </span>
@@ -68,8 +68,8 @@ export function ReviewCard({ sense, flipped, onFlip }: ReviewCardProps) {
             </span>
             {sense.examples.length > 0 ? (
               <span className="flex flex-col gap-1.5 border-t border-border pt-3">
-                {sense.examples.map((example) => (
-                  <span key={example.text} className="flex flex-col gap-0.5">
+                {sense.examples.map((example, index) => (
+                  <span key={`${index}:${example.text}`} className="flex flex-col gap-0.5">
                     <span className="text-sm text-text-muted">{example.text}</span>
                     <span className="text-sm">{example.translation}</span>
                   </span>
@@ -94,15 +94,19 @@ interface CardFaceProps {
   rotated?: boolean;
 }
 
+/**
+ * 卡片单面。外层用 <div> 而非 <span>：面内包含块级排版内容，
+ * span 包 div 违反 HTML 嵌套规则（RAY-237 评审 nit）。
+ */
 function CardFace({ children, hidden, rotated = false }: CardFaceProps) {
   return (
-    <span
+    <div
       aria-hidden={hidden}
       className={`col-start-1 row-start-1 flex min-h-64 flex-col rounded-2xl border border-border bg-surface p-6 [backface-visibility:hidden] sm:min-h-72 ${
         rotated ? "[transform:rotateY(180deg)]" : ""
       }`}
     >
       {children}
-    </span>
+    </div>
   );
 }

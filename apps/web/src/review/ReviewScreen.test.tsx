@@ -73,14 +73,14 @@ describe("ReviewScreen", () => {
     const definition = screen.getByText(card.sense.definitions[0]!);
     const flipButton = screen.getByRole("button", { name: `显示 ${card.sense.term} 的释义` });
     expect(faceAriaHidden(definition)).toBe("true");
-    expect(flipButton.getAttribute("aria-pressed")).toBe("false");
+    expect(flipButton.getAttribute("aria-expanded")).toBe("false");
 
     fireEvent.click(flipButton);
     expect(faceAriaHidden(definition)).toBe("false");
     expect(
       screen
         .getByRole("button", { name: `隐藏 ${card.sense.term} 的释义` })
-        .getAttribute("aria-pressed"),
+        .getAttribute("aria-expanded"),
     ).toBe("true");
 
     fireEvent.click(screen.getByRole("button", { name: `隐藏 ${card.sense.term} 的释义` }));
@@ -136,7 +136,7 @@ describe("ReviewScreen", () => {
     expect(
       screen
         .getByRole("button", { name: `隐藏 ${card.sense.term} 的释义` })
-        .getAttribute("aria-pressed"),
+        .getAttribute("aria-expanded"),
     ).toBe("true");
 
     // 字母键 a 等价于 1（Again）

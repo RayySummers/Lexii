@@ -1,55 +1,10 @@
 import { newCardFields } from "@lexilexi/fsrs";
 import { toItemId } from "@lexilexi/core";
 import { describe, expect, it } from "vitest";
-import {
-  formatDueLabel,
-  memoryFieldsToCardInput,
-  previewGradeDueLabels,
-  ratingFromKey,
-} from "./grade";
+import { formatDueLabel, previewGradeDueLabels, ratingFromKey } from "./grade";
 import { makeMemory } from "./testFixtures";
 
 const NOW = new Date("2026-08-10T12:00:00.000Z");
-
-describe("memoryFieldsToCardInput", () => {
-  it("按 domain-model §6 换算：字段直映射、时间转 Date、scheduled_days 恒为 0", () => {
-    const memory = makeMemory(toItemId("item_x"), {
-      due: "2026-08-10T12:00:00.000Z",
-      stabilityDays: 3.5,
-      difficulty: 6,
-      reps: 4,
-      lapses: 1,
-      status: "review",
-      lastReviewAt: "2026-08-07T12:00:00.000Z",
-      lastRating: "good",
-      learningSteps: 2,
-      elapsedDays: 3,
-    });
-
-    expect(memoryFieldsToCardInput(memory.fields)).toEqual({
-      due: new Date("2026-08-10T12:00:00.000Z"),
-      stability: 3.5,
-      difficulty: 6,
-      scheduled_days: 0,
-      learning_steps: 2,
-      reps: 4,
-      lapses: 1,
-      state: "review",
-      last_review: new Date("2026-08-07T12:00:00.000Z"),
-    });
-  });
-
-  it("旧版记录缺 learningSteps 时兜底为 0，lastReviewAt 为 null 时不传 last_review", () => {
-    const memory = makeMemory(toItemId("item_x"), {
-      learningSteps: undefined,
-      lastReviewAt: null,
-    });
-
-    const input = memoryFieldsToCardInput(memory.fields);
-    expect(input.learning_steps).toBe(0);
-    expect(input.last_review).toBeUndefined();
-  });
-});
 
 describe("previewGradeDueLabels", () => {
   it("新卡：again 回到第一步（1m），good 走第二步（10m），easy 直接转复习", () => {

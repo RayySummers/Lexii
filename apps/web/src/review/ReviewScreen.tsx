@@ -9,6 +9,7 @@
  * - 评分按钮副文案为各档到期时间预览（@lexilexi/fsrs Scheduler.preview）。
  */
 import { useEffect } from "react";
+import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
 import type { ReviewRating } from "@lexilexi/core";
 import { ReviewCard } from "./ReviewCard";
 import { RatingButtons } from "./RatingButtons";
@@ -37,6 +38,12 @@ export function ReviewScreen({ provider, onExit }: ReviewScreenProps) {
   const session = useReviewSession(provider);
   const dueLabels = session.current ? computeDueLabels(session.current) : null;
 
+  // 键盘监听依赖稳定引用而非整个 session 对象：session 每次渲染都是新对象，
+  // 依赖 [session] 会导致每次状态变化都移除/重挂监听。flip / grade 是
+  // useCallback 稳定引用（provider 由 App 以 useState 固定），phase 仅在
+  // 阶段切换时变化（RAY-237 评审建议 C2）。
+  const { phase, flip, grade } = session;
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) {
@@ -53,21 +60,21 @@ export function ReviewScreen({ provider, onExit }: ReviewScreenProps) {
         if (onInteractive) {
           return; // 焦点在按钮上：交给按钮原生激活，避免重复触发
         }
-        if (session.phase === "reviewing") {
+        if (phase === "reviewing") {
           event.preventDefault();
-          session.flip();
+          flip();
         }
         return;
       }
       const rating = ratingFromKey(event.key);
-      if (rating && session.phase === "reviewing") {
+      if (rating && phase === "reviewing") {
         event.preventDefault();
-        void session.grade(rating);
+        void grade(rating);
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [session]);
+  }, [phase, flip, grade]);
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
@@ -81,6 +88,7 @@ export function ReviewScreen({ provider, onExit }: ReviewScreenProps) {
         </button>
         {session.phase === "reviewing" ? (
           <span
+            role="status"
             aria-label={`进度 ${session.index + 1} / ${session.totalCount}，剩余 ${session.totalCount - session.index - 1}`}
             className="text-sm text-text-muted"
           >
@@ -123,7 +131,9 @@ function PhaseContent({ session, dueLabels, onExit }: PhaseContentProps) {
             disabled={session.importing}
             className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {session.importing ? "正在导入…" : "导入内置示例词表（14 词）"}
+            {session.importing
+              ? "正在导入…"
+              : `导入内置示例词表（${SAMPLE_WORDLIST_ROW_COUNT} 词）`}
           </button>
         </div>
       );
