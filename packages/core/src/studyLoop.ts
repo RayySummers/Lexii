@@ -57,12 +57,15 @@ const MAX_RESPONSE_LENGTH = 200;
 /**
  * 字段换算：领域状态 → 调度器卡片输入（对应 domain-model.md §6）。
  *
+ * 公开 API：apps/web 复习界面的评分预览（Scheduler.preview）复用同一换算，
+ * 避免界面层再维护一份逐字段重复的实现（RAY-237 评审建议 C1）。
+ *
  * `learningSteps ?? 0` 为防御性兜底：本字段引入（RAY-242）之前落库的
  * MemoryState（或旧版本导出回导）可能缺失该字段，直接传 undefined 会让
  * 调度器内部 Math.max(0, undefined) 得 NaN（评审建议 #2）。MemoryState
  * 是可重放的事件投影，任何前缀序列都必须能安全通过调度器。
  */
-function fieldsToCard(fields: MemoryStateFields): CardInput {
+export function memoryFieldsToCardInput(fields: MemoryStateFields): CardInput {
   return {
     due: new Date(fields.due),
     stability: fields.stabilityDays,
@@ -123,9 +126,10 @@ export async function gradeReview(
     if (!previous) {
       throw new Error(`记忆状态不存在：${input.itemId}`);
     }
-    const { card, log } = new Scheduler(fieldsToCard(previous.fields), new Date(time)).review(
-      input.rating,
-    );
+    const { card, log } = new Scheduler(
+      memoryFieldsToCardInput(previous.fields),
+      new Date(time),
+    ).review(input.rating);
     const reviewEvent: ReviewEvent = {
       id: toEventId(createId("evt", 12)),
       type: "review",

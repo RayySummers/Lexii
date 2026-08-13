@@ -41,6 +41,9 @@ importers:
       '@lexilexi/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@lexilexi/fsrs':
+        specifier: workspace:*
+        version: link:../../packages/fsrs
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -69,6 +72,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.0.5
         version: 6.0.5(vite@8.2.1(@types/node@26.2.0)(jiti@2.7.0))
+      fake-indexeddb:
+        specifier: ^6.2.5
+        version: 6.2.5
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1

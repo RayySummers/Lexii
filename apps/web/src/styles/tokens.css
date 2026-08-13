@@ -24,6 +24,7 @@
   --lex-primary-contrast: #ffffff;
   --lex-accent: #d97706;
   --lex-danger: #dc2626;
+  --lex-success: #16a34a;
   --lex-focus-ring: #6366f1;
 }
 
@@ -45,5 +46,6 @@
   --lex-primary-contrast: #1e1b4b;
   --lex-accent: #f59e0b;
   --lex-danger: #f87171;
+  --lex-success: #4ade80;
   --lex-focus-ring: #818cf8;
 }
