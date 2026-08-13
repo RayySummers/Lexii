@@ -1,16 +1,36 @@
+/**
+ * 应用外壳：品牌头部 + 主题切换 + 首页 / 复习界面切换。
+ *
+ * 数据源注入：`reviewProviderFactory` 是测试接缝——测试传入 mock 工厂，
+ * 生产环境使用默认工厂（浏览器 IndexedDB）。工厂在进入复习时才惰性创建，
+ * 因此非浏览器环境（如仅渲染首页的测试）不会触碰 IndexedDB。
+ */
+import { useCallback, useState } from "react";
 import { APP_NAME, APP_NAME_ZH } from "@lexilexi/core";
+import { HomeScreen } from "./HomeScreen";
 import { useTheme } from "./hooks/useTheme";
+import { ReviewScreen } from "./review/ReviewScreen";
+import { createDefaultReviewDataProvider } from "./review/data";
+import type { ReviewDataProvider } from "./review/types";
 
-const PACKAGES = [
-  { name: "@lexilexi/core", description: "核心领域模型与共享类型" },
-  { name: "@lexilexi/fsrs", description: "FSRS-7 调度算法（骨架）" },
-  { name: "@lexilexi/stats", description: "学习统计（骨架）" },
-  { name: "@lexilexi/eval", description: "学习评测（骨架）" },
-  { name: "@lexilexi/ai", description: "AI 能力（空壳，见 README）" },
-];
+export interface AppProps {
+  /** 复习数据源工厂（测试注入 mock；默认浏览器 IndexedDB） */
+  reviewProviderFactory?: () => ReviewDataProvider;
+}
 
-export function App() {
+export function App({ reviewProviderFactory = createDefaultReviewDataProvider }: AppProps) {
   const { theme, toggleTheme } = useTheme();
+  const [provider, setProvider] = useState<ReviewDataProvider | null>(null);
+  const [view, setView] = useState<"home" | "review">("home");
+
+  const startReview = useCallback(() => {
+    setProvider((current) => current ?? reviewProviderFactory());
+    setView("review");
+  }, [reviewProviderFactory]);
+
+  const exitReview = useCallback(() => {
+    setView("home");
+  }, []);
 
   return (
     <div className="min-h-screen bg-bg text-text transition-colors">
@@ -29,35 +49,11 @@ export function App() {
         </button>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl px-6 py-16">
-        <h1 className="text-4xl font-bold tracking-tight">定制化背单词体验</h1>
-        <p className="mt-4 text-lg text-text-muted">
-          现代简洁 · 多语言 · 支持导入词库 · local-first
-        </p>
-
-        <section
-          aria-labelledby="workspace-heading"
-          className="mt-12 rounded-xl border border-border bg-surface p-6"
-        >
-          <h2 id="workspace-heading" className="text-lg font-semibold">
-            Monorepo 工作区
-          </h2>
-          <p className="mt-1 text-sm text-text-muted">
-            pnpm workspace · apps/web + packages/* · TypeScript strict · Vitest
-          </p>
-          <ul className="mt-4 space-y-2">
-            {PACKAGES.map((pkg) => (
-              <li
-                key={pkg.name}
-                className="flex items-baseline justify-between gap-4 border-b border-border pb-2 last:border-b-0 last:pb-0"
-              >
-                <code className="text-sm font-medium text-primary">{pkg.name}</code>
-                <span className="text-sm text-text-muted">{pkg.description}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      </main>
+      {view === "review" && provider ? (
+        <ReviewScreen provider={provider} onExit={exitReview} />
+      ) : (
+        <HomeScreen onStartReview={startReview} />
+      )}
     </div>
   );
 }
