@@ -1,13 +1,14 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import html from "../../index.html?raw";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { syncThemeColorMeta } from "./themeColor";
 import themeColorSource from "./themeColor?raw";
 
-// Vitest 的 CSS 插件会拦截 .css?raw 并返回空模块，改用 fs 直接读取 tokens.css 源码
-// （vitest 运行时 cwd 固定为 apps/web 包目录，CI / 根目录递归执行均一致）
-const tokensCss = readFileSync(resolve(process.cwd(), "src/styles/tokens.css"), "utf8");
+// Vitest 的 CSS 插件会拦截 .css?raw 并返回空模块，改用 fs 直接读取 tokens.css 源码。
+// 相对路径基于包目录解析（vitest 运行时 cwd 固定为配置根目录 apps/web，
+// 本地与 CI 的 pnpm 递归执行均一致）。不使用 process / node:path / import.meta.url：
+// 避免 Node 全局类型渗入应用代码，且 jsdom 环境的 URL 会按 http://localhost 解析相对路径。
+const tokensCss = readFileSync("src/styles/tokens.css", "utf8");
 
 // 提取 tokens.css 的 :root 块中浅色 --lex-bg 的值（design tokens 的唯一来源）
 function extractLightBgToken(source: string): string {
