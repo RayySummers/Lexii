@@ -7,6 +7,8 @@ import { openDatabase } from "./persistence";
 import { exportLexilexiData, importLexilexiData, parseLexilexiExport } from "./export";
 import { EXPORT_FORMAT_VERSION } from "./constants";
 import type { LexilexiExportData } from "./export";
+import { SAMPLE_WORDLIST_CSV, SAMPLE_WORDLIST_ROW_COUNT } from "./sampleWordlist";
+import { importCsvWordlist } from "./importWords";
 import { makeLearningItem, makeMemoryState, makeReviewEvent, makeSense, now } from "./helpers";
 
 /** 每个测试用独立的 fake-indexeddb 实例 */
@@ -113,6 +115,33 @@ describe("exportLexilexiData / importLexilexiData", () => {
 
     await source.delete();
     await target.delete();
+  });
+
+  it("导出在单个读事务内快照：与并发导入串行化，不拍到跨表中间态", async () => {
+    const db = openDatabase(makeOptions());
+    await makeExport(db); // 预置 1 条（items/senses/memoryStates 各 1 + review 事件 1）
+
+    // 并发：整批导入（四表同事务写入）与导出同时进行
+    const [, snapshot] = await Promise.all([
+      importCsvWordlist(db, SAMPLE_WORDLIST_CSV, { source: "并发导入" }),
+      exportLexilexiData(db, now()),
+    ]);
+
+    // 快照要么是导入前的 1 条，要么是导入后的 1 + 14 条，绝不混合
+    expect([1, 1 + SAMPLE_WORDLIST_ROW_COUNT]).toContain(snapshot.items.length);
+    // 四张表两两完整：每个 item 的 sense 与 memoryState 都在快照内
+    expect(snapshot.senses.length).toBe(snapshot.items.length);
+    expect(snapshot.memoryStates.length).toBe(snapshot.items.length);
+    const senseIds = new Set(snapshot.senses.map((sense) => sense.id));
+    const memoryIds = new Set(snapshot.memoryStates.map((memory) => memory.id));
+    for (const item of snapshot.items) {
+      expect(senseIds.has(item.senseId)).toBe(true);
+      expect(memoryIds.has(item.id)).toBe(true);
+    }
+    // 事件数 = 每个条目 1 条 import 事件 + 预置的 1 条 review 事件（快照前/后二选一）
+    expect([snapshot.items.length, snapshot.items.length + 1]).toContain(snapshot.events.length);
+
+    await db.delete();
   });
 
   it("导入覆盖语义：同 id 记录被导入数据覆盖", async () => {

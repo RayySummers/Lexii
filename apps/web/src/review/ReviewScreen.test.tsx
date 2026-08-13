@@ -249,6 +249,8 @@ describe("ReviewScreen", () => {
 
       await waitFor(() => expect(harness.exportBackup).toHaveBeenCalledTimes(1));
       expect(createObjectURL).toHaveBeenCalledTimes(1);
+      // 导出成功有 aria-live 反馈（评审建议 C4）
+      expect(await screen.findByText("已导出备份。")).toBeInTheDocument();
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     } finally {
       URL.createObjectURL = originalCreate;

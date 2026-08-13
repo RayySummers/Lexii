@@ -96,7 +96,8 @@ describe("createIndexedDbSettingsDataProvider", () => {
 
     const parsed = parseCsvWordlist(csv).entries;
     expect(parsed).toHaveLength(SAMPLE_WORDLIST_ROW_COUNT);
-    expect(csv.startsWith("term,definition,pos\n")).toBe(true);
+    // 导出文件前置 UTF-8 BOM（Excel 兼容），解析器忽略 BOM
+    expect(csv.startsWith("\uFEFFterm,definition,pos\n")).toBe(true);
   });
 
   it("importBackup 非法 JSON 抛错，库保持原样", async () => {

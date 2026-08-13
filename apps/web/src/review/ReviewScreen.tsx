@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
 import type { ReviewRating } from "@lexilexi/core";
-import { datedFilename, downloadTextFile } from "../lib/download";
+import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
 import { ReviewCard } from "./ReviewCard";
 import { RatingButtons } from "./RatingButtons";
 import { formatDueLabel, previewGradeDueLabels, ratingFromKey } from "./grade";
@@ -40,17 +40,20 @@ export function ReviewScreen({ provider, onExit }: ReviewScreenProps) {
   const dueLabels = session.current ? computeDueLabels(session.current) : null;
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
 
   const handleExport = useCallback(async () => {
     setExporting(true);
     setExportError(null);
+    setExportNotice(null);
     try {
       const data = await provider.exportBackup();
       downloadTextFile(
         datedFilename("lexilexi-backup", "json"),
-        JSON.stringify(data, null, 2),
+        serializeBackup(data),
         "application/json",
       );
+      setExportNotice("已导出备份。");
     } catch (err) {
       setExportError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -127,6 +130,15 @@ export function ReviewScreen({ provider, onExit }: ReviewScreenProps) {
           </button>
         </div>
       </div>
+
+      {exportNotice ? (
+        <p
+          role="status"
+          className="rounded-xl border border-border bg-surface p-4 text-sm text-success"
+        >
+          {exportNotice}
+        </p>
+      ) : null}
 
       {exportError ? (
         <p

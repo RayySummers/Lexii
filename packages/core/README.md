@@ -65,18 +65,23 @@ const { reviewEvent, nextMemoryState } = await gradeReview(db, {
 CSV 格式：`term,definition[,pos]`（两列/三列），或带表头（`term`/`definition`/`pos`
 大小写不敏感、顺序任意）。详见 `docs/domain-model.md` §7。
 
-词表导出（CSV 只承载词条三列，可经 `importCsvWordlist` 导回，不含学习进度；
-完整备份请用上面的 `exportLexilexiData`）：
+词表导出（CSV 只承载词条三列，**常规词条**可经 `importCsvWordlist` 导回，
+不含学习进度；完整备份请用上面的 `exportLexilexiData`）：
 
 ```ts
 import { exportCsvWordlist, serializeWordlistCsv } from "@lexilexi/core";
 
-// 从数据库导出未删除条目为 CSV 文本（按 createdAt 升序，RFC 4180 转义）
+// 从数据库导出未删除条目为 CSV 文本（按 createdAt 升序，RFC 4180 转义，
+// 前置 UTF-8 BOM 供 Windows 中文版 Excel 识别编码）
 const csv = await exportCsvWordlist(db);
 
-// 或直接序列化词条列表（纯函数）
+// 或直接序列化词条列表（纯函数，无 BOM）
 const csv2 = serializeWordlistCsv([{ term: "apple", definitions: ["苹果"], pos: "n." }]);
 ```
+
+CSV 导回边界（详见 `docs/domain-model.md` §7）：释义含全角分号「；」的词条导回后
+会被拆成多条、含换行的释义无法原样导回、词条须匹配英文字母/撇号/连字符/点模式；
+特殊内容以 JSON 备份为准。
 
 ## 持久化防线（apps/web 消费）
 

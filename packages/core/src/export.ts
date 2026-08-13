@@ -26,17 +26,30 @@ export interface LexilexiExportData {
   events: Event[];
 }
 
-/** 导出全部学习数据（快照；调用方应保证无并发写入） */
+/**
+ * 导出全部学习数据（单读事务快照）。
+ *
+ * 四张表在同一个只读事务内读取：与并发写入（评分、导入等）串行化，
+ * 不会拍到「items 已写、memoryStates 未写」这类跨表中间态（评审建议 C2）。
+ */
 export async function exportLexilexiData(
   db: LexilexiDatabase,
   now: IsoDate,
 ): Promise<LexilexiExportData> {
-  const [items, senses, memoryStates, events] = await Promise.all([
-    db.items.toArray(),
-    db.senses.toArray(),
-    db.memoryStates.toArray(),
-    db.events.toArray(),
-  ]);
+  const [items, senses, memoryStates, events] = await db.transaction(
+    "r",
+    db.items,
+    db.senses,
+    db.memoryStates,
+    db.events,
+    async () =>
+      Promise.all([
+        db.items.toArray(),
+        db.senses.toArray(),
+        db.memoryStates.toArray(),
+        db.events.toArray(),
+      ]),
+  );
   return {
     format: "lexilexi",
     exportFormatVersion: EXPORT_FORMAT_VERSION,

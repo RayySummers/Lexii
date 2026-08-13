@@ -11,8 +11,7 @@
  * 全部颜色走 design tokens（浅色/深色两套自动生效），不硬编码颜色。
  */
 import { useCallback, useRef, useState } from "react";
-import type { LexilexiExportData } from "@lexilexi/core";
-import { datedFilename, downloadTextFile } from "../lib/download";
+import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
 import { usePersistenceStatus } from "./persistenceStatus";
 import { useOverview } from "./useOverview";
 import type { DataOverview, SettingsDataProvider } from "./types";
@@ -35,11 +34,6 @@ function readFileAsText(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error ?? new Error("读取文件失败"));
     reader.readAsText(file);
   });
-}
-
-/** 把导出快照序列化为带缩进的 JSON 文本（可读备份） */
-function serializeBackup(data: LexilexiExportData): string {
-  return JSON.stringify(data, null, 2);
 }
 
 export function SettingsScreen({ provider, onExit }: SettingsScreenProps) {

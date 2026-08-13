@@ -29,6 +29,11 @@ describe("serializeWordlistCsv", () => {
     expect(csv).toBe("term,definition,pos");
     expect(parseCsvWordlist(csv).entries).toEqual([]);
   });
+
+  it("纯序列化不输出 BOM（BOM 由导出入口添加，属文件编码层）", () => {
+    const csv = serializeWordlistCsv([{ term: "apple", definitions: ["苹果"] }]);
+    expect(csv.startsWith("term,definition,pos")).toBe(true);
+  });
 });
 
 describe("exportCsvWordlist", () => {
@@ -50,9 +55,9 @@ describe("exportCsvWordlist", () => {
     const csv = await exportCsvWordlist(db);
     const parsed = parseCsvWordlist(csv).entries;
 
-    // gone 被排除；book（更早）排在 apple 之前
+    // gone 被排除；book（更早）排在 apple 之前；解析器忽略 BOM，round-trip 不受影响
     expect(parsed.map((entry) => entry.term)).toEqual(["book", "apple"]);
-    expect(csv.startsWith("term,definition,pos\n")).toBe(true);
+    expect(csv.startsWith("\uFEFFterm,definition,pos\n")).toBe(true);
     await db.delete();
   });
 
@@ -72,9 +77,25 @@ describe("exportCsvWordlist", () => {
     await db.delete();
   });
 
-  it("空库导出仅表头", async () => {
+  it("导出文本前置 UTF-8 BOM（Windows Excel 中文不乱码）", async () => {
     const db = openDatabase({ indexedDB: new IDBFactory(), IDBKeyRange });
-    expect(await exportCsvWordlist(db)).toBe("term,definition,pos");
+    const sense = makeSense();
+    sense.term = "apple";
+    await db.senses.put(sense);
+    await db.items.put(makeLearningItem(sense.id));
+
+    const csv = await exportCsvWordlist(db);
+    expect(csv.startsWith("\uFEFFterm,definition,pos\n")).toBe(true);
+    // BOM 之后的内容与纯序列化一致
+    expect(csv.slice(1)).toBe(
+      serializeWordlistCsv([{ term: "apple", definitions: ["你好；打招呼"], pos: "int." }]),
+    );
+    await db.delete();
+  });
+
+  it("空库导出仅 BOM + 表头", async () => {
+    const db = openDatabase({ indexedDB: new IDBFactory(), IDBKeyRange });
+    expect(await exportCsvWordlist(db)).toBe("\uFEFFterm,definition,pos");
     await db.delete();
   });
 });

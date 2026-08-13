@@ -18,7 +18,7 @@ pnpm build          # tsc --noEmit + vite build
 - `src/theme/themeColor.ts` — 浏览器外壳色同步：`meta theme-color` 跟随主题，值取自 `--lex-bg` token（不硬编码）
 - `src/App.tsx` — 应用外壳：品牌头部 + 主题切换 + 首页 / 复习 / 设置界面切换
 - `src/HomeScreen.tsx` — 首页（品牌与复习入口）
-- `src/lib/download.ts` — 文件下载工具（`downloadTextFile` / `datedFilename`，纯前端无网络）
+- `src/lib/download.ts` — 文件下载工具（`downloadTextFile` / `datedFilename` / `serializeBackup`，纯前端无网络）
 - `src/settings/` — 设置页（RAY-245）：
   - `types.ts` — `SettingsDataProvider` / `DataOverview`（UI 与数据源之间的契约）
   - `data.ts` — IndexedDB 数据源：`createIndexedDbSettingsDataProvider`（包装 core 的 `exportLexilexiData` / `exportCsvWordlist` / `parseLexilexiExport` / `importLexilexiData`）

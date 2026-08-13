@@ -158,6 +158,7 @@ interface ReviewEvent extends BaseEvent {
 - 格式错误报「第 N 行 + 原因」（`CsvFormatError`），整份数据全通过或全拒绝，绝不静默丢弃行；空文件 → 空列表，空行跳过。
 - 词条校验：英文字母/撇号/连字符/点（如 `don't`、`well-known`、`Mr.`），字段长度 ≤ 500。
 - 语言默认 `en`（可覆盖）；同词条重复导入 = 新条目（保留全部轨迹）。
+- 导出（`exportCsvWordlist`）与导入互逆的边界：CSV 只承载 term/definitions/pos 三列；**释义本身含全角分号「；」的词条导回后会被拆成多条释义**（「；」是多释义分隔符）、**释义含换行的词条无法原样导回**（解析器不支持字段内换行）、词条须满足上面的单词模式。特殊内容请以 `exportLexilexiData` 的 JSON 备份为准。导出文件前置 UTF-8 BOM（Windows 中文版 Excel 兼容），解析侧自动忽略。
 
 ## 8. 存储决策（每个实体为什么存、存在哪、留多久）
 
