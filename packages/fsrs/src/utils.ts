@@ -43,11 +43,6 @@ export function dateDiffInDays(last: Date, current: Date): number {
   return Math.floor((utc2 - utc1) / 86_400_000);
 }
 
-/** 两个时刻相差的分钟数（向下取整） */
-export function dateDiffInMinutes(now: DateInput, pre: DateInput): number {
-  return Math.floor((toDate(now).getTime() - toDate(pre).getTime()) / 60_000);
-}
-
 /** 统一时间输入为 Date（Date 直接返回，数字按毫秒时间戳，字符串走 Date.parse） */
 export function toDate(value: DateInput): Date {
   if (value instanceof Date) {

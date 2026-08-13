@@ -6,7 +6,7 @@
  */
 
 import { alea } from "./alea";
-import { DEFAULT_W, S_MAX, S_MIN, normalizeParameters } from "./defaults";
+import { S_MAX, S_MIN, normalizeParameters } from "./defaults";
 import type { FSRSParameters } from "./models";
 import { clamp, roundTo } from "./utils";
 
@@ -229,9 +229,6 @@ export class FSRSAlgorithm {
     return { difficulty: newD, stability: newS };
   }
 }
-
-/** 仅供默认参数快速构造 */
-export const DEFAULT_W_VALUE: readonly number[] = DEFAULT_W;
 
 const FUZZ_RANGES = [
   { start: 2.5, end: 7.0, factor: 0.15 },

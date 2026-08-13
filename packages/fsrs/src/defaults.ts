@@ -117,26 +117,11 @@ export function clipParameters(
 }
 
 /**
- * 校验权重向量：长度必须为 17（v4）/ 19（v5）/ 21（v6），且全部有限。
- */
-export function checkParameters(parameters: number[] | readonly number[]): void {
-  const invalid = parameters.find((param) => !Number.isFinite(param));
-  if (invalid !== undefined) {
-    throw new RangeError(`Non-finite or NaN value in parameters ${parameters}`);
-  }
-  if (![17, 19, 21].includes(parameters.length)) {
-    throw new RangeError(
-      `Invalid parameter length: ${parameters.length}. Must be 17, 19 or 21 for FSRSv4, 5 and 6 respectively.`,
-    );
-  }
-}
-
-/**
  * 权重迁移与裁剪（与官方 migrateParameters 一致）：
  * - 21 个：按区间裁剪；
  * - 19 个：补齐 [0, 默认 decay]；
  * - 17 个：先做 v4→v6 换算，再补齐 [0, 0, 0, 默认 decay]；
- * - 其他长度：回退默认权重（checkParameters 负责报错）。
+ * - 其他长度：回退默认权重。
  */
 export function migrateParameters(
   parameters?: number[] | readonly number[],

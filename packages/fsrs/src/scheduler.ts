@@ -28,8 +28,8 @@ const GRADE_TO_NUMBER: Record<Grade, number> = {
   easy: 4,
 };
 
-const MINUTE = 60 * 1000;
-const DAY = 24 * 60 * 60 * 1000;
+/** 合法评分档位集合（运行时校验用，拦截绕过类型检查的脏输入） */
+const VALID_GRADES: ReadonlySet<string> = new Set(Object.keys(GRADE_TO_NUMBER));
 
 /**
  * 单卡排期器。每次排期基于「上次复习时的卡片状态 + 本次复习时间」，
@@ -70,8 +70,16 @@ export class Scheduler {
     };
   }
 
-  /** 按给定评分排期并返回结果（同一评分幂等） */
+  /**
+   * 按给定评分排期并返回结果（同一评分幂等）。
+   *
+   * 入口先无条件校验评分：非四档（如 UI/导入路径传进脏数据）一律抛 RangeError，
+   * 对齐官方 ts-fsrs 的 checkGrade 行为，防止 NaN/无效卡片状态被上层持久化。
+   */
   review(grade: Grade): RecordLogItem {
+    if (!VALID_GRADES.has(grade)) {
+      throw new RangeError(`Invalid grade "${String(grade)}", expected again/hard/good/easy`);
+    }
     const cached = this.next.get(grade);
     if (cached) {
       return cached;
@@ -199,6 +207,11 @@ export class Scheduler {
         return good;
       case "easy":
         return easy;
+      default: {
+        // review() 入口已校验评分，此处仅作穷尽性兜底（tsc noFallthroughCasesInSwitch 下不会到达）
+        const exhaustive: never = grade;
+        throw new RangeError(`Invalid grade "${String(exhaustive)}"`);
+      }
     }
   }
 
@@ -284,6 +297,11 @@ export class Scheduler {
       }
       case "easy":
         return { minutes: 0, nextStep: 0 };
+      default: {
+        // review() 入口已校验评分，此处仅作穷尽性兜底
+        const exhaustive: never = grade;
+        throw new RangeError(`Invalid grade "${String(exhaustive)}"`);
+      }
     }
   }
 
@@ -354,13 +372,12 @@ function toCard(input: CardInput): Card {
 }
 
 /**
- * 便捷入口：创建一个绑定了默认参数的调度器。
- * 需要自定义参数时直接 `new Scheduler(card, now, params)`。
+ * 便捷入口：创建调度器（可选自定义参数，与构造器签名一致）。
  */
-export function scheduler(card: CardInput, now: Date | number | string): Scheduler {
-  return new Scheduler(card, now);
+export function scheduler(
+  card: CardInput,
+  now: Date | number | string,
+  params?: Partial<FSRSParameters>,
+): Scheduler {
+  return new Scheduler(card, now, params);
 }
-
-/** 毫秒常量（供测试与调试使用） */
-export const MS_PER_MINUTE = MINUTE;
-export const MS_PER_DAY = DAY;

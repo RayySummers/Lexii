@@ -40,8 +40,54 @@ describe("公开 API 契约", () => {
     expect(s.review("good")).toBe(s.review("good"));
   });
 
-  it("评分非法时抛错", () => {
-    expect(() => new Scheduler(newCard(), NOW).review("manual" as Grade)).toThrow();
+  it("评分非法时抛错（RangeError，四态 × 默认/空步骤矩阵）", () => {
+    const invalidGrades = ["manual", "MANUAL", "", " " as Grade, undefined as unknown as Grade];
+    for (const grade of invalidGrades) {
+      // new 卡：默认步骤 / 空步骤 / 关闭短期记忆
+      expect(() => new Scheduler(newCard(), NOW).review(grade as Grade)).toThrow(RangeError);
+      expect(() =>
+        new Scheduler(newCard(), NOW, { learning_steps: [] }).review(grade as Grade),
+      ).toThrow(RangeError);
+      expect(() =>
+        new Scheduler(newCard(), NOW, { enable_short_term: false }).review(grade as Grade),
+      ).toThrow(RangeError);
+
+      // learning 卡（good 后进步骤）
+      const learning = new Scheduler(newCard(), NOW).review("good").card;
+      expect(() => new Scheduler(learning, addTime(NOW, 10, false)).review(grade as Grade)).toThrow(
+        RangeError,
+      );
+      expect(() =>
+        new Scheduler(learning, addTime(NOW, 10, false), { learning_steps: [] }).review(
+          grade as Grade,
+        ),
+      ).toThrow(RangeError);
+
+      // review 卡（good→good 走完步骤）
+      const review = new Scheduler(
+        new Scheduler(newCard(), NOW).review("good").card,
+        addTime(NOW, 10, false),
+      ).review("good").card;
+      expect(() => new Scheduler(review, addTime(NOW, 10, false)).review(grade as Grade)).toThrow(
+        RangeError,
+      );
+      expect(() =>
+        new Scheduler(review, addTime(NOW, 10, false), { learning_steps: [] }).review(
+          grade as Grade,
+        ),
+      ).toThrow(RangeError);
+
+      // relearning 卡（review 后 again）
+      const relearning = new Scheduler(review, addTime(NOW, 10, false)).review("again").card;
+      expect(() =>
+        new Scheduler(relearning, addTime(NOW, 10, false)).review(grade as Grade),
+      ).toThrow(RangeError);
+      expect(() =>
+        new Scheduler(relearning, addTime(NOW, 10, false), { relearning_steps: [] }).review(
+          grade as Grade,
+        ),
+      ).toThrow(RangeError);
+    }
   });
 
   it("卡片输入不被修改（调度器只读输入）", () => {

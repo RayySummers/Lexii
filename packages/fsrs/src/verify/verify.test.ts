@@ -182,7 +182,11 @@ describe("fsrs-verify: 复习轨迹对照官方参考实现", () => {
 });
 
 describe("fsrs-verify: 同一时刻四档预览对照", () => {
-  RUN_CASES.slice(0, 6).forEach((runCase, caseIndex) => {
+  // 前 6 组基础配置 + 两组 enable_fuzz（fuzz × preview 差分对照）
+  const previewCases = RUN_CASES.slice(0, 6).concat(
+    RUN_CASES.filter((runCase) => runCase.params?.enable_fuzz),
+  );
+  previewCases.forEach((runCase, caseIndex) => {
     it(`${runCase.name} / 随机起点卡片`, () => {
       const rng = makeRng(987654321 + caseIndex);
       const dates = randomDates(rng, 5);
@@ -294,7 +298,38 @@ describe("fsrs-verify: 算法原语对照", () => {
     const oursCard = emptyCard(now);
     expect(() => refF.next(refCard, now, 0 as RefGrade)).toThrow();
     expect(() => refF.next(refCard, now, 5 as RefGrade)).toThrow();
-    expect(() => new Scheduler(oursCard, now).review("manual" as Grade)).toThrow();
+    expect(() => new Scheduler(oursCard, now).review("manual" as Grade)).toThrow(RangeError);
+  });
+
+  it("非法评分矩阵（四态 × 默认/空步骤）无条件抛 RangeError", () => {
+    // 官方 checkGrade 在入口对非 1–4 一律抛错；回归 B1：不能依赖下游偶然抛错
+    const now = new Date(2026, 0, 1, 9, 0, 0, 0);
+    const invalid = ["manual", "", 0, 5, null, undefined] as unknown as Grade[];
+    const card = emptyCard(now);
+
+    // new
+    for (const grade of invalid) {
+      expect(() => new Scheduler(card, now).review(grade)).toThrow(RangeError);
+      expect(() => new Scheduler(card, now, { learning_steps: [] }).review(grade)).toThrow(
+        RangeError,
+      );
+      expect(() => new Scheduler(card, now, { enable_short_term: false }).review(grade)).toThrow(
+        RangeError,
+      );
+    }
+
+    // learning / review / relearning 三种状态 × 默认/空步骤
+    const learning = new Scheduler(card, now).review("good").card;
+    const review = new Scheduler(learning, now).review("good").card;
+    const relearning = new Scheduler(review, now).review("again").card;
+    for (const stateCard of [learning, review, relearning]) {
+      for (const grade of invalid) {
+        expect(() => new Scheduler(stateCard, now).review(grade)).toThrow(RangeError);
+        expect(() =>
+          new Scheduler(stateCard, now, { learning_steps: [], relearning_steps: [] }).review(grade),
+        ).toThrow(RangeError);
+      }
+    }
   });
 });
 

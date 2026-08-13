@@ -83,6 +83,25 @@ const { card, log } = new Scheduler(persistedCard, new Date()).review("good");
 - 边界：评分非法（非四档）抛错；`t < 0`（复习时间早于上次复习）抛错。
 - 本包不实现 rollback/forget/reschedule——core 数据层基于 Event 重放即可，需要时再谈。
 
+### Date 字段的持久化形态（给 #2 的落库约束）
+
+`Card` 的 `due` / `last_review` 与 `ReviewLog` 的 `due` / `review` 在内存中是 `Date`，
+**持久化时必须显式转换**，二选一（推荐 ISO string）：
+
+- **ISO string**：`JSON.stringify` 天然输出 ISO 8601 字符串；回读时用
+  `new Date(value)` 或 JSON reviver 转换（本包的 `toDate` 接受这两种输入）。
+- **epoch ms（number）**：`date.getTime()`；回读时 `new Date(ms)`。
+
+无论哪种，**序列化后不得直接存 `Date` 对象**，且 round-trip 必须可逆
+（导出 JSON 原样导回后 `new Scheduler(card, now)` 输出一致）。示例 reviver：
+
+```ts
+const revive = (key: string, value: unknown) =>
+  key.endsWith("_at") || key === "due" || key === "review" || key === "last_review"
+    ? new Date(value as string)
+    : value;
+```
+
 ### 对接状态
 
 - #2（领域模型与数据层）进行中，Event schema v0 尚无落库格式。本契约的 `ReviewLog`
@@ -90,7 +109,7 @@ const { card, log } = new Scheduler(persistedCard, new Date()).review("good");
 
 ## 公开 API
 
-- `Scheduler` / `scheduler(card, now)` — 单卡排期（`preview()` 四档预览 / `review(grade)`）
+- `Scheduler` / `scheduler(card, now, params?)` — 单卡排期（`preview()` 四档预览 / `review(grade)`）
 - `FSRSAlgorithm` — 算法原语（遗忘曲线、初始值、稳定性/难度更新、间隔与 fuzz）
 - `forgettingCurve(params, elapsedDays, stability)` — 遗忘曲线 R(t,S)
 - `normalizeParameters(props?)` — 参数归一化（对齐官方 generatorParameters）
@@ -109,8 +128,9 @@ const { card, log } = new Scheduler(persistedCard, new Date()).review("good");
 - 自定义参数：enable_short_term=false（LongTermScheduler 路径）、空学习步骤、
   单步骤、多步重学（触发 w17/w18 收紧）
 - 权重迁移：17（v4）/ 19（v5）/ 21（v6）参数自动补齐与裁剪
-- enable_fuzz（确定性 seed，官方 Alea PRNG 逐位对齐）
+- enable_fuzz（确定性 seed，官方 Alea PRNG 逐位对齐；含 fuzz × 四档 preview 对照）
 - 算法原语：遗忘曲线、间隔修正系数、参数归一化、非法输入报错行为
+- 非法评分：new / learning / review / relearning × 默认步骤 / 空步骤下必须全部抛错
 
 **验收红线：与官方参考实现输出一致才算通过。** CI 中作为独立 job 运行，结果单独可见。
 
