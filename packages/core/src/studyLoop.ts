@@ -26,13 +26,13 @@ export interface GradeReviewInput {
   exerciseType: ExerciseType;
   /** 自我评分四档（MVP 由按键直接映射，不经过评测） */
   rating: ReviewRating;
-  /** 卡片出现到评分（毫秒，非负） */
+  /** 卡片出现到评分（毫秒；非负有限值，运行时校验） */
   reviewDurationMs: number;
   /** 是否先翻面看了答案 */
   revealed: boolean;
   /** 本次作答是否正确（练习界面给出的判定） */
   answerWasCorrect: boolean;
-  /** 用户输入（可选；recall 形式下即输入的拼写，不含答案口令类内容） */
+  /** 用户输入（可选；recall 形式下即输入的拼写，不含答案口令类内容；超长截断） */
   response?: string;
   /** 评分发生时刻（ISO；默认调用方当前时间） */
   time?: IsoDate;
@@ -46,14 +46,29 @@ export interface GradeReviewResult {
   nextMemoryState: MemoryState;
 }
 
-/** 字段换算：领域状态 → 调度器卡片输入（对应 domain-model.md §6） */
+/** response 字段长度上限（防御脏输入；recall 拼写输入远超此值无意义） */
+const MAX_RESPONSE_LENGTH = 200;
+
+/** 与 persistence.ts recordReview 的分工：
+ *  recordReview 只做「事件 + 新状态」的原子写入（输入已算好，事务内校验存在性）；
+ *  gradeReview 负责「事务内读旧状态 → FSRS 排期 → 调用同一原子写入契约」。
+ *  改动任何一处落库路径时，必须同步检查另一处（见 persistence.ts 对应注释）。 */
+
+/**
+ * 字段换算：领域状态 → 调度器卡片输入（对应 domain-model.md §6）。
+ *
+ * `learningSteps ?? 0` 为防御性兜底：本字段引入（RAY-242）之前落库的
+ * MemoryState（或旧版本导出回导）可能缺失该字段，直接传 undefined 会让
+ * 调度器内部 Math.max(0, undefined) 得 NaN（评审建议 #2）。MemoryState
+ * 是可重放的事件投影，任何前缀序列都必须能安全通过调度器。
+ */
 function fieldsToCard(fields: MemoryStateFields): CardInput {
   return {
     due: new Date(fields.due),
     stability: fields.stabilityDays,
     difficulty: fields.difficulty,
     scheduled_days: 0,
-    learning_steps: fields.learningSteps,
+    learning_steps: fields.learningSteps ?? 0,
     reps: fields.reps,
     lapses: fields.lapses,
     state: fields.status,
@@ -101,6 +116,7 @@ export async function gradeReview(
   db: LexilexiDatabase,
   input: GradeReviewInput,
 ): Promise<GradeReviewResult> {
+  validateGradeReviewInput(input);
   const time = input.time ?? new Date().toISOString();
   return db.transaction("rw", db.memoryStates, db.events, async () => {
     const previous = await db.memoryStates.get(input.itemId);
@@ -121,7 +137,9 @@ export async function gradeReview(
       reviewDurationMs: input.reviewDurationMs,
       revealed: input.revealed,
       answerWasCorrect: input.answerWasCorrect,
-      ...(input.response !== undefined ? { response: input.response } : {}),
+      ...(input.response !== undefined
+        ? { response: input.response.slice(0, MAX_RESPONSE_LENGTH) }
+        : {}),
       elapsedDays: elapsedDaysSince(previous.fields.lastReviewAt, new Date(time)),
     };
     const nextMemoryState: MemoryState = {
@@ -137,8 +155,27 @@ export async function gradeReview(
 }
 
 /**
+ * 输入校验（防御式，拒绝绕过类型检查的脏输入）：
+ * - reviewDurationMs 必须为非负有限数（负数/NaN/Infinity 说明调用方有 bug）；
+ * - time 若提供必须是合法时间（非法串会污染事件时间轴）。
+ * 评分档位由调度器入口校验（RangeError）；response 超长截断不报错。
+ */
+function validateGradeReviewInput(input: GradeReviewInput): void {
+  if (!Number.isFinite(input.reviewDurationMs) || input.reviewDurationMs < 0) {
+    throw new RangeError(`Invalid reviewDurationMs: ${input.reviewDurationMs}`);
+  }
+  if (input.time !== undefined && Number.isNaN(Date.parse(input.time))) {
+    throw new RangeError(`Invalid time: ${input.time}`);
+  }
+}
+
+/**
  * 查询到期条目 id（due <= now 的全部记忆状态；MVP 新卡 due 为导入时刻，
  * 导入即到期。学习步骤中的卡片到期时间由 FSRS 排期决定）。
+ *
+ * 性能说明（评审建议 #4）：filter 是 Dexie 全表扫描，MVP 词库规模（数百条目）
+ * 无碍；词库变大后应给 fields.due 建索引（需走 DB schema 版本迁移）或改
+ * bounds 查询，届时本条注释随实现一起更新。
  */
 export async function getDueItemIds(db: LexilexiDatabase, now: IsoDate): Promise<ItemId[]> {
   const due = await db.memoryStates.filter((state) => state.fields.due <= now).toArray();

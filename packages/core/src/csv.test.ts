@@ -79,6 +79,13 @@ describe("parseCsvWordlist（CSV 词表解析与格式校验）", () => {
     expect(entries.map((entry) => entry.term)).toEqual(["well-known", "don't", "Mr."]);
   });
 
+  it("UTF-8 BOM header imports cleanly (Excel export, regression guard)", () => {
+    // U+FEFF at file start; first header cell keeps the BOM, trimmed away by trim().
+    // Source must stay ASCII: build the BOM with an escape sequence, not a literal char.
+    const { entries } = parseCsvWordlist("\uFEFFterm,definition\napple,苹果");
+    expect(entries).toEqual([{ term: "apple", definitions: ["苹果"] }]);
+  });
+
   describe("格式错误：明确提示（行号 + 原因）", () => {
     it("列数不足", () => {
       // 无表头词表：首行即数据，单列报「第 1 行 列数不足」

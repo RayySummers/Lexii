@@ -26,6 +26,10 @@ export function countReviews(events: readonly ReviewEvent[]): number {
 /**
  * 当前连击：截止基准时刻，以本地日历日计的连续复习天数。
  *
+ * 日历日一律按「本地日历日序号」（localDayOrdinal）比较，不做毫秒差运算：
+ * 夏令时切换日两个本地午夜相距 23h（拨快日）或 25h（回拨日），
+ * 毫秒差会误判「昨天」或跳过一天（评审建议 #1 的 DST bug）。
+ *
  * @param events 复习事件（任意顺序、可含未来事件——未来事件被忽略）
  * @param now 查询基准时刻（ISO；默认调用方当前时间）
  * @returns 0 = 没有任何复习记录；1 = 仅今天复习过（或昨天复习了但今天还没）
@@ -38,49 +42,49 @@ export function computeStreak(
   if (Number.isNaN(endMs)) {
     throw new RangeError(`Invalid date: ${now}`);
   }
-  const endDay = localDayStart(endMs);
-  let latestDay: number | null = null;
+  const endOrdinal = localDayOrdinal(endMs);
+  let latestOrdinal: number | null = null;
   for (const event of events) {
-    const day = localDayStart(Date.parse(event.time));
-    if (Number.isNaN(day) || day > endDay) {
+    const ordinal = localDayOrdinal(Date.parse(event.time));
+    if (Number.isNaN(ordinal) || ordinal > endOrdinal) {
       continue; // 非法或未来事件不参与
     }
-    if (latestDay === null || day > latestDay) {
-      latestDay = day;
+    if (latestOrdinal === null || ordinal > latestOrdinal) {
+      latestOrdinal = ordinal;
     }
   }
-  if (latestDay === null) {
+  if (latestOrdinal === null) {
     return 0; // 没有任何复习记录
   }
-  // 允许基准当天尚未复习：昨天的连击尚未中断
-  if (endDay - latestDay > DAY_MS) {
+  // 允许基准当天尚未复习：最近复习在昨天（序号差 1）或今天，连击都未中断
+  if (endOrdinal - latestOrdinal > 1) {
     return 0;
   }
 
   const days = new Set<number>();
   for (const event of events) {
-    const day = localDayStart(Date.parse(event.time));
-    if (!Number.isNaN(day) && day <= endDay) {
-      days.add(day);
+    const ordinal = localDayOrdinal(Date.parse(event.time));
+    if (!Number.isNaN(ordinal) && ordinal <= endOrdinal) {
+      days.add(ordinal);
     }
   }
 
   let streak = 0;
-  for (
-    let cursor = latestDay;
-    days.has(cursor);
-    cursor = localDayStart(new Date(cursor).getTime() - DAY_MS)
-  ) {
+  for (let cursor = latestOrdinal; days.has(cursor); cursor -= 1) {
     streak += 1;
   }
   return streak;
 }
 
-/** 本地时区下某时刻所在日历日的 0 点（毫秒时间戳） */
-function localDayStart(ms: number): number {
+/**
+ * 本地日历日序号：某时刻所在「本地日历日」的唯一递增整数（每天严格 +1）。
+ *
+ * 从本地日历分量（Y/M/D）构造 UTC 日号再除以一天的毫秒数——不用
+ * 「epoch 毫秒 ÷ 86400000」（夏令时切换日会错位），因此与夏令时无关。
+ */
+function localDayOrdinal(ms: number): number {
   const date = new Date(ms);
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS;
 }
 
 /** 包名（保留原骨架导出的兼容） */

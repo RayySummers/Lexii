@@ -2,7 +2,8 @@ import type { DexieOptions } from "dexie";
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
 import { importCsvWordlist } from "./importWords";
-import { makeLearningItem, makeSense } from "./helpers";
+import { makeLearningItem, makeMemoryState, makeSense } from "./helpers";
+import type { MemoryStateFields } from "./memory";
 import { openDatabase } from "./persistence";
 import type { LexilexiDatabase } from "./persistence";
 import { getDueItemIds, gradeReview } from "./studyLoop";
@@ -284,5 +285,109 @@ describe("gradeReview（学习回路：评分 → FSRS 排期 → 事件落库�
     ).rejects.toThrow(RangeError);
     expect(await database.events.count()).toBe(0);
     expect((await database.memoryStates.get(item.id))?.fields.reps).toBe(0);
+  });
+
+  it("旧数据缺 learningSteps：防御性兜底为 0，正常排期（评审建议 #2）", async () => {
+    const database = freshDatabase();
+    const sense = makeSense();
+    const item = makeLearningItem(sense.id);
+    await database.senses.put(sense);
+    await database.items.put(item);
+    // 模拟本 PR 之前落库的 MemoryState（无 learningSteps 字段）
+    const legacyFields = {
+      status: "new" as const,
+      due: TIME,
+      stabilityDays: 0,
+      difficulty: 0,
+      elapsedDays: 0,
+      reps: 0,
+      lapses: 0,
+      lastReviewAt: null,
+      lastRating: null,
+    };
+    await database.memoryStates.put({
+      id: item.id,
+      itemId: item.id,
+      // 故意缺 learningSteps；字段直接以 any 落库（IndexedDB 记录无 schema 约束）
+      fields: legacyFields as unknown as MemoryStateFields,
+      createdAt: TIME,
+      updatedAt: TIME,
+    });
+
+    const result = await gradeReview(database, {
+      itemId: item.id,
+      senseId: sense.id,
+      exerciseType: "recall",
+      rating: "good",
+      reviewDurationMs: 1000,
+      revealed: false,
+      answerWasCorrect: true,
+      time: TIME,
+    });
+    expect(result.nextMemoryState.fields.learningSteps).toBeGreaterThanOrEqual(0);
+    expect(result.nextMemoryState.fields.reps).toBe(1);
+    expect(await database.events.where("type").equals("review").count()).toBe(1);
+  });
+
+  it("reviewDurationMs 非法（负数/NaN/Infinity）拒绝（评审建议 #7）", async () => {
+    const database = freshDatabase();
+    const sense = makeSense();
+    const item = makeLearningItem(sense.id);
+    await database.senses.put(sense);
+    await database.items.put(item);
+    await database.memoryStates.put(makeMemoryState(item.id));
+
+    for (const badDuration of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      await expect(
+        gradeReview(database, {
+          itemId: item.id,
+          senseId: sense.id,
+          exerciseType: "recall",
+          rating: "good",
+          reviewDurationMs: badDuration,
+          revealed: false,
+          answerWasCorrect: true,
+          time: TIME,
+        }),
+      ).rejects.toThrow(RangeError);
+    }
+    // time 非法同样拒绝（污染事件时间轴）
+    await expect(
+      gradeReview(database, {
+        itemId: item.id,
+        senseId: sense.id,
+        exerciseType: "recall",
+        rating: "good",
+        reviewDurationMs: 1000,
+        revealed: false,
+        answerWasCorrect: true,
+        time: "not-a-date",
+      }),
+    ).rejects.toThrow(RangeError);
+    expect(await database.events.count()).toBe(0);
+  });
+
+  it("response 超长截断（评审建议 #7）", async () => {
+    const database = freshDatabase();
+    const sense = makeSense();
+    const item = makeLearningItem(sense.id);
+    await database.senses.put(sense);
+    await database.items.put(item);
+    await database.memoryStates.put(makeMemoryState(item.id));
+
+    const longResponse = "a".repeat(500);
+    const { reviewEvent } = await gradeReview(database, {
+      itemId: item.id,
+      senseId: sense.id,
+      exerciseType: "recall",
+      rating: "good",
+      reviewDurationMs: 1000,
+      revealed: false,
+      answerWasCorrect: true,
+      response: longResponse,
+      time: TIME,
+    });
+    expect(reviewEvent.response?.length).toBeLessThan(longResponse.length);
+    expect(reviewEvent.response?.length).toBeLessThanOrEqual(200);
   });
 });

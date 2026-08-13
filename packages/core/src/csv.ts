@@ -83,10 +83,12 @@ function splitCsvRows(text: string): string[] {
 }
 
 /**
- * 解析单行 CSV 为单元格（RFC 4180 风格）：
+ * 解析单行 CSV 为单元格（RFC 4180 风格，单行字段）：
  * - 逗号分隔；
- * - 引号包裹字段：可含逗号/换行，"" 转义为 "；
+ * - 引号包裹字段：可含逗号，"" 转义为 "；
  * - 容错：行末未闭合引号视为「该字段延伸到行尾」（释义手写加引号常见错误）。
+ * 注意：输入先按行切分（splitCsvRows），不支持 RFC 4180 的跨行字段
+ * （引号内换行）——词表场景不需要，遇到会按格式错误报行号（评审建议 #5）。
  */
 function parseCsvLine(line: string): string[] {
   const cells: string[] = [];
