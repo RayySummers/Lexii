@@ -1,19 +1,71 @@
 /**
- * @lexilexi/core — Lexilexi 核心领域模型与共享类型
+ * @lexilexi/core — Lexilexi 核心领域模型与本地数据层
  *
- * 本包承载与 UI 无关的领域概念（学习条目、义项、记忆状态等），
- * 是唯一被所有包共享的基础层。骨架阶段仅声明最稳定的常量与基础类型，
- * 完整的领域模型在 MVP 迭代中逐步补充。
+ * 本包承载与 UI 无关的领域概念与本地持久化（local-first）：
+ * - 领域模型：Learning Item / Sense / Memory State / Event（event schema v0）
+ *   设计文档见 docs/domain-model.md，接口契约与 @lexilexi/fsrs 对齐。
+ * - IndexedDB/Dexie 持久化：schema 升级必须走版本迁移（禁止清库重来）。
+ * - 数据防线：navigator.storage.persist() / persisted() 申请与状态上报。
+ * - 导出/导入：完整可恢复的 JSON 快照。
+ *
+ * 不含任何算法实现（FSRS 在 @lexilexi/fsrs，评测在 @lexilexi/eval，
+ * 统计在 @lexilexi/stats），不依赖浏览器 UI 层。
  */
-
-/** 应用名（英文） */
-export const APP_NAME = "Lexilexi";
-
-/** 应用名（中文） */
-export const APP_NAME_ZH = "乐希";
-
-/** 学习条目 id（骨架阶段使用字符串，后续若需要可迁移为结构化 id） */
-export type ItemId = string;
-
-/** 义项（sense）id */
-export type SenseId = string;
+export {
+  APP_NAME,
+  APP_NAME_ZH,
+  DB_SCHEMA_VERSION,
+  EVENT_SCHEMA_VERSION,
+  EXPORT_FORMAT_VERSION,
+} from "./constants";
+export { createId, hasIdPrefix, toEventId, toItemId, toSenseId } from "./id";
+export type { EventId, IdPrefix, ItemId, SenseId } from "./id";
+export type {
+  ExampleSentence,
+  IsoDate,
+  ItemKind,
+  ItemStatus,
+  LanguageCode,
+  LearningItem,
+  Sense,
+} from "./domain";
+export type { MemoryState, MemoryStateFields, MemoryStatus } from "./memory";
+export { isDeleteItemEvent, isEditSenseEvent, isImportEvent, isReviewEvent } from "./events";
+export type {
+  BaseEvent,
+  DeleteItemEvent,
+  Diff,
+  EditItemEvent,
+  EditSenseEvent,
+  Event,
+  EventType,
+  ExerciseType,
+  ImportEvent,
+  ReviewEvent,
+  ReviewRating,
+  SuspendEvent,
+  UnsuspendEvent,
+} from "./events";
+export {
+  createLexilexiDatabase,
+  deleteItem,
+  openDatabase,
+  openLexilexiDatabase,
+  recordReview,
+  suspendItem,
+  unsuspendItem,
+} from "./persistence";
+export type { DexieConstructor, LexilexiDatabase, LexilexiTables } from "./persistence";
+export {
+  STORAGE_PERMISSION_EVENT,
+  dispatchStoragePermissionRequested,
+  getStorageManager,
+  requestPersistence,
+} from "./persistenceGuard";
+export type {
+  PersistenceStatus,
+  StorageManagerLike,
+  StoragePermissionRequestedDetail,
+} from "./persistenceGuard";
+export { exportLexilexiData, importLexilexiData, parseLexilexiExport } from "./export";
+export type { LexilexiExportData } from "./export";
