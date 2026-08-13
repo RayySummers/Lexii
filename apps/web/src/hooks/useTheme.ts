@@ -42,7 +42,11 @@ export function useTheme(): { theme: Theme; toggleTheme: () => void } {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // 隐私模式 / storage 禁用时忽略持久化失败，主题切换本身不受影响
+    }
   }, [theme]);
 
   const toggleTheme = useCallback(() => {
