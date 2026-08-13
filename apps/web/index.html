@@ -21,6 +21,11 @@
         }
       })();
     </script>
+    <!--
+      初始值 = tokens.css :root 的浅色 --lex-bg，仅作首帧渲染前 / 无 JS 兜底；
+      深色模式由 useTheme 运行时读取 --lex-bg token 同步更新（src/theme/themeColor.ts）。
+      themeColor.test.ts 会校验此处与 token 一致，防止两处漂移。
+    -->
     <meta name="theme-color" content="#fafaf9" />
     <meta
       name="description"
