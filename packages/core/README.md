@@ -8,7 +8,7 @@ Lexilexi 核心领域模型与本地数据层包。
 - IndexedDB/Dexie 持久化层：数据库 `lexilexi`（表 `items` / `senses` / `memoryStates` / `events`），**schema 升级必须走版本迁移，禁止清库重来**。
 - 持久化防线：`navigator.storage.persist()` / `persisted()` 申请与状态上报（`requestPersistence`，事件 `lexilexi:storage-permission`）。
 - 导出/导入：完整可恢复 JSON（`exportLexilexiData` / `importLexilexiData` / `parseLexilexiExport`）。
-- 词表导入：CSV 解析与格式校验（`parseCsvWordlist`）、批量导入（`importCsvWordlist`）、内置示例词表（`SAMPLE_WORDLIST_CSV`，许可干净）。
+- 词表导入/导出：CSV 解析与格式校验（`parseCsvWordlist`）、批量导入（`importCsvWordlist`）、CSV 导出（`serializeWordlistCsv` / `exportCsvWordlist`）、内置示例词表（`SAMPLE_WORDLIST_CSV`，许可干净）。
 - 学习回路：评分 → FSRS 排期 → 事件落库（`gradeReview`）、到期队列（`getDueItemIds`）。
 - **不包含**任何算法实现（FSRS 在 `@lexilexi/fsrs`，评测在 `@lexilexi/eval`，统计在 `@lexilexi/stats`）。
 
@@ -64,6 +64,19 @@ const { reviewEvent, nextMemoryState } = await gradeReview(db, {
 
 CSV 格式：`term,definition[,pos]`（两列/三列），或带表头（`term`/`definition`/`pos`
 大小写不敏感、顺序任意）。详见 `docs/domain-model.md` §7。
+
+词表导出（CSV 只承载词条三列，可经 `importCsvWordlist` 导回，不含学习进度；
+完整备份请用上面的 `exportLexilexiData`）：
+
+```ts
+import { exportCsvWordlist, serializeWordlistCsv } from "@lexilexi/core";
+
+// 从数据库导出未删除条目为 CSV 文本（按 createdAt 升序，RFC 4180 转义）
+const csv = await exportCsvWordlist(db);
+
+// 或直接序列化词条列表（纯函数）
+const csv2 = serializeWordlistCsv([{ term: "apple", definitions: ["苹果"], pos: "n." }]);
+```
 
 ## 持久化防线（apps/web 消费）
 

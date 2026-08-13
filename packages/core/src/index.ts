@@ -79,6 +79,7 @@ export { exportLexilexiData, importLexilexiData, parseLexilexiExport } from "./e
 export type { LexilexiExportData } from "./export";
 export { DEFAULT_WORDLIST_LANG, CsvFormatError, parseCsvWordlist } from "./csv";
 export type { CsvParseResult, CsvWordEntry } from "./csv";
+export { exportCsvWordlist, serializeWordlistCsv } from "./exportCsv";
 export { SAMPLE_WORDLIST, SAMPLE_WORDLIST_CSV, SAMPLE_WORDLIST_ROW_COUNT } from "./sampleWordlist";
 export { importCsvWordlist } from "./importWords";
 export type { ImportWordsOptions, ImportWordsResult } from "./importWords";

@@ -8,9 +8,10 @@
  *     1–4 或 A / H / G / E → Again / Hard / Good / Easy
  * - 评分按钮副文案为各档到期时间预览（@lexilexi/fsrs Scheduler.preview）。
  */
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
 import type { ReviewRating } from "@lexilexi/core";
+import { datedFilename, downloadTextFile } from "../lib/download";
 import { ReviewCard } from "./ReviewCard";
 import { RatingButtons } from "./RatingButtons";
 import { formatDueLabel, previewGradeDueLabels, ratingFromKey } from "./grade";
@@ -37,6 +38,25 @@ function computeDueLabels(card: ReviewCardData): Record<ReviewRating, string> {
 export function ReviewScreen({ provider, onExit }: ReviewScreenProps) {
   const session = useReviewSession(provider);
   const dueLabels = session.current ? computeDueLabels(session.current) : null;
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const data = await provider.exportBackup();
+      downloadTextFile(
+        datedFilename("lexilexi-backup", "json"),
+        JSON.stringify(data, null, 2),
+        "application/json",
+      );
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setExporting(false);
+    }
+  }, [provider]);
 
   // 键盘监听依赖稳定引用而非整个 session 对象：session 每次渲染都是新对象，
   // 依赖 [session] 会导致每次状态变化都移除/重挂监听。flip / grade 是
@@ -86,17 +106,36 @@ export function ReviewScreen({ provider, onExit }: ReviewScreenProps) {
         >
           返回首页
         </button>
-        {session.phase === "reviewing" ? (
-          <span
-            role="status"
-            aria-label={`进度 ${session.index + 1} / ${session.totalCount}，剩余 ${session.totalCount - session.index - 1}`}
-            className="text-sm text-text-muted"
+        <div className="flex items-center gap-3">
+          {session.phase === "reviewing" ? (
+            <span
+              role="status"
+              aria-label={`进度 ${session.index + 1} / ${session.totalCount}，剩余 ${session.totalCount - session.index - 1}`}
+              className="text-sm text-text-muted"
+            >
+              {session.index + 1} / {session.totalCount} · 剩余{" "}
+              {session.totalCount - session.index - 1}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => void handleExport()}
+            disabled={exporting}
+            className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {session.index + 1} / {session.totalCount} · 剩余{" "}
-            {session.totalCount - session.index - 1}
-          </span>
-        ) : null}
+            {exporting ? "导出中…" : "导出备份"}
+          </button>
+        </div>
       </div>
+
+      {exportError ? (
+        <p
+          role="alert"
+          className="rounded-xl border border-danger/40 bg-surface p-4 text-sm text-text"
+        >
+          导出失败：{exportError}
+        </p>
+      ) : null}
 
       <PhaseContent session={session} dueLabels={dueLabels} onExit={onExit} />
     </main>

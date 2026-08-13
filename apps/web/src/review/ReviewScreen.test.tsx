@@ -4,9 +4,9 @@
  * 覆盖验收点：正反面切换、四档评分、键盘快捷键与按钮等价、
  * 队列推进与完成态、空状态与错误恢复。
  */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { ReviewRating } from "@lexilexi/core";
+import type { LexilexiExportData, ReviewRating } from "@lexilexi/core";
 import { ReviewScreen } from "./ReviewScreen";
 import { makeCard } from "./testFixtures";
 import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
@@ -17,7 +17,19 @@ interface ProviderHarness {
   grade: ReturnType<typeof vi.fn>;
   hasAnyItems: ReturnType<typeof vi.fn>;
   importSampleWordlist: ReturnType<typeof vi.fn>;
+  exportBackup: ReturnType<typeof vi.fn>;
 }
+
+const EMPTY_EXPORT: LexilexiExportData = {
+  format: "lexilexi",
+  exportFormatVersion: 1,
+  dbSchemaVersion: 1,
+  exportedAt: "2026-08-14T00:00:00.000Z",
+  items: [],
+  senses: [],
+  memoryStates: [],
+  events: [],
+};
 
 function makeHarness(
   options: {
@@ -38,8 +50,15 @@ function makeHarness(
     .mockResolvedValue(undefined);
   const hasAnyItems = vi.fn<() => Promise<boolean>>().mockResolvedValue(hasItems);
   const importSampleWordlist = vi.fn<() => Promise<number>>().mockResolvedValue(14);
-  const provider: ReviewDataProvider = { loadQueue, grade, hasAnyItems, importSampleWordlist };
-  return { provider, loadQueue, grade, hasAnyItems, importSampleWordlist };
+  const exportBackup = vi.fn<() => Promise<LexilexiExportData>>().mockResolvedValue(EMPTY_EXPORT);
+  const provider: ReviewDataProvider = {
+    loadQueue,
+    grade,
+    hasAnyItems,
+    importSampleWordlist,
+    exportBackup,
+  };
+  return { provider, loadQueue, grade, hasAnyItems, importSampleWordlist, exportBackup };
 }
 
 /** 当前面（未翻面时正面，翻面后背面）的 aria-hidden 状态 */
@@ -209,5 +228,44 @@ describe("ReviewScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
     await expectCardShown(card.sense.term);
+  });
+
+  it("点击导出备份：调用数据源导出并触发下载", async () => {
+    const card = makeCard();
+    const harness = makeHarness({ queue: [card] });
+    // jsdom 未实现 URL.createObjectURL，桩掉以验证下载被触发
+    const createObjectURL = vi.fn().mockReturnValue("blob:test");
+    const revokeObjectURL = vi.fn();
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL;
+    try {
+      render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+      await expectCardShown(card.sense.term);
+
+      fireEvent.click(screen.getByRole("button", { name: "导出备份" }));
+
+      await waitFor(() => expect(harness.exportBackup).toHaveBeenCalledTimes(1));
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    } finally {
+      URL.createObjectURL = originalCreate;
+      URL.revokeObjectURL = originalRevoke;
+      clickSpy.mockRestore();
+    }
+  });
+
+  it("导出失败：显示错误提示", async () => {
+    const card = makeCard();
+    const harness = makeHarness({ queue: [card] });
+    harness.exportBackup.mockRejectedValue(new Error("IndexedDB 不可用"));
+    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    await expectCardShown(card.sense.term);
+
+    fireEvent.click(screen.getByRole("button", { name: "导出备份" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("导出失败");
   });
 });
