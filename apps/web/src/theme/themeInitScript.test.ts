@@ -35,9 +35,16 @@ describe("index.html 主题初始化内联脚本", () => {
     expect(initScript).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 
+  it("storage key 与 resolve.ts 保持一致（防 key 漂移）", () => {
+    expect(initScript).toContain(THEME_STORAGE_KEY);
+  });
+
   const cases: Array<[label: string, stored: string | null, prefersDark: boolean]> = [
     ["localStorage 存 light", "light", false],
     ["localStorage 存 dark", "dark", true],
+    // 反向用例：存储值与系统偏好方向相反时，才能暴露「key 漂移导致读到 null」的问题
+    ["localStorage 存 light 且系统深色", "light", true],
+    ["localStorage 存 dark 且系统浅色", "dark", false],
     ["无持久化值且系统深色", null, true],
     ["无持久化值且系统浅色", null, false],
     ["非法持久化值且系统深色", "blue", true],

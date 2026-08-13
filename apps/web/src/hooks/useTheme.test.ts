@@ -51,6 +51,24 @@ describe("useTheme", () => {
     expect(document.documentElement.dataset.theme).toBe("dark");
   });
 
+  it("localStorage 写入被禁用时不崩溃，主题切换照常生效", () => {
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as unknown as typeof matchMedia;
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("QuotaExceededError");
+    });
+
+    const { result } = renderHook(() => useTheme());
+    expect(result.current.theme).toBe("light");
+
+    act(() => {
+      result.current.toggleTheme();
+    });
+    expect(result.current.theme).toBe("dark");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+
+    setItemSpy.mockRestore();
+  });
+
   it("toggleTheme 在浅色与深色之间切换并持久化", () => {
     window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as unknown as typeof matchMedia;
     const { result } = renderHook(() => useTheme());
