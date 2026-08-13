@@ -41,5 +41,26 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-  # FSRS-7 对照官方参考实现的验证（fsrs-verify）将在 FSRS 算法实现后加入独立 job，
-  # 标记为 fsrs-verify 并单独运行，见 packages/fsrs/README.md。
+  fsrs-verify:
+    name: FSRS-7 对照官方参考实现验证
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 对照官方 ts-fsrs 参考实现的差分验证，单独 job、结果独立可见。
+      # 验收红线：与官方参考实现输出一致才算通过（见 packages/fsrs/README.md）。
+      - name: FSRS-7 verify
+        run: pnpm --filter @lexilexi/fsrs test:verify

@@ -1,16 +1,16 @@
 /**
- * @lexilexi/fsrs — FSRS-7 调度算法包（骨架）
+ * @lexilexi/fsrs — Lexilexi 的 FSRS-7 调度算法包
  *
- * 骨架阶段仅声明与官方 FSRS-7 参考实现一致的领域常量与类型，
- * 调度算法（memory state 更新、间隔计算）将在后续迭代实现，
- * 并用 `fsrs-verify` 标记的对照用例验证（见 README）。
+ * 职责：记忆状态更新（难度/稳定性）、间隔计算、到期复习调度。
+ * 这是学习体验的核心引擎，替换传统 SM-2 类算法。
+ *
+ * 公开 API（接口契约见 README「与 #2 的接口约定」）：
+ * - scheduler(card, now) / Scheduler / preview / review
+ * - FSRSAlgorithm（算法原语）、forgettingCurve、normalizeParameters
  */
 
-/** FSRS 复习评分档位（与官方参考实现一致：again / hard / good / easy） */
-export type Rating = "again" | "hard" | "good" | "easy";
-
-/** 所有合法评分档位 */
-export const RATINGS: readonly Rating[] = ["again", "hard", "good", "easy"];
-
-/** 卡片记忆状态（骨架阶段仅声明，具体流转规则待算法实现） */
-export type MemoryState = "new" | "learning" | "review" | "relearning";
+export * from "./models";
+export * from "./algorithm";
+export * from "./defaults";
+export * from "./scheduler";
+export * from "./utils";
