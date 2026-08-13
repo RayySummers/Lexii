@@ -9,12 +9,19 @@
  */
 import {
   SAMPLE_WORDLIST_CSV,
+  exportLexilexiData,
   getDueItemIds,
   gradeReview,
   importCsvWordlist,
   openDatabase,
 } from "@lexilexi/core";
-import type { LearningItem, LexilexiDatabase, MemoryState, ReviewRating } from "@lexilexi/core";
+import type {
+  LearningItem,
+  LexilexiDatabase,
+  LexilexiExportData,
+  MemoryState,
+  ReviewRating,
+} from "@lexilexi/core";
 import { buildReviewQueue } from "./queue";
 import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
 
@@ -64,6 +71,10 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
     async importSampleWordlist(): Promise<number> {
       const result = await importCsvWordlist(db, SAMPLE_WORDLIST_CSV, { source: SAMPLE_SOURCE });
       return result.importedCount;
+    },
+
+    async exportBackup(): Promise<LexilexiExportData> {
+      return exportLexilexiData(db, new Date().toISOString());
     },
   };
 }

@@ -14,6 +14,7 @@
   "dependencies": {
     "@lexilexi/core": "workspace:*",
     "@lexilexi/fsrs": "workspace:*",
+    "@lexilexi/stats": "workspace:*",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

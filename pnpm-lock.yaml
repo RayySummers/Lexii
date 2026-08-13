@@ -44,6 +44,9 @@ importers:
       '@lexilexi/fsrs':
         specifier: workspace:*
         version: link:../../packages/fsrs
+      '@lexilexi/stats':
+        specifier: workspace:*
+        version: link:../../packages/stats
       react:
         specifier: ^19.2.8
         version: 19.2.8

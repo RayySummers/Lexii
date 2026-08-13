@@ -16,8 +16,14 @@ pnpm build          # tsc --noEmit + vite build
 - `src/styles/tokens.css` — 语义化 design tokens（浅色/深色两套，组件禁止硬编码颜色）
 - `src/hooks/useTheme.ts` — 主题状态：localStorage 优先，其次跟随系统偏好；通过 `<html data-theme>` 生效
 - `src/theme/themeColor.ts` — 浏览器外壳色同步：`meta theme-color` 跟随主题，值取自 `--lex-bg` token（不硬编码）
-- `src/App.tsx` — 应用外壳：品牌头部 + 主题切换 + 首页 / 复习界面切换
+- `src/App.tsx` — 应用外壳：品牌头部 + 主题切换 + 首页 / 复习 / 设置界面切换
 - `src/HomeScreen.tsx` — 首页（品牌与复习入口）
+- `src/lib/download.ts` — 文件下载工具（`downloadTextFile` / `datedFilename`，纯前端无网络）
+- `src/settings/` — 设置页（RAY-245）：
+  - `types.ts` — `SettingsDataProvider` / `DataOverview`（UI 与数据源之间的契约）
+  - `data.ts` — IndexedDB 数据源：`createIndexedDbSettingsDataProvider`（包装 core 的 `exportLexilexiData` / `exportCsvWordlist` / `parseLexilexiExport` / `importLexilexiData`）
+  - `persistenceStatus.ts` — 持久化权限状态（启动申请 + `usePersistenceStatus` hook，监听 `lexilexi:storage-permission`）
+  - `SettingsScreen.tsx` — 设置页 UI：持久化提示、数据概览、JSON/CSV 导出、JSON 导入
 - `src/review/` — 复习界面（RAY-237）：
   - `types.ts` — `ReviewCard` / `ReviewDataProvider` / `GradeContext`（UI 与数据源之间的契约）
   - `queue.ts` — `buildReviewQueue`：到期条目 → 可复习卡片（完整性校验 + 排序，纯函数）
