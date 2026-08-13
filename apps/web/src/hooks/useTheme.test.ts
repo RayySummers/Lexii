@@ -88,4 +88,56 @@ describe("useTheme", () => {
     expect(document.documentElement.dataset.theme).toBe("light");
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
   });
+
+  describe("meta theme-color 同步", () => {
+    let meta: HTMLMetaElement;
+
+    beforeEach(() => {
+      document.head.innerHTML = "";
+      document.documentElement.removeAttribute("style");
+      meta = document.createElement("meta");
+      meta.name = "theme-color";
+      meta.content = "#fafaf9";
+      document.head.appendChild(meta);
+    });
+
+    afterEach(() => {
+      document.head.innerHTML = "";
+      document.documentElement.removeAttribute("style");
+    });
+
+    it("挂载时按当前 --lex-bg token 同步 meta", () => {
+      window.matchMedia = vi
+        .fn()
+        .mockReturnValue({ matches: false }) as unknown as typeof matchMedia;
+      document.documentElement.style.setProperty("--lex-bg", "#fafaf9");
+      renderHook(() => useTheme());
+      expect(meta.content).toBe("#fafaf9");
+    });
+
+    it("切换主题后重新读取 token 并更新 meta", () => {
+      window.matchMedia = vi
+        .fn()
+        .mockReturnValue({ matches: false }) as unknown as typeof matchMedia;
+      document.documentElement.style.setProperty("--lex-bg", "#fafaf9");
+      const { result } = renderHook(() => useTheme());
+      expect(meta.content).toBe("#fafaf9");
+
+      // 模拟 data-theme="dark" 下 tokens.css 的深色 --lex-bg 已生效
+      document.documentElement.style.setProperty("--lex-bg", "#0c0a09");
+      act(() => {
+        result.current.toggleTheme();
+      });
+      expect(result.current.theme).toBe("dark");
+      expect(meta.content).toBe("#0c0a09");
+    });
+
+    it("token 不可用时保持 meta 原值且不抛错", () => {
+      window.matchMedia = vi
+        .fn()
+        .mockReturnValue({ matches: false }) as unknown as typeof matchMedia;
+      renderHook(() => useTheme());
+      expect(meta.content).toBe("#fafaf9");
+    });
+  });
 });

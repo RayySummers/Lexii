@@ -15,6 +15,7 @@ pnpm build          # tsc --noEmit + vite build
 
 - `src/styles/tokens.css` — 语义化 design tokens（浅色/深色两套，组件禁止硬编码颜色）
 - `src/hooks/useTheme.ts` — 主题状态：localStorage 优先，其次跟随系统偏好；通过 `<html data-theme>` 生效
+- `src/theme/themeColor.ts` — 浏览器外壳色同步：`meta theme-color` 跟随主题，值取自 `--lex-bg` token（不硬编码）
 - `src/App.tsx` — 最小页面（含深色模式切换按钮，验收点 2）
 
 ## 约束
