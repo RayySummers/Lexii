@@ -30,7 +30,15 @@ export type {
   Sense,
 } from "./domain";
 export type { MemoryState, MemoryStateFields, MemoryStatus } from "./memory";
-export { isDeleteItemEvent, isEditSenseEvent, isImportEvent, isReviewEvent } from "./events";
+export {
+  isDeleteItemEvent,
+  isEditItemEvent,
+  isEditSenseEvent,
+  isImportEvent,
+  isReviewEvent,
+  isSuspendEvent,
+  isUnsuspendEvent,
+} from "./events";
 export type {
   BaseEvent,
   DeleteItemEvent,

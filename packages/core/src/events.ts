@@ -112,10 +112,22 @@ export function isImportEvent(event: Event): event is ImportEvent {
   return event.type === "import";
 }
 
+export function isEditItemEvent(event: Event): event is EditItemEvent {
+  return event.type === "edit-item";
+}
+
 export function isEditSenseEvent(event: Event): event is EditSenseEvent {
   return event.type === "edit-sense";
 }
 
 export function isDeleteItemEvent(event: Event): event is DeleteItemEvent {
   return event.type === "delete-item";
+}
+
+export function isSuspendEvent(event: Event): event is SuspendEvent {
+  return event.type === "suspend";
+}
+
+export function isUnsuspendEvent(event: Event): event is UnsuspendEvent {
+  return event.type === "unsuspend";
 }

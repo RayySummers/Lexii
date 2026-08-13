@@ -37,7 +37,7 @@ type ItemStatus = "active" | "suspended" | "deleted";
 ```
 
 - 通过 `id` 寻址；`senseId` 不可变。
-- `status` 流转：`active → suspended → active` 可逆；`→ deleted` 不可逆（删除时同时标记其 Memory State，不物理清除历史事件）。
+- `status` 流转：`active → suspended → active` 可逆；`→ deleted` 不可逆（软删除，历史事件永久保留，重复删除报错）。删除时仅更新 Memory State 的 `updatedAt`，不设删除标记字段——v0 靠 `item.status === "deleted"` 推导记忆状态已归档。
 
 ## 4. Sense
 
@@ -115,14 +115,14 @@ interface BaseEvent {
 }
 ```
 
-| type                    | 额外字段（全部必填，否则非法）                                                                                               | 与 Learning Item 关联 |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| `import`                | `itemId`、`term`、`lang`、`senseId`                                                                                          | 强（刚创建）          |
-| `review`                | `itemId`、`senseId`、`exerciseType`、`rating`、`reviewDurationMs`、`revealed`、`answerWasCorrect`、`response`、`elapsedDays` | 强                    |
-| `edit-item`             | `itemId`、`diff`                                                                                                             | 强                    |
-| `edit-sense`            | `senseId`、`diff`                                                                                                            | 经 senseId            |
-| `delete-item`           | `itemId`                                                                                                                     | 强（事件保留）        |
-| `suspend` / `unsuspend` | `itemId`、`reason`                                                                                                           | 强                    |
+| type                    | 额外字段（除标注可选外均必填，缺失即非法）                                                                                    | 与 Learning Item 关联 |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| `import`                | `itemId`、`term`、`lang`、`senseId`                                                                                           | 强（刚创建）          |
+| `review`                | `itemId`、`senseId`、`exerciseType`、`rating`、`reviewDurationMs`、`revealed`、`answerWasCorrect`、`elapsedDays`，`response?` | 强                    |
+| `edit-item`             | `itemId`、`diff`                                                                                                              | 强                    |
+| `edit-sense`            | `senseId`、`diff`                                                                                                             | 经 senseId            |
+| `delete-item`           | `itemId`                                                                                                                      | 强（事件保留）        |
+| `suspend` / `unsuspend` | `itemId`、`reason`                                                                                                            | 强                    |
 
 `review` 事件：
 
@@ -166,7 +166,7 @@ interface ReviewEvent extends BaseEvent {
 
 ## 10. 持久化防线（storage.persist）
 
-- 启动时检查 `navigator.storage.persisted()`；返回 `false` 则调用 `navigator.storage.persist()` 申请，并触发 `storage-permission-requested` 事件（前端设置页据此提示「当前数据可能被清理，建议导出」）。
+- 启动时检查 `navigator.storage.persisted()`；返回 `false` 则调用 `navigator.storage.persist()` 申请，并触发 `lexilexi:storage-permission` 事件（前端设置页据此提示「当前数据可能被清理，建议导出」）。
 - 不可用环境（不支持 StorageManager 的浏览器）静默降级，绝不阻塞启动、绝不抛错。
 - 不写 cookie、不写 localStorage 学习数据；`localStorage` 仅存主题等非学习偏好。
 
@@ -174,3 +174,4 @@ interface ReviewEvent extends BaseEvent {
 
 - **导出必须完整可恢复**：`exportLexilexiData()` 产出单文件 JSON，含 `items`、`senses`、`memoryStates`、`events` 四张表 + schema 版本号；`importLexilexiData()` 能将其原样导回（JSON round-trip 测试保证）。
 - 导入时同 `id` 冲突按「导入覆盖」处理，版本高于当前的不合法数据明确报错，绝不静默清库。
+- **低版本导入策略（v1 定稿，v0 无此字段）**：`dbSchemaVersion === 当前版本` 直接导入；`dbSchemaVersion < 当前版本` 允许导入，**不隐式迁移**——记录数据为 `put` 覆盖，未来 schema 升级时由数据库自身的 `version(n).upgrade()` 迁移链在打开时补齐（导入路径本身不做表结构改写）。若未来引入破坏性 schema 变更导致旧版无法安全导入，须在 `importLexilexiData` 显式拒绝并给出升级指引，且必须随新版本更新本文档。

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Event, ReviewEvent } from "./events";
-import { isDeleteItemEvent, isEditSenseEvent, isImportEvent, isReviewEvent } from "./events";
+import {
+  isDeleteItemEvent,
+  isEditItemEvent,
+  isEditSenseEvent,
+  isImportEvent,
+  isReviewEvent,
+  isSuspendEvent,
+  isUnsuspendEvent,
+} from "./events";
 import { makeReviewEvent } from "./helpers";
 import { toEventId, toItemId, toSenseId } from "./id";
 
@@ -53,5 +61,35 @@ describe("事件类型判别函数", () => {
     const reviewEvent: Event = makeReviewEvent(toItemId("item_1"), toSenseId("sense_1"));
     expect(isEditSenseEvent(editEvent)).toBe(true);
     expect(isEditSenseEvent(reviewEvent)).toBe(false);
+  });
+
+  it("isEditItemEvent / isSuspendEvent / isUnsuspendEvent 判别正确", () => {
+    const editItemEvent: Event = {
+      id: toEventId("evt_5"),
+      type: "edit-item",
+      time: "2026-08-13T10:00:00.000Z",
+      itemId: toItemId("item_1"),
+      diff: { tags: ["高频"] },
+    };
+    const suspendEvent: Event = {
+      id: toEventId("evt_6"),
+      type: "suspend",
+      time: "2026-08-13T10:00:00.000Z",
+      itemId: toItemId("item_1"),
+      reason: "暂停",
+    };
+    const unsuspendEvent: Event = {
+      id: toEventId("evt_7"),
+      type: "unsuspend",
+      time: "2026-08-13T10:00:00.000Z",
+      itemId: toItemId("item_1"),
+      reason: "恢复",
+    };
+    expect(isEditItemEvent(editItemEvent)).toBe(true);
+    expect(isEditItemEvent(suspendEvent)).toBe(false);
+    expect(isSuspendEvent(suspendEvent)).toBe(true);
+    expect(isSuspendEvent(unsuspendEvent)).toBe(false);
+    expect(isUnsuspendEvent(unsuspendEvent)).toBe(true);
+    expect(isUnsuspendEvent(editItemEvent)).toBe(false);
   });
 });

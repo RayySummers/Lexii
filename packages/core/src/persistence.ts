@@ -160,7 +160,7 @@ export async function unsuspendItem(
   });
 }
 
-/** 删除条目（软删除：标记状态 + 记忆状态 + 事件，历史事件永久保留） */
+/** 删除条目（软删除：标记状态 + 记忆状态 + 事件，历史事件永久保留；→ deleted 不可逆，重复删除报错） */
 export async function deleteItem(
   db: LexilexiDatabase,
   itemId: LearningItem["id"],
@@ -170,6 +170,9 @@ export async function deleteItem(
     const item = await db.items.get(itemId);
     if (!item) {
       throw new Error(`学习条目不存在：${itemId}`);
+    }
+    if (item.status === "deleted") {
+      throw new Error(`学习条目不可重复删除（当前状态：${item.status}）`);
     }
     await db.items.put({ ...item, status: "deleted", updatedAt: now });
     const memoryState = await db.memoryStates.get(itemId);

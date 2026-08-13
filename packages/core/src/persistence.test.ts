@@ -201,6 +201,16 @@ describe("suspendItem / unsuspendItem / deleteItem", () => {
     );
   });
 
+  it("重复删除报错（→ deleted 不可逆，不产生第二条 delete-item 事件）", async () => {
+    const database = freshDatabase();
+    const item = makeLearningItem(makeSense().id);
+    await database.items.put(item);
+    await deleteItem(database, item.id, now());
+
+    await expect(deleteItem(database, item.id, now())).rejects.toThrow("不可重复删除");
+    expect(await database.events.where("type").equals("delete-item").count()).toBe(1);
+  });
+
   it("删除无记忆状态的条目同样成功（记忆状态可选路径）", async () => {
     const database = freshDatabase();
     const item = makeLearningItem(makeSense().id);
