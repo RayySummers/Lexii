@@ -21,6 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@lexilexi/fsrs": "workspace:*",
     "dexie": "^4.2.0"
   },
   "devDependencies": {

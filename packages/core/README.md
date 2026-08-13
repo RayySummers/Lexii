@@ -8,6 +8,8 @@ Lexilexi 核心领域模型与本地数据层包。
 - IndexedDB/Dexie 持久化层：数据库 `lexilexi`（表 `items` / `senses` / `memoryStates` / `events`），**schema 升级必须走版本迁移，禁止清库重来**。
 - 持久化防线：`navigator.storage.persist()` / `persisted()` 申请与状态上报（`requestPersistence`，事件 `lexilexi:storage-permission`）。
 - 导出/导入：完整可恢复 JSON（`exportLexilexiData` / `importLexilexiData` / `parseLexilexiExport`）。
+- 词表导入：CSV 解析与格式校验（`parseCsvWordlist`）、批量导入（`importCsvWordlist`）、内置示例词表（`SAMPLE_WORDLIST_CSV`，许可干净）。
+- 学习回路：评分 → FSRS 排期 → 事件落库（`gradeReview`）、到期队列（`getDueItemIds`）。
 - **不包含**任何算法实现（FSRS 在 `@lexilexi/fsrs`，评测在 `@lexilexi/eval`，统计在 `@lexilexi/stats`）。
 
 ## 领域模型（四个核心概念）
@@ -36,6 +38,32 @@ const db = openDatabase();
 // 评分落库（原子：事件 + 新记忆状态同事务写入，失败整体回滚）
 await recordReview(db, reviewEvent, nextMemoryState);
 ```
+
+## 词表导入与学习回路（RAY-242）
+
+```ts
+import { importCsvWordlist, gradeReview, getDueItemIds } from "@lexilexi/core";
+
+// 1. 导入 CSV 词表（格式错误抛 CsvFormatError，带行号与原因；失败整体回滚）
+const { itemIds } = await importCsvWordlist(db, csvText, { source: "导入:四级词表.csv" });
+
+// 2. 到期队列（新卡 due = 导入时刻，导入即到期）
+const dueIds = await getDueItemIds(db, new Date().toISOString());
+
+// 3. 一次练习：评分 → FSRS 排期 → 事件落库（同事务原子）
+const { reviewEvent, nextMemoryState } = await gradeReview(db, {
+  itemId: dueIds[0],
+  senseId: sense.id,
+  exerciseType: "recall",
+  rating: "good", // again / hard / good / easy
+  reviewDurationMs: 3000,
+  revealed: false,
+  answerWasCorrect: true,
+});
+```
+
+CSV 格式：`term,definition[,pos]`（两列/三列），或带表头（`term`/`definition`/`pos`
+大小写不敏感、顺序任意）。详见 `docs/domain-model.md` §7。
 
 ## 持久化防线（apps/web 消费）
 

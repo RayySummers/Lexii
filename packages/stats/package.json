@@ -20,6 +20,9 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@lexilexi/core": "workspace:*"
+  },
   "devDependencies": {
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"

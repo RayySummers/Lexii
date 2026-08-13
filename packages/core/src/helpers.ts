@@ -49,6 +49,7 @@ export function makeMemoryState(itemId: LearningItem["id"]): MemoryState {
       stabilityDays: 1,
       difficulty: 4,
       elapsedDays: 0,
+      learningSteps: 0,
       reps: 0,
       lapses: 0,
       lastReviewAt: null,
