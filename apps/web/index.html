@@ -3,6 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script data-lexilexi-theme-init>
+      // 在首次渲染前应用主题，避免深色偏好用户看到浅色闪烁（FOUC）。
+      // 解析规则必须与 src/theme/resolve.ts 保持一致（themeInitScript.test.ts 会校验）。
+      (function () {
+        try {
+          var stored = window.localStorage.getItem("lexilexi:theme");
+          var theme =
+            stored === "light" || stored === "dark"
+              ? stored
+              : window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+          document.documentElement.dataset.theme = theme;
+        } catch (e) {
+          // localStorage / matchMedia 不可用时保持默认浅色，React 挂载后由 useTheme 兜底
+        }
+      })();
+    </script>
     <meta name="theme-color" content="#fafaf9" />
     <meta
       name="description"

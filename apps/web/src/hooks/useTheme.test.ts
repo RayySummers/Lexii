@@ -33,6 +33,42 @@ describe("useTheme", () => {
     expect(document.documentElement.dataset.theme).toBe("light");
   });
 
+  it("内联脚本已应用 data-theme 时直接采用，不按当前系统偏好重算", () => {
+    // 模拟首帧渲染前内联脚本已按当时的系统深色偏好应用了 dark，
+    // 而 React 挂载时系统偏好已变化——状态必须与已渲染的 DOM 一致，避免二次闪烁
+    document.documentElement.dataset.theme = "dark";
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as unknown as typeof matchMedia;
+    const { result } = renderHook(() => useTheme());
+    expect(result.current.theme).toBe("dark");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+  });
+
+  it("DOM 上 data-theme 非法时回退到 localStorage / 系统偏好解析", () => {
+    document.documentElement.dataset.theme = "blue";
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as unknown as typeof matchMedia;
+    const { result } = renderHook(() => useTheme());
+    expect(result.current.theme).toBe("dark");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+  });
+
+  it("localStorage 写入被禁用时不崩溃，主题切换照常生效", () => {
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as unknown as typeof matchMedia;
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("QuotaExceededError");
+    });
+
+    const { result } = renderHook(() => useTheme());
+    expect(result.current.theme).toBe("light");
+
+    act(() => {
+      result.current.toggleTheme();
+    });
+    expect(result.current.theme).toBe("dark");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+
+    setItemSpy.mockRestore();
+  });
+
   it("toggleTheme 在浅色与深色之间切换并持久化", () => {
     window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as unknown as typeof matchMedia;
     const { result } = renderHook(() => useTheme());
