@@ -13,4 +13,5 @@ export * from "./models";
 export * from "./algorithm";
 export * from "./defaults";
 export * from "./scheduler";
+export * from "./newCard";
 export * from "./utils";

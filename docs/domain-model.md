@@ -79,6 +79,7 @@ interface MemoryStateFields {
   stabilityDays: number; // FSRS S（天），与 ts-fsrs Card.stability 同语义
   difficulty: number; // FSRS D ∈ [1,10]，与 ts-fsrs Card.difficulty 同语义
   elapsedDays: number; // FSRS elapsed_days
+  learningSteps: number; // 学习步骤游标（当前处于 (re)learning 的第几步，0 = 不在步骤内；与 ts-fsrs Card.learning_steps 同语义）
   reps: number; // 累计复习次数
   lapses: number; // 遗忘次数
   lastReviewAt: IsoDate | null; // 首次评分前为 null
@@ -87,21 +88,23 @@ interface MemoryStateFields {
 }
 ```
 
-- 每个 Learning Item 恰一份；由 `NewCardFields()`（`packages/fsrs` 公开 API）初始化。
+- 每个 Learning Item 恰一份；由 `newCardFields()`（`@lexilexi/fsrs` 公开 API，RAY-236 契约）初始化：状态 new、难度与稳定度为 0、`learningSteps` 为 0、`due` 为当前时刻（导入即到期）。
+- `learningSteps` 为 RAY-242 新增字段（打通学习回路所需）：不持久化步骤游标，学习阶段的卡片将永远无法走完步骤转 Review。该字段进 `fields` payload，不改变 IndexedDB 表结构（Dexie 记录无 schema 约束），**不触发数据库版本迁移**；但导出/回读与事件重放需保留该字段。
 - **恢复不变量（MemoryState 必须是事件的投影）**：在任一 `ReviewEvent` 序列前缀上重放调度，得到的状态必须与库中 MemoryState 一致。`delete-item` 事件后记录归档，重放跳过被删条目。
 - 多词义合并（未来）若修改本结构，必须走 IndexedDB 版本迁移（红线）。
 
 ## 6. 与 FSRS-7 的换算约定
 
-| MemoryStateFields           | ts-fsrs        | 换算                            |
-| --------------------------- | -------------- | ------------------------------- |
-| `stabilityDays`             | `S`（天）      | 直存                            |
-| `difficulty`                | `D`            | 直存（FSRS 7 默认初值 `D₀(4)`） |
-| `elapsedDays`               | `elapsed_days` | 直存                            |
-| `due`                       | 下次复习日期   | 直存（ISO 字符串）              |
-| 评分 `again/hard/good/easy` | `1/2/3/4`      | 直映射                          |
+| MemoryStateFields           | ts-fsrs          | 换算                                                    |
+| --------------------------- | ---------------- | ------------------------------------------------------- |
+| `stabilityDays`             | `S`（天）        | 直存                                                    |
+| `difficulty`                | `D`              | 直存（FSRS 7 默认初值 `D₀(4)`）                         |
+| `elapsedDays`               | `elapsed_days`   | 直存（按上次复习时间的 UTC 日历日差，口径与调度器一致） |
+| `learningSteps`             | `learning_steps` | 直存                                                    |
+| `due`                       | 下次复习日期     | 直存（ISO 字符串）                                      |
+| 评分 `again/hard/good/easy` | `1/2/3/4`        | 直映射                                                  |
 
-`packages/fsrs` 公开 API 即消费本类型：输入「旧 `MemoryStateFields` + 当前时间 + 评分」→ 输出新 `MemoryStateFields`。`ReviewRating = "again" | "hard" | "good" | "easy"`（数字映射 1–4 见 `ratingToNumber()` / `ratingFromNumber()`，在 `@lexilexi/fsrs` 实现）。
+`packages/fsrs` 公开 API 即消费本类型：输入「旧 `MemoryStateFields` + 当前时间 + 评分」→ 输出新 `MemoryStateFields`。`ReviewRating = "again" | "hard" | "good" | "easy"`（数字映射 1–4 由 `Scheduler.review()` 内部完成，实现在 `@lexilexi/fsrs`）。
 
 ## 7. Event（schema v0，落库格式）
 
@@ -145,6 +148,16 @@ interface ReviewEvent extends BaseEvent {
 ```
 
 其他事件的 `diff` 为 JSON Patch 风格的最小变更描述，v0 仅要求**结构化可解析**（数组），不要求可自动重放。所有类型均提供判别函数（`isReviewEvent` 等），零 `any`。
+
+`import` 事件由词表导入（`importCsvWordlist`）产生：每个新 Learning Item 恰好一条，同一事务内写入 Sense / Item / Memory State（`newCardFields()` 初始化）+ import 事件，失败整体回滚。学习回路（`gradeReview`）：读旧 MemoryState → FSRS 排期 → 新 MemoryState + review 事件同事务原子落库。
+
+### CSV 词表格式（RAY-242 定稿）
+
+- 标准格式：`term,definition[,pos]`（两列/三列均可）；或带表头 `term`/`definition`/`pos`（大小写不敏感、顺序任意，其他列忽略）。
+- 释义内的逗号须加引号（RFC 4180 风格；未闭合引号容错到行尾），`""` 转义为 `"`；多条释义以全角分号 `；` 分隔。
+- 格式错误报「第 N 行 + 原因」（`CsvFormatError`），整份数据全通过或全拒绝，绝不静默丢弃行；空文件 → 空列表，空行跳过。
+- 词条校验：英文字母/撇号/连字符/点（如 `don't`、`well-known`、`Mr.`），字段长度 ≤ 500。
+- 语言默认 `en`（可覆盖）；同词条重复导入 = 新条目（保留全部轨迹）。
 
 ## 8. 存储决策（每个实体为什么存、存在哪、留多久）
 

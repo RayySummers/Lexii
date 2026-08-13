@@ -87,6 +87,11 @@ export function openDatabase(dexieOptions?: DexieOptions, injectedDexie?: Dexie)
  *
  * 在同一次事务中写入复习事件与新的记忆状态——要么都成功，要么都不生效。
  * 若条目或记忆状态不存在则整个事务中止并抛出（防御式，不产生孤儿事件）。
+ *
+ * 与 studyLoop.gradeReview 的分工（评审建议 #6）：
+ * 本函数只做「事件 + 新状态」的原子写入，输入（事件、排期后的状态）由调用方
+ * 算好；gradeReview 在本函数的事务契约之上，负责「读旧状态 → FSRS 排期 →
+ * 原子写入」的完整学习回路。改动任何一处落库路径时，必须同步检查另一处。
  */
 export async function recordReview(
   db: LexilexiDatabase,

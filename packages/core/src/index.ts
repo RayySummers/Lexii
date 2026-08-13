@@ -77,3 +77,10 @@ export type {
 } from "./persistenceGuard";
 export { exportLexilexiData, importLexilexiData, parseLexilexiExport } from "./export";
 export type { LexilexiExportData } from "./export";
+export { DEFAULT_WORDLIST_LANG, CsvFormatError, parseCsvWordlist } from "./csv";
+export type { CsvParseResult, CsvWordEntry } from "./csv";
+export { SAMPLE_WORDLIST, SAMPLE_WORDLIST_CSV, SAMPLE_WORDLIST_ROW_COUNT } from "./sampleWordlist";
+export { importCsvWordlist } from "./importWords";
+export type { ImportWordsOptions, ImportWordsResult } from "./importWords";
+export { getDueItemIds, gradeReview } from "./studyLoop";
+export type { GradeReviewInput, GradeReviewResult } from "./studyLoop";

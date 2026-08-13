@@ -28,6 +28,8 @@ export interface MemoryStateFields {
   difficulty: number;
   /** 距上次复习经过的天数（FSRS elapsed_days） */
   elapsedDays: number;
+  /** 学习步骤游标（当前处于 (re)learning 的第几步，0 = 不在步骤内） */
+  learningSteps: number;
   /** 累计复习次数 */
   reps: number;
   /** 遗忘次数 */
