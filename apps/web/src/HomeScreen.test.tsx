@@ -61,10 +61,7 @@ describe("HomeScreen", () => {
 
   it("今日有到期词时显示到期徽标", async () => {
     render(
-      <HomeScreen
-        onStart={vi.fn()}
-        statsProvider={makeStatsProvider(badgeSnapshot(3, 10, 2))}
-      />,
+      <HomeScreen onStart={vi.fn()} statsProvider={makeStatsProvider(badgeSnapshot(3, 10, 2))} />,
     );
 
     expect(await screen.findByText("今日到期 3 词")).toBeInTheDocument();
@@ -74,10 +71,7 @@ describe("HomeScreen", () => {
 
   it("live region 固定挂载：即使无到期内容，status 区域也在文档中", async () => {
     render(
-      <HomeScreen
-        onStart={vi.fn()}
-        statsProvider={makeStatsProvider(badgeSnapshot(0, 0, 0))}
-      />,
+      <HomeScreen onStart={vi.fn()} statsProvider={makeStatsProvider(badgeSnapshot(0, 0, 0))} />,
     );
 
     await screen.findByRole("button", { name: "学习" });
@@ -87,10 +81,7 @@ describe("HomeScreen", () => {
 
   it("无到期但复习过时显示安静文案", async () => {
     render(
-      <HomeScreen
-        onStart={vi.fn()}
-        statsProvider={makeStatsProvider(badgeSnapshot(0, 10, 2))}
-      />,
+      <HomeScreen onStart={vi.fn()} statsProvider={makeStatsProvider(badgeSnapshot(0, 10, 2))} />,
     );
 
     expect(await screen.findByText("今日无到期词，休息一下。")).toBeInTheDocument();
@@ -98,10 +89,7 @@ describe("HomeScreen", () => {
 
   it("无任何学习记录时不显示到期相关文案", async () => {
     render(
-      <HomeScreen
-        onStart={vi.fn()}
-        statsProvider={makeStatsProvider(badgeSnapshot(0, 0, 0))}
-      />,
+      <HomeScreen onStart={vi.fn()} statsProvider={makeStatsProvider(badgeSnapshot(0, 0, 0))} />,
     );
 
     await screen.findByRole("button", { name: "学习" });
