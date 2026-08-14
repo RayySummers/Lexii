@@ -193,6 +193,9 @@ export function SettingsScreen({ provider, onExit }: SettingsScreenProps) {
           乐希 Lexilexi 是开源软件（local-first，学习数据只存本机）。欢迎在 GitHub
           上查看源码、反馈问题或提出建议。
         </p>
+        {/* 规格称「反馈问题」为按钮，这里实现为按钮样式的语义化 <a>（RAY-251 评审
+            nit 已确认）：外链跳转场景下 <a> 保留中键新开、复制链接、无 JS 降级等
+            原生链接能力，视觉与交互样式与主/次按钮一致。勿改回 <button> + window.open。 */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <a
             href={GITHUB_REPO_URL}
