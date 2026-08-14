@@ -7,15 +7,22 @@
  * - 数据概览：词条数 / 复习次数 / 连续天数；无词库、无复习记录时有友好空状态。
  * - 导出：JSON 完整备份（可原样导回）+ CSV 词表（可经 importCsvWordlist 导回）。
  * - 导入：JSON 备份恢复（同 id 覆盖）；解析失败 / 版本不兼容有明确错误提示。
+ * - 关于（RAY-251）：GitHub 仓库链接 + 反馈问题入口（纯外链跳转，新窗口打开）；
+ *   页面底部展示构建时注入的版本号（`APP_VERSION`，来源 package.json，不硬编码）。
  *
  * 全部颜色走 design tokens（浅色/深色两套自动生效），不硬编码颜色。
  */
 import { useCallback, useRef, useState } from "react";
 import { StatCard } from "../components/StatCard";
+import { APP_VERSION } from "../lib/appVersion";
 import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
 import { usePersistenceStatus } from "./persistenceStatus";
 import { useOverview } from "./useOverview";
 import type { DataOverview, SettingsDataProvider } from "./types";
+
+/** 项目 GitHub 仓库与反馈入口（RAY-251）：纯外链跳转，不请求任何外部数据 */
+const GITHUB_REPO_URL = "https://github.com/RayySummers/Lexilexi";
+const GITHUB_ISSUES_URL = "https://github.com/RayySummers/Lexilexi/issues";
 
 export interface SettingsScreenProps {
   provider: SettingsDataProvider;
@@ -181,6 +188,31 @@ export function SettingsScreen({ provider, onExit }: SettingsScreenProps) {
         </label>
       </Section>
 
+      <Section title="关于">
+        <p className="text-sm text-text-muted">
+          乐希 Lexilexi 是开源软件（local-first，学习数据只存本机）。欢迎在 GitHub
+          上查看源码、反馈问题或提出建议。
+        </p>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <a
+            href={GITHUB_REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex w-fit items-center rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            GitHub 仓库
+          </a>
+          <a
+            href={GITHUB_ISSUES_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex w-fit items-center rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            反馈问题
+          </a>
+        </div>
+      </Section>
+
       <div aria-live="polite">
         {notice ? (
           <p
@@ -199,6 +231,10 @@ export function SettingsScreen({ provider, onExit }: SettingsScreenProps) {
           </p>
         ) : null}
       </div>
+
+      <footer className="border-t border-border pt-4 text-center text-xs text-text-muted">
+        乐希 Lexilexi v{APP_VERSION}
+      </footer>
     </main>
   );
 }
