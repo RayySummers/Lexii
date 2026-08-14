@@ -10,19 +10,22 @@ Lexilexi 学习统计包：从本地事件流聚合学习统计。
 
 ## 指标（RAY-252：统计面板 8 项 + 数据层打底）
 
-| 指标               | 函数                                      | 口径                                                                                                              |
-| ------------------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| 已复习数           | `countReviews(events)`                    | review 事件总数（一次评分一次复习），即「累计已完成（次数）」                                                     |
-| 连击               | `computeStreak(events, now?)`             | 以本地日历日计的连续复习天数；今天还没学不算断；中断后从最新一段算起                                              |
-| 累计天数           | `computeTotalDays(events, now?)`          | 有复习记录的不同本地日历日数（未来脏事件不计）                                                                    |
-| 今日已学习（次数） | `computeLearnedTodayCount(events, now?)`  | 今天首次被复习（新学）的词条数：词条在事件流里时间最早的那条 review 事件即其「学习」记录，落在今天即计 1          |
-| 今日已复习（次数） | `computeReviewedTodayCount(events, now?)` | 今天对已学词条的复习次数 = 今天的 review 事件数 − 今日已学习数（去掉每个词条今天那次首次复习）                    |
-| 累计已完成（词条） | `computeCompletedWordCount(events)`       | 至少复习过一次的词条数（itemId 去重；时间非法的记录同样计入）                                                     |
-| 本地日区间         | `localDayBounds(now, offsetDays?)`        | 某本地日历日的半开区间 [start, end)（ISO），供「今日/明日到期」与 `@lexilexi/core` 的 `getDueItemIdsInRange` 对齐 |
+| 指标               | 函数                                      | 口径                                                                                                                  |
+| ------------------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| 已复习数           | `countReviews(events)`                    | review 事件总数（一次评分一次复习），即「累计已完成（次数）」                                                         |
+| 连击               | `computeStreak(events, now?)`             | 以本地日历日计的连续复习天数；今天还没学不算断；中断后从最新一段算起                                                  |
+| 累计天数           | `computeTotalDays(events, now?)`          | 有复习记录的不同本地日历日数（未来脏事件不计）                                                                        |
+| 今日已学习（次数） | `computeLearnedTodayCount(events, now?)`  | 今天首次被复习（新学）的词条数：词条在事件流里时间最早的那条 review 事件即其「学习」记录，落在今天即计 1              |
+| 今日已复习（次数） | `computeReviewedTodayCount(events, now?)` | 今天对已学词条的复习次数 = 今天的 review 事件数 − 今日已学习数（去掉每个词条今天那次首次复习）                        |
+| 累计已完成（词条） | `computeCompletedWordCount(events)`       | 至少复习过一次的词条数（itemId 去重；时间非法的记录同样计入）                                                         |
+| 本地日区间         | `localDayBounds(now, offsetDays?)`        | 某本地日历日的半开区间 [start, end)（ISO），供「今日待学/明日到期」与 `@lexilexi/core` 的 `getDueItemIdsInRange` 对齐 |
 
-「今日到期 / 明日到期（词条）」由 `apps/web` 统计数据源经
+「今日待学 / 明日到期（词条）」由 `apps/web` 统计数据源经
 `@lexilexi/core` 的 `getDueItemIds` / `getDueItemIdsInRange` 查询记忆状态得到
 （due 口径见 core；统计包只负责把「基准时刻」换算成本地日历日区间）。
+措辞不对称（今日「待学」/ 明日「到期」）是口径使然而非遗漏：今日含 reps===0
+的新词（due = now），称「待学」更准确；明日均为已排期复习卡，称「到期」更
+准确。若未来「明日到期」也统一术语，需同步本行与 `apps/web` 统计页文案。
 
 ## 复习结果分类（对/错/遗忘，数据层打底）
 

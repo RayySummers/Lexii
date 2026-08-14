@@ -2,7 +2,10 @@
  * 统计页：8 项统计（RAY-252：统计面板扩充）+ 导航改版（RAY-253）。
  *
  * 连续天数 / 累计天数 / 今日已学习（次数）/ 今日已复习（次数）/
- * 今日到期（词条）/ 明日到期（词条）/ 累计已完成（次数）/ 累计已完成（词条）。
+ * 今日待学（词条）/ 明日到期（词条）/ 累计已完成（次数）/ 累计已完成（词条）。
+ *
+ * RAY-255：「今日到期（词条）」→「今日待学（词条）」——与首页徽标口径一致
+ * （dueCount 含 reps===0 的新词）；统计口径（stats.dueCount 语义）不变。
  *
  * - 数据经 StatsDataProvider 加载（IndexedDB 聚合，口径见 stats/data.ts 与
  *   packages/stats README）；统计数据全本地计算，不联网不上传；
@@ -26,7 +29,7 @@ const STAT_ROWS: ReadonlyArray<{ label: string; value: (stats: StatsSnapshot) =>
   { label: "累计天数", value: (stats) => stats.totalDays },
   { label: "今日已学习（次数）", value: (stats) => stats.todayLearnCount },
   { label: "今日已复习（次数）", value: (stats) => stats.todayReviewCount },
-  { label: "今日到期（词条）", value: (stats) => stats.dueCount },
+  { label: "今日待学（词条）", value: (stats) => stats.dueCount },
   { label: "明日到期（词条）", value: (stats) => stats.dueTomorrowCount },
   { label: "累计已完成（次数）", value: (stats) => stats.reviewCount },
   { label: "累计已完成（词条）", value: (stats) => stats.completedWordCount },
