@@ -1,6 +1,6 @@
 {
   "name": "lexilexi",
-  "version": "0.0.0",
+  "version": "0.1.0-alpha.2",
   "private": true,
   "description": "乐希 Lexilexi — local-first 定制化背单词体验（现代简洁、多语言、支持导入词库）",
   "packageManager": "pnpm@10.34.5",
