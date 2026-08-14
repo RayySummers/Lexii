@@ -185,3 +185,24 @@ export async function getDueItemIds(db: LexilexiDatabase, now: IsoDate): Promise
   const due = await db.memoryStates.filter((state) => state.fields.due <= now).toArray();
   return due.map((state) => state.itemId);
 }
+
+/**
+ * 查询到期时间落在半开区间 [from, to) 内的条目 id（due >= from 且 due < to）。
+ *
+ * 与 getDueItemIds 同口径（不过滤条目 status，由调用方如复习队列自行过滤），
+ * 供统计「明日到期」等按本地日历日区间查询到期数的场景使用——区间边界由
+ * @lexilexi/stats 的 localDayBounds 换算（本地日 00:00 到次日 00:00），
+ * 与夏令时无关。
+ *
+ * 性能说明同 getDueItemIds：filter 为 Dexie 全表扫描，MVP 词库规模无碍。
+ */
+export async function getDueItemIdsInRange(
+  db: LexilexiDatabase,
+  from: IsoDate,
+  to: IsoDate,
+): Promise<ItemId[]> {
+  const due = await db.memoryStates
+    .filter((state) => state.fields.due >= from && state.fields.due < to)
+    .toArray();
+  return due.map((state) => state.itemId);
+}

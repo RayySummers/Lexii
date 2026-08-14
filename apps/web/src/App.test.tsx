@@ -41,8 +41,20 @@ function makeSettingsProviderFactory() {
   return { provider, factory: vi.fn().mockReturnValue(provider) };
 }
 
+/** 全零统计快照（首页徽标 + 统计页测试用） */
+const EMPTY_STATS_SNAPSHOT = {
+  streakDays: 0,
+  totalDays: 0,
+  todayLearnCount: 0,
+  todayReviewCount: 0,
+  dueCount: 0,
+  dueTomorrowCount: 0,
+  reviewCount: 0,
+  completedWordCount: 0,
+};
+
 /** 测试接缝：注入 mock 统计数据源工厂（首页徽标 + 统计页） */
-function makeStatsProviderFactory(snapshot = { dueCount: 0, reviewCount: 0, streakDays: 0 }) {
+function makeStatsProviderFactory(snapshot = EMPTY_STATS_SNAPSHOT) {
   const provider: StatsDataProvider = {
     loadStats: vi.fn().mockResolvedValue(snapshot),
   };
@@ -122,6 +134,7 @@ describe("App", () => {
 
   it("首页显示今日到期徽标（统计数据源挂载即创建一次）", async () => {
     const { factory: statsFactory } = makeStatsProviderFactory({
+      ...EMPTY_STATS_SNAPSHOT,
       dueCount: 3,
       reviewCount: 10,
       streakDays: 2,
@@ -136,7 +149,17 @@ describe("App", () => {
   });
 
   it("点击统计进入统计页，返回首页退出", async () => {
-    const statsFactory = makeStatsProviderFactory({ dueCount: 2, reviewCount: 8, streakDays: 1 });
+    // 8 个字段取互不相同的值，避免 getByText 撞值
+    const statsFactory = makeStatsProviderFactory({
+      streakDays: 1,
+      totalDays: 2,
+      todayLearnCount: 3,
+      todayReviewCount: 4,
+      dueCount: 5,
+      dueTomorrowCount: 6,
+      reviewCount: 7,
+      completedWordCount: 8,
+    });
     render(
       <App
         reviewProviderFactory={makeReviewProviderFactory().factory}
@@ -146,7 +169,9 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "统计" }));
     expect(await screen.findByText("连续天数")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("7")).toBeInTheDocument();
     expect(screen.getByText("8")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "返回首页" }));
