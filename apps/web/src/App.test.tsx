@@ -5,6 +5,7 @@ import { App } from "./App";
 import { makeCard } from "./review/testFixtures";
 import type { ReviewDataProvider } from "./review/types";
 import type { SettingsDataProvider } from "./settings/types";
+import type { StatsDataProvider } from "./stats/types";
 
 const EMPTY_EXPORT: LexilexiExportData = {
   format: "lexilexi",
@@ -36,6 +37,14 @@ function makeSettingsProviderFactory() {
     exportBackup: vi.fn().mockResolvedValue(EMPTY_EXPORT),
     exportWordlistCsv: vi.fn().mockResolvedValue("term,definition,pos"),
     importBackup: vi.fn().mockResolvedValue({ items: 0, senses: 0, memoryStates: 0, events: 0 }),
+  };
+  return { provider, factory: vi.fn().mockReturnValue(provider) };
+}
+
+/** 测试接缝：注入 mock 统计数据源工厂（首页徽标 + 统计页） */
+function makeStatsProviderFactory(snapshot = { dueCount: 0, reviewCount: 0, streakDays: 0 }) {
+  const provider: StatsDataProvider = {
+    loadStats: vi.fn().mockResolvedValue(snapshot),
   };
   return { provider, factory: vi.fn().mockReturnValue(provider) };
 }
@@ -106,6 +115,39 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "设置" }));
     expect(await screen.findByRole("button", { name: "导出 JSON 完整备份" })).toBeInTheDocument();
     expect(factory).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "返回首页" }));
+    expect(screen.getByRole("button", { name: "开始复习" })).toBeInTheDocument();
+  });
+
+  it("首页显示今日到期徽标（统计数据源挂载即创建一次）", async () => {
+    const { factory: statsFactory } = makeStatsProviderFactory({
+      dueCount: 3,
+      reviewCount: 10,
+      streakDays: 2,
+    });
+    const { factory: reviewFactory } = makeReviewProviderFactory();
+    render(<App reviewProviderFactory={reviewFactory} statsProviderFactory={statsFactory} />);
+
+    expect(await screen.findByText("今日到期 3 词")).toBeInTheDocument();
+    expect(statsFactory).toHaveBeenCalledTimes(1);
+    // 复习数据源保持惰性：仅展示徽标不创建复习源
+    expect(reviewFactory).not.toHaveBeenCalled();
+  });
+
+  it("点击统计进入统计页，返回首页退出", async () => {
+    const statsFactory = makeStatsProviderFactory({ dueCount: 2, reviewCount: 8, streakDays: 1 });
+    render(
+      <App
+        reviewProviderFactory={makeReviewProviderFactory().factory}
+        statsProviderFactory={statsFactory.factory}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "统计" }));
+    expect(await screen.findByText("连续天数")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("8")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "返回首页" }));
     expect(screen.getByRole("button", { name: "开始复习" })).toBeInTheDocument();

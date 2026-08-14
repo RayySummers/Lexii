@@ -11,6 +11,7 @@
  * 全部颜色走 design tokens（浅色/深色两套自动生效），不硬编码颜色。
  */
 import { useCallback, useRef, useState } from "react";
+import { StatCard } from "../components/StatCard";
 import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
 import { usePersistenceStatus } from "./persistenceStatus";
 import { useOverview } from "./useOverview";
@@ -294,15 +295,6 @@ function Overview({
           还没有复习记录，完成一次复习后这里会更新。
         </p>
       ) : null}
-    </div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-surface-raised p-4 text-center">
-      <p className="text-2xl font-bold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-text-muted">{label}</p>
     </div>
   );
 }
