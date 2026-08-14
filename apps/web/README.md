@@ -40,7 +40,7 @@ pnpm build          # tsc --noEmit + vite build
   - `types.ts` — `StatsSnapshot`（今日到期 / 已复习 / 连续天数）/ `StatsDataProvider`（UI 与数据源之间的契约）
   - `data.ts` — IndexedDB 数据源：`createIndexedDbStatsDataProvider`（包装 core 的 `getDueItemIds` + stats 包的 `countReviews` / `computeStreak`）；默认工厂自带无 IndexedDB 环境兜底
   - `useStats.ts` / `useStatsProvider.ts` — 快照加载与数据源创建 hooks（统计页与首页徽标共用）
-  - `StatsScreen.tsx` — 统计页 UI：统计卡片 + 加载 / 空状态 / 错误重试
+  - `StatsScreen.tsx` — 统计页 UI：8 项统计卡片 + 加载 / 空状态 / 错误重试（RAY-253 起统一导航头）
 - `src/review/` — 复习界面（RAY-237，RAY-253 三模式）：
   - `types.ts` — `ReviewCard` / `ReviewDataProvider` / `GradeContext`（UI 与数据源之间的契约）
   - `queue.ts` — `buildReviewQueue`：id 列表 → 可复习卡片（完整性校验，纯函数，保持 core 给定的顺序）

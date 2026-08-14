@@ -18,7 +18,7 @@ import {
 } from "@lexilexi/core";
 import type { LexilexiDatabase } from "@lexilexi/core";
 import { localDayBounds } from "@lexilexi/stats";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createIndexedDbReviewDataProvider } from "../review/data";
 import {
   createEmptyStatsDataProvider,
@@ -57,22 +57,31 @@ describe("createIndexedDbStatsDataProvider", () => {
   });
 
   it("评分一张卡后：到期数减一，累计次数/词条/天数/今日学习各 +1，今日复习为 0", async () => {
-    const statsProvider = createIndexedDbStatsDataProvider(db!);
-    const reviewProvider = createIndexedDbReviewDataProvider(db!);
-    await importCsvWordlist(db!, SAMPLE_WORDLIST_CSV, { source: "test" });
+    // 冻结系统时间到远离本地午夜的时刻（只假 Date、不假计时器，Dexie 事务不受影响）：
+    // 「good」的到期时间在 10 分钟内，若在 23:50 之后运行会跨过本地午夜，
+    // 使 dueTomorrowCount 变成 1，产生与实现无关的时间点抖动。
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-14T04:00:00.000Z"));
+    try {
+      const statsProvider = createIndexedDbStatsDataProvider(db!);
+      const reviewProvider = createIndexedDbReviewDataProvider(db!);
+      await importCsvWordlist(db!, SAMPLE_WORDLIST_CSV, { source: "test" });
 
-    const card = (await reviewProvider.loadQueue("learn"))[0]!;
-    await reviewProvider.grade(card, "good", { reviewDurationMs: 1_000, revealed: true });
+      const card = (await reviewProvider.loadQueue("learn"))[0]!;
+      await reviewProvider.grade(card, "good", { reviewDurationMs: 1_000, revealed: true });
 
-    const stats = await statsProvider.loadStats();
-    expect(stats.dueCount).toBe(SAMPLE_WORDLIST_ROW_COUNT - 1);
-    expect(stats.reviewCount).toBe(1);
-    expect(stats.completedWordCount).toBe(1);
-    expect(stats.streakDays).toBe(1);
-    expect(stats.totalDays).toBe(1);
-    expect(stats.todayLearnCount).toBe(1);
-    expect(stats.todayReviewCount).toBe(0);
-    expect(stats.dueTomorrowCount).toBe(0);
+      const stats = await statsProvider.loadStats();
+      expect(stats.dueCount).toBe(SAMPLE_WORDLIST_ROW_COUNT - 1);
+      expect(stats.reviewCount).toBe(1);
+      expect(stats.completedWordCount).toBe(1);
+      expect(stats.streakDays).toBe(1);
+      expect(stats.totalDays).toBe(1);
+      expect(stats.todayLearnCount).toBe(1);
+      expect(stats.todayReviewCount).toBe(0);
+      expect(stats.dueTomorrowCount).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("同一张卡今天第二次评分：今日已学习不变，今日已复习 +1", async () => {
