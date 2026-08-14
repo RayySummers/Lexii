@@ -63,7 +63,7 @@ export function HomeScreen({ onStart, statsProvider }: HomeScreenProps) {
 /**
  * 今日待学徽标：
  * - 有待学词（新词或到期复习）→ 强调徽标「今日待学 N 词」；
- * - 无待学词但复习过 → 弱化文案「今日无到期词」；
+ * - 无待学词但复习过 → 弱化文案「今日无待学词」；
  * - 数据未加载 / 无任何学习记录 → 无内容。
  *
  * 可访问性（Oscar 评审 C5）：live region 容器固定挂载、只切换内部内容——
@@ -79,7 +79,7 @@ function DueBadge({ dueCount, hasReviewed }: { dueCount: number | null; hasRevie
       </span>
     );
   } else if (dueCount !== null && hasReviewed) {
-    content = <span className="text-sm text-text-muted">今日无到期词，休息一下。</span>;
+    content = <span className="text-sm text-text-muted">今日无待学词，休息一下。</span>;
   }
   return <div role="status">{content}</div>;
 }
