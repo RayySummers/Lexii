@@ -156,7 +156,7 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "学习" })).toBeInTheDocument();
   });
 
-  it("首页显示今日到期徽标（统计数据源挂载即创建一次）", async () => {
+  it("首页显示今日待学徽标（统计数据源挂载即创建一次）", async () => {
     const { factory: statsFactory } = makeStatsProviderFactory({
       ...EMPTY_STATS_SNAPSHOT,
       dueCount: 3,
@@ -166,7 +166,7 @@ describe("App", () => {
     const { factory: reviewFactory } = makeReviewProviderFactory();
     render(<App reviewProviderFactory={reviewFactory} statsProviderFactory={statsFactory} />);
 
-    expect(await screen.findByText("今日到期 3 词")).toBeInTheDocument();
+    expect(await screen.findByText("今日待学 3 词")).toBeInTheDocument();
     expect(statsFactory).toHaveBeenCalledTimes(1);
     // 复习数据源保持惰性：仅展示徽标不创建复习源
     expect(reviewFactory).not.toHaveBeenCalled();

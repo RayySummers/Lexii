@@ -1,7 +1,7 @@
 /**
  * 首页 UI 测试（mock 统计数据源）。
  *
- * RAY-253：三个模式按钮（学习 / 复习 / 混合）+ 今日到期徽标；
+ * RAY-253：三个模式按钮（学习 / 复习 / 混合）+ 今日待学徽标（RAY-254 起，此前为到期徽标）；
  * 品牌名与介绍文案不再渲染（已归档 docs/archive/homepage-intro-v1.md）。
  */
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -59,46 +59,46 @@ describe("HomeScreen", () => {
     expect(onStart).toHaveBeenCalledWith(mode);
   });
 
-  it("今日有到期词时显示到期徽标", async () => {
+  it("今日有待学词时显示待学徽标", async () => {
     render(
       <HomeScreen onStart={vi.fn()} statsProvider={makeStatsProvider(badgeSnapshot(3, 10, 2))} />,
     );
 
-    expect(await screen.findByText("今日到期 3 词")).toBeInTheDocument();
+    expect(await screen.findByText("今日待学 3 词")).toBeInTheDocument();
     // 徽标位于固定挂载的 live region 内（Oscar 评审 C5）
-    expect(screen.getByText("今日到期 3 词").closest('[role="status"]')).not.toBeNull();
+    expect(screen.getByText("今日待学 3 词").closest('[role="status"]')).not.toBeNull();
   });
 
-  it("live region 固定挂载：即使无到期内容，status 区域也在文档中", async () => {
+  it("live region 固定挂载：即使无待学内容，status 区域也在文档中", async () => {
     render(
       <HomeScreen onStart={vi.fn()} statsProvider={makeStatsProvider(badgeSnapshot(0, 0, 0))} />,
     );
 
     await screen.findByRole("button", { name: "学习" });
     expect(screen.getByRole("status")).toBeInTheDocument();
-    expect(screen.queryByText(/今日到期/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/今日待学/)).not.toBeInTheDocument();
   });
 
-  it("无到期但复习过时显示安静文案", async () => {
+  it("无待学词但复习过时显示安静文案", async () => {
     render(
       <HomeScreen onStart={vi.fn()} statsProvider={makeStatsProvider(badgeSnapshot(0, 10, 2))} />,
     );
 
-    expect(await screen.findByText("今日无到期词，休息一下。")).toBeInTheDocument();
+    expect(await screen.findByText("今日无待学词，休息一下。")).toBeInTheDocument();
   });
 
-  it("无任何学习记录时不显示到期相关文案", async () => {
+  it("无任何学习记录时不显示待学相关文案", async () => {
     render(
       <HomeScreen onStart={vi.fn()} statsProvider={makeStatsProvider(badgeSnapshot(0, 0, 0))} />,
     );
 
     await screen.findByRole("button", { name: "学习" });
-    expect(screen.queryByText(/今日到期/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/今日待学/)).not.toBeInTheDocument();
   });
 
   it("统计数据源不可用（null）时不显示徽标", () => {
     render(<HomeScreen onStart={vi.fn()} statsProvider={null} />);
 
-    expect(screen.queryByText(/今日到期/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/今日待学/)).not.toBeInTheDocument();
   });
 });

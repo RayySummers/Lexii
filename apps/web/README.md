@@ -17,7 +17,7 @@ pnpm build          # tsc --noEmit + vite build
 - `src/hooks/useTheme.ts` — 主题状态：localStorage 优先，其次跟随系统偏好；通过 `<html data-theme>` 生效
 - `src/theme/themeColor.ts` — 浏览器外壳色同步：`meta theme-color` 跟随主题，值取自 `--lex-bg` token（不硬编码）
 - `src/App.tsx` — 应用外壳：全局导航（统计 / 设置入口 + 主题图标切换）+ 首页 / 复习 / 设置 / 统计界面切换
-- `src/HomeScreen.tsx` — 首页：三模式按钮（学习 / 复习 / 混合）+ 今日到期徽标（无品牌名与介绍文案，已归档 docs/archive/homepage-intro-v1.md）
+- `src/HomeScreen.tsx` — 首页：三模式按钮（学习 / 复习 / 混合）+ 今日待学徽标（无品牌名与介绍文案，已归档 docs/archive/homepage-intro-v1.md）
 - `src/components/ScreenHeader.tsx` — 内部页面统一导航头（左侧返回箭头、标题右对齐，设置页与统计页共用）
 - `src/components/icons.tsx` — 内联 SVG 图标（返回箭头 / 太阳 / 月亮，stroke 继承 currentColor，不硬编码颜色）
 - `src/components/StatCard.tsx` — 统计数值卡片（统计页）
