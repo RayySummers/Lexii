@@ -74,6 +74,11 @@ describe("parseCsvWordlist（CSV 词表解析与格式校验）", () => {
     expect(parseCsvWordlist("   \n  ").entries).toEqual([]);
   });
 
+  it("忽略开头的 UTF-8 BOM（导出文件自带 BOM，round-trip 不受影响）", () => {
+    const { entries } = parseCsvWordlist("\uFEFFterm,definition\napple,苹果");
+    expect(entries).toEqual([{ term: "apple", definitions: ["苹果"] }]);
+  });
+
   it("兼容常见词条形态：连字符、撇号、缩写点", () => {
     const { entries } = parseCsvWordlist("well-known,众所周知的\ndon't,不要\nMr.,先生");
     expect(entries.map((entry) => entry.term)).toEqual(["well-known", "don't", "Mr."]);

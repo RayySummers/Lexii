@@ -4,6 +4,7 @@
  * 用 Blob + 对象 URL + 临时 <a download> 触发下载，随后清理；
  * 不依赖任何后端，符合 local-first 红线。
  */
+import type { LexilexiExportData } from "@lexilexi/core";
 
 /**
  * 以指定 MIME 类型下载一段文本为文件。
@@ -23,6 +24,15 @@ export function downloadTextFile(filename: string, text: string, mimeType: strin
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
+}
+
+/**
+ * 把导出快照序列化为带缩进的 JSON 文本（可读备份）。
+ *
+ * 复习页与设置页的导出共用此函数（评审建议 C5：序列化不再各写一遍）。
+ */
+export function serializeBackup(data: LexilexiExportData): string {
+  return JSON.stringify(data, null, 2);
 }
 
 /** 下载文件名日期戳（YYYY-MM-DD，本地时区），如 `lexilexi-backup-2026-08-14.json` */

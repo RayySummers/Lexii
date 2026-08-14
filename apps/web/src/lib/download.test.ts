@@ -2,7 +2,8 @@
  * 下载工具测试（jsdom 未实现 URL.createObjectURL，桩掉以验证下载被触发）。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { datedFilename, downloadTextFile } from "./download";
+import type { LexilexiExportData } from "@lexilexi/core";
+import { datedFilename, downloadTextFile, serializeBackup } from "./download";
 
 describe("downloadTextFile", () => {
   const createObjectURL = vi.fn().mockReturnValue("blob:mock");
@@ -60,5 +61,22 @@ describe("datedFilename", () => {
     expect(datedFilename("lexilexi-backup", "json")).toMatch(
       /^lexilexi-backup-\d{4}-\d{2}-\d{2}\.json$/,
     );
+  });
+});
+
+describe("serializeBackup", () => {
+  it("序列化为带缩进的 JSON（复习页/设置页共用）", () => {
+    const data: LexilexiExportData = {
+      format: "lexilexi",
+      exportFormatVersion: 1,
+      dbSchemaVersion: 1,
+      exportedAt: "2026-08-14T00:00:00.000Z",
+      items: [],
+      senses: [],
+      memoryStates: [],
+      events: [],
+    };
+    expect(serializeBackup(data)).toBe(JSON.stringify(data, null, 2));
+    expect(serializeBackup(data).startsWith('{\n  "format"')).toBe(true);
   });
 });

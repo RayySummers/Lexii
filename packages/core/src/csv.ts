@@ -60,7 +60,7 @@ export class CsvFormatError extends Error {
  * @throws CsvFormatError 任一数据行格式非法时抛出（带行号与原因）
  */
 export function parseCsvWordlist(text: string): CsvParseResult {
-  const rows = splitCsvRows(text);
+  const rows = splitCsvRows(stripUtf8Bom(text));
   if (rows.length === 0) {
     return { entries: [] };
   }
@@ -80,6 +80,14 @@ export function parseCsvWordlist(text: string): CsvParseResult {
 /** 按行切分（兼容 \r\n / \n / \r），跳过完全空白的行 */
 function splitCsvRows(text: string): string[] {
   return text.split(/\r\n|\n|\r/).filter((row) => row.trim() !== "");
+}
+
+/**
+ * 去掉开头的 UTF-8 BOM（Windows 记事本 / 部分 Excel 导出的 CSV 常见；
+ * 与 exportCsvWordlist 导出的 BOM 前缀互为逆操作，忽略而非报错）。
+ */
+function stripUtf8Bom(text: string): string {
+  return text.startsWith("\uFEFF") ? text.slice(1) : text;
 }
 
 /**
