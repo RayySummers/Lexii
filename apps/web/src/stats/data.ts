@@ -4,7 +4,7 @@
  * 聚合口径（对应 docs/domain-model.md §7 事件流唯一事实来源）：
  * - dueCount：getDueItemIds（core 公开 API，due <= now 的记忆状态数，含积压）
  * - dueTomorrowCount：getDueItemIdsInRange + localDayBounds（明天本地日历日
- *   的半开区间 [start, end)，与「今日到期」同为记忆状态口径）
+ *   的半开区间 [start, end)，与「今日待学」同为记忆状态口径）
  * - reviewCount / streakDays / totalDays / todayLearnCount / todayReviewCount /
  *   completedWordCount：@lexilexi/stats 纯函数（口径见 packages/stats）
  *
