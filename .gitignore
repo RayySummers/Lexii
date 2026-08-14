@@ -24,3 +24,8 @@ AGENTS.md
 .multica/
 .agent_context/
 .codegraph/
+
+# preset pipeline: downloaded sources & intermediate/generated artifacts
+# (tier0.data.json 在 packages/core/src/presets/ 内，随包提交)
+scripts/presets/.data/
+scripts/presets/output/
