@@ -2,15 +2,16 @@
  * 复习数据源（IndexedDB 实现）。
  *
  * 所有数据操作经由 @lexilexi/core 的公开 API：
- * - loadQueue：getDueItemIds（到期筛选）→ bulkGet（条目 / 义项 / 记忆状态，
- *   各一次批量往返，不在循环里逐条查询）→ buildReviewQueue（完整性校验 + 排序）
+ * - loadQueue：getStudyQueueItemIds（按模式筛选 + 排序 + 混合穿插）→
+ *   bulkGet（条目 / 义项 / 记忆状态，各一次批量往返，不在循环里逐条查询）
+ *   → buildReviewQueue（完整性校验，保持 core 给定的顺序）
  * - grade：gradeReview（读旧状态 → FSRS 排期 → 事件 + 状态单事务原子落库）
  * - importSampleWordlist：importCsvWordlist（内置示例词表，空状态一键体验）
  */
 import {
   SAMPLE_WORDLIST_CSV,
   exportLexilexiData,
-  getDueItemIds,
+  getStudyQueueItemIds,
   gradeReview,
   importCsvWordlist,
   openDatabase,
@@ -21,6 +22,7 @@ import type {
   LexilexiExportData,
   MemoryState,
   ReviewRating,
+  StudyMode,
 } from "@lexilexi/core";
 import { buildReviewQueue } from "./queue";
 import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
@@ -31,16 +33,16 @@ const SAMPLE_SOURCE = "内置示例词表";
 /** 基于已打开的 Lexilexi 数据库创建复习数据源（测试注入 fake-indexeddb 实例） */
 export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewDataProvider {
   return {
-    async loadQueue(): Promise<ReviewCard[]> {
+    async loadQueue(mode: StudyMode): Promise<ReviewCard[]> {
       const now = new Date().toISOString();
-      const dueIds = await getDueItemIds(db, now);
-      if (dueIds.length === 0) {
+      const ids = await getStudyQueueItemIds(db, now, mode);
+      if (ids.length === 0) {
         return [];
       }
-      // items / memories 与 dueIds 对齐（bulkGet 平行数组）；senses 按保留条目取
+      // items / memories 与 ids 对齐（bulkGet 平行数组）；senses 按保留条目取
       const [items, memories] = await Promise.all([
-        db.items.bulkGet(dueIds),
-        db.memoryStates.bulkGet(dueIds),
+        db.items.bulkGet(ids),
+        db.memoryStates.bulkGet(ids),
       ]);
       const kept = alignCompletePairs(items, memories);
       const senses = await db.senses.bulkGet(kept.map((pair) => pair.item.senseId));

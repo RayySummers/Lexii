@@ -83,5 +83,10 @@ export { exportCsvWordlist, serializeWordlistCsv } from "./exportCsv";
 export { SAMPLE_WORDLIST, SAMPLE_WORDLIST_CSV, SAMPLE_WORDLIST_ROW_COUNT } from "./sampleWordlist";
 export { importCsvWordlist } from "./importWords";
 export type { ImportWordsOptions, ImportWordsResult } from "./importWords";
-export { getDueItemIds, gradeReview, memoryFieldsToCardInput } from "./studyLoop";
-export type { GradeReviewInput, GradeReviewResult } from "./studyLoop";
+export {
+  getDueItemIds,
+  getStudyQueueItemIds,
+  gradeReview,
+  memoryFieldsToCardInput,
+} from "./studyLoop";
+export type { GradeReviewInput, GradeReviewResult, StudyMode } from "./studyLoop";

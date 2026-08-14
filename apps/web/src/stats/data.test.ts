@@ -54,7 +54,7 @@ describe("createIndexedDbStatsDataProvider", () => {
     const reviewProvider = createIndexedDbReviewDataProvider(db!);
     await importCsvWordlist(db!, SAMPLE_WORDLIST_CSV, { source: "test" });
 
-    const card = (await reviewProvider.loadQueue())[0]!;
+    const card = (await reviewProvider.loadQueue("learn"))[0]!;
     await reviewProvider.grade(card, "good", { reviewDurationMs: 1_000, revealed: true });
 
     const stats = await statsProvider.loadStats();

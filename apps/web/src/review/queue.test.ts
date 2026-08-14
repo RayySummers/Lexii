@@ -74,10 +74,10 @@ describe("buildReviewQueue", () => {
     expect(cards.map((card) => card.item.id)).toEqual([dueItem.id]);
   });
 
-  it("due 升序排序，同 due 按 createdAt 决胜", () => {
+  it("保持输入顺序（排序与穿插由 core 的 getStudyQueueItemIds 决定，本函数不重排）", () => {
     const a = makeCardLike("2026-08-10T00:00:00.000Z", "2026-08-03T00:00:00.000Z");
-    const b = makeCardLike("2026-08-10T00:00:00.000Z", "2026-08-01T00:00:00.000Z"); // 同 due，创建更早
-    const c = makeCardLike("2026-08-09T00:00:00.000Z", "2026-08-05T00:00:00.000Z"); // due 最早
+    const b = makeCardLike("2026-08-09T00:00:00.000Z", "2026-08-01T00:00:00.000Z"); // due 更早但排在输入第二位
+    const c = makeCardLike("2026-08-08T00:00:00.000Z", "2026-08-05T00:00:00.000Z");
 
     const cards = buildReviewQueue(
       [a.item, b.item, c.item],
@@ -86,7 +86,7 @@ describe("buildReviewQueue", () => {
       NOW,
     );
 
-    expect(cards.map((card) => card.item.id)).toEqual([c.item.id, b.item.id, a.item.id]);
+    expect(cards.map((card) => card.item.id)).toEqual([a.item.id, b.item.id, c.item.id]);
   });
 
   it("due 恰等于 now 的卡视为到期（<= 比较）", () => {

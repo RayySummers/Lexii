@@ -185,3 +185,85 @@ export async function getDueItemIds(db: LexilexiDatabase, now: IsoDate): Promise
   const due = await db.memoryStates.filter((state) => state.fields.due <= now).toArray();
   return due.map((state) => state.itemId);
 }
+
+/** 学习模式：决定首页三个入口（学习 / 复习 / 混合）各加载哪类队列 */
+export type StudyMode = "learn" | "review" | "mixed";
+
+/** 混合模式穿插节奏：每 2 张复习卡之后穿插 1 张新词卡 */
+export const INTERLEAVE_REVIEW_STEP = 2;
+
+/**
+ * 查询学习队列条目 id（按模式筛选与排序，RAY-253 三模式首页）。
+ *
+ * 「新词」口径：从未评分的卡，即 `fields.reps === 0`——与 MemoryState
+ * 不变量一致（首次评分前 reps 恒为 0，评分后恒 > 0；`lastReviewAt === null`
+ * 是等价口径）。到期口径沿用 getDueItemIds：`due <= now`。
+ *
+ * - learn：仅新词，按 due 升序（新卡 due = 导入时刻，即导入顺序）；
+ * - review：仅已评分且到期的卡，按 due 升序；
+ * - mixed：复习卡为主干，每 INTERLEAVE_REVIEW_STEP 张复习卡穿插 1 张
+ *   新词卡；任一侧耗尽后按序补齐另一侧（interleaveCards 纯函数）。
+ *
+ * 排序为（due, createdAt）双键——新卡 due 与 createdAt 同源（导入时刻），
+ * 同一批导入的新词按导入顺序稳定；同 due 的复习卡按记忆状态创建时间决胜，
+ * 与 UI 层旧排序口径保持一致。
+ */
+export async function getStudyQueueItemIds(
+  db: LexilexiDatabase,
+  now: IsoDate,
+  mode: StudyMode,
+): Promise<ItemId[]> {
+  const dueStates = await db.memoryStates.filter((state) => state.fields.due <= now).toArray();
+  const newStates: MemoryState[] = [];
+  const reviewStates: MemoryState[] = [];
+  for (const state of dueStates) {
+    if (state.fields.reps === 0) {
+      newStates.push(state);
+    } else {
+      reviewStates.push(state);
+    }
+  }
+  newStates.sort(compareStatesByDue);
+  reviewStates.sort(compareStatesByDue);
+  const newIds = newStates.map((state) => state.itemId);
+  const reviewIds = reviewStates.map((state) => state.itemId);
+  switch (mode) {
+    case "learn":
+      return newIds;
+    case "review":
+      return reviewIds;
+    case "mixed":
+      return interleaveCards(reviewIds, newIds);
+  }
+}
+
+/**
+ * 混合队列组装（纯函数）：复习 id 为主干，每 INTERLEAVE_REVIEW_STEP 张
+ * 复习卡后穿插一张新词卡；复习卡耗尽后按序补齐剩余新词（复习为空时即
+ * 纯新词队列），新词耗尽则保持复习序。
+ */
+export function interleaveCards(reviewIds: readonly ItemId[], newIds: readonly ItemId[]): ItemId[] {
+  const result: ItemId[] = [];
+  let newIndex = 0;
+  for (let i = 0; i < reviewIds.length; i++) {
+    result.push(reviewIds[i]!);
+    if ((i + 1) % INTERLEAVE_REVIEW_STEP === 0 && newIndex < newIds.length) {
+      result.push(newIds[newIndex]!);
+      newIndex += 1;
+    }
+  }
+  while (newIndex < newIds.length) {
+    result.push(newIds[newIndex]!);
+    newIndex += 1;
+  }
+  return result;
+}
+
+/** due 升序，同 due 按记忆状态创建时间决胜（ISO-8601 同格式字符串可直接字典序比较） */
+function compareStatesByDue(a: MemoryState, b: MemoryState): number {
+  const byDue = a.fields.due.localeCompare(b.fields.due);
+  if (byDue !== 0) {
+    return byDue;
+  }
+  return a.createdAt.localeCompare(b.createdAt);
+}

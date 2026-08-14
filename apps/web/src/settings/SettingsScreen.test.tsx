@@ -2,14 +2,15 @@
  * 设置页交互测试（mock 数据源 + mock 持久化状态 hook，不依赖 IndexedDB）。
  *
  * 覆盖验收点：持久化 denied 提示 + 直达导出、JSON/CSV 导出、JSON 导入
- * 成功/失败、空状态（无词库 / 无复习记录）、概览错误重试。
+ * 成功/失败、统一导航头（RAY-253：左侧返回箭头、标题右对齐）。
+ * 数据概览已随 RAY-253 反馈 6 删除（与统计页重复），不再有相关用例。
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LexilexiExportData } from "@lexilexi/core";
 import { usePersistenceStatus } from "./persistenceStatus";
 import { SettingsScreen } from "./SettingsScreen";
-import type { DataOverview, ImportBackupResult, SettingsDataProvider } from "./types";
+import type { ImportBackupResult, SettingsDataProvider } from "./types";
 
 vi.mock("./persistenceStatus", () => ({
   usePersistenceStatus: vi.fn(),
@@ -28,28 +29,23 @@ const EMPTY_EXPORT: LexilexiExportData = {
 
 interface Harness {
   provider: SettingsDataProvider;
-  loadOverview: ReturnType<typeof vi.fn>;
   exportBackup: ReturnType<typeof vi.fn>;
   exportWordlistCsv: ReturnType<typeof vi.fn>;
   importBackup: ReturnType<typeof vi.fn>;
 }
 
-function makeHarness(
-  overview: DataOverview = { itemCount: 0, reviewCount: 0, streakDays: 0 },
-): Harness {
-  const loadOverview = vi.fn<() => Promise<DataOverview>>().mockResolvedValue(overview);
+function makeHarness(): Harness {
   const exportBackup = vi.fn<() => Promise<LexilexiExportData>>().mockResolvedValue(EMPTY_EXPORT);
   const exportWordlistCsv = vi.fn<() => Promise<string>>().mockResolvedValue("term,definition,pos");
   const importBackup = vi
     .fn<(text: string) => Promise<ImportBackupResult>>()
     .mockResolvedValue({ items: 0, senses: 0, memoryStates: 0, events: 0 });
   const provider: SettingsDataProvider = {
-    loadOverview,
     exportBackup,
     exportWordlistCsv,
     importBackup,
   };
-  return { provider, loadOverview, exportBackup, exportWordlistCsv, importBackup };
+  return { provider, exportBackup, exportWordlistCsv, importBackup };
 }
 
 /** 桩掉 jsdom 未实现的 URL.createObjectURL / revokeObjectURL 与锚点点击，返回恢复函数 */
@@ -71,32 +67,26 @@ describe("SettingsScreen", () => {
     vi.mocked(usePersistenceStatus).mockReturnValue(null);
   });
 
-  it("渲染数据概览统计", async () => {
-    const harness = makeHarness({ itemCount: 5, reviewCount: 3, streakDays: 2 });
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+  it("统一导航头：标题「设置」右对齐，返回箭头触发 onExit", () => {
+    const onExit = vi.fn();
+    render(<SettingsScreen provider={makeHarness().provider} onExit={onExit} />);
 
-    expect(await screen.findByText("5")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("词条")).toBeInTheDocument();
-    expect(screen.getByText("已复习")).toBeInTheDocument();
-    expect(screen.getByText("连续天数")).toBeInTheDocument();
+    const heading = screen.getByRole("heading", { name: "设置" });
+    expect(heading).toBeInTheDocument();
+    expect(heading).toHaveClass("text-right");
+
+    fireEvent.click(screen.getByRole("button", { name: "返回首页" }));
+    expect(onExit).toHaveBeenCalledTimes(1);
   });
 
-  it("无词库：显示空状态", async () => {
-    const harness = makeHarness({ itemCount: 0, reviewCount: 0, streakDays: 0 });
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+  it("不渲染数据概览（RAY-253 反馈 6：与统计页重复，已删除）", async () => {
+    render(<SettingsScreen provider={makeHarness().provider} onExit={() => {}} />);
 
-    expect(await screen.findByText("还没有学习数据。")).toBeInTheDocument();
-  });
-
-  it("有词但无复习记录：显示统计空状态提示", async () => {
-    const harness = makeHarness({ itemCount: 5, reviewCount: 0, streakDays: 0 });
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
-
-    expect(
-      await screen.findByText("还没有复习记录，完成一次复习后这里会更新。"),
-    ).toBeInTheDocument();
+    await screen.findByText("数据安全");
+    expect(screen.queryByText("数据概览")).not.toBeInTheDocument();
+    expect(screen.queryByText("词条")).not.toBeInTheDocument();
+    expect(screen.queryByText("已复习")).not.toBeInTheDocument();
+    expect(screen.queryByText("连续天数")).not.toBeInTheDocument();
   });
 
   it("持久化被拒：显示提示并直达导出", async () => {
@@ -131,7 +121,7 @@ describe("SettingsScreen", () => {
     const harness = makeHarness();
     render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
 
-    await screen.findByText("数据概览");
+    await screen.findByText("数据安全");
     expect(screen.queryByText("当前数据可能被浏览器清理，建议导出备份。")).not.toBeInTheDocument();
     expect(screen.queryByText("本地数据已受浏览器持久化保护。")).not.toBeInTheDocument();
   });
@@ -166,7 +156,7 @@ describe("SettingsScreen", () => {
     }
   });
 
-  it("导入 JSON 成功：显示恢复计数并刷新概览", async () => {
+  it("导入 JSON 成功：显示恢复计数", async () => {
     const harness = makeHarness();
     harness.importBackup.mockResolvedValue({ items: 3, senses: 3, memoryStates: 3, events: 3 });
     render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
@@ -177,7 +167,6 @@ describe("SettingsScreen", () => {
 
     expect(await screen.findByText("已恢复 3 个词条、3 个义项、3 条学习记录")).toBeInTheDocument();
     expect(harness.importBackup).toHaveBeenCalledTimes(1);
-    expect(harness.loadOverview).toHaveBeenCalledTimes(2); // 首载 + 导入后刷新
   });
 
   it("导入失败：显示明确错误提示", async () => {
@@ -190,16 +179,5 @@ describe("SettingsScreen", () => {
     fireEvent.change(screen.getByLabelText("选择备份文件…"), { target: { files: [file] } });
 
     expect(await screen.findByRole("alert")).toHaveTextContent("导入失败：导出文件版本不兼容");
-  });
-
-  it("概览加载失败：显示错误并可重试", async () => {
-    const harness = makeHarness();
-    harness.loadOverview.mockRejectedValueOnce(new Error("IndexedDB 不可用"));
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
-
-    expect(await screen.findByText(/无法读取本地数据/)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "重试" }));
-    await waitFor(() => expect(harness.loadOverview).toHaveBeenCalledTimes(2));
   });
 });

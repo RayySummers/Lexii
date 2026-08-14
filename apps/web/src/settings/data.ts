@@ -1,37 +1,26 @@
 /**
  * 设置页数据源（IndexedDB 实现）。
  *
- * 所有数据操作经由 @lexilexi/core 的公开 API 与 @lexilexi/stats 的纯函数：
- * - loadOverview：items（未删除）+ events 聚合 → 词条数 / 复习次数 / 连续天数
+ * 所有数据操作经由 @lexilexi/core 的公开 API：
  * - exportBackup：exportLexilexiData（完整 JSON 快照）
  * - exportWordlistCsv：exportCsvWordlist（词表 CSV，仅未删除条目）
  * - importBackup：parseLexilexiExport → importLexilexiData（单事务、同 id 覆盖）
+ *
+ * RAY-253 反馈 6：loadOverview（数据概览）已随设置页概览区删除。
  */
 import {
   exportCsvWordlist,
   exportLexilexiData,
   importLexilexiData,
-  isReviewEvent,
   openDatabase,
   parseLexilexiExport,
 } from "@lexilexi/core";
 import type { LexilexiDatabase, LexilexiExportData } from "@lexilexi/core";
-import { computeStreak, countReviews } from "@lexilexi/stats";
-import type { DataOverview, ImportBackupResult, SettingsDataProvider } from "./types";
+import type { ImportBackupResult, SettingsDataProvider } from "./types";
 
 /** 基于已打开的 Lexilexi 数据库创建设置页数据源（测试注入 fake-indexeddb 实例） */
 export function createIndexedDbSettingsDataProvider(db: LexilexiDatabase): SettingsDataProvider {
   return {
-    async loadOverview(): Promise<DataOverview> {
-      const [items, events] = await Promise.all([db.items.toArray(), db.events.toArray()]);
-      const reviewEvents = events.filter(isReviewEvent);
-      return {
-        itemCount: items.filter((item) => item.status !== "deleted").length,
-        reviewCount: countReviews(reviewEvents),
-        streakDays: computeStreak(reviewEvents),
-      };
-    },
-
     async exportBackup(): Promise<LexilexiExportData> {
       return exportLexilexiData(db, new Date().toISOString());
     },
