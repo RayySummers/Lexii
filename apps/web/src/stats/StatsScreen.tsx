@@ -1,21 +1,40 @@
 /**
- * 统计页：连续天数 / 今日到期 / 已复习（RAY-240）。
+ * 统计页：8 项统计（RAY-252：统计面板扩充）。
  *
- * - 数据经 StatsDataProvider 加载（IndexedDB 聚合，口径见 stats/data.ts）；
+ * 连续天数 / 累计天数 / 今日已学习（次数）/ 今日已复习（次数）/
+ * 今日到期（词条）/ 明日到期（词条）/ 累计已完成（次数）/ 累计已完成（词条）。
+ *
+ * - 数据经 StatsDataProvider 加载（IndexedDB 聚合，口径见 stats/data.ts 与
+ *   packages/stats README）；统计数据全本地计算，不联网不上传；
  * - 加载中 / 加载失败（可重试）/ 无学习数据 三种状态有明确展示；
  * - 全部颜色走 design tokens（浅色/深色两套自动生效）。
  */
 import { StatCard } from "../components/StatCard";
 import { useStats } from "./useStats";
-import type { StatsDataProvider } from "./types";
+import type { StatsDataProvider, StatsSnapshot } from "./types";
 
 export interface StatsScreenProps {
   provider: StatsDataProvider;
   onExit(): void;
 }
 
+/** 8 项统计的展示顺序与文案（口径与 packages/stats README 对齐） */
+const STAT_ROWS: ReadonlyArray<{ label: string; value: (stats: StatsSnapshot) => number }> = [
+  { label: "连续天数", value: (stats) => stats.streakDays },
+  { label: "累计天数", value: (stats) => stats.totalDays },
+  { label: "今日已学习（次数）", value: (stats) => stats.todayLearnCount },
+  { label: "今日已复习（次数）", value: (stats) => stats.todayReviewCount },
+  { label: "今日到期（词条）", value: (stats) => stats.dueCount },
+  { label: "明日到期（词条）", value: (stats) => stats.dueTomorrowCount },
+  { label: "累计已完成（次数）", value: (stats) => stats.reviewCount },
+  { label: "累计已完成（词条）", value: (stats) => stats.completedWordCount },
+];
+
 export function StatsScreen({ provider, onExit }: StatsScreenProps) {
   const { stats, error, reload } = useStats(provider);
+
+  const hasData =
+    stats !== null && (stats.reviewCount > 0 || stats.dueCount > 0 || stats.dueTomorrowCount > 0);
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
@@ -49,16 +68,16 @@ export function StatsScreen({ provider, onExit }: StatsScreenProps) {
         <p role="status" className="text-sm text-text-muted">
           正在加载…
         </p>
-      ) : stats.reviewCount === 0 && stats.dueCount === 0 ? (
+      ) : !hasData ? (
         <div className="rounded-2xl border border-border bg-surface p-6 text-center">
           <p className="text-sm">还没有学习数据。</p>
           <p className="mt-1 text-sm text-text-muted">完成第一次复习后，这里会显示你的学习统计。</p>
         </div>
       ) : (
-        <section aria-label="学习统计" className="grid grid-cols-3 gap-3">
-          <StatCard label="连续天数" value={String(stats.streakDays)} />
-          <StatCard label="今日到期" value={String(stats.dueCount)} />
-          <StatCard label="已复习" value={String(stats.reviewCount)} />
+        <section aria-label="学习统计" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {STAT_ROWS.map((row) => (
+            <StatCard key={row.label} label={row.label} value={String(row.value(stats))} />
+          ))}
         </section>
       )}
     </main>

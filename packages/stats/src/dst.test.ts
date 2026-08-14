@@ -13,11 +13,17 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { toEventId, toItemId, toSenseId } from "@lexilexi/core";
-import type { ReviewEvent } from "@lexilexi/core";
-import { computeStreak } from "./index";
+import type { ReviewEvent, ReviewRating } from "@lexilexi/core";
+import {
+  computeLearnedTodayCount,
+  computeReviewedTodayCount,
+  computeStreak,
+  computeTotalDays,
+  localDayBounds,
+} from "./index";
 
 let eventSeq = 0;
-function reviewAt(time: string): ReviewEvent {
+function reviewAt(time: string, rating: ReviewRating = "good"): ReviewEvent {
   eventSeq += 1;
   return {
     id: toEventId(`evt_dst_${eventSeq}`),
@@ -26,7 +32,7 @@ function reviewAt(time: string): ReviewEvent {
     itemId: toItemId("item_1"),
     senseId: toSenseId("sense_1"),
     exerciseType: "recall",
-    rating: "good",
+    rating,
     reviewDurationMs: 2000,
     revealed: false,
     answerWasCorrect: true,
@@ -94,6 +100,69 @@ describe("computeStreak（夏令时口径，TZ=America/New_York）", () => {
     withTimezone("America/New_York", () => {
       const events = [reviewAt("2026-08-12T14:00:00.000Z")];
       expect(computeStreak(events, "2026-08-13T16:00:00.000Z")).toBe(1);
+    });
+  });
+});
+
+/** 新增统计函数的夏令时口径：多词条场景（首次复习 = 学习） */
+let itemSeq = 0;
+function reviewEventForDst(itemKey: string, time: string): ReviewEvent {
+  itemSeq += 1;
+  return {
+    id: toEventId(`evt_dst_item_${itemSeq}`),
+    type: "review",
+    time,
+    itemId: toItemId(`item_${itemKey}`),
+    senseId: toSenseId(`sense_${itemKey}`),
+    exerciseType: "recall",
+    rating: "good",
+    reviewDurationMs: 2000,
+    revealed: false,
+    answerWasCorrect: true,
+    elapsedDays: 0,
+  };
+}
+
+describe("累计天数 / 今日学习 / 今日复习（夏令时口径，TZ=America/New_York）", () => {
+  it("回拨日（本地日 25h）：跨日事件与今日事件分开计数", () => {
+    withTimezone("America/New_York", () => {
+      // 2026-11-01 02:00 美东回拨一小时（EDT → EST）
+      const events = [
+        reviewEventForDst("a", "2026-10-31T14:00:00.000Z"), // 本地 10-31 10:00 EDT
+        reviewEventForDst("a", "2026-11-01T05:30:00.000Z"), // 本地 11-01 01:30 EDT（回拨前）
+        reviewEventForDst("b", "2026-11-01T17:00:00.000Z"), // 本地 11-01 12:00 EST
+      ];
+      const now = "2026-11-01T18:00:00.000Z"; // 本地 11-01 13:00 EST
+      expect(computeTotalDays(events, now)).toBe(2);
+      // 词条 a 首次复习在 10-31：今天 11-01 的复习不算学习；词条 b 首次复习在今天
+      expect(computeLearnedTodayCount(events, now)).toBe(1);
+      expect(computeReviewedTodayCount(events, now)).toBe(1);
+    });
+  });
+
+  it("拨快日（本地日 23h）：凌晨与正午同属一天", () => {
+    withTimezone("America/New_York", () => {
+      // 2026-03-08 02:00 美东拨快一小时（EST → EDT）
+      const events = [
+        reviewEventForDst("a", "2026-03-08T06:30:00.000Z"), // 本地 03-08 01:30 EST（拨快前）
+        reviewEventForDst("b", "2026-03-08T16:00:00.000Z"), // 本地 03-08 12:00 EDT
+      ];
+      const now = "2026-03-08T17:00:00.000Z"; // 本地 03-08 13:00 EDT
+      expect(computeTotalDays(events, now)).toBe(1);
+      expect(computeLearnedTodayCount(events, now)).toBe(2);
+      expect(computeReviewedTodayCount(events, now)).toBe(0);
+    });
+  });
+
+  it("回拨日 localDayBounds：该本地日跨 25h（end − start = 25h）", () => {
+    withTimezone("America/New_York", () => {
+      const bounds = localDayBounds("2026-11-01T17:00:00.000Z"); // 本地 11-01 12:00 EST
+      const spanMs = Date.parse(bounds.end) - Date.parse(bounds.start);
+      expect(spanMs).toBe(25 * 3_600_000);
+      // 本地 11-01 凌晨（回拨前 EDT 时刻）落在区间内
+      const early = Date.parse("2026-11-01T05:30:00.000Z");
+      expect(early).toBeGreaterThanOrEqual(Date.parse(bounds.start));
+      expect(early).toBeLessThan(Date.parse(bounds.end));
     });
   });
 });
