@@ -13,6 +13,7 @@ import type {
   MemoryState,
   ReviewRating,
   Sense,
+  StudyMode,
 } from "@lexilexi/core";
 
 /** 复习队列中的一张卡 */
@@ -33,13 +34,19 @@ export interface GradeContext {
 /**
  * 复习数据源。
  *
- * 职责边界：只做「加载到期队列 / 评分落库 / 词库状态查询 / 示例词表导入」，
- * 全部经由 @lexilexi/core 的公开 API（getDueItemIds / gradeReview /
- * importCsvWordlist），不在 apps/web 内实现任何调度算法。
+ * 职责边界：只做「按模式加载队列 / 评分落库 / 词库状态查询 / 示例词表导入」，
+ * 全部经由 @lexilexi/core 的公开 API（getStudyQueueItemIds / gradeReview /
+ * importCsvWordlist），不在 apps/web 内实现任何调度与队列组合算法。
  */
 export interface ReviewDataProvider {
-  /** 加载到期复习队列（due <= now，按 due 升序；不含 status 非 active 的条目） */
-  loadQueue(): Promise<ReviewCard[]>;
+  /**
+   * 按学习模式加载队列（RAY-253 三模式首页）：
+   * - learn：未评分新词（reps === 0）
+   * - review：已评分且到期的卡（reps > 0 && due <= now）
+   * - mixed：复习卡穿插新词卡（每 2 张复习 1 张新词）
+   * 顺序由 @lexilexi/core 的 getStudyQueueItemIds 决定（含混合穿插）。
+   */
+  loadQueue(mode: StudyMode): Promise<ReviewCard[]>;
   /** 评分并原子落库（排期由 @lexilexi/core 完成） */
   grade(card: ReviewCard, rating: ReviewRating, context: GradeContext): Promise<void>;
   /** 词库是否为空（决定空状态：无词导入 vs 今日无到期） */

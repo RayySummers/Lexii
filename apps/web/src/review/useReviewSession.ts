@@ -12,7 +12,7 @@
  * （与 core gradeReview 的输入对齐）；翻面只影响 revealed 标记，不影响计时。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReviewRating } from "@lexilexi/core";
+import type { ReviewRating, StudyMode } from "@lexilexi/core";
 import type { GradeContext, ReviewCard, ReviewDataProvider } from "../review/types";
 
 export type SessionPhase = "loading" | "empty" | "no-due" | "reviewing" | "done" | "error";
@@ -69,7 +69,7 @@ function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function useReviewSession(provider: ReviewDataProvider): ReviewSession {
+export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode): ReviewSession {
   const [state, setState] = useState<SessionState>(INITIAL_STATE);
   // 状态机之外的时序数据：避免异步竞态与 StrictMode 双调用
   const loadIdRef = useRef(0);
@@ -103,7 +103,10 @@ export function useReviewSession(provider: ReviewDataProvider): ReviewSession {
     const loadId = ++loadIdRef.current;
     apply({ phase: "loading", error: null, cards: [], index: 0, flipped: false });
     try {
-      const [queue, hasItems] = await Promise.all([provider.loadQueue(), provider.hasAnyItems()]);
+      const [queue, hasItems] = await Promise.all([
+        provider.loadQueue(mode),
+        provider.hasAnyItems(),
+      ]);
       if (loadId !== loadIdRef.current) {
         return; // 已有更新的加载请求（StrictMode 双调用 / 重试竞态），丢弃过期结果
       }
@@ -118,7 +121,7 @@ export function useReviewSession(provider: ReviewDataProvider): ReviewSession {
       }
       apply({ phase: "error", error: toErrorMessage(error) });
     }
-  }, [provider, apply, startReviewing]);
+  }, [provider, mode, apply, startReviewing]);
 
   useEffect(() => {
     void load();

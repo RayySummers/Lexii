@@ -4,7 +4,7 @@
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { ReviewRating } from "@lexilexi/core";
+import type { ReviewRating, StudyMode } from "@lexilexi/core";
 import { makeCard } from "./testFixtures";
 import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
 import { useReviewSession } from "./useReviewSession";
@@ -24,7 +24,7 @@ function makeHarness(
   } = {},
 ): Harness {
   const { queue = [], hasItems = queue.length > 0, loadError = null } = options;
-  const loadQueue = vi.fn<() => Promise<ReviewCard[]>>();
+  const loadQueue = vi.fn<(mode: StudyMode) => Promise<ReviewCard[]>>();
   if (loadError) {
     loadQueue.mockRejectedValue(loadError);
   } else {
@@ -45,21 +45,22 @@ function makeHarness(
 }
 
 describe("useReviewSession 时序边界", () => {
-  it("初始加载：loading → reviewing（队列非空）", async () => {
+  it("初始加载：loading → reviewing（队列非空），模式透传给数据源", async () => {
     const card = makeCard();
-    const { provider } = makeHarness({ queue: [card] });
-    const { result } = renderHook(() => useReviewSession(provider));
+    const { provider, loadQueue } = makeHarness({ queue: [card] });
+    const { result } = renderHook(() => useReviewSession(provider, "review"));
 
     expect(result.current.phase).toBe("loading");
     await waitFor(() => expect(result.current.phase).toBe("reviewing"));
     expect(result.current.current).toBe(card);
     expect(result.current.totalCount).toBe(1);
+    expect(loadQueue).toHaveBeenCalledWith("review");
   });
 
   it("连按评分：同一张卡只评分一次（grading 防抖），不跳过卡片", async () => {
     const card = makeCard();
     const harness = makeHarness({ queue: [card] });
-    const { result } = renderHook(() => useReviewSession(harness.provider));
+    const { result } = renderHook(() => useReviewSession(harness.provider, "review"));
     await waitFor(() => expect(result.current.phase).toBe("reviewing"));
 
     await act(async () => {
@@ -75,7 +76,7 @@ describe("useReviewSession 时序边界", () => {
 
   it("翻面守卫：非 reviewing 阶段 flip 无效", async () => {
     const harness = makeHarness({ queue: [], hasItems: true });
-    const { result } = renderHook(() => useReviewSession(harness.provider));
+    const { result } = renderHook(() => useReviewSession(harness.provider, "review"));
     await waitFor(() => expect(result.current.phase).toBe("no-due"));
 
     act(() => result.current.flip());
@@ -85,7 +86,7 @@ describe("useReviewSession 时序边界", () => {
   it("非 reviewing 阶段评分无效（done 态不重复评分）", async () => {
     const card = makeCard();
     const harness = makeHarness({ queue: [card] });
-    const { result } = renderHook(() => useReviewSession(harness.provider));
+    const { result } = renderHook(() => useReviewSession(harness.provider, "review"));
     await waitFor(() => expect(result.current.phase).toBe("reviewing"));
 
     await act(async () => {
@@ -103,7 +104,7 @@ describe("useReviewSession 时序边界", () => {
     const card = makeCard();
     const harness = makeHarness({ queue: [card] });
     harness.grade.mockRejectedValueOnce(new Error("落库失败"));
-    const { result } = renderHook(() => useReviewSession(harness.provider));
+    const { result } = renderHook(() => useReviewSession(harness.provider, "review"));
     await waitFor(() => expect(result.current.phase).toBe("reviewing"));
 
     await act(async () => {
@@ -121,7 +122,7 @@ describe("useReviewSession 时序边界", () => {
     let resolveFirst!: (queue: ReviewCard[]) => void;
     const card = makeCard();
     const loadQueue = vi
-      .fn<() => Promise<ReviewCard[]>>()
+      .fn<(mode: StudyMode) => Promise<ReviewCard[]>>()
       .mockImplementationOnce(() => new Promise((resolve) => (resolveFirst = resolve)))
       .mockResolvedValueOnce([card]);
     const provider: ReviewDataProvider = {
@@ -131,7 +132,7 @@ describe("useReviewSession 时序边界", () => {
       importSampleWordlist: vi.fn().mockResolvedValue(14),
       exportBackup: vi.fn().mockResolvedValue(null as never),
     };
-    const { result } = renderHook(() => useReviewSession(provider));
+    const { result } = renderHook(() => useReviewSession(provider, "review"));
 
     // 触发第二次加载（retry），覆盖第一次未决请求
     act(() => result.current.retry());
@@ -146,7 +147,7 @@ describe("useReviewSession 时序边界", () => {
   });
 
   it("importSample 失败：进入 error 态且 importing 复位", async () => {
-    const loadQueue = vi.fn<() => Promise<ReviewCard[]>>().mockResolvedValue([]);
+    const loadQueue = vi.fn<(mode: StudyMode) => Promise<ReviewCard[]>>().mockResolvedValue([]);
     const importSampleWordlist = vi
       .fn<() => Promise<number>>()
       .mockRejectedValue(new Error("导入失败"));
@@ -157,7 +158,7 @@ describe("useReviewSession 时序边界", () => {
       importSampleWordlist,
       exportBackup: vi.fn().mockResolvedValue(null as never),
     };
-    const { result } = renderHook(() => useReviewSession(provider));
+    const { result } = renderHook(() => useReviewSession(provider, "review"));
     await waitFor(() => expect(result.current.phase).toBe("empty"));
 
     await act(async () => {
@@ -174,7 +175,7 @@ describe("useReviewSession 时序边界", () => {
     const second = makeCard();
     second.sense.term = "book";
     const harness = makeHarness({ queue: [first, second] });
-    const { result } = renderHook(() => useReviewSession(harness.provider));
+    const { result } = renderHook(() => useReviewSession(harness.provider, "review"));
     await waitFor(() => expect(result.current.phase).toBe("reviewing"));
 
     act(() => result.current.flip());

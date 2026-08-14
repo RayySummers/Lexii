@@ -6,7 +6,7 @@
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { LexilexiExportData, ReviewRating } from "@lexilexi/core";
+import type { LexilexiExportData, ReviewRating, StudyMode } from "@lexilexi/core";
 import { ReviewScreen } from "./ReviewScreen";
 import { makeCard } from "./testFixtures";
 import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
@@ -33,7 +33,7 @@ const EMPTY_EXPORT: LexilexiExportData = {
 
 function makeHarness(options: { queue?: ReviewCard[] } = {}): ProviderHarness {
   const { queue = [] } = options;
-  const loadQueue = vi.fn<() => Promise<ReviewCard[]>>().mockResolvedValue(queue);
+  const loadQueue = vi.fn<(mode: StudyMode) => Promise<ReviewCard[]>>().mockResolvedValue(queue);
   const grade = vi
     .fn<(card: ReviewCard, rating: ReviewRating, context: GradeContext) => Promise<void>>()
     .mockResolvedValue(undefined);
@@ -60,7 +60,7 @@ describe("ReviewScreen 键盘边界", () => {
     const card = makeCard();
     card.sense.term = "apple";
     const harness = makeHarness({ queue: [card] });
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
     await expectCardShown("apple");
 
     fireEvent.keyDown(window, { key: "1", repeat: true });
@@ -78,7 +78,7 @@ describe("ReviewScreen 键盘边界", () => {
     const card = makeCard();
     card.sense.term = "apple";
     const harness = makeHarness({ queue: [card] });
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
     await expectCardShown("apple");
 
     fireEvent.keyDown(window, { key: "1", ctrlKey: true });
@@ -97,7 +97,7 @@ describe("ReviewScreen 键盘边界", () => {
     const card = makeCard();
     card.sense.term = "apple";
     const harness = makeHarness({ queue: [card] });
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
     await expectCardShown("apple");
 
     const flipButton = screen.getByRole("button", { name: `显示 ${card.sense.term} 的释义` });
@@ -113,7 +113,7 @@ describe("ReviewScreen 键盘边界", () => {
     const card = makeCard();
     card.sense.term = "apple";
     const harness = makeHarness({ queue: [card] });
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
     await expectCardShown("apple");
 
     // 焦点落在评分按钮（button）上时，数字键不是该按钮的原生行为 → 正常评分
@@ -129,7 +129,7 @@ describe("ReviewScreen 键盘边界", () => {
     const card = makeCard();
     card.sense.term = "apple";
     const harness = makeHarness({ queue: [card] });
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
     await expectCardShown("apple");
 
     fireEvent.keyDown(window, { key: "G" });
@@ -144,7 +144,7 @@ describe("ReviewScreen 评分失败恢复", () => {
     card.sense.term = "apple";
     const harness = makeHarness({ queue: [card] });
     harness.grade.mockRejectedValueOnce(new Error("IndexedDB 磁盘写入失败"));
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
     await expectCardShown("apple");
 
     fireEvent.click(screen.getByRole("button", { name: /Good/ }));
@@ -164,7 +164,7 @@ describe("ReviewScreen 评分失败恢复", () => {
     card.sense.term = "apple";
     const harness = makeHarness({ queue: [card] });
     harness.grade.mockRejectedValueOnce(new Error("事务失败"));
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
     await expectCardShown("apple");
 
     fireEvent.click(screen.getByRole("button", { name: /Again/ }));

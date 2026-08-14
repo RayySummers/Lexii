@@ -16,9 +16,11 @@ pnpm build          # tsc --noEmit + vite build
 - `src/styles/tokens.css` — 语义化 design tokens（浅色/深色两套，组件禁止硬编码颜色）
 - `src/hooks/useTheme.ts` — 主题状态：localStorage 优先，其次跟随系统偏好；通过 `<html data-theme>` 生效
 - `src/theme/themeColor.ts` — 浏览器外壳色同步：`meta theme-color` 跟随主题，值取自 `--lex-bg` token（不硬编码）
-- `src/App.tsx` — 应用外壳：品牌头部 + 主题切换 + 首页 / 复习 / 设置 / 统计界面切换
-- `src/HomeScreen.tsx` — 首页（品牌、今日到期徽标与复习入口）
-- `src/components/StatCard.tsx` — 统计数值卡片（设置页概览与统计页共用）
+- `src/App.tsx` — 应用外壳：全局导航（统计 / 设置入口 + 主题图标切换）+ 首页 / 复习 / 设置 / 统计界面切换
+- `src/HomeScreen.tsx` — 首页：三模式按钮（学习 / 复习 / 混合）+ 今日到期徽标（无品牌名与介绍文案，已归档 docs/archive/homepage-intro-v1.md）
+- `src/components/ScreenHeader.tsx` — 内部页面统一导航头（左侧返回箭头、标题右对齐，设置页与统计页共用）
+- `src/components/icons.tsx` — 内联 SVG 图标（返回箭头 / 太阳 / 月亮，stroke 继承 currentColor，不硬编码颜色）
+- `src/components/StatCard.tsx` — 统计数值卡片（统计页）
 - `src/lib/download.ts` — 文件下载工具（`downloadTextFile` / `datedFilename` / `serializeBackup`，纯前端无网络）
 - `src/lib/appVersion.ts` — 构建时注入的版本号 `APP_VERSION`（vite.config.ts `define` 读取 `apps/web/package.json` 的 version；发版只改 package.json，UI 自动跟随）
 - `src/pwa/` — PWA（RAY-240）：
@@ -30,22 +32,32 @@ pnpm build          # tsc --noEmit + vite build
   - `sw.js` — Service Worker：外壳预缓存 + 从 index.html 解析构建产物预缓存 + 静态资源 stale-while-revalidate + 导航离线回退
   - `icons/` — 由 `scripts/generate-icons.mjs` 生成的 PNG 图标（`pnpm icons` 重新生成）
 - `src/settings/` — 设置页（RAY-245）：
-  - `types.ts` — `SettingsDataProvider` / `DataOverview`（UI 与数据源之间的契约）
+  - `types.ts` — `SettingsDataProvider` / `ImportBackupResult`（UI 与数据源之间的契约）
   - `data.ts` — IndexedDB 数据源：`createIndexedDbSettingsDataProvider`（包装 core 的 `exportLexilexiData` / `exportCsvWordlist` / `parseLexilexiExport` / `importLexilexiData`）
   - `persistenceStatus.ts` — 持久化权限状态（启动申请 + `usePersistenceStatus` hook，监听 `lexilexi:storage-permission`）
-  - `SettingsScreen.tsx` — 设置页 UI：持久化提示、数据概览、JSON/CSV 导出、JSON 导入、关于（GitHub 仓库链接 + 反馈问题入口，纯外链新窗口打开）与底部版本号
+  - `SettingsScreen.tsx` — 设置页 UI：持久化提示、JSON/CSV 导出、JSON 导入、关于（GitHub 仓库链接 + 反馈问题入口，纯外链新窗口打开）与底部版本号（RAY-253 起无数据概览，概览已并入统计页）
 - `src/stats/` — 统计页（RAY-240）：
   - `types.ts` — `StatsSnapshot`（今日到期 / 已复习 / 连续天数）/ `StatsDataProvider`（UI 与数据源之间的契约）
   - `data.ts` — IndexedDB 数据源：`createIndexedDbStatsDataProvider`（包装 core 的 `getDueItemIds` + stats 包的 `countReviews` / `computeStreak`）；默认工厂自带无 IndexedDB 环境兜底
   - `useStats.ts` / `useStatsProvider.ts` — 快照加载与数据源创建 hooks（统计页与首页徽标共用）
-  - `StatsScreen.tsx` — 统计页 UI：三张统计卡片 + 加载 / 空状态 / 错误重试
-- `src/review/` — 复习界面（RAY-237）：
+  - `StatsScreen.tsx` — 统计页 UI：8 项统计卡片 + 加载 / 空状态 / 错误重试（RAY-253 起统一导航头）
+- `src/review/` — 复习界面（RAY-237，RAY-253 三模式）：
   - `types.ts` — `ReviewCard` / `ReviewDataProvider` / `GradeContext`（UI 与数据源之间的契约）
-  - `queue.ts` — `buildReviewQueue`：到期条目 → 可复习卡片（完整性校验 + 排序，纯函数）
+  - `queue.ts` — `buildReviewQueue`：id 列表 → 可复习卡片（完整性校验，纯函数，保持 core 给定的顺序）
   - `grade.ts` — 评分预览与文案：`previewGradeDueLabels`（按钮到期时间预览，走 `@lexilexi/fsrs` 公开 API）+ `formatDueLabel`（中文相对时间）
-  - `data.ts` — IndexedDB 数据源：`createIndexedDbReviewDataProvider`（包装 core 的 `getDueItemIds` / `gradeReview` / `importCsvWordlist`）
+  - `data.ts` — IndexedDB 数据源：`createIndexedDbReviewDataProvider`（包装 core 的 `getStudyQueueItemIds` / `gradeReview` / `importCsvWordlist`）
   - `useReviewSession.ts` — 会话状态机（loading / empty / no-due / reviewing / done / error）
   - `ReviewCard.tsx` / `RatingButtons.tsx` / `ReviewScreen.tsx` — 卡片正反面、四档评分按钮、会话容器
+
+## 三模式学习队列（RAY-253）
+
+首页三个入口对应 `@lexilexi/core` 的 `StudyMode`（`getStudyQueueItemIds`）：
+
+- **学习**（learn）：仅未评分新词（`reps === 0`），按 due 升序
+- **复习**（review）：仅已评分且到期的卡（`reps > 0 && due <= now`），按 due 升序
+- **混合**（mixed）：复习卡为主干，每 2 张复习卡穿插 1 张新词卡
+
+队列筛选、排序与穿插全部在 `packages/core`（算法层）；`apps/web` 只做完整性校验与渲染。
 
 ## PWA（可安装 + 离线）
 

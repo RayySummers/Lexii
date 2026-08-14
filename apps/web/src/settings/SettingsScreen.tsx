@@ -1,24 +1,24 @@
 /**
- * 设置页：数据安全 + 数据概览 + 导出 / 导入（RAY-245）。
+ * 设置页：数据安全 + 导出 / 导入（RAY-245），导航改版（RAY-253）。
  *
  * - 数据安全：监听 `lexilexi:storage-permission` 事件（经 usePersistenceStatus），
  *   状态为 "denied" 时提示「当前数据可能被清理，建议导出」并提供直达导出入口；
  *   "unsupported" 环境静默降级、不提示（验收点 6）。
- * - 数据概览：词条数 / 复习次数 / 连续天数；无词库、无复习记录时有友好空状态。
  * - 导出：JSON 完整备份（可原样导回）+ CSV 词表（可经 importCsvWordlist 导回）。
  * - 导入：JSON 备份恢复（同 id 覆盖）；解析失败 / 版本不兼容有明确错误提示。
+ * - RAY-253 反馈 5/6：统一导航头（左侧返回箭头、标题右对齐，同统计页）；
+ *   数据概览已删除（与统计页功能重复）。
  * - 关于（RAY-251）：GitHub 仓库链接 + 反馈问题入口（纯外链跳转，新窗口打开）；
  *   页面底部展示构建时注入的版本号（`APP_VERSION`，来源 package.json，不硬编码）。
  *
  * 全部颜色走 design tokens（浅色/深色两套自动生效），不硬编码颜色。
  */
 import { useCallback, useRef, useState } from "react";
-import { StatCard } from "../components/StatCard";
+import { ScreenHeader } from "../components/ScreenHeader";
 import { APP_VERSION } from "../lib/appVersion";
 import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
 import { usePersistenceStatus } from "./persistenceStatus";
-import { useOverview } from "./useOverview";
-import type { DataOverview, SettingsDataProvider } from "./types";
+import type { SettingsDataProvider } from "./types";
 
 /** 项目 GitHub 仓库与反馈入口（RAY-251）：纯外链跳转，不请求任何外部数据 */
 const GITHUB_REPO_URL = "https://github.com/RayySummers/Lexilexi";
@@ -46,7 +46,6 @@ function readFileAsText(file: File): Promise<string> {
 
 export function SettingsScreen({ provider, onExit }: SettingsScreenProps) {
   const persistence = usePersistenceStatus();
-  const { overview, error: overviewError, reload: reloadOverview } = useOverview(provider);
 
   const [exporting, setExporting] = useState<"json" | "csv" | null>(null);
   const [importing, setImporting] = useState(false);
@@ -99,7 +98,6 @@ export function SettingsScreen({ provider, onExit }: SettingsScreenProps) {
         setNotice(
           `已恢复 ${result.items} 个词条、${result.senses} 个义项、${result.events} 条学习记录`,
         );
-        reloadOverview();
       } catch (err) {
         setError(`导入失败：${toErrorMessage(err)}`);
       } finally {
@@ -109,20 +107,12 @@ export function SettingsScreen({ provider, onExit }: SettingsScreenProps) {
         }
       }
     },
-    [provider, reloadOverview],
+    [provider],
   );
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onExit}
-          className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-        >
-          返回首页
-        </button>
-      </div>
+      <ScreenHeader title="设置" onBack={onExit} />
 
       <Section title="数据安全">
         <PersistenceBanner
@@ -130,10 +120,6 @@ export function SettingsScreen({ provider, onExit }: SettingsScreenProps) {
           onExport={handleExportJson}
           exporting={exporting === "json"}
         />
-      </Section>
-
-      <Section title="数据概览">
-        <Overview overview={overview} error={overviewError} onRetry={reloadOverview} />
       </Section>
 
       <Section title="导出数据">
@@ -281,59 +267,4 @@ function PersistenceBanner({
     return <p className="text-sm text-text-muted">本地数据已受浏览器持久化保护。</p>;
   }
   return null;
-}
-
-/** 数据概览：加载中 / 错误重试 / 空状态 / 统计卡片 */
-function Overview({
-  overview,
-  error,
-  onRetry,
-}: {
-  overview: DataOverview | null;
-  error: string | null;
-  onRetry(): void;
-}) {
-  if (error) {
-    return (
-      <div className="flex flex-col items-start gap-3 rounded-xl border border-danger/40 bg-surface p-4">
-        <p className="text-sm">无法读取本地数据：{error}</p>
-        <button
-          type="button"
-          onClick={onRetry}
-          className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-        >
-          重试
-        </button>
-      </div>
-    );
-  }
-  if (!overview) {
-    return (
-      <p role="status" className="text-sm text-text-muted">
-        正在加载…
-      </p>
-    );
-  }
-  if (overview.itemCount === 0) {
-    return (
-      <div className="rounded-xl border border-border bg-surface-raised p-4 text-center">
-        <p className="text-sm">还没有学习数据。</p>
-        <p className="mt-1 text-sm text-text-muted">
-          去复习页导入内置示例词表，或在这里导入备份即可开始。
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      <StatCard label="词条" value={String(overview.itemCount)} />
-      <StatCard label="已复习" value={String(overview.reviewCount)} />
-      <StatCard label="连续天数" value={String(overview.streakDays)} />
-      {overview.reviewCount === 0 ? (
-        <p className="col-span-3 text-xs text-text-muted">
-          还没有复习记录，完成一次复习后这里会更新。
-        </p>
-      ) : null}
-    </div>
-  );
 }

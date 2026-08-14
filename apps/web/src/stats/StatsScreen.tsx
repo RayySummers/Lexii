@@ -1,5 +1,5 @@
 /**
- * 统计页：8 项统计（RAY-252：统计面板扩充）。
+ * 统计页：8 项统计（RAY-252：统计面板扩充）+ 导航改版（RAY-253）。
  *
  * 连续天数 / 累计天数 / 今日已学习（次数）/ 今日已复习（次数）/
  * 今日到期（词条）/ 明日到期（词条）/ 累计已完成（次数）/ 累计已完成（词条）。
@@ -7,8 +7,10 @@
  * - 数据经 StatsDataProvider 加载（IndexedDB 聚合，口径见 stats/data.ts 与
  *   packages/stats README）；统计数据全本地计算，不联网不上传；
  * - 加载中 / 加载失败（可重试）/ 无学习数据 三种状态有明确展示；
+ * - RAY-253 反馈 5：统一导航头（左侧返回箭头、标题右对齐，同设置页）；
  * - 全部颜色走 design tokens（浅色/深色两套自动生效）。
  */
+import { ScreenHeader } from "../components/ScreenHeader";
 import { StatCard } from "../components/StatCard";
 import { useStats } from "./useStats";
 import type { StatsDataProvider, StatsSnapshot } from "./types";
@@ -38,16 +40,7 @@ export function StatsScreen({ provider, onExit }: StatsScreenProps) {
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight">统计</h1>
-        <button
-          type="button"
-          onClick={onExit}
-          className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-        >
-          返回首页
-        </button>
-      </div>
+      <ScreenHeader title="统计" onBack={onExit} />
 
       {error ? (
         <div className="flex flex-col items-start gap-3 rounded-2xl border border-danger/40 bg-surface p-6">

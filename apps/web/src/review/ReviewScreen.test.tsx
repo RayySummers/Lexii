@@ -6,7 +6,7 @@
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { LexilexiExportData, ReviewRating } from "@lexilexi/core";
+import type { LexilexiExportData, ReviewRating, StudyMode } from "@lexilexi/core";
 import { ReviewScreen } from "./ReviewScreen";
 import { makeCard } from "./testFixtures";
 import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
@@ -39,7 +39,7 @@ function makeHarness(
   } = {},
 ): ProviderHarness {
   const { queue = [], hasItems = queue.length > 0, loadError = null } = options;
-  const loadQueue = vi.fn<() => Promise<ReviewCard[]>>();
+  const loadQueue = vi.fn<(mode: StudyMode) => Promise<ReviewCard[]>>();
   if (loadError) {
     loadQueue.mockRejectedValue(loadError);
   } else {
@@ -75,7 +75,13 @@ describe("ReviewScreen", () => {
   it("加载后渲染第一张卡的词条与进度", async () => {
     const card = makeCard();
     card.sense.term = "apple";
-    render(<ReviewScreen provider={makeHarness({ queue: [card] }).provider} onExit={() => {}} />);
+    render(
+      <ReviewScreen
+        provider={makeHarness({ queue: [card] }).provider}
+        mode="review"
+        onExit={() => {}}
+      />,
+    );
 
     await expectCardShown("apple");
     expect(screen.getAllByText("apple").length).toBeGreaterThan(0);
@@ -86,7 +92,13 @@ describe("ReviewScreen", () => {
 
   it("点击卡片翻面：释义从 aria-hidden 变为可见，再点翻回", async () => {
     const card = makeCard();
-    render(<ReviewScreen provider={makeHarness({ queue: [card] }).provider} onExit={() => {}} />);
+    render(
+      <ReviewScreen
+        provider={makeHarness({ queue: [card] }).provider}
+        mode="review"
+        onExit={() => {}}
+      />,
+    );
     await expectCardShown(card.sense.term);
 
     const definition = screen.getByText(card.sense.definitions[0]!);
@@ -112,7 +124,7 @@ describe("ReviewScreen", () => {
     const second = makeCard();
     second.sense.term = "book";
     const harness = makeHarness({ queue: [first, second] });
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
     await expectCardShown("apple");
 
     fireEvent.click(screen.getByRole("button", { name: /Good/ }));
@@ -129,7 +141,7 @@ describe("ReviewScreen", () => {
   it("翻面后评分记录 revealed=true", async () => {
     const card = makeCard();
     const harness = makeHarness({ queue: [card] });
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
     await expectCardShown(card.sense.term);
 
     fireEvent.click(screen.getByRole("button", { name: `显示 ${card.sense.term} 的释义` }));
@@ -147,7 +159,7 @@ describe("ReviewScreen", () => {
     const card = makeCard();
     card.sense.term = "apple";
     const harness = makeHarness({ queue: [card] });
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
     await expectCardShown("apple");
 
     // 空格翻面
@@ -167,7 +179,7 @@ describe("ReviewScreen", () => {
   it("数字键 2 评分 Hard；无关键不触发", async () => {
     const card = makeCard();
     const harness = makeHarness({ queue: [card] });
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
     await expectCardShown(card.sense.term);
 
     fireEvent.keyDown(window, { key: "5" });
@@ -182,7 +194,7 @@ describe("ReviewScreen", () => {
     const first = makeCard();
     const second = makeCard();
     const harness = makeHarness({ queue: [first, second] });
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
     await expectCardShown(first.sense.term);
 
     fireEvent.click(screen.getByRole("button", { name: /Good/ }));
@@ -198,7 +210,7 @@ describe("ReviewScreen", () => {
     card.sense.term = "apple";
     const harness = makeHarness({ queue: [], hasItems: false });
     harness.loadQueue.mockResolvedValueOnce([]).mockResolvedValue([card]);
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
 
     expect(await screen.findByText("词库还是空的")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /导入内置示例词表/ }));
@@ -210,9 +222,38 @@ describe("ReviewScreen", () => {
 
   it("有词但今日无到期：显示对应提示", async () => {
     const harness = makeHarness({ queue: [], hasItems: true });
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
 
     expect(await screen.findByText("今天没有到期的词")).toBeInTheDocument();
+    expect(harness.loadQueue).toHaveBeenCalledWith("review");
+  });
+
+  it("学习模式：队列为空但有词时显示「没有待学习的新词」", async () => {
+    const harness = makeHarness({ queue: [], hasItems: true });
+    render(<ReviewScreen provider={harness.provider} mode="learn" onExit={() => {}} />);
+
+    expect(await screen.findByText("没有待学习的新词")).toBeInTheDocument();
+    expect(harness.loadQueue).toHaveBeenCalledWith("learn");
+  });
+
+  it("混合模式：队列为空但有词时显示「今天没有可复习的词」", async () => {
+    const harness = makeHarness({ queue: [], hasItems: true });
+    render(<ReviewScreen provider={harness.provider} mode="mixed" onExit={() => {}} />);
+
+    expect(await screen.findByText("今天没有可复习的词")).toBeInTheDocument();
+    expect(harness.loadQueue).toHaveBeenCalledWith("mixed");
+  });
+
+  it("学习模式完成态：显示「本轮学习完成」与学习计数", async () => {
+    const card = makeCard();
+    const harness = makeHarness({ queue: [card] });
+    render(<ReviewScreen provider={harness.provider} mode="learn" onExit={() => {}} />);
+    await expectCardShown(card.sense.term);
+
+    fireEvent.click(screen.getByRole("button", { name: /Good/ }));
+
+    expect(await screen.findByText("本轮学习完成")).toBeInTheDocument();
+    expect(screen.getByText("共学习 1 张卡片")).toBeInTheDocument();
   });
 
   it("加载失败：显示错误与重试，重试成功后进入复习", async () => {
@@ -221,7 +262,7 @@ describe("ReviewScreen", () => {
     harness.loadQueue
       .mockRejectedValueOnce(new Error("IndexedDB 不可用"))
       .mockResolvedValue([card]);
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
 
     expect(await screen.findByText("加载失败")).toBeInTheDocument();
     expect(screen.getByText("IndexedDB 不可用")).toBeInTheDocument();
@@ -242,7 +283,7 @@ describe("ReviewScreen", () => {
     URL.createObjectURL = createObjectURL;
     URL.revokeObjectURL = revokeObjectURL;
     try {
-      render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+      render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
       await expectCardShown(card.sense.term);
 
       fireEvent.click(screen.getByRole("button", { name: "导出备份" }));
@@ -263,7 +304,7 @@ describe("ReviewScreen", () => {
     const card = makeCard();
     const harness = makeHarness({ queue: [card] });
     harness.exportBackup.mockRejectedValue(new Error("IndexedDB 不可用"));
-    render(<ReviewScreen provider={harness.provider} onExit={() => {}} />);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
     await expectCardShown(card.sense.term);
 
     fireEvent.click(screen.getByRole("button", { name: "导出备份" }));

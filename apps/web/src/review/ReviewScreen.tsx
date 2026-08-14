@@ -10,7 +10,8 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
-import type { ReviewRating } from "@lexilexi/core";
+import type { ReviewRating, StudyMode } from "@lexilexi/core";
+import { BackArrowIcon } from "../components/icons";
 import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
 import { ReviewCard } from "./ReviewCard";
 import { RatingButtons } from "./RatingButtons";
@@ -20,8 +21,26 @@ import { useReviewSession, type ReviewSession } from "./useReviewSession";
 
 export interface ReviewScreenProps {
   provider: ReviewDataProvider;
+  /** 学习模式（学习 / 复习 / 混合），决定队列与空状态文案 */
+  mode: StudyMode;
   onExit(): void;
 }
+
+/** 队列为空（有词但当前模式无可复习内容）时的按模式文案 */
+const NO_QUEUE_COPY: Record<StudyMode, { title: string; body: string }> = {
+  review: {
+    title: "今天没有到期的词",
+    body: "到期队列已清空。新的卡片会在复习间隔到达后进入队列；想学新词请返回首页选择「学习」。",
+  },
+  learn: {
+    title: "没有待学习的新词",
+    body: "词库里没有从未学过的新词。返回首页试试「复习」或「混合」模式。",
+  },
+  mixed: {
+    title: "今天没有可复习的词",
+    body: "今天没有到期词，也没有待学习的新词。休息一下，或返回首页换一种模式。",
+  },
+};
 
 /** 当前卡四档评分的到期文案（预览计算轻量，无需 memo） */
 function computeDueLabels(card: ReviewCardData): Record<ReviewRating, string> {
@@ -35,8 +54,8 @@ function computeDueLabels(card: ReviewCardData): Record<ReviewRating, string> {
   };
 }
 
-export function ReviewScreen({ provider, onExit }: ReviewScreenProps) {
-  const session = useReviewSession(provider);
+export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
+  const session = useReviewSession(provider, mode);
   const dueLabels = session.current ? computeDueLabels(session.current) : null;
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -119,9 +138,10 @@ export function ReviewScreen({ provider, onExit }: ReviewScreenProps) {
         <button
           type="button"
           onClick={onExit}
-          className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          aria-label="返回首页"
+          className="rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
         >
-          返回首页
+          <BackArrowIcon className="h-5 w-5" />
         </button>
         <div className="flex items-center gap-3">
           {session.phase === "reviewing" ? (
@@ -163,7 +183,7 @@ export function ReviewScreen({ provider, onExit }: ReviewScreenProps) {
         </p>
       ) : null}
 
-      <PhaseContent session={session} dueLabels={dueLabels} onExit={onExit} />
+      <PhaseContent session={session} dueLabels={dueLabels} mode={mode} onExit={onExit} />
     </main>
   );
 }
@@ -171,11 +191,12 @@ export function ReviewScreen({ provider, onExit }: ReviewScreenProps) {
 interface PhaseContentProps {
   session: ReviewSession;
   dueLabels: Record<ReviewRating, string> | null;
+  mode: StudyMode;
   onExit(): void;
 }
 
 /** 按会话阶段渲染对应内容（独立于容器，便于逐阶段阅读） */
-function PhaseContent({ session, dueLabels, onExit }: PhaseContentProps) {
+function PhaseContent({ session, dueLabels, mode, onExit }: PhaseContentProps) {
   switch (session.phase) {
     case "loading":
       return (
@@ -188,7 +209,7 @@ function PhaseContent({ session, dueLabels, onExit }: PhaseContentProps) {
         <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 text-center">
           <h2 className="text-xl font-semibold">词库还是空的</h2>
           <p className="max-w-sm text-sm text-text-muted">
-            还没有任何需要复习的词。导入你自己的 CSV 词表，或先导入内置示例词表体验完整的复习流程。
+            还没有任何需要学习的词。导入你自己的 CSV 词表，或先导入内置示例词表体验完整的学习流程。
           </p>
           <button
             type="button"
@@ -202,13 +223,12 @@ function PhaseContent({ session, dueLabels, onExit }: PhaseContentProps) {
           </button>
         </div>
       );
-    case "no-due":
+    case "no-due": {
+      const copy = NO_QUEUE_COPY[mode];
       return (
         <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 text-center">
-          <h2 className="text-xl font-semibold">今天没有到期的词</h2>
-          <p className="max-w-sm text-sm text-text-muted">
-            到期队列已清空。新的卡片会在复习间隔到达后进入队列。
-          </p>
+          <h2 className="text-xl font-semibold">{copy.title}</h2>
+          <p className="max-w-sm text-sm text-text-muted">{copy.body}</p>
           <button
             type="button"
             onClick={onExit}
@@ -218,6 +238,7 @@ function PhaseContent({ session, dueLabels, onExit }: PhaseContentProps) {
           </button>
         </div>
       );
+    }
     case "error":
       return (
         <div className="flex flex-col items-center gap-4 rounded-2xl border border-danger/40 bg-surface p-8 text-center">
@@ -235,8 +256,14 @@ function PhaseContent({ session, dueLabels, onExit }: PhaseContentProps) {
     case "done":
       return (
         <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 text-center">
-          <h2 className="text-xl font-semibold">本轮复习完成</h2>
-          <p className="text-sm text-text-muted">共复习 {session.gradedCount} 张卡片</p>
+          <h2 className="text-xl font-semibold">
+            {mode === "learn" ? "本轮学习完成" : "本轮复习完成"}
+          </h2>
+          <p className="text-sm text-text-muted">
+            {mode === "learn"
+              ? `共学习 ${session.gradedCount} 张卡片`
+              : `共复习 ${session.gradedCount} 张卡片`}
+          </p>
           <button
             type="button"
             onClick={onExit}
