@@ -8,7 +8,7 @@
  *     1–4 或 A / H / G / E → Again / Hard / Good / Easy
  * - 评分按钮副文案为各档到期时间预览（@lexilexi/fsrs Scheduler.preview）。
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
 import type { ReviewRating } from "@lexilexi/core";
 import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
@@ -61,11 +61,25 @@ export function ReviewScreen({ provider, onExit }: ReviewScreenProps) {
     }
   }, [provider]);
 
-  // 键盘监听依赖稳定引用而非整个 session 对象：session 每次渲染都是新对象，
-  // 依赖 [session] 会导致每次状态变化都移除/重挂监听。flip / grade 是
-  // useCallback 稳定引用（provider 由 App 以 useState 固定），phase 仅在
-  // 阶段切换时变化（RAY-237 评审建议 C2）。
-  const { phase, flip, grade } = session;
+  // 键盘监听：监听器生命周期与组件绑定（空依赖），阶段与回调经 ref 读取。
+  // 之前依赖 [phase] 会在阶段切换时移除/重挂监听——重挂窗口内（或闭包
+  // 捕获到旧 phase 时）按键会被静默吞掉；按键状态本身由 session 状态机守卫，
+  // 监听器不需要随阶段重建（RAY-239 测试补全发现的竞态）。
+  const { flip, grade } = session;
+  const phaseRef = useRef(session.phase);
+  const flipRef = useRef(flip);
+  const gradeRef = useRef(grade);
+
+  // 每次提交后同步 ref（react-hooks/refs 禁止渲染期写 ref；useLayoutEffect
+  // 在 DOM 提交后、浏览器绘制前同步执行——用户键盘事件派发前 ref 必然已
+  // 更新，把「重挂窗口内按键读到旧状态」的理论窗口压到零。Oscar 评审
+  // suggestion 采纳：useEffect 在绘制后异步执行，理论上存在绘制与 effect
+  // 之间的空隙；键盘输入路径改 useLayoutEffect 后无此窗口）。
+  useLayoutEffect(() => {
+    phaseRef.current = session.phase;
+    flipRef.current = flip;
+    gradeRef.current = grade;
+  });
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -83,21 +97,21 @@ export function ReviewScreen({ provider, onExit }: ReviewScreenProps) {
         if (onInteractive) {
           return; // 焦点在按钮上：交给按钮原生激活，避免重复触发
         }
-        if (phase === "reviewing") {
+        if (phaseRef.current === "reviewing") {
           event.preventDefault();
-          flip();
+          flipRef.current();
         }
         return;
       }
       const rating = ratingFromKey(event.key);
-      if (rating && phase === "reviewing") {
+      if (rating && phaseRef.current === "reviewing") {
         event.preventDefault();
-        void grade(rating);
+        void gradeRef.current(rating);
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [phase, flip, grade]);
+  }, []);
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
