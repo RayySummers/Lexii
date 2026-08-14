@@ -43,7 +43,7 @@ describe("StatsScreen", () => {
     expect(screen.getByText("累计天数")).toBeInTheDocument();
     expect(screen.getByText("今日已学习（次数）")).toBeInTheDocument();
     expect(screen.getByText("今日已复习（次数）")).toBeInTheDocument();
-    expect(screen.getByText("今日到期（词条）")).toBeInTheDocument();
+    expect(screen.getByText("今日待学（词条）")).toBeInTheDocument();
     expect(screen.getByText("明日到期（词条）")).toBeInTheDocument();
     expect(screen.getByText("累计已完成（次数）")).toBeInTheDocument();
     expect(screen.getByText("累计已完成（词条）")).toBeInTheDocument();
