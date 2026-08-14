@@ -23,6 +23,21 @@ export default tseslint.config(
     },
   },
   {
+    // PWA 静态资源（apps/web/public/）：Service Worker 等纯 JS 文件
+    // 不经构建管线，但同样走 ESLint（补充浏览器全局：self / caches / clients 等）
+    files: ["**/public/**/*.js"],
+    languageOptions: {
+      globals: { ...globals.browser },
+    },
+  },
+  {
+    // Node 构建/生成脚本（如 apps/web/scripts/generate-icons.mjs）
+    files: ["**/scripts/**/*.{js,mjs,cjs}"],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+  },
+  {
     files: ["**/*.{tsx,jsx}"],
     plugins: {
       "react-hooks": reactHooks,
