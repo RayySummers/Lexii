@@ -14,6 +14,20 @@ function makeStatsProvider(snapshot: StatsSnapshot): StatsDataProvider {
   return { loadStats: vi.fn().mockResolvedValue(snapshot) };
 }
 
+/** 只含首页徽标关心的字段、其余归零的快照 */
+function badgeSnapshot(dueCount: number, reviewCount: number, streakDays: number): StatsSnapshot {
+  return {
+    streakDays,
+    totalDays: 0,
+    todayLearnCount: 0,
+    todayReviewCount: 0,
+    dueCount,
+    dueTomorrowCount: 0,
+    reviewCount,
+    completedWordCount: 0,
+  };
+}
+
 describe("HomeScreen", () => {
   it("渲染三个模式按钮：学习 / 复习 / 混合", () => {
     render(<HomeScreen onStart={vi.fn()} statsProvider={null} />);
@@ -49,7 +63,7 @@ describe("HomeScreen", () => {
     render(
       <HomeScreen
         onStart={vi.fn()}
-        statsProvider={makeStatsProvider({ dueCount: 3, reviewCount: 10, streakDays: 2 })}
+        statsProvider={makeStatsProvider(badgeSnapshot(3, 10, 2))}
       />,
     );
 
@@ -62,7 +76,7 @@ describe("HomeScreen", () => {
     render(
       <HomeScreen
         onStart={vi.fn()}
-        statsProvider={makeStatsProvider({ dueCount: 0, reviewCount: 0, streakDays: 0 })}
+        statsProvider={makeStatsProvider(badgeSnapshot(0, 0, 0))}
       />,
     );
 
@@ -75,7 +89,7 @@ describe("HomeScreen", () => {
     render(
       <HomeScreen
         onStart={vi.fn()}
-        statsProvider={makeStatsProvider({ dueCount: 0, reviewCount: 10, streakDays: 2 })}
+        statsProvider={makeStatsProvider(badgeSnapshot(0, 10, 2))}
       />,
     );
 
@@ -86,7 +100,7 @@ describe("HomeScreen", () => {
     render(
       <HomeScreen
         onStart={vi.fn()}
-        statsProvider={makeStatsProvider({ dueCount: 0, reviewCount: 0, streakDays: 0 })}
+        statsProvider={makeStatsProvider(badgeSnapshot(0, 0, 0))}
       />,
     );
 

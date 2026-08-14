@@ -85,6 +85,7 @@ export { importCsvWordlist } from "./importWords";
 export type { ImportWordsOptions, ImportWordsResult } from "./importWords";
 export {
   getDueItemIds,
+  getDueItemIdsInRange,
   getStudyQueueItemIds,
   gradeReview,
   memoryFieldsToCardInput,

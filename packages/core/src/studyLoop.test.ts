@@ -1,4 +1,4 @@
-import type { DexieOptions } from "dexie";
+﻿import type { DexieOptions } from "dexie";
 import { newCardFields } from "@lexilexi/fsrs";
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
@@ -7,7 +7,12 @@ import { makeLearningItem, makeMemoryState, makeSense } from "./helpers";
 import type { MemoryStateFields } from "./memory";
 import { openDatabase } from "./persistence";
 import type { LexilexiDatabase } from "./persistence";
-import { getDueItemIds, gradeReview, memoryFieldsToCardInput } from "./studyLoop";
+import {
+  getDueItemIds,
+  getDueItemIdsInRange,
+  gradeReview,
+  memoryFieldsToCardInput,
+} from "./studyLoop";
 
 /** 每个用例用独立的 fake-indexeddb 实例（互不干扰） */
 function makeOptions(): DexieOptions {
@@ -434,5 +439,87 @@ describe("memoryFieldsToCardInput（公开字段换算 API，RAY-237 评审建�
     const input = memoryFieldsToCardInput(fields);
     expect(input.learning_steps).toBe(0);
     expect(input.last_review).toBeUndefined();
+  });
+});
+
+describe("getDueItemIdsInRange（半开区间到期查询，RAY-252 明日到期用）", () => {
+  it("只返回 due 落在 [from, to) 内的条目", async () => {
+    const database = freshDatabase();
+    const dues = [
+      "2026-08-13T08:00:00.000Z", // from 之前
+      "2026-08-14T00:00:00.000Z", // = from（含）
+      "2026-08-14T12:00:00.000Z", // 区间内
+      "2026-08-15T00:00:00.000Z", // = to（不含）
+      "2026-08-15T06:00:00.000Z", // to 之后
+    ];
+    const itemIds: string[] = [];
+    for (const [index, due] of dues.entries()) {
+      const sense = makeSense();
+      const item = makeLearningItem(sense.id);
+      await database.senses.put(sense);
+      await database.items.put(item);
+      await database.memoryStates.put({
+        id: item.id,
+        itemId: item.id,
+        fields: { ...newCardFields({ now: "2026-08-13T00:00:00.000Z" }), due },
+        createdAt: "2026-08-13T00:00:00.000Z",
+        updatedAt: "2026-08-13T00:00:00.000Z",
+      });
+      itemIds[index] = item.id;
+    }
+
+    const from = "2026-08-14T00:00:00.000Z";
+    const to = "2026-08-15T00:00:00.000Z";
+    const result = await getDueItemIdsInRange(database, from, to);
+    expect(result.sort()).toEqual([itemIds[1], itemIds[2]].sort());
+  });
+
+  it("空区间返回空数组", async () => {
+    const database = freshDatabase();
+    const { itemIds } = await importCsvWordlist(database, "apple,苹果,n.", {
+      source: "测试",
+      time: TIME,
+    });
+    // 导入即到期（due = TIME），查询其后一天的空区间
+    const result = await getDueItemIdsInRange(
+      database,
+      "2026-08-14T00:00:00.000Z",
+      "2026-08-15T00:00:00.000Z",
+    );
+    expect(result).toEqual([]);
+    expect(itemIds.length).toBe(1);
+  });
+
+  it("边界对齐本地日半开区间：前一日末尾的 due 不算明日到期", async () => {
+    const database = freshDatabase();
+    const sense = makeSense();
+    const item = makeLearningItem(sense.id);
+    await database.senses.put(sense);
+    await database.items.put(item);
+    // due = 8-14T23:59:59.999Z，仍属于 [8-14, 8-15) 区间
+    await database.memoryStates.put({
+      id: item.id,
+      itemId: item.id,
+      fields: {
+        ...newCardFields({ now: "2026-08-13T00:00:00.000Z" }),
+        due: "2026-08-14T23:59:59.999Z",
+      },
+      createdAt: "2026-08-13T00:00:00.000Z",
+      updatedAt: "2026-08-13T00:00:00.000Z",
+    });
+
+    const inDay = await getDueItemIdsInRange(
+      database,
+      "2026-08-14T00:00:00.000Z",
+      "2026-08-15T00:00:00.000Z",
+    );
+    expect(inDay).toEqual([item.id]);
+    // 次日区间（[8-15, 8-16)）不含该条目
+    const nextDay = await getDueItemIdsInRange(
+      database,
+      "2026-08-15T00:00:00.000Z",
+      "2026-08-16T00:00:00.000Z",
+    );
+    expect(nextDay).toEqual([]);
   });
 });

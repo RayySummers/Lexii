@@ -22,6 +22,7 @@ pnpm build          # tsc --noEmit + vite build
 - `src/components/icons.tsx` — 内联 SVG 图标（返回箭头 / 太阳 / 月亮，stroke 继承 currentColor，不硬编码颜色）
 - `src/components/StatCard.tsx` — 统计数值卡片（统计页）
 - `src/lib/download.ts` — 文件下载工具（`downloadTextFile` / `datedFilename` / `serializeBackup`，纯前端无网络）
+- `src/lib/appVersion.ts` — 构建时注入的版本号 `APP_VERSION`（vite.config.ts `define` 读取 `apps/web/package.json` 的 version；发版只改 package.json，UI 自动跟随）
 - `src/pwa/` — PWA（RAY-240）：
   - `register.ts` — Service Worker 注册（仅生产构建，失败静默降级）
   - `manifest.test.ts` — manifest 可安装性结构 + 图标完整性 + theme_color 与 index.html 一致性（CI 锁定）
@@ -34,7 +35,7 @@ pnpm build          # tsc --noEmit + vite build
   - `types.ts` — `SettingsDataProvider` / `ImportBackupResult`（UI 与数据源之间的契约）
   - `data.ts` — IndexedDB 数据源：`createIndexedDbSettingsDataProvider`（包装 core 的 `exportLexilexiData` / `exportCsvWordlist` / `parseLexilexiExport` / `importLexilexiData`）
   - `persistenceStatus.ts` — 持久化权限状态（启动申请 + `usePersistenceStatus` hook，监听 `lexilexi:storage-permission`）
-  - `SettingsScreen.tsx` — 设置页 UI：持久化提示、JSON/CSV 导出、JSON 导入（RAY-253 起无数据概览，概览已并入统计页）
+  - `SettingsScreen.tsx` — 设置页 UI：持久化提示、JSON/CSV 导出、JSON 导入、关于（GitHub 仓库链接 + 反馈问题入口，纯外链新窗口打开）与底部版本号（RAY-253 起无数据概览，概览已并入统计页）
 - `src/stats/` — 统计页（RAY-240）：
   - `types.ts` — `StatsSnapshot`（今日到期 / 已复习 / 连续天数）/ `StatsDataProvider`（UI 与数据源之间的契约）
   - `data.ts` — IndexedDB 数据源：`createIndexedDbStatsDataProvider`（包装 core 的 `getDueItemIds` + stats 包的 `countReviews` / `computeStreak`）；默认工厂自带无 IndexedDB 环境兜底

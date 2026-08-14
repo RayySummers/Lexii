@@ -8,6 +8,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LexilexiExportData } from "@lexilexi/core";
+import { APP_VERSION } from "../lib/appVersion";
 import { usePersistenceStatus } from "./persistenceStatus";
 import { SettingsScreen } from "./SettingsScreen";
 import type { ImportBackupResult, SettingsDataProvider } from "./types";
@@ -179,5 +180,36 @@ describe("SettingsScreen", () => {
     fireEvent.change(screen.getByLabelText("选择备份文件…"), { target: { files: [file] } });
 
     expect(await screen.findByRole("alert")).toHaveTextContent("导入失败：导出文件版本不兼容");
+  });
+
+  it("关于：渲染 GitHub 仓库链接（新窗口打开）", async () => {
+    const harness = makeHarness();
+    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+    await screen.findByText("关于");
+
+    const link = screen.getByRole("link", { name: "GitHub 仓库" });
+    expect(link).toHaveAttribute("href", "https://github.com/RayySummers/Lexilexi");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("关于：反馈问题入口指向 GitHub Issues（新窗口打开）", async () => {
+    const harness = makeHarness();
+    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+    await screen.findByText("关于");
+
+    const link = screen.getByRole("link", { name: "反馈问题" });
+    expect(link).toHaveAttribute("href", "https://github.com/RayySummers/Lexilexi/issues");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("底部展示与构建注入一致的版本号", async () => {
+    const harness = makeHarness();
+    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+    await screen.findByText("关于");
+
+    // 断言 UI 走 APP_VERSION（构建注入），不硬编码具体版本——发版 bump package.json 后测试自动跟随
+    expect(screen.getByText(`乐希 Lexilexi v${APP_VERSION}`)).toBeInTheDocument();
   });
 });
