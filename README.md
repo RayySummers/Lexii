@@ -21,15 +21,15 @@ Lexilexi 是一款本地优先的词汇学习应用：数据只存在你自己�
 
 ## 技术栈
 
-| 层     | 选型                         |
-| ------ | ---------------------------- |
-| 语言   | TypeScript（strict）         |
-| 前端   | React + Vite + Tailwind CSS  |
-| 测试   | Vitest                       |
-| 包管理 | pnpm workspace（monorepo）   |
-| 存储   | IndexedDB（Dexie）           |
-| 调度   | FSRS-7                       |
-| 许可   | GPL-3.0-or-later             |
+| 层     | 选型                        |
+| ------ | --------------------------- |
+| 语言   | TypeScript（strict）        |
+| 前端   | React + Vite + Tailwind CSS |
+| 测试   | Vitest                      |
+| 包管理 | pnpm workspace（monorepo）  |
+| 存储   | IndexedDB（Dexie）          |
+| 调度   | FSRS-7                      |
+| 许可   | GPL-3.0-or-later            |
 
 ## 仓库结构（Monorepo）
 
@@ -64,13 +64,13 @@ pnpm lint       # ESLint + Prettier 检查
 
 ## 文档
 
-| 文档 | 说明 |
-| --- | --- |
-| [CONTRIBUTING.md](./CONTRIBUTING.md) | PR 流程、代码评审标准（13 条）、评审流程 |
-| [ROADMAP.md](./ROADMAP.md) | 首期 20 天计划与里程碑、下一期方向 |
-| [docs/domain-model.md](./docs/domain-model.md) | 领域模型设计（Learning Item / Sense / Memory State / Event） |
-| [packages/fsrs/README.md](./packages/fsrs/README.md) | FSRS-7 实现与版本口径（对照官方参考实现验证） |
-| [packages/ai/README.md](./packages/ai/README.md) | AI 能力规划（BYOK、忆语）与「为什么 MVP 不做」 |
+| 文档                                                 | 说明                                                         |
+| ---------------------------------------------------- | ------------------------------------------------------------ |
+| [CONTRIBUTING.md](./CONTRIBUTING.md)                 | PR 流程、代码评审标准（13 条）、评审流程                     |
+| [ROADMAP.md](./ROADMAP.md)                           | 首期 20 天计划与里程碑、下一期方向                           |
+| [docs/domain-model.md](./docs/domain-model.md)       | 领域模型设计（Learning Item / Sense / Memory State / Event） |
+| [packages/fsrs/README.md](./packages/fsrs/README.md) | FSRS-7 实现与版本口径（对照官方参考实现验证）                |
+| [packages/ai/README.md](./packages/ai/README.md)     | AI 能力规划（BYOK、忆语）与「为什么 MVP 不做」               |
 
 ## 许可
 

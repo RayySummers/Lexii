@@ -10,15 +10,15 @@
 
 ## 首期 20 天计划
 
-| 阶段 | 天数 | 内容 | 状态 |
-| --- | --- | --- | --- |
-| 1 | Day 1 | Monorepo 脚手架：TS + React + Vite + Tailwind + Vitest 骨架、packages 骨架（core / fsrs / stats / eval + ai 空壳及说明文档）、GPL License、CI、首个 commit + 首个 PR | ✅ 完成 |
-| 2 | Day 2–5 | FSRS-7 实现并对照官方参考实现逐项验证（`fsrs-verify`，CI 单独跑）+ 领域模型与数据层：Learning Item / Sense / Memory State / Event 设计文档 + IndexedDB（Dexie）持久化 + `storage.persist()` 数据防线与提示 | ✅ 完成 |
-| 3 | Day 6–9 | CSV 词表导入 + 学习回路打通（练习 → 评分 → FSRS 排期 → 事件落库）+ 复习界面 v1（卡片正反面、Again/Hard/Good/Easy 评分、键盘快捷键、深色模式、响应式） | ✅ 完成 |
-| 4 | Day 10–14 | PWA（可安装、离线可用）+ 每日到期队列 + 基础统计页 + 数据导出（JSON 可原样导回 + CSV；显眼导出入口）与空状态 / 错误处理打磨 | ✅ 完成 |
-| 5 | Day 15–16 | 测试补全 + 边界用例 + 全量代码评审（Oscar 13 条标准） | ✅ 完成 |
-| 6 | Day 17–18 | 开源发布：CONTRIBUTING.md 落地、仓库转公开（GPL）、README / ROADMAP 更新、许可证与数据源许可核查 | 🔄 进行中 |
-| 7 | Day 19–20 | alpha 发布：GitHub Release + 静态托管部署（PWA 可安装）+ 真机试用 + 里程碑验收 + 下一期规划 | ⏳ 待开始 |
+| 阶段 | 天数      | 内容                                                                                                                                                                                                       | 状态      |
+| ---- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| 1    | Day 1     | Monorepo 脚手架：TS + React + Vite + Tailwind + Vitest 骨架、packages 骨架（core / fsrs / stats / eval + ai 空壳及说明文档）、GPL License、CI、首个 commit + 首个 PR                                       | ✅ 完成   |
+| 2    | Day 2–5   | FSRS-7 实现并对照官方参考实现逐项验证（`fsrs-verify`，CI 单独跑）+ 领域模型与数据层：Learning Item / Sense / Memory State / Event 设计文档 + IndexedDB（Dexie）持久化 + `storage.persist()` 数据防线与提示 | ✅ 完成   |
+| 3    | Day 6–9   | CSV 词表导入 + 学习回路打通（练习 → 评分 → FSRS 排期 → 事件落库）+ 复习界面 v1（卡片正反面、Again/Hard/Good/Easy 评分、键盘快捷键、深色模式、响应式）                                                      | ✅ 完成   |
+| 4    | Day 10–14 | PWA（可安装、离线可用）+ 每日到期队列 + 基础统计页 + 数据导出（JSON 可原样导回 + CSV；显眼导出入口）与空状态 / 错误处理打磨                                                                                | ✅ 完成   |
+| 5    | Day 15–16 | 测试补全 + 边界用例 + 全量代码评审（Oscar 13 条标准）                                                                                                                                                      | ✅ 完成   |
+| 6    | Day 17–18 | 开源发布：CONTRIBUTING.md 落地、仓库转公开（GPL）、README / ROADMAP 更新、许可证与数据源许可核查                                                                                                           | 🔄 进行中 |
+| 7    | Day 19–20 | alpha 发布：GitHub Release + 静态托管部署（PWA 可安装）+ 真机试用 + 里程碑验收 + 下一期规划                                                                                                                | ⏳ 待开始 |
 
 **里程碑：Day 20（2026-08-29 截止）**——达成「删掉旧背词软件，用乐希背词」，随后回顾并定下一期。
 
