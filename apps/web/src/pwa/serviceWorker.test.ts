@@ -19,10 +19,7 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import { describe, expect, it, vi } from "vitest";
 
-const SW_PATH = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../public/sw.js",
-);
+const SW_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../public/sw.js");
 
 /** 模拟生产构建产物：index.html 引用了带 hash 的 js/css */
 const INDEX_HTML = `<!doctype html>
@@ -90,10 +87,7 @@ class FakeCache {
     this.entries.set(toKey(input), response);
   }
 
-  async match(
-    input: string | FakeRequest,
-    options?: MatchOptions,
-  ): Promise<Response | undefined> {
+  async match(input: string | FakeRequest, options?: MatchOptions): Promise<Response | undefined> {
     this.lastMatchOptions = options;
     return this.entries.get(toKey(input));
   }
