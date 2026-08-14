@@ -37,16 +37,19 @@ describe("StatsScreen", () => {
     expect(screen.queryByText("连续天数")).not.toBeInTheDocument();
   });
 
-  it("加载失败显示错误并可重试恢复", async () => {
+  it("加载失败显示友好错误文案（原始信息收进折叠详情）并可重试恢复", async () => {
     const provider: StatsDataProvider = {
       loadStats: vi
         .fn()
-        .mockRejectedValueOnce(new Error("boom"))
+        .mockRejectedValueOnce(new Error("IndexedDB connection failed: boom"))
         .mockResolvedValue({ dueCount: 1, reviewCount: 2, streakDays: 3 }),
     };
     render(<StatsScreen provider={provider} onExit={vi.fn()} />);
 
-    expect(await screen.findByText(/无法读取本地数据/)).toBeInTheDocument();
+    // 主文案友好（Oscar 评审 C4），原始错误只出现在折叠详情里
+    expect(await screen.findByText("无法读取本地数据，请重试。")).toBeInTheDocument();
+    const rawError = screen.getByText(/IndexedDB connection failed: boom/);
+    expect(rawError.closest("details")).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
     expect(await screen.findByText("连续天数")).toBeInTheDocument();

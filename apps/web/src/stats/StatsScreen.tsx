@@ -32,7 +32,11 @@ export function StatsScreen({ provider, onExit }: StatsScreenProps) {
 
       {error ? (
         <div className="flex flex-col items-start gap-3 rounded-2xl border border-danger/40 bg-surface p-6">
-          <p className="text-sm">无法读取本地数据：{error}</p>
+          <p className="text-sm">无法读取本地数据，请重试。</p>
+          <details className="text-xs text-text-muted">
+            <summary>错误详情</summary>
+            <p className="mt-1 whitespace-pre-wrap">{error}</p>
+          </details>
           <button
             type="button"
             onClick={reload}

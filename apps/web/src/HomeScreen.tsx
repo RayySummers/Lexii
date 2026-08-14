@@ -6,6 +6,7 @@
  * - 仅承载展示与导航，复习数据一律由 ReviewScreen 加载；
  * - 全部颜色走 design tokens（浅色/深色两套自动生效）。
  */
+import type { ReactNode } from "react";
 import { useStats } from "./stats/useStats";
 import type { StatsDataProvider } from "./stats/types";
 
@@ -62,26 +63,22 @@ export function HomeScreen({ onStartReview, statsProvider }: HomeScreenProps) {
  * 今日到期徽标：
  * - 有到期 → 强调徽标「今日到期 N 词」；
  * - 无到期但复习过 → 弱化文案「今日无到期词」；
- * - 数据未加载 / 无任何学习记录 → 不渲染（避免误导）。
- * 异步加载，容器用 aria-live 让读屏器能感知到变化。
+ * - 数据未加载 / 无任何学习记录 → 无内容。
+ *
+ * 可访问性（Oscar 评审 C5）：live region 容器固定挂载、只切换内部内容——
+ * 部分读屏器不播报「动态插入的 live region」；role="status" 隐含
+ * aria-live="polite" + aria-atomic="true"，徽标文本异步出现时会被播报。
  */
 function DueBadge({ dueCount, hasReviewed }: { dueCount: number | null; hasReviewed: boolean }) {
-  if (dueCount === null || (dueCount === 0 && !hasReviewed)) {
-    return null;
-  }
-  if (dueCount > 0) {
-    return (
-      <span
-        aria-live="polite"
-        className="rounded-full border border-accent/40 bg-surface px-4 py-1.5 text-sm font-medium text-accent"
-      >
+  let content: ReactNode = null;
+  if (dueCount !== null && dueCount > 0) {
+    content = (
+      <span className="rounded-full border border-accent/40 bg-surface px-4 py-1.5 text-sm font-medium text-accent">
         今日到期 {dueCount} 词
       </span>
     );
+  } else if (dueCount !== null && hasReviewed) {
+    content = <span className="text-sm text-text-muted">今日无到期词，休息一下。</span>;
   }
-  return (
-    <span aria-live="polite" className="text-sm text-text-muted">
-      今日无到期词，休息一下。
-    </span>
-  );
+  return <div role="status">{content}</div>;
 }

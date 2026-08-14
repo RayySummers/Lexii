@@ -20,6 +20,21 @@ describe("HomeScreen", () => {
     );
 
     expect(await screen.findByText("今日到期 3 词")).toBeInTheDocument();
+    // 徽标位于固定挂载的 live region 内（Oscar 评审 C5）
+    expect(screen.getByText("今日到期 3 词").closest('[role="status"]')).not.toBeNull();
+  });
+
+  it("live region 固定挂载：即使无到期内容，status 区域也在文档中", async () => {
+    render(
+      <HomeScreen
+        onStartReview={vi.fn()}
+        statsProvider={makeStatsProvider({ dueCount: 0, reviewCount: 0, streakDays: 0 })}
+      />,
+    );
+
+    await screen.findByRole("button", { name: "开始复习" });
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.queryByText(/到期/)).not.toBeInTheDocument();
   });
 
   it("无到期但复习过时显示安静文案", async () => {

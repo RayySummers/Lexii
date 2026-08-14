@@ -5,6 +5,10 @@
  * - dueCount：getDueItemIds（core 公开 API，due <= now 的记忆状态数）
  * - reviewCount：countReviews（review 事件总数，@lexilexi/stats）
  * - streakDays：computeStreak（本地日历日连续天数，@lexilexi/stats）
+ *
+ * 性能说明（Oscar 评审 C1）：review 事件查询走 events 表的 type 索引
+ * （where("type").equals("review")），不整表 toArray；事件数上万后
+ * 只读取 review 子集，其他事件类型（import/edit/suspend…）不进入内存。
  */
 import { getDueItemIds, isReviewEvent, openDatabase } from "@lexilexi/core";
 import type { LexilexiDatabase } from "@lexilexi/core";
@@ -16,12 +20,16 @@ export function createIndexedDbStatsDataProvider(db: LexilexiDatabase): StatsDat
   return {
     async loadStats(): Promise<StatsSnapshot> {
       const now = new Date().toISOString();
-      const [dueIds, events] = await Promise.all([getDueItemIds(db, now), db.events.toArray()]);
-      const reviewEvents = events.filter(isReviewEvent);
+      const [dueIds, reviewEvents] = await Promise.all([
+        getDueItemIds(db, now),
+        db.events.where("type").equals("review").toArray(),
+      ]);
+      // where 查询返回 Event[]，经类型守卫收窄为 ReviewEvent[] 供 stats 纯函数使用
+      const reviews = reviewEvents.filter(isReviewEvent);
       return {
         dueCount: dueIds.length,
-        reviewCount: countReviews(reviewEvents),
-        streakDays: computeStreak(reviewEvents, now),
+        reviewCount: countReviews(reviews),
+        streakDays: computeStreak(reviews, now),
       };
     },
   };

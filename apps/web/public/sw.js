@@ -5,6 +5,8 @@
  * - install：预缓存应用外壳（HTML / 清单 / 图标），并从 index.html 解析出
  *   带 hash 的静态资源 URL（js / css / 图标等）一并预缓存——不依赖构建期
  *   清单，首次在线访问完成安装后即可完全离线使用；成功后立即接管页面。
+ *   预缓存逐项 allSettled：个别资源 404（如某些静态托管不给 `/` 返回目录
+ *   索引）不使整个安装失败，与全文件「静默降级」哲学一致（Oscar 评审 C2）。
  * - activate：清理旧版本缓存，并接管已打开的页面（clients.claim）。
  * - fetch：
  *   · 导航请求：网络优先，失败回退缓存的 index.html（离线打开应用）；
@@ -25,6 +27,14 @@ const APP_SHELL = [
   "/icons/maskable-512.png",
   "/icons/apple-touch-icon.png",
 ];
+
+/**
+ * 逐项预缓存（成功项保留，失败项静默跳过）。
+ * 不用 cache.addAll：它任一项失败即整体 reject，会因单个 404 阻断安装。
+ */
+function precacheAll(cache, urls) {
+  return Promise.allSettled(urls.map((url) => cache.add(url)));
+}
 
 /**
  * 从 index.html 解析同源静态资源 URL（src / href 属性），
@@ -50,14 +60,14 @@ async function precacheAssetsFromHtml(cache) {
       urls.add(url);
     }
   }
-  await Promise.allSettled([...urls].map((url) => cache.add(url)));
+  await precacheAll(cache, [...urls]);
 }
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then((cache) => precacheAll(cache, APP_SHELL))
       .then((cache) => precacheAssetsFromHtml(cache))
       .then(() => self.skipWaiting()),
   );
