@@ -43,7 +43,7 @@
 - 许可证：**GPL-3.0-or-later**（GNU GPL v3，或（由你选择）任何更高版本）。
 - 仓库已于 Day 17 转公开；依赖（react MIT、dexie Apache-2.0、ts-fsrs MIT 等）与 GPL-3.0 兼容；内嵌第三方代码（Alea PRNG，MIT）已带完整声明。
 - 词表数据源许可干净：内置示例词表为原创，仓库零捆绑第三方词典数据（用户词库一律自行导入）。
-- 许可证检测：✅ 已修复——LICENSE 与 gnu.org 官方文本逐字节一致（PR #16 去 BOM + 标题块前置、PR #17 删除自定义版权块），GitHub API 已翻转为 GPL-3.0，仓库页显示 GPL-3.0 徽章。「or any later version」表述保留，README 许可章节采用 GPL-3.0-or-later 口径。
+- 许可证检测：✅ 已修复——LICENSE 与 gnu.org 官方文本逐字节一致（PR #16 去 BOM + 标题块前置、PR #17 删除自定义版权块），GitHub API 已翻转为 GPL-3.0，仓库页显示 GPL-3.0 徽章。「or later」许可选择保留，由 README 许可章节承载（LICENSE 为 gnu.org 官方 GPLv3 标准文本，不含 or-later 表述）。
 - 贡献方式与 13 条评审标准见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
 ### 开源遗留待办（未承诺日期）
