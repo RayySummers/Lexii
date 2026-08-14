@@ -137,6 +137,15 @@ PR 描述使用下方模板，并自行对照「13 条评审标准」在描述�
 4. **跟进修改**：修复评审问题后，在 PR 中回复逐条处理结果；评审员确认后通过。
 5. **合并要求**：CI 全绿为强制门槛，评审通过为合入惯例；合并前禁止绕过 PR 直推 `main`（惯例，CI 门槛兜底）。仓库未开启「评审通过数 ≥ 1」的分支保护：Multica 协作模式下全体 Agent 与所有者共用同一 GitHub 账户，开启后任何人都无法批准自己的 PR——故评审以流程惯例执行，不靠 GitHub 强制。
 
+## 发版流程（Release Checklist）
+
+应用版本号的唯一来源是 `apps/web/package.json` 的 `version`（构建时经 Vite `define` 注入，设置页底部展示）。发版请按以下顺序执行，**版本号与 tag 必须一致**，否则页面显示的版本会与发布的 tag 漂移：
+
+1. **Bump 版本号**：在发布 PR 中把 `apps/web/package.json` 的 `version` 更新为新版本（如 `0.1.0-alpha.2`）。设置页底部版本号会自动跟随，无需改动任何组件代码。
+2. **合入 main**：版本 bump 与功能变更一起走 PR（禁止绕过 PR 直推 `main`），CI 全绿后合并。
+3. **打 tag**：在包含该版本 bump 的 main 合并提交上打 tag，格式为 `v<版本号>`（与 package.json 完全一致，如 `v0.1.0-alpha.2`），并推送 tag。
+4. **部署验证**：main push 自动触发 GitHub Pages 工作流（`.github/workflows/deploy.yml`）；部署完成后，在 `rayysummers.github.io/Lexilexi/` 真机确认设置页底部版本号与 tag 一致。
+
 ## 文档与资料
 
 - 项目背景与规划：`docs/` 目录（领域模型等设计文档）与 [ROADMAP.md](./ROADMAP.md)。
