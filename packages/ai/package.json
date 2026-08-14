@@ -1,6 +1,6 @@
 ﻿{
   "name": "@lexilexi/ai",
-  "version": "0.0.0",
+  "version": "0.1.0-alpha.2",
   "private": true,
   "type": "module",
   "description": "Lexilexi AI 能力包（空壳：仅规划文档，MVP 不实现任何 AI 功能）",
