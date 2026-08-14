@@ -1,12 +1,17 @@
 /**
  * Lexilexi Service Worker（PWA 离线能力）。
  *
+ * 路径策略（重要）：本文件所有应用内路径一律「相对 SW 自身位置」解析
+ * （resolveUrl），缓存键统一为绝对 URL。因此应用可部署在任意子路径下
+ * （GitHub Pages 的 /Lexilexi/、根路径、自定义域名），无需按部署环境改写。
+ * 与 Vite base "./"、manifest / index.html 的相对路径策略保持一致。
+ *
  * 缓存策略（全部仅限同源 GET，不缓存任何跨域请求）：
  * - install：预缓存应用外壳（HTML / 清单 / 图标），并从 index.html 解析出
  *   带 hash 的静态资源 URL（js / css / 图标等）一并预缓存——不依赖构建期
  *   清单，首次在线访问完成安装后即可完全离线使用；成功后立即接管页面。
- *   预缓存逐项 allSettled：个别资源 404（如某些静态托管不给 `/` 返回目录
- *   索引）不使整个安装失败，与全文件「静默降级」哲学一致（Oscar 评审 C2）。
+ *   预缓存逐项 allSettled：个别资源 404（如某些静态托管不给目录索引）不使
+ *   整个安装失败，与全文件「静默降级」哲学一致（Oscar 评审 C2）。
  * - activate：清理旧版本缓存，并接管已打开的页面（clients.claim）。
  * - fetch：
  *   · 导航请求：网络优先，失败回退缓存的 index.html（离线打开应用）；
@@ -17,16 +22,25 @@
  */
 const CACHE_NAME = "lexilexi-shell-v1";
 
-/** 应用外壳：导航回退与安装即用所需的最小集合 */
+/** 以 SW 自身位置解析应用内路径为绝对 URL（同源）。 */
+function resolveUrl(path) {
+  return new URL(path, self.location.href).href;
+}
+
+/** 应用外壳：导航回退与安装即用所需的最小集合（相对 SW 位置，缓存键为绝对 URL） */
 const APP_SHELL = [
-  "/",
-  "/index.html",
-  "/manifest.webmanifest",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-  "/icons/maskable-512.png",
-  "/icons/apple-touch-icon.png",
-];
+  "./",
+  "./index.html",
+  "./manifest.webmanifest",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/maskable-512.png",
+  "./icons/apple-touch-icon.png",
+].map(resolveUrl);
+
+/** 导航回退与外壳解析使用的入口 URL */
+const INDEX_URL = resolveUrl("./index.html");
+const ROOT_URL = resolveUrl("./");
 
 /**
  * 逐项预缓存（成功项保留，失败项静默跳过）。
@@ -38,13 +52,14 @@ function precacheAll(cache, urls) {
 
 /**
  * 从 index.html 解析同源静态资源 URL（src / href 属性），
- * 用于把带内容 hash 的构建产物（/assets/*.js、*.css 等）预缓存进当前版本。
- * 解析失败或个别资源缓存失败均静默降级（不阻塞安装）。
+ * 用于把带内容 hash 的构建产物（./assets/*.js、*.css 等）预缓存进当前版本。
+ * 接受相对路径（./ 与 ../）与根绝对路径（/，非 //），统一经 resolveUrl
+ * 解析为绝对 URL；解析失败或个别资源缓存失败均静默降级（不阻塞安装）。
  */
 async function precacheAssetsFromHtml(cache) {
   let html;
   try {
-    const response = await fetch("/index.html", { cache: "no-cache" });
+    const response = await fetch(INDEX_URL, { cache: "no-cache" });
     if (!response.ok) {
       return;
     }
@@ -54,11 +69,17 @@ async function precacheAssetsFromHtml(cache) {
   }
   const urls = new Set();
   for (const match of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
-    const url = match[1];
-    // 仅同源绝对路径静态资源；跳过协议相对 URL、内联 data:、锚点等
-    if (url.startsWith("/") && !url.startsWith("//") && url !== "/index.html") {
-      urls.add(url);
+    const raw = match[1];
+    // 仅应用内路径：./、../ 或单个 / 开头；跳过协议相对 URL（//）、
+    // 内联 data:、锚点、以及 index.html 自身
+    if (!/^(?:\.\.?\/|\/(?!\/))/.test(raw)) {
+      continue;
     }
+    const abs = resolveUrl(raw);
+    if (abs === INDEX_URL) {
+      continue;
+    }
+    urls.add(abs);
   }
   await precacheAll(cache, [...urls]);
 }
@@ -122,8 +143,8 @@ self.addEventListener("fetch", (event) => {
       fetch(request).catch(
         async () =>
           (await caches.match(request, MATCH_OPTIONS)) ??
-          (await caches.match("/index.html", MATCH_OPTIONS)) ??
-          (await caches.match("/", MATCH_OPTIONS)),
+          (await caches.match(INDEX_URL, MATCH_OPTIONS)) ??
+          (await caches.match(ROOT_URL, MATCH_OPTIONS)),
       ),
     );
     return;

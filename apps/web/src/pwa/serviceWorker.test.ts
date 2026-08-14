@@ -21,15 +21,15 @@ import { describe, expect, it, vi } from "vitest";
 
 const SW_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../public/sw.js");
 
-/** 模拟生产构建产物：index.html 引用了带 hash 的 js/css */
+/** 模拟生产构建产物：index.html 引用了带 hash 的 js/css（Vite base "./" 的相对产物） */
 const INDEX_HTML = `<!doctype html>
 <html lang="zh-CN">
   <head>
-    <link rel="stylesheet" href="/assets/index-def456.css" />
+    <link rel="stylesheet" href="./assets/index-def456.css" />
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/assets/index-abc123.js"></script>
+    <script type="module" src="./assets/index-abc123.js"></script>
   </body>
 </html>`;
 
@@ -61,6 +61,9 @@ let sandboxFetch: (input: string | FakeRequest) => Promise<Response>;
 
 /** 与 sw.js sandbox 一致的 SW 源（相对 URL 按此解析为绝对 URL） */
 const SW_ORIGIN = "http://localhost";
+
+/** SW 脚本默认位置（位于站点根；子路径部署用例会覆盖） */
+const DEFAULT_SW_HREF = "http://localhost/sw.js";
 
 /** 归一化缓存键：相对路径按 SW 全局作用域解析为绝对 URL（模拟真实 Cache API） */
 function toKey(input: string | FakeRequest): string {
@@ -116,15 +119,17 @@ function defaultFetch(input: string | FakeRequest): Promise<Response> {
   return Promise.resolve(new Response(`content of ${url}`, { status: 200 }));
 }
 
-/** 加载 sw.js 到 vm sandbox，返回事件处理器与缓存实例 */
+/** 加载 sw.js 到 vm sandbox，返回事件处理器与缓存实例（swHref 决定相对路径解析基准） */
 function loadServiceWorker(
   fetchImpl: (input: string | FakeRequest) => Promise<Response> = defaultFetch,
+  swHref: string = DEFAULT_SW_HREF,
 ): SwHarness {
   sandboxFetch = fetchImpl;
   const cachesByName = new Map<string, FakeCache>();
   const handlers = new Map<string, (event: SwEventLike) => void>();
   const skipWaiting = vi.fn().mockResolvedValue(undefined);
   const claim = vi.fn().mockResolvedValue(undefined);
+  const swLocation = new URL(swHref);
 
   const cacheStorage = {
     /** 最近一次 CacheStorage.match 收到的选项（回归断言用） */
@@ -161,7 +166,7 @@ function loadServiceWorker(
   };
 
   const self = {
-    location: { origin: "http://localhost" },
+    location: { origin: swLocation.origin, href: swHref },
     addEventListener(type: string, handler: (event: SwEventLike) => void) {
       handlers.set(type, handler);
     },
@@ -251,7 +256,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
 
   it("外壳中个别资源 404 不阻断安装（allSettled 降级，评审 C2）", async () => {
     const harness = loadServiceWorker((url) => {
-      if (url === "/") {
+      if (url === "http://localhost/") {
         return Promise.reject(new TypeError("Failed to fetch")); // 模拟托管方不返回目录索引
       }
       return defaultFetch(url);
@@ -352,5 +357,40 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     });
     expect(crossOriginResponse).toBeUndefined();
     expect(sandboxFetch).not.toHaveBeenCalled();
+  });
+
+  it("子路径部署（GitHub Pages /Lexilexi/）：外壳与构建产物按 SW 位置解析缓存键（RAY-241 回归锁定）", async () => {
+    const SW_HREF = "https://rayysummers.github.io/Lexilexi/sw.js";
+    const harness = loadServiceWorker(defaultFetch, SW_HREF);
+    await runInstall(harness);
+
+    const cache = harness.cachesByName.get("lexilexi-shell-v1");
+    expect(cache).toBeDefined();
+    for (const shellUrl of [
+      "https://rayysummers.github.io/Lexilexi/",
+      "https://rayysummers.github.io/Lexilexi/index.html",
+      "https://rayysummers.github.io/Lexilexi/manifest.webmanifest",
+      "https://rayysummers.github.io/Lexilexi/icons/icon-192.png",
+    ]) {
+      expect(cache!.entries.has(shellUrl)).toBe(true);
+    }
+    // 构建产物同样解析到子路径下，而非站点根
+    expect(
+      cache!.entries.has("https://rayysummers.github.io/Lexilexi/assets/index-abc123.js"),
+    ).toBe(true);
+    expect(
+      cache!.entries.has("https://rayysummers.github.io/Lexilexi/assets/index-def456.css"),
+    ).toBe(true);
+
+    // 子路径下的导航请求离线时回退到子路径下的 index.html
+    sandboxFetch = () => Promise.reject(new TypeError("Failed to fetch"));
+    const response = await dispatchFetch(harness, {
+      method: "GET",
+      url: "https://rayysummers.github.io/Lexilexi/review",
+      mode: "navigate",
+    });
+    expect(response).toBeDefined();
+    expect(response!.ok).toBe(true);
+    expect(await response!.text()).toContain("./assets/index-abc123.js");
   });
 });

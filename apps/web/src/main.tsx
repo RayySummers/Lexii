@@ -11,8 +11,10 @@ import "./styles/index.css";
 initPersistenceStatus();
 
 // PWA：仅生产构建注册 Service Worker。开发环境跳过，避免缓存干扰 Vite HMR。
+// 注册路径相对当前文档（BASE_URL 为 "./" 时相对部署子路径，如 /Lexilexi/），
+// 与 sw.js 内部「相对 SW 自身位置」的路径策略一致。
 if (import.meta.env.PROD) {
-  registerServiceWorker("/sw.js");
+  registerServiceWorker(`${import.meta.env.BASE_URL}sw.js`);
 }
 
 const rootElement = document.getElementById("root");

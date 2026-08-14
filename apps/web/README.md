@@ -55,6 +55,10 @@ pnpm build          # tsc --noEmit + vite build
   之后断网也能打开应用并复习（学习数据本就在本机 IndexedDB，不经过网络）。
 - 开发：Service Worker 仅在生产构建（`import.meta.env.PROD`）注册，避免干扰 Vite HMR。
 - 缓存版本：`public/sw.js` 顶部 `CACHE_NAME` 在缓存结构或预缓存清单变化时递增。
+- 路径策略（部署无关）：Vite `base: "./"`，manifest / index.html / sw.js 全部按
+  「相对自身位置」解析路径，因此产物可部署在任意子路径（如 GitHub Pages 的
+  `/Lexilexi/`）、根路径或自定义域名，无需按环境改写（`serviceWorker.test.ts`
+  有子路径部署回归用例锁定）。
 - 已知限制（记录在案）：manifest 的 `theme_color` / `background_color` 是静态浅色值，
   深色主题下安装启动屏/标题栏仍为浅色——manifest 静态配色是平台限制；
   页面内 `meta theme-color` 已由 `themeColor.ts` 随主题动态同步，不受此限。

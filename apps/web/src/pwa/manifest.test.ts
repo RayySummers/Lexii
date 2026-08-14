@@ -44,7 +44,7 @@ function loadManifest(): Manifest {
 }
 
 function readIconBytes(src: string): Buffer {
-  const relative = src.replace(/^\//, "");
+  const relative = src.replace(/^(?:\.\/|\/)/, "");
   return readFileSync(path.join(PUBLIC_DIR, relative));
 }
 
@@ -54,8 +54,9 @@ describe("manifest.webmanifest（可安装性结构）", () => {
     expect(manifest.name).toBeTruthy();
     expect(manifest.short_name).toBeTruthy();
     expect(manifest.display).toBe("standalone");
-    expect(manifest.start_url).toBe("/");
-    expect(manifest.id).toBe("/");
+    // 相对 manifest 自身的路径：任意子路径部署（如 GitHub Pages /Lexilexi/）均可安装
+    expect(manifest.start_url).toBe("./");
+    expect(manifest.id).toBe("./");
   });
 
   it("图标覆盖 any 192 / any 512 / maskable 512", () => {
