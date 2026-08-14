@@ -64,14 +64,24 @@ async function precacheAssetsFromHtml(cache) {
 }
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE_NAME)
-      .then((cache) => precacheAll(cache, APP_SHELL))
-      .then((cache) => precacheAssetsFromHtml(cache))
-      .then(() => self.skipWaiting()),
-  );
+  event.waitUntil(installShell());
 });
+
+/**
+ * 安装流程：打开缓存 → 预缓存外壳 → 预缓存构建产物 → 立即接管页面。
+ *
+ * 注意（Oscar 复审 blocking）：Cache.add / addAll / put 按规范都解析为
+ * undefined，Promise.allSettled 解析为结果数组——若用 .then 链把前一步的
+ * 解析值传给下一步，拿到的是 undefined/数组而非 Cache 对象，会导致
+ * 类型错误使整个安装失败（SW 进入 redundant）。这里显式 async/await，
+ * 每一步都从本地变量取 cache，不依赖链上解析值。
+ */
+async function installShell() {
+  const cache = await caches.open(CACHE_NAME);
+  await precacheAll(cache, APP_SHELL);
+  await precacheAssetsFromHtml(cache);
+  await self.skipWaiting();
+}
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
@@ -83,6 +93,19 @@ self.addEventListener("activate", (event) => {
       .then(() => self.clients.claim()),
   );
 });
+
+/**
+ * 缓存查找统一选项：忽略 Vary。
+ *
+ * 关键（Oscar 复审后续，实测定性）：托管方可能给静态资源响应带
+ * `Vary: Origin`（vite preview 即如此）。缓存条目由 cache.add 写入时，
+ * 其内部请求不带 Origin 头；而 module script 的请求**一定带 Origin**
+ * （模块脚本强制 cors 模式）。两者按 Vary 匹配即判定不一致 → 缓存未命中 →
+ * 离线回退拿不到响应，module script 报 net::ERR_FAILED（经典脚本不带
+ * Origin 反而能命中）。本应用全部缓存条目为同源且不按 Vary 变体区分，
+ * 一律忽略 Vary 匹配。
+ */
+const MATCH_OPTIONS = { ignoreVary: true };
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
@@ -98,16 +121,16 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request).catch(
         async () =>
-          (await caches.match(request)) ??
-          (await caches.match("/index.html")) ??
-          (await caches.match("/")),
+          (await caches.match(request, MATCH_OPTIONS)) ??
+          (await caches.match("/index.html", MATCH_OPTIONS)) ??
+          (await caches.match("/", MATCH_OPTIONS)),
       ),
     );
     return;
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => {
+    caches.match(request, MATCH_OPTIONS).then((cached) => {
       const fetched = fetch(request)
         .then((response) => {
           if (response.ok) {

@@ -32,15 +32,20 @@ describe("registerServiceWorker", () => {
     expect(register).toHaveBeenCalledWith("/sw.js");
   });
 
-  it("注册被拒绝时静默降级（不向调用方抛错）", async () => {
+  it("注册被拒绝时不向调用方抛错，但 console.warn 保留排查线索", async () => {
     const register = vi.fn().mockRejectedValue(new Error("not allowed"));
     Object.defineProperty(navigator, "serviceWorker", {
       configurable: true,
       value: { register },
     });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     expect(() => registerServiceWorker("/sw.js")).not.toThrow();
     await Promise.resolve(); // 等待 rejection 被内部 catch 消费
     expect(register).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]![0]).toContain("not allowed");
+
+    warnSpy.mockRestore();
   });
 });
