@@ -11,7 +11,7 @@ import type { LexilexiExportData } from "@lexilexi/core";
 import { APP_VERSION } from "../lib/appVersion";
 import { usePersistenceStatus } from "./persistenceStatus";
 import { SettingsScreen } from "./SettingsScreen";
-import type { ImportBackupResult, SettingsDataProvider } from "./types";
+import type { ImportBackupResult, PresetSummary, SettingsDataProvider } from "./types";
 
 vi.mock("./persistenceStatus", () => ({
   usePersistenceStatus: vi.fn(),
@@ -28,11 +28,23 @@ const EMPTY_EXPORT: LexilexiExportData = {
   events: [],
 };
 
+const DEFAULT_PRESET_SUMMARIES: PresetSummary[] = [
+  {
+    id: "core-en-tier0",
+    name: "核心词表（中考/高考/四级/六级 + 高频）",
+    status: "installed",
+    installedCount: 7195,
+    totalCount: 7195,
+    installedVersion: "1.0.0",
+  },
+];
+
 interface Harness {
   provider: SettingsDataProvider;
   exportBackup: ReturnType<typeof vi.fn>;
   exportWordlistCsv: ReturnType<typeof vi.fn>;
   importBackup: ReturnType<typeof vi.fn>;
+  getPresetSummaries: ReturnType<typeof vi.fn>;
 }
 
 function makeHarness(): Harness {
@@ -41,12 +53,16 @@ function makeHarness(): Harness {
   const importBackup = vi
     .fn<(text: string) => Promise<ImportBackupResult>>()
     .mockResolvedValue({ items: 0, senses: 0, memoryStates: 0, events: 0 });
+  const getPresetSummaries = vi
+    .fn<() => Promise<PresetSummary[]>>()
+    .mockResolvedValue(DEFAULT_PRESET_SUMMARIES);
   const provider: SettingsDataProvider = {
     exportBackup,
     exportWordlistCsv,
     importBackup,
+    getPresetSummaries,
   };
-  return { provider, exportBackup, exportWordlistCsv, importBackup };
+  return { provider, exportBackup, exportWordlistCsv, importBackup, getPresetSummaries };
 }
 
 /** 桩掉 jsdom 未实现的 URL.createObjectURL / revokeObjectURL 与锚点点击，返回恢复函数 */
@@ -211,5 +227,35 @@ describe("SettingsScreen", () => {
 
     // 断言 UI 走 APP_VERSION（构建注入），不硬编码具体版本——发版 bump package.json 后测试自动跟随
     expect(screen.getByText(`乐希 Lexilexi v${APP_VERSION}`)).toBeInTheDocument();
+  });
+
+  it("数据来源与许可：入口进入二级页并展示来源与许可声明，返回按钮回到设置", async () => {
+    const harness = makeHarness();
+    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "查看数据来源与许可" }));
+
+    // 二级页标题与安装状态
+    expect(await screen.findByRole("heading", { name: "数据来源与许可" })).toBeInTheDocument();
+    expect(await screen.findByText("已安装")).toBeInTheDocument();
+    expect(await screen.findByText("7195 词条 · v1.0.0")).toBeInTheDocument();
+    expect(harness.getPresetSummaries).toHaveBeenCalledTimes(1);
+
+    // 数据来源与许可链接（新窗口打开）
+    expect(screen.getByText("ECDICT")).toBeInTheDocument();
+    expect(screen.getByText("NGSL 1.2（New General Service List）")).toBeInTheDocument();
+    const licenseLinks = screen.getAllByRole("link", { name: "许可文本" });
+    expect(licenseLinks.length).toBeGreaterThanOrEqual(3);
+    for (const link of licenseLinks) {
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    }
+
+    // NOTICE 文本可见
+    expect(screen.getByText(/Copyright \(c\) 2025 Linwei/)).toBeInTheDocument();
+
+    // 返回设置页
+    fireEvent.click(screen.getByRole("button", { name: "返回设置" }));
+    expect(await screen.findByRole("heading", { name: "设置" })).toBeInTheDocument();
   });
 });
