@@ -8,8 +8,9 @@
 import type { DexieOptions } from "dexie";
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
-import type { IsoDate, ItemId } from "./domain";
+import type { IsoDate } from "./domain";
 import { makeLearningItem, makeMemoryState, makeSense } from "./helpers";
+import type { ItemId } from "./id";
 import { openDatabase } from "./persistence";
 import type { LexilexiDatabase } from "./persistence";
 import { getStudyQueueItemIds, interleaveCards } from "./studyLoop";
