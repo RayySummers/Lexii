@@ -8,7 +8,7 @@
  *     1–4 或 A / H / G / E → Again / Hard / Good / Easy
  * - 评分按钮副文案为各档到期时间预览（@lexilexi/fsrs Scheduler.preview）。
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
 import type { ReviewRating } from "@lexilexi/core";
 import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
@@ -70,9 +70,12 @@ export function ReviewScreen({ provider, onExit }: ReviewScreenProps) {
   const flipRef = useRef(flip);
   const gradeRef = useRef(grade);
 
-  // 每次提交后同步 ref（react-hooks/refs 禁止渲染期写 ref；effect 在
-  // 任何用户事件派发前完成，监听器读到的永远是最新状态）。
-  useEffect(() => {
+  // 每次提交后同步 ref（react-hooks/refs 禁止渲染期写 ref；useLayoutEffect
+  // 在 DOM 提交后、浏览器绘制前同步执行——用户键盘事件派发前 ref 必然已
+  // 更新，把「重挂窗口内按键读到旧状态」的理论窗口压到零。Oscar 评审
+  // suggestion 采纳：useEffect 在绘制后异步执行，理论上存在绘制与 effect
+  // 之间的空隙；键盘输入路径改 useLayoutEffect 后无此窗口）。
+  useLayoutEffect(() => {
     phaseRef.current = session.phase;
     flipRef.current = flip;
     gradeRef.current = grade;
