@@ -43,17 +43,32 @@ export function createLexilexiDatabase(
  *
  * 版本链：v1 为初始 schema；后续 schema 升级追加 version(n)，
  * 每个版本内先执行数据迁移、再 stores(...) 声明新表集合（见上方迁移示例）。
+ * v2（RAY-258）：新增 meta 表（key → value 字符串，预设词表安装进度/完成标记
+ * 与未来的扩展包元信息）。纯新增表，无数据迁移，存量数据原样保留。
  */
 export function openLexilexiDatabase(db: Dexie): void {
   if (db.isOpen()) {
     return;
   }
-  db.version(DB_SCHEMA_VERSION).stores({
+  db.version(1).stores({
     items: "id",
     senses: "id",
     memoryStates: "id",
     events: "id, time, type",
   });
+  db.version(DB_SCHEMA_VERSION).stores({
+    items: "id",
+    senses: "id",
+    memoryStates: "id",
+    events: "id, time, type",
+    meta: "key",
+  });
+}
+
+/** meta 表记录（key 唯一，value 为字符串——进度数字/版本号/JSON 均可） */
+export interface MetaRecord {
+  key: string;
+  value: string;
 }
 
 export interface LexilexiTables {
@@ -61,6 +76,7 @@ export interface LexilexiTables {
   senses: Table<Sense, string>;
   memoryStates: Table<MemoryState, string>;
   events: Table<Event, string>;
+  meta: Table<MetaRecord, string>;
 }
 
 export interface LexilexiDatabase extends Dexie {
@@ -68,6 +84,7 @@ export interface LexilexiDatabase extends Dexie {
   senses: Table<Sense, string>;
   memoryStates: Table<MemoryState, string>;
   events: Table<Event, string>;
+  meta: Table<MetaRecord, string>;
 }
 
 /**

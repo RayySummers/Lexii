@@ -174,9 +174,13 @@ interface ReviewEvent extends BaseEvent {
 
 ## 9. 数据层与版本迁移
 
-- Dexie 数据库 **`lexilexi`**，`SCHEMA_VERSION = 1`，表：`items`(`id`)、`senses`(`id`)、`memoryStates`(`id`)、`events`(`id`, `time`, `type`)。
+- Dexie 数据库 **`lexilexi`**，`SCHEMA_VERSION = 2`，表：`items`(`id`)、`senses`(`id`)、`memoryStates`(`id`)、`events`(`id`, `time`, `type`)、`meta`(`key`)。
 - **schema 升级必须走 `db.version(n).stores(...).upgrade(...)` 迁移**，严禁 `db.delete()` / `db.close()` 后重建（清库重来是红线）。每版迁移函数带独立单元测试。
+- 版本链：v1 = 初始四表；v2（RAY-258）= 新增 `meta` 表（`{ key, value }` 字符串键值，
+  承载预设词表安装进度/完成标记 `preset:<id>:progress` / `preset:<id>:done`
+  与未来的扩展包元信息）。纯新增表，无数据迁移，存量数据原样保留。
 - 数据库操作一律走 `db.transaction("rw", ...)`；同一「评分 → 写状态 + 写事件」必须单事务原子落库。
+- 预设词表安装（`installPreset`）分块事务落库：每 400 词条一个事务（词条 → Sense / Item / Memory State / import 事件 4 记录），进度标记与块同事务提交，中断后从断点续装、不重复导入；完成标记 `preset:<id>:done` 命中即幂等跳过。
 
 ## 10. 持久化防线（storage.persist）
 
@@ -186,6 +190,6 @@ interface ReviewEvent extends BaseEvent {
 
 ## 11. 导出/导入
 
-- **导出必须完整可恢复**：`exportLexilexiData()` 产出单文件 JSON，含 `items`、`senses`、`memoryStates`、`events` 四张表 + schema 版本号；`importLexilexiData()` 能将其原样导回（JSON round-trip 测试保证）。
+- **导出必须完整可恢复**：`exportLexilexiData()` 产出单文件 JSON，含 `items`、`senses`、`memoryStates`、`events` 四张表 + schema 版本号；`importLexilexiData()` 能将其原样导回（JSON round-trip 测试保证）。`meta` 表为安装/偏好标记（非学习数据），不随导出；备份恢复后若库中已有数据，首启引导按「已有数据」跳过内置词表安装，不会重复导入。
 - 导入时同 `id` 冲突按「导入覆盖」处理，版本高于当前的不合法数据明确报错，绝不静默清库。
 - **低版本导入策略（v1 定稿，v0 无此字段）**：`dbSchemaVersion === 当前版本` 直接导入；`dbSchemaVersion < 当前版本` 允许导入，**不隐式迁移**——记录数据为 `put` 覆盖，未来 schema 升级时由数据库自身的 `version(n).upgrade()` 迁移链在打开时补齐（导入路径本身不做表结构改写）。若未来引入破坏性 schema 变更导致旧版无法安全导入，须在 `importLexilexiData` 显式拒绝并给出升级指引，且必须随新版本更新本文档。

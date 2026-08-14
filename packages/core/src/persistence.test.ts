@@ -221,3 +221,45 @@ describe("suspendItem / unsuspendItem / deleteItem", () => {
     expect(await database.events.where("type").equals("delete-item").count()).toBe(1);
   });
 });
+
+describe("schema 版本迁移（v1 → v2：meta 表，RAY-258）", () => {
+  it("v1 旧库打开后自动升级到 v2，存量数据原样保留，meta 表可用", async () => {
+    const options = makeOptions();
+
+    // 1. 按 v1 schema 建库并写入存量数据（模拟旧版本用户）
+    const legacy = new Dexie("lexilexi", options);
+    legacy.version(1).stores({
+      items: "id",
+      senses: "id",
+      memoryStates: "id",
+      events: "id, time, type",
+    });
+    await legacy.open();
+    await legacy.table("senses").put(makeSense());
+    const legacyItem = makeLearningItem(makeSense().id);
+    await legacy.table("items").put(legacyItem);
+    await legacy.table("memoryStates").put(makeMemoryState(legacyItem.id));
+    await legacy.table("events").put(makeReviewEvent(legacyItem.id, legacyItem.senseId));
+    legacy.close();
+
+    // 2. 用当前版本打开同一数据库 → Dexie 自动执行 v2 升级
+    const upgraded = openDatabase(options);
+    expect(upgraded.verno).toBe(2);
+    expect(await upgraded.senses.count()).toBe(1);
+    expect(await upgraded.items.count()).toBe(1);
+    expect(await upgraded.memoryStates.count()).toBe(1);
+    expect(await upgraded.events.count()).toBe(1);
+    expect(await upgraded.items.get(legacyItem.id)).toEqual(legacyItem);
+
+    // 3. meta 表可读写（预设词表安装标记依赖）
+    await upgraded.meta.put({ key: "preset:test:progress", value: "42" });
+    expect((await upgraded.meta.get("preset:test:progress"))?.value).toBe("42");
+    await upgraded.delete();
+  });
+
+  it("全新库直接以 v2 创建（含 meta 表）", async () => {
+    const database = freshDatabase();
+    expect(database.verno).toBe(2);
+    expect(await database.meta.count()).toBe(0);
+  });
+});

@@ -17,6 +17,7 @@ import { useCallback, useRef, useState } from "react";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { APP_VERSION } from "../lib/appVersion";
 import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
+import { DataSourcesScreen } from "./DataSourcesScreen";
 import { usePersistenceStatus } from "./persistenceStatus";
 import type { SettingsDataProvider } from "./types";
 
@@ -45,6 +46,28 @@ function readFileAsText(file: File): Promise<string> {
 }
 
 export function SettingsScreen({ provider, onExit }: SettingsScreenProps) {
+  // 二级视图分发（hooks 规则：主视图的全部 hooks 在 SettingsMainView 内，此处仅一个 state）
+  const [view, setView] = useState<"main" | "licenses">("main");
+  if (view === "licenses") {
+    return <DataSourcesScreen provider={provider} onBack={() => setView("main")} />;
+  }
+  return (
+    <SettingsMainView
+      provider={provider}
+      onExit={onExit}
+      onOpenLicenses={() => setView("licenses")}
+    />
+  );
+}
+
+interface SettingsMainViewProps {
+  provider: SettingsDataProvider;
+  onExit(): void;
+  /** 进入「数据来源与许可」二级页 */
+  onOpenLicenses(): void;
+}
+
+function SettingsMainView({ provider, onExit, onOpenLicenses }: SettingsMainViewProps) {
   const persistence = usePersistenceStatus();
 
   const [exporting, setExporting] = useState<"json" | "csv" | null>(null);
@@ -172,6 +195,19 @@ export function SettingsScreen({ provider, onExit }: SettingsScreenProps) {
         >
           {importing ? "正在恢复…" : "选择备份文件…"}
         </label>
+      </Section>
+
+      <Section title="数据来源与许可">
+        <p className="text-sm text-text-muted">
+          预设词表由开源数据（ECDICT、NGSL 1.2）清洗打包，随应用内置、离线可用。
+        </p>
+        <button
+          type="button"
+          onClick={onOpenLicenses}
+          className="w-fit rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        >
+          查看数据来源与许可
+        </button>
       </Section>
 
       <Section title="关于">

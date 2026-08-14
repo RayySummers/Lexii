@@ -10,12 +10,10 @@
  */
 import { newCardFields } from "@lexilexi/fsrs";
 import { DEFAULT_WORDLIST_LANG, parseCsvWordlist } from "./csv";
-import type { CsvWordEntry } from "./csv";
 import type { IsoDate, LanguageCode, LearningItem, Sense } from "./domain";
 import { createId, toEventId, toItemId, toSenseId } from "./id";
 import type { MemoryState } from "./memory";
 import type { LexilexiDatabase } from "./persistence";
-
 /** 导入选项 */
 export interface ImportWordsOptions {
   /** 词库标识（写入 LearningItem.source 与导入记录，如 "导入:四级词表.csv"） */
@@ -83,21 +81,31 @@ export async function importCsvWordlist(
   return { importedCount: entries.length, itemIds };
 }
 
-/** CSV 行 → Sense（内容快照；释义用全角分号拆分多条） */
-function toSense(entry: CsvWordEntry, lang: LanguageCode): Sense {
+/** 词条内容（CSV 行 / 预设词表条目共用：义项快照的输入形态） */
+export interface WordEntryContent {
+  term: string;
+  definitions: string[];
+  pos?: string;
+  ipa?: string;
+  tags?: string[];
+}
+
+/** 词条内容 → Sense（内容快照；释义用全角分号拆分多条） */
+export function toSense(entry: WordEntryContent, lang: LanguageCode): Sense {
   return {
     id: toSenseId(createId("sense")),
     lang,
     term: entry.term,
     definitions: entry.definitions,
     ...(entry.pos ? { pos: entry.pos } : {}),
-    tags: [],
+    ...(entry.ipa ? { ipa: entry.ipa } : {}),
+    tags: entry.tags ?? [],
     examples: [],
   };
 }
 
 /** 新条目的初始记忆状态（@lexilexi/fsrs 的 newCardFields，due = 导入时刻，导入即到期） */
-function toMemoryState(itemId: LearningItem["id"], time: IsoDate): MemoryState {
+export function toMemoryState(itemId: LearningItem["id"], time: IsoDate): MemoryState {
   const fields = newCardFields({ now: time });
   return {
     id: itemId,

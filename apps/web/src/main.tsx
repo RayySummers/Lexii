@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { bootstrapTier0Preset } from "./presets/bootstrap";
 import { registerServiceWorker } from "./pwa/register";
 import { initPersistenceStatus } from "./settings/persistenceStatus";
 import "./styles/index.css";
@@ -9,6 +10,10 @@ import "./styles/index.css";
 // 结果经 lexilexi:storage-permission 事件上报，设置页据此提示；不支持的环境
 // 静默降级，绝不阻塞启动。
 initPersistenceStatus();
+
+// 首启引导：全新库自动安装 Tier 0 内置核心词表（RAY-258，local-first 开箱可用）。
+// fire-and-forget：分块落库、可续装、幂等，失败不阻塞启动（错误仅记录 console）。
+bootstrapTier0Preset();
 
 // PWA：仅生产构建注册 Service Worker。开发环境跳过，避免缓存干扰 Vite HMR。
 // 注册路径相对当前文档（BASE_URL 为 "./" 时相对部署子路径，如 /Lexilexi/），

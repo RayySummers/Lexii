@@ -63,7 +63,7 @@ export {
   suspendItem,
   unsuspendItem,
 } from "./persistence";
-export type { DexieConstructor, LexilexiDatabase, LexilexiTables } from "./persistence";
+export type { DexieConstructor, LexilexiDatabase, LexilexiTables, MetaRecord } from "./persistence";
 export {
   STORAGE_PERMISSION_EVENT,
   dispatchStoragePermissionRequested,
@@ -77,12 +77,28 @@ export type {
 } from "./persistenceGuard";
 export { exportLexilexiData, importLexilexiData, parseLexilexiExport } from "./export";
 export type { LexilexiExportData } from "./export";
-export { DEFAULT_WORDLIST_LANG, CsvFormatError, parseCsvWordlist } from "./csv";
+export { DEFAULT_WORDLIST_LANG, CsvFormatError, parseCsvWordlist, TERM_PATTERN } from "./csv";
 export type { CsvParseResult, CsvWordEntry } from "./csv";
 export { exportCsvWordlist, serializeWordlistCsv } from "./exportCsv";
 export { SAMPLE_WORDLIST, SAMPLE_WORDLIST_CSV, SAMPLE_WORDLIST_ROW_COUNT } from "./sampleWordlist";
-export { importCsvWordlist } from "./importWords";
-export type { ImportWordsOptions, ImportWordsResult } from "./importWords";
+export { importCsvWordlist, toMemoryState, toSense } from "./importWords";
+export type { ImportWordsOptions, ImportWordsResult, WordEntryContent } from "./importWords";
+export {
+  getPresetInstallState,
+  installPreset,
+  presetDoneKey,
+  presetProgressKey,
+  PRESET_CHUNK_SIZE,
+} from "./presets/install";
+export type {
+  PresetInstallOptions,
+  PresetInstallResult,
+  PresetInstallState,
+  PresetInstallStatus,
+} from "./presets/install";
+export type { PresetPackage, PresetWordEntry, ThirdPartyDataSource } from "./presets/types";
+export { THIRD_PARTY_DATA_SOURCES, THIRD_PARTY_NOTICES } from "./presets/notices";
+export { TIER0_PRESET, TIER0_PRESET_ROW_COUNT } from "./presets/tier0";
 export {
   getDueItemIds,
   getDueItemIdsInRange,
