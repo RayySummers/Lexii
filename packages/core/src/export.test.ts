@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { LexilexiDatabase } from "./persistence";
 import { openDatabase } from "./persistence";
 import { exportLexilexiData, importLexilexiData, parseLexilexiExport } from "./export";
-import { EXPORT_FORMAT_VERSION } from "./constants";
+import { DB_SCHEMA_VERSION, EXPORT_FORMAT_VERSION } from "./constants";
 import type { LexilexiExportData } from "./export";
 import { SAMPLE_WORDLIST_CSV, SAMPLE_WORDLIST_ROW_COUNT } from "./sampleWordlist";
 import { importCsvWordlist } from "./importWords";
@@ -70,7 +70,7 @@ describe("数据迁移红线（禁止清库重来）", () => {
 
   it("建库后版本号为 DB_SCHEMA_VERSION", async () => {
     const db = openDatabase(makeOptions());
-    expect(db.verno).toBe(1);
+    expect(db.verno).toBe(DB_SCHEMA_VERSION);
     await db.close();
     await db.delete();
   });

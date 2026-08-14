@@ -20,8 +20,9 @@ export const EVENT_SCHEMA_VERSION = 0;
  *
  * 红线：升级必须通过 Dexie version(n).stores().upgrade() 迁移，
  * 禁止删除数据库后重建（清库重来）。
+ * v2（RAY-258）：新增 meta 表（预设词表安装进度/完成标记），纯新增无数据迁移。
  */
-export const DB_SCHEMA_VERSION = 1;
+export const DB_SCHEMA_VERSION = 2;
 
 /** 导出文件（完整可恢复 JSON）的格式版本 */
 export const EXPORT_FORMAT_VERSION = 1;
