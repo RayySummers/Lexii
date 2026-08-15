@@ -153,7 +153,8 @@ export function selectBookEntries(cleanedAll) {
       const p1Words = getP1Words()[def.id];
       if (p1Words) {
         const p1Entries = cleanedAll.filter(
-          (entry) => p1Words.has(entry.term.toLowerCase()) && !termSet.has(entry.term.toLowerCase()),
+          (entry) =>
+            p1Words.has(entry.term.toLowerCase()) && !termSet.has(entry.term.toLowerCase()),
         );
         entries = [...entries, ...p1Entries].sort((a, b) => a.term.localeCompare(b.term));
       }

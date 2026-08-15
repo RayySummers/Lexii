@@ -155,7 +155,10 @@ describe("getWordbookPackage（词书定义 → 可安装包）", () => {
     for (const entry of preset.entries) {
       const inTagSet = tagAllowed.has(entry.term);
       const inPool = WORDBOOK_POOL.has(entry.term.toLowerCase());
-      expect(inTagSet || inPool, `${entry.term}: not in tag set but ${inPool ? "in pool" : "missing from pool"}`).toBe(true);
+      expect(
+        inTagSet || inPool,
+        `${entry.term}: not in tag set but ${inPool ? "in pool" : "missing from pool"}`,
+      ).toBe(true);
     }
     expect(preset.entries.length).toBe(EXPECTED_TERM_COUNTS["book-tem4"]);
   });
