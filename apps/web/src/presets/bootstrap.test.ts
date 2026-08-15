@@ -5,16 +5,37 @@
  * 全部注入 fake-indexeddb 与小预设包，不依赖真实 Tier 0 数据。
  */
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LexilexiDatabase, PresetPackage } from "@lexilexi/core";
 import {
+  enrichmentDoneKey,
+  enrichmentProgressKey,
   importCsvWordlist,
   installPreset,
   openDatabase,
   parseEnrichmentPreset,
   presetProgressKey,
 } from "@lexilexi/core";
-import { bootstrapPresetData } from "./bootstrap";
+import { bootstrapPresetData, bootstrapTier0Preset } from "./bootstrap";
+
+// 富化子路径 mock（suggestion 3 入口测试）：避免在测试中装载 3.6MB 的
+// 真实 enrichment.tier0.data.json，用覆盖词表首词 "a" 的小包替代。
+vi.mock("@lexilexi/core/presets/enrichment", async () => {
+  const { parseEnrichmentPreset } = await import("@lexilexi/core");
+  return {
+    ENRICHMENT_TIER0_PRESET: parseEnrichmentPreset(
+      {
+        id: "web-test-enrichment",
+        version: "1.0.0",
+        name: "测试富化包",
+        generatedAt: "2026-08-15T00:00:00.000Z",
+        source: "测试来源（CC BY）",
+        entries: [["a", "/uˈes-mock/", "/uˈkeɪ-mock/", "", "", "", "", "", "", []]],
+      },
+      "web-test-enrichment.json",
+    ),
+  };
+});
 
 function makeOptions(): { indexedDB: IDBFactory; IDBKeyRange: typeof IDBKeyRange } {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
@@ -143,4 +164,30 @@ describe("bootstrapPresetData（首启内置词表引导）", () => {
     const other = await database.senses.filter((s) => s.term === "bootword1").first();
     expect(other?.ipaUs).toBeUndefined();
   });
+});
+
+describe("bootstrapTier0Preset（入口：新装写完成标记跳过存量回填，suggestion 3）", () => {
+  it(
+    "全新库：安装内联富化后写完成标记，不再跑全量回填",
+    async () => {
+      const database = freshDatabase();
+      bootstrapTier0Preset(database);
+      // fire-and-forget 入口：等待完成标记落库（真实 Tier 0 全量安装，
+      // fake-indexeddb 口径 ~1.3s；全套件并行下放宽到 60s）
+      await vi.waitFor(
+        async () => {
+          const done = await database.meta.get(enrichmentDoneKey("web-test-enrichment"));
+          expect(done?.value).toBe("1.0.0");
+        },
+        { timeout: 30_000, interval: 50 },
+      );
+      // mock 富化包覆盖词表首词 "a"：安装时已内联填充
+      const sense = await database.senses.filter((s) => s.term === "a").first();
+      expect(sense?.ipaUs).toBe("/uˈes-mock/");
+      // 完成标记写入即清理残留进度
+      const progress = await database.meta.get(enrichmentProgressKey("web-test-enrichment"));
+      expect(progress).toBeUndefined();
+    },
+    60_000,
+  );
 });

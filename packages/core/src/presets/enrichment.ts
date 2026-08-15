@@ -8,11 +8,14 @@
  *
  * 两条落库路径：
  * - 新装：installPreset 安装词条时内联填充（见 install.ts 的
- *   options.enrichment）；
- * - 存量库：backfillEnrichment 回填——分块事务按 senses.term 索引
- *   anyOfIgnoreCase 命中词条补字段（「禁止清库重来」：只改记录字段，
- *   不需要 IndexedDB schema 版本迁移，与 learningSteps 等记录级字段
- *   演进的先例一致，见 docs/domain-model.md §4 演进说明）。
+ *   options.enrichment）；完成后由引导层写完成标记（markEnrichmentDone），
+ *   跳过存量回填（新装词条已内联填充，再全量扫一遍是纯浪费）；
+ * - 存量库：backfillEnrichment 回填——单次全量读 senses 建内存小写 Map，
+ *   分块按主键 CAS 写回（不用 term 索引 anyOfIgnoreCase：无 transform 的
+ *   索引没有原生大小写不敏感查询，真机上同样是 JS 逐条比较，O(块数 ×
+ *   词表) 全扫描）；「禁止清库重来」：只改记录字段，不需要 IndexedDB
+ *   schema 版本迁移，与 learningSteps 等记录级字段演进的先例一致，见
+ *   docs/domain-model.md §4 演进说明。
  *
  * 合并口径（两路径一致，mergeEnrichmentIntoContent / IntoSense）：
  * 富化字段「只在目标字段缺失/为空时填充」，绝不覆盖用户已有内容
@@ -26,7 +29,7 @@ import type { LexilexiDatabase } from "../persistence";
 import type { WordEntryContent } from "../importWords";
 import type { EnrichmentPresetEntry, EnrichmentPresetPackage } from "./types";
 
-/** 每块富化词条数（anyOfIgnoreCase 一次查询的合理上限，与词表安装块一致） */
+/** 每块富化词条数（单块事务的写回量上限，与词表安装块一致；查询在内存 Map 上完成） */
 export const ENRICHMENT_CHUNK_SIZE = 400;
 
 /** 回填进度与完成标记的 meta 键（以富化包 id 为键空间） */
@@ -297,12 +300,29 @@ export function mergeEnrichmentIntoSense(
 
 /** 回填结果 */
 export type EnrichmentBackfillResult =
-  { status: "backfilled"; filledCount: number } | { status: "already-backfilled"; version: string };
+  | { status: "backfilled"; filledCount: number }
+  | { status: "already-backfilled"; version: string };
 
 /** 回填选项 */
 export interface EnrichmentBackfillOptions {
   /** 块间让出事件循环（测试可注入 no-op；默认 setTimeout 0） */
   yield?: () => Promise<void>;
+}
+
+/**
+ * 标记富化包已处理（Oscar 评审 suggestion 3）：新装路径 installPreset
+ * 已同事务内联填充富化字段，引导层在 installed 后调用本函数写完成标记，
+ * 跳过存量回填的全量扫描。同时清掉可能的残留进度（完成标记写入后，
+ * 中断续填的进度不再有意义）。
+ */
+export async function markEnrichmentDone(
+  db: LexilexiDatabase,
+  pkg: EnrichmentPresetPackage,
+): Promise<void> {
+  await db.transaction("rw", db.meta, async () => {
+    await db.meta.put({ key: enrichmentDoneKey(pkg.id), value: pkg.version });
+    await db.meta.delete(enrichmentProgressKey(pkg.id));
+  });
 }
 
 /**
@@ -312,10 +332,19 @@ export interface EnrichmentBackfillOptions {
  * 词表/词书外词条）不受影响。完成后写 `enrichment:<id>:done` 标记，
  * 下次启动直接跳过。
  *
+ * 实现（Oscar 评审 suggestion 1/2）：
+ * - 单次全量读 senses 建内存小写 Map，之后分块按主键 CAS 写回——替代
+ *   每块 `anyOfIgnoreCase` 全扫描（Dexie 对无 transform 的索引没有原生
+ *   大小写不敏感查询，真机上同样是 JS 逐条比较，O(块数 × 词表)）；
+ *   快照可能错过回填期间的并发写入，但合并口径「只补缺失字段」幂等，
+ *   错过的写入由下一次回填（如版本递增重跑）补上，安全；
+ * - 完成标记比对版本：`enrichment:<id>:done` 的值 ≠ 包版本即重跑
+ *   （ENRICHMENT_VERSION 递增后存量用户能收到新回填；合并幂等，重跑安全）。
+ *
  * @param db 已打开的 Lexilexi 数据库
  * @param pkg 富化数据包（装载校验后的形态）
  * @returns backfilled = 本次实际改写的 Sense 数；
- *   already-backfilled = 完成标记命中，跳过
+ *   already-backfilled = 完成标记版本与包版本一致，跳过
  */
 export async function backfillEnrichment(
   db: LexilexiDatabase,
@@ -324,12 +353,27 @@ export async function backfillEnrichment(
 ): Promise<EnrichmentBackfillResult> {
   const yieldFn = options.yield ?? (() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
 
+  // 完成标记比对版本（suggestion 2）：版本一致才跳过；版本不同重跑
   const done = await db.meta.get(enrichmentDoneKey(pkg.id));
-  if (done) {
+  if (done && done.value === pkg.version) {
     return { status: "already-backfilled", version: done.value };
   }
 
   const map = toEnrichmentMap(pkg);
+
+  // 单次全量读 senses 建内存小写 Map（suggestion 1）：回填为后台一次性
+  // 任务，全量快照 + 分块主键 CAS 写回，避免每块索引全扫描。
+  const allSenses = await db.senses.toArray();
+  const byTerm = new Map<string, Sense[]>();
+  for (const sense of allSenses) {
+    const key = sense.term.toLowerCase();
+    const bucket = byTerm.get(key);
+    if (bucket) {
+      bucket.push(sense);
+    } else {
+      byTerm.set(key, [sense]);
+    }
+  }
 
   // 并发首启竞态加固（与 installPreset 同款）：起始事务先写 progress=0
   // 占位（条件写入），占位后重读一次进度。
@@ -361,18 +405,6 @@ export async function backfillEnrichment(
         if ((Number.isFinite(currentValue) ? currentValue : 0) !== expectedCursor) {
           throw new ConcurrentBackfillError(pkg.id);
         }
-        const terms = chunk.map((entry) => entry[0]);
-        const senses = await db.senses.where("term").anyOfIgnoreCase(terms).toArray();
-        const byTerm = new Map<string, Sense[]>();
-        for (const sense of senses) {
-          const key = sense.term.toLowerCase();
-          const bucket = byTerm.get(key);
-          if (bucket) {
-            bucket.push(sense);
-          } else {
-            byTerm.set(key, [sense]);
-          }
-        }
         for (const entryTuple of chunk) {
           const enrichment = map.get(entryTuple[0].toLowerCase());
           if (!enrichment) {
@@ -398,7 +430,7 @@ export async function backfillEnrichment(
       }
       // 并发回填者推进了进度（本块已整体回滚）：先看是否已完成，再重读续填
       const doneNow = await db.meta.get(enrichmentDoneKey(pkg.id));
-      if (doneNow) {
+      if (doneNow && doneNow.value === pkg.version) {
         return { status: "already-backfilled", version: doneNow.value };
       }
       const current = await db.meta.get(enrichmentProgressKey(pkg.id));

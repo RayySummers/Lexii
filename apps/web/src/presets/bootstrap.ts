@@ -18,6 +18,7 @@ import {
   backfillEnrichment,
   getPresetInstallState,
   installPreset,
+  markEnrichmentDone,
   openDatabase,
   TIER0_PRESET,
 } from "@lexilexi/core";
@@ -80,9 +81,16 @@ export function bootstrapTier0Preset(db?: LexilexiDatabase): void {
       if (outcome.status === "error") {
         console.error("[presets] 内置核心词表安装失败：", outcome.message);
       }
+      if (outcome.status === "installed") {
+        // 新装路径（Oscar 评审 suggestion 3）：词条落库时已同事务内联填充
+        // 富化字段，直接写完成标记跳过存量回填——回填只补缺失字段，
+        // 新装库再全量扫一遍是纯浪费（18 块全扫描、零写入）。
+        await markEnrichmentDone(database, ENRICHMENT_TIER0_PRESET);
+        return;
+      }
       // 富化回填（RAY-268 存量库路径）：按 term 补字段，幂等
-      // （enrichment:<id>:done 标记命中即跳过），新装词条已在安装时内联
-      // 填充，回填只改「缺失/为空」的字段，两路径口径一致。
+      // （enrichment:<id>:done 标记与包版本一致即跳过），单次全量读
+      // senses 建内存 Map 分块写回；合并只改「缺失/为空」的字段。
       const backfill = await backfillEnrichment(database, ENRICHMENT_TIER0_PRESET);
       if (backfill.status === "backfilled" && backfill.filledCount > 0) {
         console.info(`[presets] 富化回填完成：${backfill.filledCount} 条词条`);

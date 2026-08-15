@@ -13,7 +13,7 @@
  * 与期望不符自动整体重试（至多 3 次）。默认单连接（慢但最简）；
  * 校验与 manifest 记录不受连接数影响。
  *
- * 用法：node scripts/presets/fetch-kaikki.mjs [--connections 16]
+ * 用法：node scripts/presets/fetch-kaikki.mjs [--connections N|--connections=N] [--force]
  * 输出：scripts/presets/.data/kaikki/kaikki.org-dictionary-English.jsonl（git 忽略）
  */
 import { createHash } from "node:crypto";
@@ -42,7 +42,7 @@ const LOCK_FILE = path.join(OUT_DIR, ".kaikki-fetch.lock");
  * 追加偏移基于启动时测量的大小，另一进程同时写会使文件错位）。锁文件
  * 记录 pid 与启动时间，正常结束/异常退出都释放（finally）。
  */
-function acquireLock() {
+function acquireLock(force) {
   if (existsSync(LOCK_FILE)) {
     let info = "";
     try {
@@ -50,7 +50,7 @@ function acquireLock() {
     } catch {
       // 锁文件读不到按空处理
     }
-    if (process.argv.includes("--force")) {
+    if (force) {
       console.log(`锁文件已存在（${info || "未知"})，--force 强制继续…`);
       return;
     }
@@ -63,6 +63,42 @@ function acquireLock() {
 
 function releaseLock() {
   rmSync(LOCK_FILE, { force: true });
+}
+
+/**
+ * 显式解析命令行参数（Oscar 评审 nit 2）：支持 `--connections 16` 与
+ * `--connections=16` 两种形态、`--force` 任意位置、未知参数立即报错
+ * ——此前 `Number(process.argv[3])` 只认固定位置，`--force --connections 16`
+ * 或 `--connections=16` 会静默得到 NaN/1 连接。
+ */
+function parseArgs(argv) {
+  const args = { connections: 1, force: false };
+  for (let i = 2; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "--force") {
+      args.force = true;
+      continue;
+    }
+    const inline = arg.match(/^--connections=(\d+)$/);
+    if (inline) {
+      args.connections = Number(inline[1]);
+      continue;
+    }
+    if (arg === "--connections") {
+      const next = argv[i + 1];
+      if (next && /^\d+$/.test(next)) {
+        args.connections = Number(next);
+        i += 1;
+        continue;
+      }
+      throw new Error(`--connections 需要数字参数（如 --connections 16 或 --connections=16）`);
+    }
+    throw new Error(`未知参数：${arg}`);
+  }
+  if (!Number.isFinite(args.connections) || args.connections < 1 || args.connections > 64) {
+    throw new Error(`连接数非法：${args.connections}（允许 1–64）`);
+  }
+  return args;
 }
 
 /** 固定抓取目标：英语词典提取（每周更新的当前快照；日期以 Last-Modified 为准） */
@@ -199,9 +235,9 @@ async function downloadParallel(url, total, connections, partPrefix) {
 }
 
 async function main() {
-  const connections = Number(process.argv[3] ?? 1);
+  const { connections, force } = parseArgs(process.argv);
   mkdirSync(OUT_DIR, { recursive: true });
-  acquireLock();
+  acquireLock(force);
   try {
     const manifest = readManifest();
     if (manifest?.file === path.basename(OUT_FILE)) {
