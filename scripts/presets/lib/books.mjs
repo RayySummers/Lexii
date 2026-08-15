@@ -13,7 +13,16 @@
  *   （确定性并列裁决）；
  * - 两条冲刺词书为「层次近似词书，非官方专四/专八名单」，命名与描述
  *   必须注明（红线）。
+ *
+ * RAY-274 调整（冲刺词书补词与 GRE 剔除）：
+ * - 真题高频词补入：从 mikigo/english-chinese-words（Apache-2.0）提取的
+ *   真题词频分析数据，专四 595 词 / 专八 684 词，合并进对应冲刺词书；
+ * - GRE 剔除：剔除 ECDICT GRE 标签中不在外部考试参考词表
+ *   （大纲词汇 kaCVanime/CEFR-VS-CN + 真题高频词）中的词条
+ *   （专四 698 词 / 专八 2633 词），为补词腾空间。
  */
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { TAG_LABELS } from "./ecdict.mjs";
 
 /**
@@ -65,18 +74,86 @@ export function byFrequencyDesc(a, b) {
 }
 
 /**
+ * RAY-274：从外部参考词表文件加载词集合（小写）。
+ * 文件每行一个词，忽略空行。
+ */
+function loadWordSet(relPath) {
+  const abs = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", relPath);
+  return new Set(
+    readFileSync(abs, "utf-8")
+      .split("\n")
+      .map((w) => w.trim().toLowerCase())
+      .filter((w) => w !== ""),
+  );
+}
+
+/**
+ * RAY-274：真题高频词补入列表（来源：mikigo/english-chinese-words，Apache-2.0）。
+ * 专四 595 词 / 专八 684 词，基于真题词频分析。在 build 时从 sources/ 加载，
+ * 合并进对应冲刺词书（去重后净增专四 130 词 / 专八 235 词）。
+ */
+const P1_WORDS = {
+  "book-tem4": () => loadWordSet("sources/zhenti-tem4-words.txt"),
+  "book-tem8": () => loadWordSet("sources/zhenti-tem8-words.txt"),
+};
+
+/**
+ * RAY-274：外部考试参考词表（大纲词汇 + 真题高频词）。
+ * GRE 标签词中不在此集合的词条将从冲刺词书中剔除。
+ */
+let _externalRefCache = null;
+function getExternalRefWords() {
+  if (!_externalRefCache) {
+    const syllabus = loadWordSet("sources/tem-syllabus-words.txt");
+    const zhentiTem4 = loadWordSet("sources/zhenti-tem4-words.txt");
+    const zhentiTem8 = loadWordSet("sources/zhenti-tem8-words.txt");
+    _externalRefCache = new Set([...syllabus, ...zhentiTem4, ...zhentiTem8]);
+  }
+  return _externalRefCache;
+}
+
+// fileURLToPath import needed for loadWordSet
+import { fileURLToPath } from "node:url";
+
+/**
  * 按词书定义选词（含「专八冲刺」词频截断），返回 id → 词条数组的 Map。
  * 词条按 term 升序排列（与共享池顺序一致）。
+ *
+ * RAY-274：冲刺词书在标准 tag 筛选后追加真题高频词补入（P1），
+ * 并剔除不在外部考试参考词表中的 GRE 标签词。
  *
  * @param {Array<import("./ecdict.mjs").CleanedEntry>} cleanedAll 清洗后的全部词条
  * @returns {Map<string, Array<import("./ecdict.mjs").CleanedEntry>>}
  */
 export function selectBookEntries(cleanedAll) {
+  const externalRef = getExternalRefWords();
   const bookEntriesById = new Map();
   for (const def of BOOK_DEFS) {
     let entries = cleanedAll
       .filter((entry) => entry.examTags.some((tag) => def.tagList.includes(tag)))
       .sort((a, b) => a.term.localeCompare(b.term));
+
+    // RAY-274：冲刺词书 — GRE 剔除须在截断之前执行，
+    // 否则专八截断后的词数基准偏移会导致最终词量不符预期。
+    if (def.id === "book-tem4" || def.id === "book-tem8") {
+      entries = entries.filter(
+        (entry) => !(entry.examTags.includes("gre") && !externalRef.has(entry.term.toLowerCase())),
+      );
+    }
+
+    // RAY-274：冲刺词书 — 补入真题高频词（P1）须在截断之前执行，
+    // 使截断目标（专四词数）已含 P1 补入词，专八截断后词数与专四一致。
+    if (def.id === "book-tem4" || def.id === "book-tem8") {
+      const termSet = new Set(entries.map((e) => e.term.toLowerCase()));
+      const p1Words = P1_WORDS[def.id]?.();
+      if (p1Words) {
+        const p1Entries = cleanedAll.filter(
+          (entry) => p1Words.has(entry.term.toLowerCase()) && !termSet.has(entry.term.toLowerCase()),
+        );
+        entries = [...entries, ...p1Entries].sort((a, b) => a.term.localeCompare(b.term));
+      }
+    }
+
     if (def.cutoffToId) {
       const targetCount = bookEntriesById.get(def.cutoffToId).length;
       entries = [...entries]
@@ -84,6 +161,7 @@ export function selectBookEntries(cleanedAll) {
         .slice(0, targetCount)
         .sort((a, b) => a.term.localeCompare(b.term));
     }
+
     bookEntriesById.set(def.id, entries);
   }
   return bookEntriesById;

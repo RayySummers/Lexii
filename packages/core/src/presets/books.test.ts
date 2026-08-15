@@ -17,7 +17,7 @@ import {
   WORDBOOK_SOURCE,
 } from "./books";
 
-/** 打包侧审计词数（scripts/presets/build.mjs --books 实测，2026-08-15） */
+/** 打包侧审计词数（scripts/presets/build.mjs --books 实测） */
 const EXPECTED_TERM_COUNTS: Record<string, number> = {
   "book-zk": 1602,
   "book-gk": 3677,
@@ -27,8 +27,8 @@ const EXPECTED_TERM_COUNTS: Record<string, number> = {
   "book-toefl": 6970,
   "book-ielts": 5038,
   "book-gre": 7504,
-  "book-tem4": 9137,
-  "book-tem8": 9137,
+  "book-tem4": 8569,
+  "book-tem8": 8569,
 };
 
 describe("WORDBOOK_CATALOG（词书目录）", () => {
@@ -60,11 +60,11 @@ describe("WORDBOOK_CATALOG（词书目录）", () => {
     }
   });
 
-  it("专八冲刺与专四冲刺同词数（词频截断至同量级，红线）", () => {
+  it("冲刺词书同词数（GRE 剔除 + 真题补入后截断至同量级）", () => {
     const tem4 = WORDBOOK_CATALOG.find((book) => book.id === "book-tem4");
     const tem8 = WORDBOOK_CATALOG.find((book) => book.id === "book-tem8");
     expect(tem8?.terms.length).toBe(tem4?.terms.length);
-    expect(tem8?.terms.length).toBeGreaterThan(9000);
+    expect(tem8?.terms.length).toBeGreaterThan(8000);
   });
 
   it("冲刺词书命名与描述注明「层次近似词书，非官方专四/专八名单」（口径红线）", () => {
@@ -143,14 +143,19 @@ describe("getWordbookPackage（词书定义 → 可安装包）", () => {
     }
   });
 
-  it("组合词书词条来自对应标签集合（专四 = 六级 ∪ 托福 的去重子集）", () => {
+  it("组合词书词条来自对应标签集合 ∪ 真题高频词补入（RAY-274）", () => {
     const tem4 = WORDBOOK_CATALOG.find((book) => book.id === "book-tem4");
     const cet6 = WORDBOOK_CATALOG.find((book) => book.id === "book-cet6");
     const toefl = WORDBOOK_CATALOG.find((book) => book.id === "book-toefl");
-    const allowed = new Set([...(cet6?.terms ?? []), ...(toefl?.terms ?? [])]);
+    // RAY-274：冲刺词书现在包含 ECDICT {cet6,toefl} 标签词 + 真题高频词补入（P1），
+    // P1 词不一定有 cet6/toefl 标签，但仍属于词书的有效内容。
+    const tagAllowed = new Set([...(cet6?.terms ?? []), ...(toefl?.terms ?? [])]);
     const preset = getWordbookPackage(tem4!);
+    // 断言：词条要么来自标签集合，要么在共享池中有完整词条数据（P1 补入词）
     for (const entry of preset.entries) {
-      expect(allowed.has(entry.term), entry.term).toBe(true);
+      const inTagSet = tagAllowed.has(entry.term);
+      const inPool = WORDBOOK_POOL.has(entry.term.toLowerCase());
+      expect(inTagSet || inPool, `${entry.term}: not in tag set but ${inPool ? "in pool" : "missing from pool"}`).toBe(true);
     }
     expect(preset.entries.length).toBe(EXPECTED_TERM_COUNTS["book-tem4"]);
   });
