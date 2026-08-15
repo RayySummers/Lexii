@@ -1,13 +1,16 @@
 /**
- * 四档评分按钮（Again / Hard / Good / Easy）。
+ * 评分按钮（RAY-265：默认三档，设置可切四档）。
  *
- * - 每档一个语义色（danger / accent / primary / success，全部走 design tokens，
+ * - 三档（默认）：认识 / 模糊 / 不认识 → FSRS Good / Hard / Again；
+ *   一档一个语义色（primary / accent / danger，全部走 design tokens，
  *   深浅两套自动生效，无硬编码颜色）；
+ * - 四档（Anki 传统）：Again / Hard / Good / Easy，沿用既有样式与快捷键；
  * - 副文案显示该档评分后的到期时间（previewGradeDueLabels 预览，与真实排期一致）；
- * - 右上角 kbd 提示快捷键（1–4，字母别名见 ReviewScreen 的键盘处理）；
- * - 移动端 2×2 网格，sm 以上一行四枚，触控目标 ≥ 48px。
+ * - 右上角 kbd 提示快捷键（三档 1–3，四档 1–4）；
+ * - 移动端网格等宽，sm 以上一行排开，触控目标 ≥ 48px。
  */
 import type { ReviewRating } from "@lexilexi/core";
+import type { RatingTierMode } from "../lib/ratingTiers";
 import { RATING_SHORTCUTS } from "./grade";
 
 interface RatingButtonConfig {
@@ -19,7 +22,36 @@ interface RatingButtonConfig {
   hoverBgClass: string;
 }
 
-const RATING_CONFIGS: readonly RatingButtonConfig[] = [
+/** 三档（默认）：认识 / 模糊 / 不认识 → Good / Hard / Again */
+const THREE_TIER_CONFIGS: readonly RatingButtonConfig[] = [
+  {
+    rating: "again",
+    label: "不认识",
+    shortcut: RATING_SHORTCUTS.again,
+    textClass: "text-danger",
+    hoverBorderClass: "hover:border-danger",
+    hoverBgClass: "hover:bg-danger/10",
+  },
+  {
+    rating: "hard",
+    label: "模糊",
+    shortcut: RATING_SHORTCUTS.hard,
+    textClass: "text-accent",
+    hoverBorderClass: "hover:border-accent",
+    hoverBgClass: "hover:bg-accent/10",
+  },
+  {
+    rating: "good",
+    label: "认识",
+    shortcut: RATING_SHORTCUTS.good,
+    textClass: "text-primary",
+    hoverBorderClass: "hover:border-primary",
+    hoverBgClass: "hover:bg-primary/10",
+  },
+];
+
+/** 四档（Anki 传统）：Again / Hard / Good / Easy */
+const FOUR_TIER_CONFIGS: readonly RatingButtonConfig[] = [
   {
     rating: "again",
     label: "Again",
@@ -57,13 +89,18 @@ const RATING_CONFIGS: readonly RatingButtonConfig[] = [
 export interface RatingButtonsProps {
   /** 各档评分后的到期时间文案（已格式化，如 { again: "10分钟", good: "1天" }） */
   dueLabels: Record<ReviewRating, string>;
+  /** 评分档位模式（三档默认 / 四档 Anki 传统） */
+  mode: RatingTierMode;
   onGrade(rating: ReviewRating): void;
 }
 
-export function RatingButtons({ dueLabels, onGrade }: RatingButtonsProps) {
+export function RatingButtons({ dueLabels, onGrade, mode }: RatingButtonsProps) {
+  const configs = mode === "three" ? THREE_TIER_CONFIGS : FOUR_TIER_CONFIGS;
+  // 类名必须字面量出现（Tailwind 编译期扫描），动态拼接会丢样式
+  const gridClass = mode === "three" ? "sm:grid-cols-3" : "sm:grid-cols-4";
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="评分">
-      {RATING_CONFIGS.map((config) => (
+    <div className={`grid grid-cols-2 gap-2 ${gridClass}`} role="group" aria-label="评分">
+      {configs.map((config) => (
         <button
           key={config.rating}
           type="button"

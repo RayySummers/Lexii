@@ -7,7 +7,7 @@
  *   aria-label / 文本内容提供。
  *
  * RAY-261：太阳/月亮主题图标已随 header 主题开关移除（主题改为设置页
- * 下拉选单），当前仅剩返回箭头。
+ * 下拉选单）。RAY-265：新增发音（扬声器）与撤销（逆时针箭头）图标。
  */
 interface IconProps {
   className?: string;
@@ -27,6 +27,45 @@ export function BackArrowIcon({ className }: IconProps) {
       aria-hidden="true"
     >
       <path d="M15 18l-6-6 6-6" />
+    </svg>
+  );
+}
+
+/** 扬声器（朗读发音，RAY-265） */
+export function SpeakerIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M11 5 6 9H2v6h4l5 4V5z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+      <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+    </svg>
+  );
+}
+
+/** 逆时针箭头（撤销上一步，RAY-265） */
+export function UndoIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 7v6h6" />
+      <path d="M3 13a9 9 0 1 0 3-7.7L3 13" />
     </svg>
   );
 }

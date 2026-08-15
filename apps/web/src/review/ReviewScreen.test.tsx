@@ -1,21 +1,26 @@
 /**
  * 复习界面交互测试（mock 数据源，不依赖 IndexedDB）。
  *
- * 覆盖验收点：正反面切换、四档评分、键盘快捷键与按钮等价、
- * 队列推进与完成态、空状态与错误恢复。
+ * 覆盖验收点：正反面切换、评分（RAY-265 默认三档 / 四档 Anki 传统）、
+ * 键盘快捷键与按钮等价、标熟、单步撤销、发音、队列推进与完成态、
+ * 空状态与错误恢复。
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { toEventId } from "@lexilexi/core";
 import type { LexilexiExportData, ReviewRating, StudyMode } from "@lexilexi/core";
+import { RATING_TIER_STORAGE_KEY } from "../lib/ratingTiers";
 import { ReviewScreen } from "./ReviewScreen";
 import { makeCard } from "./testFixtures";
-import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
+import type { GradeContext, GradeResult, ReviewCard, ReviewDataProvider } from "./types";
 
 interface ProviderHarness {
   provider: ReviewDataProvider;
   loadQueue: ReturnType<typeof vi.fn>;
   loadMultipleChoiceQueue: ReturnType<typeof vi.fn>;
   grade: ReturnType<typeof vi.fn>;
+  markMastered: ReturnType<typeof vi.fn>;
+  undoGrade: ReturnType<typeof vi.fn>;
   hasAnyItems: ReturnType<typeof vi.fn>;
   importSampleWordlist: ReturnType<typeof vi.fn>;
   exportBackup: ReturnType<typeof vi.fn>;
@@ -31,6 +36,26 @@ const EMPTY_EXPORT: LexilexiExportData = {
   memoryStates: [],
   events: [],
 };
+
+afterEach(() => {
+  // 档位设置在 localStorage：每个用例后清理，保证「默认三档」用例不受污染
+  try {
+    window.localStorage.clear();
+  } catch {
+    // 忽略清理失败
+  }
+  vi.unstubAllGlobals();
+});
+
+/** 切换到四档（Anki 传统）——需要 Again/Hard/Good/Easy 的用例先调用 */
+function useFourTiers() {
+  window.localStorage.setItem(RATING_TIER_STORAGE_KEY, "four");
+}
+
+/** 与卡片对齐的评分落库结果（撤销证据） */
+function gradeResultFor(card: ReviewCard, eventSuffix: string): GradeResult {
+  return { reviewEventId: toEventId(`evt_test_${eventSuffix}`), previousMemoryState: card.memory };
+}
 
 function makeHarness(
   options: {
@@ -48,7 +73,19 @@ function makeHarness(
   }
   const loadMultipleChoiceQueue = vi.fn().mockResolvedValue({ questions: [], cards: [] });
   const grade = vi
-    .fn<(card: ReviewCard, rating: ReviewRating, context: GradeContext) => Promise<void>>()
+    .fn<(card: ReviewCard, rating: ReviewRating, context: GradeContext) => Promise<GradeResult>>()
+    .mockImplementation(async (card) => gradeResultFor(card, "grade"));
+  const markMastered = vi
+    .fn<(card: ReviewCard, context: GradeContext) => Promise<GradeResult>>()
+    .mockImplementation(async (card) => gradeResultFor(card, "mastered"));
+  const undoGrade = vi
+    .fn<
+      (
+        itemId: ReviewCard["item"]["id"],
+        eventId: GradeResult["reviewEventId"],
+        previousMemoryState: GradeResult["previousMemoryState"],
+      ) => Promise<void>
+    >()
     .mockResolvedValue(undefined);
   const hasAnyItems = vi.fn<() => Promise<boolean>>().mockResolvedValue(hasItems);
   const importSampleWordlist = vi.fn<() => Promise<number>>().mockResolvedValue(14);
@@ -57,6 +94,8 @@ function makeHarness(
     loadQueue,
     loadMultipleChoiceQueue,
     grade,
+    markMastered,
+    undoGrade,
     hasAnyItems,
     importSampleWordlist,
     exportBackup,
@@ -66,6 +105,8 @@ function makeHarness(
     loadQueue,
     loadMultipleChoiceQueue,
     grade,
+    markMastered,
+    undoGrade,
     hasAnyItems,
     importSampleWordlist,
     exportBackup,
@@ -83,7 +124,8 @@ function expectCardShown(term: string) {
 }
 
 describe("ReviewScreen", () => {
-  it("加载后渲染第一张卡的词条与进度", async () => {
+  it("加载后渲染第一张卡的词条与进度（四档 Anki 传统）", async () => {
+    useFourTiers();
     const card = makeCard();
     card.sense.term = "apple";
     render(
@@ -99,6 +141,39 @@ describe("ReviewScreen", () => {
     expect(screen.getByText(/1 \/ 1/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Again/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Easy/ })).toBeInTheDocument();
+  });
+
+  it("默认三档：认识 / 模糊 / 不认识（无 Easy）", async () => {
+    const card = makeCard();
+    render(
+      <ReviewScreen
+        provider={makeHarness({ queue: [card] }).provider}
+        mode="review"
+        onExit={() => {}}
+      />,
+    );
+    await expectCardShown(card.sense.term);
+
+    expect(screen.getByRole("button", { name: /评分：认识/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /模糊/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /不认识/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Easy/ })).not.toBeInTheDocument();
+  });
+
+  it("默认三档：数字键 4 与字母 E 不评分（Easy 未提供）", async () => {
+    const card = makeCard();
+    const harness = makeHarness({ queue: [card] });
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
+    await expectCardShown(card.sense.term);
+
+    fireEvent.keyDown(window, { key: "4" });
+    fireEvent.keyDown(window, { key: "e" });
+    expect(harness.grade).not.toHaveBeenCalled();
+
+    // 三档数字键 1–3 正常评分
+    fireEvent.keyDown(window, { key: "3" });
+    await screen.findByText("本轮复习完成");
+    expect(harness.grade).toHaveBeenCalledWith(card, "good", expect.anything());
   });
 
   it("点击卡片翻面：释义从 aria-hidden 变为可见，再点翻回", async () => {
@@ -129,7 +204,8 @@ describe("ReviewScreen", () => {
     expect(faceAriaHidden(definition)).toBe("true");
   });
 
-  it("点击评分按钮：以对应档位评分并进入下一张卡", async () => {
+  it("点击评分按钮：以对应档位评分并进入下一张卡（四档）", async () => {
+    useFourTiers();
     const first = makeCard();
     first.sense.term = "apple";
     const second = makeCard();
@@ -149,7 +225,27 @@ describe("ReviewScreen", () => {
     );
   });
 
+  it("默认三档：点「认识」以 Good 评分并进入下一张卡", async () => {
+    const first = makeCard();
+    first.sense.term = "apple";
+    const second = makeCard();
+    second.sense.term = "book";
+    const harness = makeHarness({ queue: [first, second] });
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
+    await expectCardShown("apple");
+
+    fireEvent.click(screen.getByRole("button", { name: /评分：认识/ }));
+
+    await expectCardShown("book");
+    expect(harness.grade).toHaveBeenCalledWith(
+      first,
+      "good",
+      expect.objectContaining({ revealed: false }),
+    );
+  });
+
   it("翻面后评分记录 revealed=true", async () => {
+    useFourTiers();
     const card = makeCard();
     const harness = makeHarness({ queue: [card] });
     render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
@@ -201,7 +297,8 @@ describe("ReviewScreen", () => {
     expect(harness.grade).toHaveBeenCalledWith(card, "hard", expect.anything());
   });
 
-  it("评完所有卡进入完成态并显示计数", async () => {
+  it("评完所有卡进入完成态并显示计数（四档）", async () => {
+    useFourTiers();
     const first = makeCard();
     const second = makeCard();
     const harness = makeHarness({ queue: [first, second] });
@@ -256,6 +353,7 @@ describe("ReviewScreen", () => {
   });
 
   it("学习模式完成态：显示「本轮学习完成」与学习计数", async () => {
+    useFourTiers();
     const card = makeCard();
     const harness = makeHarness({ queue: [card] });
     render(<ReviewScreen provider={harness.provider} mode="learn" onExit={() => {}} />);
@@ -321,5 +419,115 @@ describe("ReviewScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "导出备份" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("导出失败");
+  });
+});
+
+describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
+  it("标熟：调用 markMastered 并进入下一张卡，可撤销回到该卡", async () => {
+    const first = makeCard();
+    first.sense.term = "apple";
+    const second = makeCard();
+    second.sense.term = "book";
+    const harness = makeHarness({ queue: [first, second] });
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
+    await expectCardShown("apple");
+
+    fireEvent.click(screen.getByRole("button", { name: /标熟/ }));
+
+    await expectCardShown("book");
+    expect(harness.markMastered).toHaveBeenCalledTimes(1);
+    expect(harness.grade).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "撤销上一步" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "撤销上一步" }));
+    await expectCardShown("apple");
+    expect(harness.undoGrade).toHaveBeenCalledTimes(1);
+    // 撤销成功后按钮消失（连续只能撤销一次）
+    expect(screen.queryByRole("button", { name: "撤销上一步" })).not.toBeInTheDocument();
+  });
+
+  it("评分后出现「撤销上一步」；撤销回退到上一张卡且不可连退", async () => {
+    const first = makeCard();
+    first.sense.term = "apple";
+    const second = makeCard();
+    second.sense.term = "book";
+    const harness = makeHarness({ queue: [first, second] });
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
+    await expectCardShown("apple");
+
+    // 评分前无撤销入口
+    expect(screen.queryByRole("button", { name: "撤销上一步" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /评分：认识/ }));
+    await expectCardShown("book");
+
+    fireEvent.click(screen.getByRole("button", { name: "撤销上一步" }));
+    await expectCardShown("apple");
+    expect(harness.undoGrade).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "撤销上一步" })).not.toBeInTheDocument();
+  });
+
+  it("完成态仍可撤销最后一步评分", async () => {
+    const card = makeCard();
+    const harness = makeHarness({ queue: [card] });
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
+    await expectCardShown(card.sense.term);
+
+    fireEvent.click(screen.getByRole("button", { name: /评分：认识/ }));
+    expect(await screen.findByText("本轮复习完成")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "撤销上一步" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "撤销上一步" }));
+    await expectCardShown(card.sense.term);
+    expect(harness.undoGrade).toHaveBeenCalledTimes(1);
+  });
+
+  it("发音：以设置口音朗读当前词条（浏览器语音合成，离线）", async () => {
+    const speak = vi.fn();
+    const cancel = vi.fn();
+    class FakeUtterance {
+      text: string;
+      lang = "";
+      constructor(text: string) {
+        this.text = text;
+      }
+    }
+    vi.stubGlobal("speechSynthesis", { speak, cancel });
+    vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
+
+    const card = makeCard();
+    card.sense.term = "apple";
+    render(
+      <ReviewScreen
+        provider={makeHarness({ queue: [card] }).provider}
+        mode="review"
+        onExit={() => {}}
+      />,
+    );
+    await expectCardShown("apple");
+
+    fireEvent.click(screen.getByRole("button", { name: /朗读 apple/ }));
+
+    expect(speak).toHaveBeenCalledTimes(1);
+    const utterance = speak.mock.calls[0]![0] as FakeUtterance;
+    expect(utterance.text).toBe("apple");
+    expect(utterance.lang).toBe("en-US"); // 默认美式
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("发音：环境不支持语音合成时给出提示，不阻塞复习", async () => {
+    vi.stubGlobal("speechSynthesis", undefined);
+    vi.stubGlobal("SpeechSynthesisUtterance", undefined);
+
+    const card = makeCard();
+    const harness = makeHarness({ queue: [card] });
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
+    await expectCardShown(card.sense.term);
+
+    fireEvent.click(screen.getByRole("button", { name: /朗读/ }));
+
+    expect(await screen.findByText("当前浏览器不支持语音合成，无法发音。")).toBeInTheDocument();
+    // 复习流程不受影响
+    expect(screen.getByRole("button", { name: /评分：认识/ })).toBeInTheDocument();
   });
 });

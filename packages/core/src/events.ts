@@ -59,6 +59,13 @@ export interface ReviewEvent extends BaseEvent {
   response?: string;
   /** 距上次复习的天数（重放恢复用；首次复习为 0） */
   elapsedDays: number;
+  /**
+   * 标熟记录（RAY-265）：本次评分来自「标熟」操作（用户自认已掌握）。
+   * 调度上映射 FSRS easy（长间隔），词保留词书、不挂起不剔除；
+   * 该标记仅作数据语义区分（统计/追溯可识别），不参与调度重放。
+   * 普通评分不写该字段（undefined）。
+   */
+  mastered?: boolean;
 }
 
 /** 编辑条目事件（diff 为最小变更描述） */

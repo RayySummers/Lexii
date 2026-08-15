@@ -10,6 +10,7 @@ import type { DateInput } from "@lexilexi/fsrs";
 import { Scheduler } from "@lexilexi/fsrs";
 import { memoryFieldsToCardInput } from "@lexilexi/core";
 import type { IsoDate, MemoryStateFields, ReviewRating } from "@lexilexi/core";
+import type { RatingTierMode } from "../lib/ratingTiers";
 
 /** 四档评分的到期时间预览（评分按钮副文案，如 Again → 10分钟） */
 export interface GradeDueLabels {
@@ -90,7 +91,16 @@ const KEY_TO_RATING: ReadonlyMap<string, ReviewRating> = new Map([
   ["e", "easy"],
 ]);
 
-/** 从键盘事件解析评分档位（无匹配返回 null；不区分大小写） */
-export function ratingFromKey(key: string): ReviewRating | null {
-  return KEY_TO_RATING.get(key.toLowerCase()) ?? null;
+/**
+ * 从键盘事件解析评分档位（无匹配返回 null；不区分大小写）。
+ *
+ * 三档模式（RAY-265 默认）：Easy 不提供，数字 4 与字母 E 不映射
+ * （评分档位只影响 UI 提供的入口，FSRS 算法核心不变）。
+ */
+export function ratingFromKey(key: string, mode: RatingTierMode): ReviewRating | null {
+  const rating = KEY_TO_RATING.get(key.toLowerCase()) ?? null;
+  if (rating === "easy" && mode === "three") {
+    return null;
+  }
+  return rating;
 }

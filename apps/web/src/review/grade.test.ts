@@ -66,24 +66,40 @@ describe("formatDueLabel", () => {
   });
 });
 
-describe("ratingFromKey", () => {
-  it("数字键 1-4 映射四档", () => {
-    expect(ratingFromKey("1")).toBe("again");
-    expect(ratingFromKey("2")).toBe("hard");
-    expect(ratingFromKey("3")).toBe("good");
-    expect(ratingFromKey("4")).toBe("easy");
+describe("ratingFromKey（档位模式感知，RAY-265）", () => {
+  it("四档模式：数字键 1-4 映射四档", () => {
+    expect(ratingFromKey("1", "four")).toBe("again");
+    expect(ratingFromKey("2", "four")).toBe("hard");
+    expect(ratingFromKey("3", "four")).toBe("good");
+    expect(ratingFromKey("4", "four")).toBe("easy");
   });
 
-  it("字母别名 a/h/g/e 不区分大小写", () => {
-    expect(ratingFromKey("a")).toBe("again");
-    expect(ratingFromKey("H")).toBe("hard");
-    expect(ratingFromKey("g")).toBe("good");
-    expect(ratingFromKey("E")).toBe("easy");
+  it("四档模式：字母别名 a/h/g/e 不区分大小写", () => {
+    expect(ratingFromKey("a", "four")).toBe("again");
+    expect(ratingFromKey("H", "four")).toBe("hard");
+    expect(ratingFromKey("g", "four")).toBe("good");
+    expect(ratingFromKey("E", "four")).toBe("easy");
+  });
+
+  it("三档模式（默认）：1-3 与 a/h/g 照常映射", () => {
+    expect(ratingFromKey("1", "three")).toBe("again");
+    expect(ratingFromKey("2", "three")).toBe("hard");
+    expect(ratingFromKey("3", "three")).toBe("good");
+    expect(ratingFromKey("a", "three")).toBe("again");
+    expect(ratingFromKey("h", "three")).toBe("hard");
+    expect(ratingFromKey("G", "three")).toBe("good");
+  });
+
+  it("三档模式：Easy 不提供，数字 4 与字母 E 不映射", () => {
+    expect(ratingFromKey("4", "three")).toBeNull();
+    expect(ratingFromKey("e", "three")).toBeNull();
+    expect(ratingFromKey("E", "three")).toBeNull();
   });
 
   it("无关按键返回 null", () => {
-    expect(ratingFromKey(" ")).toBeNull();
-    expect(ratingFromKey("Enter")).toBeNull();
-    expect(ratingFromKey("5")).toBeNull();
+    expect(ratingFromKey(" ", "three")).toBeNull();
+    expect(ratingFromKey("Enter", "four")).toBeNull();
+    expect(ratingFromKey("5", "three")).toBeNull();
+    expect(ratingFromKey("5", "four")).toBeNull();
   });
 });

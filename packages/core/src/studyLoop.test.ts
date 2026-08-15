@@ -1,9 +1,10 @@
-﻿import type { DexieOptions } from "dexie";
+import type { DexieOptions } from "dexie";
 import { newCardFields } from "@lexilexi/fsrs";
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
 import { importCsvWordlist } from "./importWords";
 import { makeLearningItem, makeMemoryState, makeSense } from "./helpers";
+import { toEventId, toItemId } from "./id";
 import type { MemoryStateFields } from "./memory";
 import { openDatabase } from "./persistence";
 import type { LexilexiDatabase } from "./persistence";
@@ -12,6 +13,7 @@ import {
   getDueItemIdsInRange,
   gradeReview,
   memoryFieldsToCardInput,
+  undoReview,
 } from "./studyLoop";
 
 /** 每个用例用独立的 fake-indexeddb 实例（互不干扰） */
@@ -521,5 +523,256 @@ describe("getDueItemIdsInRange（半开区间到期查询，RAY-252 明日到期
       "2026-08-16T00:00:00.000Z",
     );
     expect(nextDay).toEqual([]);
+  });
+});
+
+describe("标熟与单步撤销（RAY-265）", () => {
+  it("标熟：记录 mastered 标记，rating 映射 easy（长间隔进入调度，词保留词书）", async () => {
+    const database = freshDatabase();
+    const { itemIds } = await importCsvWordlist(database, "apple,苹果,n.", {
+      source: "测试",
+      time: TIME,
+    });
+    const itemId = itemIds[0]!;
+    const item = (await database.items.get(itemId))!;
+    const sense = (await database.senses.get(item.senseId))!;
+
+    const { reviewEvent, nextMemoryState, previousMemoryState } = await gradeReview(database, {
+      itemId,
+      senseId: sense.id,
+      exerciseType: "recall",
+      rating: "easy",
+      mastered: true,
+      reviewDurationMs: 2000,
+      revealed: false,
+      answerWasCorrect: true,
+      time: TIME,
+    });
+
+    expect(reviewEvent).toMatchObject({
+      type: "review",
+      rating: "easy",
+      mastered: true,
+      answerWasCorrect: true,
+    });
+    expect(nextMemoryState.fields.lastRating).toBe("easy");
+    // 长间隔：直接进入复习状态且 due 显著晚于评分时刻（FSRS easy 排期）
+    expect(nextMemoryState.fields.status).toBe("review");
+    expect(Date.parse(nextMemoryState.fields.due)).toBeGreaterThan(Date.parse(TIME));
+    // 词保留词书：条目状态不变（不剔除、不挂起）
+    expect((await database.items.get(itemId))!.status).toBe("active");
+    // 返回评分前状态供撤销回滚
+    expect(previousMemoryState.fields).toEqual({
+      status: "new",
+      due: TIME,
+      stabilityDays: 0,
+      difficulty: 0,
+      elapsedDays: 0,
+      learningSteps: 0,
+      reps: 0,
+      lapses: 0,
+      lastReviewAt: null,
+      lastRating: null,
+    });
+  });
+
+  it("普通评分不写 mastered 字段", async () => {
+    const database = freshDatabase();
+    const { itemIds } = await importCsvWordlist(database, "apple,苹果", {
+      source: "测试",
+      time: TIME,
+    });
+    const item = (await database.items.get(itemIds[0]!))!;
+    const sense = (await database.senses.get(item.senseId))!;
+    const { reviewEvent } = await gradeReview(database, {
+      itemId: item.id,
+      senseId: sense.id,
+      exerciseType: "recall",
+      rating: "easy",
+      reviewDurationMs: 1000,
+      revealed: false,
+      answerWasCorrect: true,
+      time: TIME,
+    });
+    expect("mastered" in reviewEvent).toBe(false);
+  });
+
+  it("标熟配非 easy 评分被拒绝（核心层强制映射契约）", async () => {
+    const database = freshDatabase();
+    const { itemIds } = await importCsvWordlist(database, "apple,苹果", {
+      source: "测试",
+      time: TIME,
+    });
+    const item = (await database.items.get(itemIds[0]!))!;
+    const sense = (await database.senses.get(item.senseId))!;
+    await expect(
+      gradeReview(database, {
+        itemId: item.id,
+        senseId: sense.id,
+        exerciseType: "recall",
+        rating: "good",
+        mastered: true,
+        reviewDurationMs: 1000,
+        revealed: false,
+        answerWasCorrect: true,
+        time: TIME,
+      }),
+    ).rejects.toThrow(RangeError);
+    expect(await database.events.count()).toBe(1); // 仅 import 事件
+  });
+
+  it("撤销：完整回滚事件与记忆状态（统计口径与撤销前一致）", async () => {
+    const database = freshDatabase();
+    const { itemIds } = await importCsvWordlist(database, "apple,苹果", {
+      source: "测试",
+      time: TIME,
+    });
+    const item = (await database.items.get(itemIds[0]!))!;
+    const sense = (await database.senses.get(item.senseId))!;
+    const before = (await database.memoryStates.get(item.id))!;
+
+    const result = await gradeReview(database, {
+      itemId: item.id,
+      senseId: sense.id,
+      exerciseType: "recall",
+      rating: "good",
+      reviewDurationMs: 1500,
+      revealed: true,
+      answerWasCorrect: true,
+      time: TIME,
+    });
+    expect(await database.events.where("type").equals("review").count()).toBe(1);
+
+    await undoReview(database, {
+      itemId: item.id,
+      eventId: result.reviewEvent.id,
+      previousMemoryState: result.previousMemoryState,
+      time: "2026-08-13T10:05:00.000Z",
+    });
+
+    // 事件删除、状态恢复（fields 逐字段一致；updatedAt 记撤销时刻）
+    expect(await database.events.where("type").equals("review").count()).toBe(0);
+    const restored = (await database.memoryStates.get(item.id))!;
+    expect(restored.fields).toEqual(before.fields);
+    expect(restored.updatedAt).toBe("2026-08-13T10:05:00.000Z");
+  });
+
+  it("撤销标熟：同样完整回滚（mastered 事件可撤销）", async () => {
+    const database = freshDatabase();
+    const { itemIds } = await importCsvWordlist(database, "apple,苹果", {
+      source: "测试",
+      time: TIME,
+    });
+    const item = (await database.items.get(itemIds[0]!))!;
+    const sense = (await database.senses.get(item.senseId))!;
+    const result = await gradeReview(database, {
+      itemId: item.id,
+      senseId: sense.id,
+      exerciseType: "recall",
+      rating: "easy",
+      mastered: true,
+      reviewDurationMs: 2000,
+      revealed: false,
+      answerWasCorrect: true,
+      time: TIME,
+    });
+
+    await undoReview(database, {
+      itemId: item.id,
+      eventId: result.reviewEvent.id,
+      previousMemoryState: result.previousMemoryState,
+    });
+
+    expect(await database.events.where("type").equals("review").count()).toBe(0);
+    const restored = (await database.memoryStates.get(item.id))!;
+    expect(restored.fields.reps).toBe(0);
+    expect(restored.fields.lastRating).toBeNull();
+  });
+
+  it("撤销不存在的事件：报错且状态不动", async () => {
+    const database = freshDatabase();
+    const { itemIds } = await importCsvWordlist(database, "apple,苹果", {
+      source: "测试",
+      time: TIME,
+    });
+    const item = (await database.items.get(itemIds[0]!))!;
+    const before = (await database.memoryStates.get(item.id))!;
+
+    await expect(
+      undoReview(database, {
+        itemId: item.id,
+        eventId: toEventId("evt_missing_001"),
+        previousMemoryState: before,
+      }),
+    ).rejects.toThrow("复习记录不存在或已撤销");
+    expect((await database.memoryStates.get(item.id))!.fields).toEqual(before.fields);
+  });
+
+  it("事件之后存在更新的评分：拒绝撤销（防线，保护事件投影不变量）", async () => {
+    const database = freshDatabase();
+    const { itemIds } = await importCsvWordlist(database, "apple,苹果", {
+      source: "测试",
+      time: TIME,
+    });
+    const item = (await database.items.get(itemIds[0]!))!;
+    const sense = (await database.senses.get(item.senseId))!;
+    const first = await gradeReview(database, {
+      itemId: item.id,
+      senseId: sense.id,
+      exerciseType: "recall",
+      rating: "good",
+      reviewDurationMs: 1000,
+      revealed: false,
+      answerWasCorrect: true,
+      time: "2026-08-13T10:00:00.000Z",
+    });
+    await gradeReview(database, {
+      itemId: item.id,
+      senseId: sense.id,
+      exerciseType: "recall",
+      rating: "good",
+      reviewDurationMs: 1000,
+      revealed: false,
+      answerWasCorrect: true,
+      time: "2026-08-13T10:10:00.000Z",
+    });
+
+    await expect(
+      undoReview(database, {
+        itemId: item.id,
+        eventId: first.reviewEvent.id,
+        previousMemoryState: first.previousMemoryState,
+      }),
+    ).rejects.toThrow("存在更新的复习记录");
+    expect(await database.events.where("type").equals("review").count()).toBe(2);
+  });
+
+  it("撤销条目不匹配的状态：报错且不落库", async () => {
+    const database = freshDatabase();
+    const { itemIds } = await importCsvWordlist(database, "apple,苹果", {
+      source: "测试",
+      time: TIME,
+    });
+    const item = (await database.items.get(itemIds[0]!))!;
+    const sense = (await database.senses.get(item.senseId))!;
+    const result = await gradeReview(database, {
+      itemId: item.id,
+      senseId: sense.id,
+      exerciseType: "recall",
+      rating: "good",
+      reviewDurationMs: 1000,
+      revealed: false,
+      answerWasCorrect: true,
+      time: TIME,
+    });
+
+    await expect(
+      undoReview(database, {
+        itemId: item.id,
+        eventId: result.reviewEvent.id,
+        previousMemoryState: { ...result.previousMemoryState, itemId: toItemId("item_other") },
+      }),
+    ).rejects.toThrow("撤销状态与条目不一致");
+    expect(await database.events.where("type").equals("review").count()).toBe(1);
   });
 });

@@ -139,12 +139,14 @@ export {
   getStudyQueueItemIds,
   gradeReview,
   memoryFieldsToCardInput,
+  undoReview,
 } from "./studyLoop";
 export type {
   GradeReviewInput,
   GradeReviewResult,
   StudyMode,
   StudyQueueOptions,
+  UndoReviewInput,
 } from "./studyLoop";
 export { editDistance, generateOptions } from "./distractors";
 export type { DistractorOption } from "./distractors";

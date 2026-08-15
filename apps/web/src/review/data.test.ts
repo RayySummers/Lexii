@@ -229,3 +229,46 @@ describe("createIndexedDbReviewDataProvider", () => {
     expect(ids.has(cardB!.item.id)).toBe(false);
   });
 });
+
+describe("标熟与单步撤销（RAY-265，数据源集成）", () => {
+  it("标熟：记录 mastered 事件并按长间隔排期，词保留词书（条目状态不变）", async () => {
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await provider.importSampleWordlist();
+    const queue = await provider.loadQueue("learn");
+    const card = queue[0]!;
+
+    const result = await provider.markMastered(card, { reviewDurationMs: 1_000, revealed: false });
+
+    expect(result.previousMemoryState.fields.reps).toBe(0);
+    const event = await db!.events.get(result.reviewEventId);
+    expect(event).toMatchObject({ type: "review", rating: "easy", mastered: true });
+
+    const memory = await db!.memoryStates.get(card.item.id);
+    expect(memory?.fields.lastRating).toBe("easy");
+    expect(memory?.fields.status).toBe("review");
+    // 词保留词书：条目未被剔除或挂起
+    const item = await db!.items.get(card.item.id);
+    expect(item?.status).toBe("active");
+    // 长间隔：due 至少 1 天以后（easy 直接转复习）
+    expect(Date.parse(memory!.fields.due)).toBeGreaterThan(Date.now() + 24 * 60 * 60 * 1000);
+  });
+
+  it("撤销：删除事件并恢复评分前状态，队列与评分前一致", async () => {
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await provider.importSampleWordlist();
+    const queue = await provider.loadQueue("learn");
+    const card = queue[0]!;
+
+    const result = await provider.grade(card, "good", { reviewDurationMs: 1_000, revealed: false });
+    expect(await db!.events.where("type").equals("review").count()).toBe(1);
+
+    await provider.undoGrade(card.item.id, result.reviewEventId, result.previousMemoryState);
+
+    expect(await db!.events.where("type").equals("review").count()).toBe(0);
+    const memory = await db!.memoryStates.get(card.item.id);
+    expect(memory?.fields).toEqual(result.previousMemoryState.fields);
+    // 回到学习队列（与评分前一致）
+    const learnQueue = await provider.loadQueue("learn");
+    expect(learnQueue.some((entry) => entry.item.id === card.item.id)).toBe(true);
+  });
+});

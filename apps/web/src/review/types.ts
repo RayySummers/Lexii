@@ -6,9 +6,12 @@
  * - `ReviewDataProvider`：数据源接口（测试注入 mock，浏览器注入 IndexedDB 实现）
  * - `GradeContext`：一次评分携带的会话上下文，与 @lexilexi/core 的
  *   `GradeReviewInput` 对应字段对齐
+ * - `GradeResult`：评分落库结果（撤销回滚所需的全部证据，RAY-265）
  */
 import type {
+  EventId,
   ExerciseType,
+  ItemId,
   LearningItem,
   LexilexiExportData,
   MemoryState,
@@ -43,12 +46,21 @@ export interface GradeContext {
   answerWasCorrect?: boolean;
 }
 
+/** 评分落库结果（RAY-265 单步撤销：完整回滚该次操作所需的全部证据） */
+export interface GradeResult {
+  /** 落库的复习事件 id（撤销时删除该事件） */
+  reviewEventId: EventId;
+  /** 评分前的记忆状态（撤销时原样恢复） */
+  previousMemoryState: MemoryState;
+}
+
 /**
  * 复习数据源。
  *
- * 职责边界：只做「按模式加载队列 / 评分落库 / 词库状态查询 / 示例词表导入」，
- * 全部经由 @lexilexi/core 的公开 API（getStudyQueueItemIds / gradeReview /
- * importCsvWordlist），不在 apps/web 内实现任何调度与队列组合算法。
+ * 职责边界：只做「按模式加载队列 / 评分落库 / 标熟 / 单步撤销 / 词库状态
+ * 查询 / 示例词表导入」，全部经由 @lexilexi/core 的公开 API
+ * （getStudyQueueItemIds / gradeReview / undoReview / importCsvWordlist），
+ * 不在 apps/web 内实现任何调度与队列组合算法。
  */
 export interface ReviewDataProvider {
   /**
@@ -67,8 +79,23 @@ export interface ReviewDataProvider {
    * cards[i] 与 questions[i] 一一对应。
    */
   loadMultipleChoiceQueue(mode: StudyMode): Promise<MultipleChoiceQueueResult>;
-  /** 评分并原子落库（排期由 @lexilexi/core 完成） */
-  grade(card: ReviewCard, rating: ReviewRating, context: GradeContext): Promise<void>;
+  /**
+   * 评分并原子落库（排期由 @lexilexi/core 完成）。
+   * 返回撤销证据（事件 id + 评分前状态），供单步撤销回滚（RAY-265）。
+   */
+  grade(card: ReviewCard, rating: ReviewRating, context: GradeContext): Promise<GradeResult>;
+  /**
+   * 标熟（RAY-265）：记录一次「已熟」评级——词保留词书中、不挂起不剔除，
+   * 按已熟的长间隔进入调度（映射 FSRS easy，很久以后再复习、仍会出现）。
+   * 返回撤销证据，与 grade 同一撤销通道。
+   */
+  markMastered(card: ReviewCard, context: GradeContext): Promise<GradeResult>;
+  /**
+   * 单步撤销（RAY-265）：完整回滚一次评分/标熟的全部本地记录——
+   * 删除复习事件 + 恢复评分前的记忆状态（单事务原子完成）。
+   * 连续只能撤销一次（由会话层约束，数据层只负责回滚）。
+   */
+  undoGrade(itemId: ItemId, eventId: EventId, previousMemoryState: MemoryState): Promise<void>;
   /** 词库是否为空（决定空状态：无词导入 vs 今日无到期） */
   hasAnyItems(): Promise<boolean>;
   /** 导入内置示例词表（空状态一键体验），返回导入条数 */
