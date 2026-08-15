@@ -15,6 +15,7 @@
 import type { ReactNode } from "react";
 import type { Sense } from "@lexilexi/core";
 import { dualPhonetics, parseWordParts } from "./enrichmentUi";
+import type { PhoneticBadge } from "./enrichmentUi";
 
 export interface ReviewCardProps {
   sense: Sense;
@@ -129,7 +130,7 @@ function PhoneticsRow({ sense, className = "" }: { sense: Sense; className?: str
       {badges.map((badge, index) => (
         <span
           key={`${index}:${badge.value}`}
-          aria-label={badge.fallback ? "音标" : badge.label === "美" ? "美式音标" : "英式音标"}
+          aria-label={phoneticLabel(badge)}
           className="flex items-center gap-1"
         >
           {badge.label ? (
@@ -144,7 +145,22 @@ function PhoneticsRow({ sense, className = "" }: { sense: Sense; className?: str
   );
 }
 
-/** 背面富化内容区块：有标签的统一容器；无内容时整个区块不渲染 */
+/**
+ * 音标条目的读屏文案：标签与音标值并写。
+ * aria-label 会替代内部文本成为 accessible name——只写标签会吞掉音标本体
+ * （Oscar 对 PR #32 的 suggestion 1，正面旧实现 aria-label="音标" 同源问题一并修）。
+ */
+function phoneticLabel(badge: PhoneticBadge): string {
+  const kind = badge.fallback ? "音标" : badge.label === "美" ? "美式音标" : "英式音标";
+  return `${kind} ${badge.value}`;
+}
+
+/**
+ * 背面富化内容区块：有标签的统一容器；无内容时整个区块不渲染。
+ * 根元素用 <div> 而非 <span>：区块内含 <ul> / <p> 等 flow content，
+ * span（phrasing）包 flow content 违反 HTML 嵌套规则（Oscar 对 PR #32 的
+ * nit 1；与 CardFace 的 RAY-237 先例同口径）。
+ */
 function CardSection({
   title,
   visible,
@@ -158,10 +174,10 @@ function CardSection({
     return null;
   }
   return (
-    <span className="flex flex-col gap-1.5 border-t border-border pt-3">
+    <div className="flex flex-col gap-1.5 border-t border-border pt-3">
       <span className="text-xs font-medium text-text-muted">{title}</span>
       {children}
-    </span>
+    </div>
   );
 }
 

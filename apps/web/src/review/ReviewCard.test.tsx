@@ -43,10 +43,10 @@ function flipCard() {
 }
 
 describe("ReviewCard 美/英双音标", () => {
-  it("正面展示美/英双音标（带标签与独立 aria-label）", () => {
+  it("正面展示美/英双音标（aria-label 含音标值，读屏不吞音标本体）", () => {
     render(<Harness sense={makeRichSense()} />);
-    expect(screen.getAllByLabelText("美式音标")).toHaveLength(2); // 正反面各一
-    expect(screen.getAllByLabelText("英式音标")).toHaveLength(2);
+    expect(screen.getAllByLabelText("美式音标 /əˈbændən/")).toHaveLength(2); // 正反面各一
+    expect(screen.getAllByLabelText("英式音标 /ɐbˈændən/")).toHaveLength(2);
     expect(screen.getAllByText("美")).toHaveLength(2);
     expect(screen.getAllByText("英")).toHaveLength(2);
     expect(screen.getAllByText("/əˈbændən/")).toHaveLength(2);
@@ -55,7 +55,7 @@ describe("ReviewCard 美/英双音标", () => {
 
   it("富化音标缺省：回退词书自带 ipa（补斜杠、无标签）", () => {
     render(<Harness sense={makeSense({ term: "abandon", ipa: "əˈbændən" })} />);
-    expect(screen.getAllByLabelText("音标")).toHaveLength(2);
+    expect(screen.getAllByLabelText("音标 /əˈbændən/")).toHaveLength(2);
     expect(screen.getAllByText("/əˈbændən/")).toHaveLength(2);
     expect(screen.queryByText("美")).toBeNull();
     expect(screen.queryByText("英")).toBeNull();
