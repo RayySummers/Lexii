@@ -96,9 +96,23 @@ export type {
   PresetInstallState,
   PresetInstallStatus,
 } from "./presets/install";
-export type { PresetPackage, PresetWordEntry, ThirdPartyDataSource } from "./presets/types";
+export type {
+  PresetPackage,
+  PresetWordEntry,
+  ThirdPartyDataSource,
+  WordbookCategory,
+  WordbookDefinition,
+} from "./presets/types";
 export { THIRD_PARTY_DATA_SOURCES, THIRD_PARTY_NOTICES } from "./presets/notices";
 export { TIER0_PRESET, TIER0_PRESET_ROW_COUNT } from "./presets/tier0";
+export {
+  getWordbookPackage,
+  WORDBOOK_CATALOG,
+  WORDBOOK_COUNT,
+  WORDBOOK_DATA_VERSION,
+  WORDBOOK_POOL,
+  WORDBOOK_SOURCE,
+} from "./presets/books";
 export {
   getDueItemIds,
   getDueItemIdsInRange,

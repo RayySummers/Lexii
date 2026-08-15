@@ -5,6 +5,7 @@ pnpm-lock.yaml
 
 # 脚本生成的产物与 vendored 数据（scripts/presets 管线生成，不手改格式）
 packages/core/src/presets/tier0.data.json
+packages/core/src/presets/books.data.json
 docs/presets/experiment.md
 docs/presets/quality-check.md
 scripts/presets/sources/ngsl/NGSL_12_stats.csv

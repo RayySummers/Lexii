@@ -1,5 +1,5 @@
 /**
- * 预设词表安装器（RAY-258 Tier 0 内置核心词表落库）。
+ * 预设词表安装器（RAY-258 Tier 0 内置核心词表落库 + RAY-262 词书库选装）。
  *
  * 与 importCsvWordlist 的关键差异：预设词表动辄数千词条，单事务逐条
  * put 会长时间占用主线程（RAY-257 简报 §四 指出的风险），因此：
@@ -13,7 +13,14 @@
  * - 每个新条目写入 Sense / Learning Item / Memory State / import 事件
  *   （4 条记录），与 importCsvWordlist 落库形态完全一致，统计与导出路径无感。
  *
- * 数据库 schema：meta 表由 DB_SCHEMA_VERSION 2 引入（persistence.ts 版本链）。
+ * term 去重（RAY-262）：词书之间与预设包之间共享词条池，同一词条可能
+ * 出现在多本词书（如「六级」与「专四冲刺」）或用户已有导入数据中。
+ * 安装时按 senses.term 索引查重：term 已存在即跳过（不新增学习项，
+ * 不覆盖既有 Sense——预设词表同源、释义一致，安装绝不改写用户数据），
+ * 跳过数计入返回结果的 skippedCount。
+ *
+ * 数据库 schema：meta 表由 DB_SCHEMA_VERSION 2 引入（persistence.ts 版本链）；
+ * senses.term 索引由 DB_SCHEMA_VERSION 4 引入（v3→v4 仅新增索引，存量保留）。
  */
 import { DEFAULT_WORDLIST_LANG } from "../csv";
 import type { LanguageCode } from "../domain";
@@ -59,7 +66,7 @@ export interface PresetInstallOptions {
 }
 
 export type PresetInstallResult =
-  | { status: "installed"; installedCount: number }
+  | { status: "installed"; installedCount: number; skippedCount: number }
   | { status: "already-installed"; installedVersion: string };
 
 /** 默认让出：把控制权交回事件循环，避免长事务阻塞 UI */
@@ -98,7 +105,8 @@ export async function getPresetInstallState(
  * @param db 已打开的 Lexilexi 数据库
  * @param preset 预设词表包（entries 已由打包侧清洗/排序/去重）
  * @param options 语言 / 时刻 / 让出函数（测试注入）
- * @returns installed = 本次新装数量；already-installed = 完成标记命中，跳过
+ * @returns installed = 本次实际新写入词条数（不含跳过的已存在词条）；
+ *   already-installed = 完成标记命中，跳过
  */
 export async function installPreset(
   db: LexilexiDatabase,
@@ -132,11 +140,14 @@ export async function installPreset(
   let cursor = Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, preset.entries.length) : 0;
   const startCursor = cursor;
   const total = preset.entries.length;
+  let skipped = 0;
 
   while (cursor < total) {
     const chunk = preset.entries.slice(cursor, cursor + PRESET_CHUNK_SIZE);
     const nextCursor = cursor + chunk.length;
     const expectedCursor = cursor;
+    // 本块跳过的词条数（事务提交成功后才计入总 skip；块回滚时作废）
+    let skippedInChunk = 0;
     try {
       // 块数据与进度标记同一事务：中断时该块整体回滚，进度停留在上一块末尾
       await db.transaction(
@@ -156,7 +167,17 @@ export async function installPreset(
           if ((Number.isFinite(currentValue) ? currentValue : 0) !== expectedCursor) {
             throw new ConcurrentInstallError(preset.id);
           }
+          // term 去重（RAY-262）：块内词条按 senses.term 索引一次查重，
+          // 已存在（来自其它词书 / 用户导入）的词条跳过，不产生重复学习项。
+          const chunkTerms = chunk.map((entry) => entry.term);
+          const existingTerms = new Set(
+            await db.senses.where("term").anyOf(chunkTerms).uniqueKeys(),
+          );
           for (const entry of chunk) {
+            if (existingTerms.has(entry.term)) {
+              skippedInChunk += 1;
+              continue;
+            }
             const sense = toSense(entry, lang);
             const itemId = toItemId(createId("item"));
             await db.senses.put(sense);
@@ -206,6 +227,8 @@ export async function installPreset(
       continue;
     }
     cursor = nextCursor;
+    // 本块事务已成功提交，skip 计数才有效
+    skipped += skippedInChunk;
     await yieldFn();
   }
 
@@ -214,7 +237,13 @@ export async function installPreset(
     await db.meta.delete(presetProgressKey(preset.id));
   });
 
-  return { status: "installed", installedCount: total - startCursor };
+  // installedCount = 实际新写入的词条数（不含跳过）；skippedCount = 因
+  // term 已存在而跳过的词条数（重叠词书 / 用户已导入数据，RAY-262）。
+  return {
+    status: "installed",
+    installedCount: total - startCursor - skipped,
+    skippedCount: skipped,
+  };
 }
 
 /** 并发安装检测错误（内部哨兵：不面向调用方文案） */

@@ -23,8 +23,11 @@ export const EVENT_SCHEMA_VERSION = 0;
  * v2（RAY-258）：新增 meta 表（预设词表安装进度/完成标记），纯新增无数据迁移。
  * v3（RAY-260）：memoryStates 新增 fields.due 索引（到期查询由全表 filter
  *   改为索引区间查询）；存量数据原样保留，Dexie 自动建索引。
+ * v4（RAY-262）：senses 新增 term 索引（预设词书安装按 term 查重，避免
+ *   重叠词书/用户已导入词条重复生成学习项）；纯新增索引无数据迁移，
+ *   存量数据原样保留。
  */
-export const DB_SCHEMA_VERSION = 3;
+export const DB_SCHEMA_VERSION = 4;
 
 /** 导出文件（完整可恢复 JSON）的格式版本 */
 export const EXPORT_FORMAT_VERSION = 1;

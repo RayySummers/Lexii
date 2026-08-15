@@ -6,6 +6,9 @@
  * - exportWordlistCsv：exportCsvWordlist（词表 CSV，仅未删除条目）
  * - importBackup：parseLexilexiExport → importLexilexiData（单事务、同 id 覆盖）
  * - getPresetSummaries：内置词表安装状态（RAY-258「数据来源与许可」页）
+ * - getWordbookSummaries / installWordbook：词书库状态与选装（RAY-262；
+ *   词书目录与共享池来自 @lexilexi/core 的 WORDBOOK_CATALOG / getWordbookPackage，
+ *   安装落库复用 installPreset 的分块/可恢复/幂等/按 term 去重能力）
  *
  * RAY-253 反馈 6：loadOverview（数据概览）已随设置页概览区删除。
  */
@@ -13,16 +16,42 @@ import {
   exportCsvWordlist,
   exportLexilexiData,
   getPresetInstallState,
+  getWordbookPackage,
   importLexilexiData,
+  installPreset,
   openDatabase,
   parseLexilexiExport,
   TIER0_PRESET,
+  WORDBOOK_CATALOG,
 } from "@lexilexi/core";
-import type { LexilexiDatabase, LexilexiExportData, PresetPackage } from "@lexilexi/core";
-import type { ImportBackupResult, PresetSummary, SettingsDataProvider } from "./types";
+import type {
+  LexilexiDatabase,
+  LexilexiExportData,
+  PresetPackage,
+  WordbookDefinition,
+} from "@lexilexi/core";
+import type {
+  ImportBackupResult,
+  PresetSummary,
+  SettingsDataProvider,
+  WordbookInstallResult,
+  WordbookSummary,
+} from "./types";
 
 /** 随包内置的预设词表（Tier 0；未来扩展包接入时在此登记） */
 const BUNDLED_PRESETS: readonly PresetPackage[] = [TIER0_PRESET];
+
+/** 词书包惰性缓存：首次访问时 join 共享池（9k+ 词条目引用），避免轮询反复构造 */
+const wordbookPackageCache = new Map<string, PresetPackage>();
+
+function getCachedWordbookPackage(book: WordbookDefinition): PresetPackage {
+  let preset = wordbookPackageCache.get(book.id);
+  if (!preset) {
+    preset = getWordbookPackage(book);
+    wordbookPackageCache.set(book.id, preset);
+  }
+  return preset;
+}
 
 /** 基于已打开的 Lexilexi 数据库创建设置页数据源（测试注入 fake-indexeddb 实例） */
 export function createIndexedDbSettingsDataProvider(db: LexilexiDatabase): SettingsDataProvider {
@@ -60,6 +89,33 @@ export function createIndexedDbSettingsDataProvider(db: LexilexiDatabase): Setti
           };
         }),
       );
+    },
+
+    async getWordbookSummaries(): Promise<WordbookSummary[]> {
+      return Promise.all(
+        WORDBOOK_CATALOG.map(async (book) => {
+          const state = await getPresetInstallState(db, getCachedWordbookPackage(book));
+          return {
+            id: state.presetId,
+            status: state.status,
+            installedCount: state.installedCount,
+            totalCount: state.totalCount,
+            ...(state.installedVersion ? { installedVersion: state.installedVersion } : {}),
+          };
+        }),
+      );
+    },
+
+    async installWordbook(bookId: string): Promise<WordbookInstallResult> {
+      const book = WORDBOOK_CATALOG.find((candidate) => candidate.id === bookId);
+      if (!book) {
+        throw new Error(`未知词书：${bookId}`);
+      }
+      const result = await installPreset(db, getCachedWordbookPackage(book));
+      if (result.status === "already-installed") {
+        return { installedCount: 0, skippedCount: 0 };
+      }
+      return { installedCount: result.installedCount, skippedCount: result.skippedCount };
     },
   };
 }

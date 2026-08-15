@@ -48,6 +48,9 @@ export function createLexilexiDatabase(
  * v3（RAY-260）：memoryStates 增加 fields.due 索引（到期/明日到期查询由
  * filter 全表扫描改为索引区间查询，评审 suggestion 2 的「为 fields.due
  * 建索引」部分）；仅新增索引，无数据迁移，存量数据原样保留。
+ * v4（RAY-262）：senses 增加 term 索引（预设词书安装按 term 查重去重，
+ * 重叠词书与用户已导入词条不重复生成学习项）；仅新增索引，无数据迁移，
+ * 存量数据原样保留。
  */
 export function openLexilexiDatabase(db: Dexie): void {
   if (db.isOpen()) {
@@ -66,9 +69,16 @@ export function openLexilexiDatabase(db: Dexie): void {
     events: "id, time, type",
     meta: "key",
   });
-  db.version(DB_SCHEMA_VERSION).stores({
+  db.version(3).stores({
     items: "id",
     senses: "id",
+    memoryStates: "id, fields.due",
+    events: "id, time, type",
+    meta: "key",
+  });
+  db.version(DB_SCHEMA_VERSION).stores({
+    items: "id",
+    senses: "id, term",
     memoryStates: "id, fields.due",
     events: "id, time, type",
     meta: "key",

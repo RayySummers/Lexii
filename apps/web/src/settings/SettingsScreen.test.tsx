@@ -50,6 +50,8 @@ interface Harness {
   exportWordlistCsv: ReturnType<typeof vi.fn>;
   importBackup: ReturnType<typeof vi.fn>;
   getPresetSummaries: ReturnType<typeof vi.fn>;
+  getWordbookSummaries: ReturnType<typeof vi.fn>;
+  installWordbook: ReturnType<typeof vi.fn>;
 }
 
 function makeHarness(): Harness {
@@ -61,13 +63,25 @@ function makeHarness(): Harness {
   const getPresetSummaries = vi
     .fn<() => Promise<PresetSummary[]>>()
     .mockResolvedValue(DEFAULT_PRESET_SUMMARIES);
+  const getWordbookSummaries = vi.fn().mockResolvedValue([]);
+  const installWordbook = vi.fn().mockResolvedValue({ installedCount: 0, skippedCount: 0 });
   const provider: SettingsDataProvider = {
     exportBackup,
     exportWordlistCsv,
     importBackup,
     getPresetSummaries,
+    getWordbookSummaries,
+    installWordbook,
   };
-  return { provider, exportBackup, exportWordlistCsv, importBackup, getPresetSummaries };
+  return {
+    provider,
+    exportBackup,
+    exportWordlistCsv,
+    importBackup,
+    getPresetSummaries,
+    getWordbookSummaries,
+    installWordbook,
+  };
 }
 
 /** 桩掉 jsdom 未实现的 URL.createObjectURL / revokeObjectURL 与锚点点击，返回恢复函数 */
@@ -283,6 +297,24 @@ describe("SettingsScreen", () => {
 
     // 断言 UI 走 APP_VERSION（构建注入），不硬编码具体版本——发版 bump package.json 后测试自动跟随
     expect(screen.getByText(`乐希 Lexilexi v${APP_VERSION}`)).toBeInTheDocument();
+  });
+
+  it("词书库：入口进入词书库页并展示分组词书目录，返回按钮回到设置（RAY-262）", async () => {
+    const harness = makeHarness();
+    renderSettings({ provider: harness.provider });
+
+    fireEvent.click(await screen.findByRole("button", { name: "浏览并安装词书" }));
+
+    // 二级页标题与分组
+    expect(await screen.findByRole("heading", { name: "词书库" })).toBeInTheDocument();
+    expect(await screen.findByText("考试词汇")).toBeInTheDocument();
+    expect(screen.getByText("冲刺词书")).toBeInTheDocument();
+    expect(screen.getByText("专四冲刺（近似词书）")).toBeInTheDocument();
+    expect(harness.getWordbookSummaries).toHaveBeenCalledTimes(1);
+
+    // 返回设置
+    fireEvent.click(screen.getByRole("button", { name: "返回设置" }));
+    expect(await screen.findByRole("heading", { name: "设置" })).toBeInTheDocument();
   });
 
   it("数据来源与许可：入口进入二级页并展示来源与许可声明，返回按钮回到设置", async () => {

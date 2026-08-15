@@ -39,6 +39,7 @@ import { isThemePreference, type ThemePreference } from "../theme/resolve";
 import { DataSourcesScreen } from "./DataSourcesScreen";
 import { usePersistenceStatus } from "./persistenceStatus";
 import type { SettingsDataProvider } from "./types";
+import { WordbookLibraryScreen } from "./WordbookLibraryScreen";
 
 /** 项目 GitHub 仓库与反馈入口（RAY-251）：纯外链跳转，不请求任何外部数据 */
 const GITHUB_REPO_URL = "https://github.com/RayySummers/Lexilexi";
@@ -74,7 +75,7 @@ export function SettingsScreen({
   onThemePreferenceChange,
 }: SettingsScreenProps) {
   // 二级视图分发（hooks 规则：主视图的全部 hooks 在 SettingsMainView 内，此处仅一个 state）
-  const [view, setView] = useState<"main" | "licenses">("main");
+  const [view, setView] = useState<"main" | "licenses" | "wordbooks">("main");
 
   // 导出/导入/提示状态提升到本层（RAY-260 评审 nit 2）：二级页切换时
   // SettingsMainView 卸载，进行中的导出与结果提示不再随卸载丢失。
@@ -163,10 +164,14 @@ export function SettingsScreen({
   if (view === "licenses") {
     return <DataSourcesScreen provider={provider} onBack={() => setView("main")} />;
   }
+  if (view === "wordbooks") {
+    return <WordbookLibraryScreen provider={provider} onBack={() => setView("main")} />;
+  }
   return (
     <SettingsMainView
       onExit={onExit}
       onOpenLicenses={() => setView("licenses")}
+      onOpenWordbooks={() => setView("wordbooks")}
       exporting={exporting}
       importing={importing}
       notice={notice}
@@ -188,6 +193,8 @@ interface SettingsMainViewProps {
   onExit(): void;
   /** 进入「数据来源与许可」二级页 */
   onOpenLicenses(): void;
+  /** 进入「词书库」二级页（RAY-262） */
+  onOpenWordbooks(): void;
   /** 导出/导入进行态与结果提示（状态由 SettingsScreen 持有，二级页切换不丢失） */
   exporting: "json" | "csv" | null;
   importing: boolean;
@@ -209,6 +216,7 @@ interface SettingsMainViewProps {
 function SettingsMainView({
   onExit,
   onOpenLicenses,
+  onOpenWordbooks,
   exporting,
   importing,
   notice,
@@ -281,6 +289,20 @@ function SettingsMainView({
             className="w-28 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           />
         </label>
+      </Section>
+
+      <Section title="词书库">
+        <p className="text-sm text-text-muted">
+          考试分级词书（中考 / 高考 / 四六级 / 考研 / 托福 / 雅思 / GRE
+          与冲刺词书）随应用内置，按需选装、全程离线；与已学词条相同的词会自动跳过。
+        </p>
+        <button
+          type="button"
+          onClick={onOpenWordbooks}
+          className="w-fit rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        >
+          浏览并安装词书
+        </button>
       </Section>
 
       <Section title="数据安全">

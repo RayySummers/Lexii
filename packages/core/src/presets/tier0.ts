@@ -13,8 +13,8 @@
  * split("\n") 是无损往返（全角分号可能出现在释义文本内，不作分隔符，
  * RAY-260 评审 nit 3）。
  */
-import { TERM_PATTERN } from "../csv";
-import type { PresetPackage, PresetWordEntry } from "./types";
+import { convertPresetEntry } from "./convertEntry";
+import type { PresetPackage } from "./types";
 import tier0Data from "./tier0.data.json";
 
 /** 生成物原始形态（紧凑元组：[term, definitions, pos, ipa, tags]，全字符串） */
@@ -27,39 +27,7 @@ type RawTier0Data = {
   entries: string[][];
 };
 
-/** 词条元组定长校验 */
-const TUPLE_LENGTH = 5;
-
-function convertEntry(raw: readonly string[], index: number): PresetWordEntry {
-  if (raw.length !== TUPLE_LENGTH) {
-    throw new Error(`tier0.data.json 词条 #${index} 元组长度非法：${raw.length}`);
-  }
-  const [term = "", defs = "", pos = "", ipa = "", tags = ""] = raw;
-  if (!term || term === "") {
-    throw new Error(`tier0.data.json 词条 #${index} 词条为空`);
-  }
-  if (!TERM_PATTERN.test(term)) {
-    throw new Error(`tier0.data.json 词条 #${index} 词条形状非法："${term}"`);
-  }
-  const definitions = defs
-    .split("\n")
-    .map((part) => part.trim())
-    .filter((part) => part !== "");
-  if (definitions.length === 0) {
-    throw new Error(`tier0.data.json 词条 #${index}（${term}）缺少释义`);
-  }
-  const tagList = tags
-    .split(/\s+/)
-    .map((part) => part.trim())
-    .filter((part) => part !== "");
-  return {
-    term,
-    definitions,
-    ...(pos !== "" ? { pos } : {}),
-    ...(ipa !== "" ? { ipa } : {}),
-    tags: tagList,
-  };
-}
+const SOURCE_NAME = "tier0.data.json";
 
 function loadTier0(): PresetPackage {
   const raw = tier0Data as unknown as RawTier0Data;
@@ -84,7 +52,7 @@ function loadTier0(): PresetPackage {
     name: raw.name,
     source: raw.source,
     lang: "en",
-    entries: raw.entries.map((entry, index) => convertEntry(entry, index)),
+    entries: raw.entries.map((entry, index) => convertPresetEntry(entry, index, SOURCE_NAME)),
   };
 }
 
