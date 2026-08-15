@@ -243,7 +243,7 @@ function main() {
     `共享词条池（全部词书 ∪ 去重）：${booksPool.size} 词，`,
     `raw ${(booksPoolVol.raw / 1024).toFixed(0)} KB，gzip ${(booksPoolVol.gzip / 1024).toFixed(0)} KB，brotli ${(booksPoolVol.brotli / 1024).toFixed(0)} KB。`,
     `独立打包（每本词书各存一份词条）：raw ${(booksStandaloneBytes / 1024).toFixed(0)} KB，`,
-    `为共享池方案的 ${(booksStandaloneBytes / booksPoolVol.raw).toFixed(2)} 倍（独立打包 5.3 MB vs 共享池 1.5 MB，实测）。`,
+    `为共享池方案的 ${(booksStandaloneBytes / booksPoolVol.raw).toFixed(2)} 倍（独立打包 raw 6,266 KB ≈ 6.3 MB vs 共享池 raw 1,486 KB ≈ 1.5 MB，实测）。`,
     "",
     "「专八冲刺」词频截断口径（frq desc → bnc desc → term asc 确定性并列裁决）：",
     "",

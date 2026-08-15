@@ -14,9 +14,9 @@
  *
  * 说明文案为过渡版（Vega 的正式文案交付后替换）。
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WordbookCategory } from "@lexilexi/core";
-import { WORDBOOK_CATALOG } from "@lexilexi/core";
+import { WORDBOOK_CATALOG } from "@lexilexi/core/presets/books";
 import { ScreenHeader } from "../components/ScreenHeader";
 import type { SettingsDataProvider, WordbookSummary } from "./types";
 
@@ -58,10 +58,20 @@ export function WordbookLibraryScreen({ provider, onBack }: WordbookLibraryScree
   const [notice, setNotice] = useState<string | null>(null);
   /** 有进行中安装 promise 的词书 id（用于「安装中…」按钮态与轮询续命） */
   const [pendingInstalls, setPendingInstalls] = useState<ReadonlySet<string>>(new Set());
+  // 卸载保护（Oscar 评审 nit 3）：安装 promise 在组件卸载后仍可能 resolve，
+  // 后续 setState / refresh 一律跳过，避免卸载组件上的状态更新。
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const refresh = useCallback(async () => {
     const result = await provider.getWordbookSummaries();
-    setSummaries(result);
+    if (mountedRef.current) {
+      setSummaries(result);
+    }
   }, [provider]);
 
   // 首次进入读全部词书状态
@@ -105,19 +115,27 @@ export function WordbookLibraryScreen({ provider, onBack }: WordbookLibraryScree
       setPendingInstalls((current) => new Set(current).add(bookId));
       try {
         const result = await provider.installWordbook(bookId);
+        if (!mountedRef.current) {
+          return; // 组件已卸载：安装仍会落库完成，但不再更新 UI 状态
+        }
         const skippedNote = result.skippedCount > 0 ? `，跳过已存在 ${result.skippedCount} 词` : "";
         setNotice(`词书已安装：新增 ${result.installedCount} 词${skippedNote}。`);
       } catch (err) {
+        if (!mountedRef.current) {
+          return;
+        }
         setError(`安装失败：${toErrorMessage(err)}`);
       } finally {
-        setPendingInstalls((current) => {
-          const next = new Set(current);
-          next.delete(bookId);
-          return next;
-        });
-        void refresh().catch(() => {
-          // 安装结束后的状态刷新失败静默忽略；用户手动操作会再触发
-        });
+        if (mountedRef.current) {
+          setPendingInstalls((current) => {
+            const next = new Set(current);
+            next.delete(bookId);
+            return next;
+          });
+          void refresh().catch(() => {
+            // 安装结束后的状态刷新失败静默忽略；用户手动操作会再触发
+          });
+        }
       }
     },
     [provider, refresh],

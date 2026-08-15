@@ -1,6 +1,6 @@
 # 预设词表格式清洗实验报告（RAY-258 范围 1）
 
-> 生成时间：2026-08-15T09:29:41.279Z（脚本：scripts/presets/analyze.mjs）
+> 生成时间：2026-08-15T10:21:25.478Z（脚本：scripts/presets/analyze.mjs）
 > 数据来源：ECDICT（MIT，commit bc015ed，ecdict.csv SHA256 1A6947E0…F9C3CF）+ NGSL 1.2（CC BY-SA 4.0，官方 NGSL_12_stats.csv）
 
 ## 1. 清洗统计（ECDICT 全量 76 万行）
@@ -82,7 +82,7 @@
 共享词条池（全部词书 ∪ 去重）：14933 词，
 raw 1486 KB，gzip 561 KB，brotli 419 KB。
 独立打包（每本词书各存一份词条）：raw 6266 KB，
-为共享池方案的 4.22 倍（独立打包 5.3 MB vs 共享池 1.5 MB，实测）。
+为共享池方案的 4.22 倍（独立打包 raw 6,266 KB ≈ 6.3 MB vs 共享池 raw 1,486 KB ≈ 1.5 MB，实测）。
 
 「专八冲刺」词频截断口径（frq desc → bnc desc → term asc 确定性并列裁决）：
 
@@ -96,4 +96,4 @@ raw 1486 KB，gzip 561 KB，brotli 419 KB。
 | 被截掉词条数 | 3705 |
 | 被截掉词条仍由单本词书覆盖 | 3705/3705（全部覆盖，不影响其它词书完整性） |
 
-脚本耗时：61.8s
+脚本耗时：59.3s

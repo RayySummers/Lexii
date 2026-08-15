@@ -54,7 +54,7 @@ export type WordbookCategory = "exam" | "sprint";
  *
  * 与 PresetPackage 的区别：词书目录只存元数据 + term 索引（"terms"），
  * 词条内容（释义/词性/音标/标签）在共享池（books.data.json 的 pool）
- * 按 term join 得到，池内每条释义只存一份，独立打包省 3.6 倍体积（实测）。
+ * 按 term join 得到，池内每条释义只存一份，独立打包省 4.2 倍体积（实测）。
  */
 export interface WordbookDefinition {
   /** 稳定标识（如 "book-cet6"），安装状态以 id 为键持久化 */

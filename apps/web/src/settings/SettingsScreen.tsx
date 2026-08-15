@@ -23,7 +23,7 @@
  *
  * 全部颜色走 design tokens（浅色/深色两套自动生效），不硬编码颜色。
  */
-import { useCallback, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { APP_VERSION } from "../lib/appVersion";
@@ -39,7 +39,15 @@ import { isThemePreference, type ThemePreference } from "../theme/resolve";
 import { DataSourcesScreen } from "./DataSourcesScreen";
 import { usePersistenceStatus } from "./persistenceStatus";
 import type { SettingsDataProvider } from "./types";
-import { WordbookLibraryScreen } from "./WordbookLibraryScreen";
+
+/**
+ * 词书库页按需加载（RAY-262 Oscar 评审 suggestion 3）：词书目录与共享池
+ * 约 2 MB，经 React.lazy + core 子路径拆为独立 async chunk，仅打开词书库
+ * 时加载，主 bundle 不再携带词书数据。
+ */
+const WordbookLibraryScreen = lazy(() =>
+  import("./WordbookLibraryScreen").then((module) => ({ default: module.WordbookLibraryScreen })),
+);
 
 /** 项目 GitHub 仓库与反馈入口（RAY-251）：纯外链跳转，不请求任何外部数据 */
 const GITHUB_REPO_URL = "https://github.com/RayySummers/Lexilexi";
@@ -165,7 +173,18 @@ export function SettingsScreen({
     return <DataSourcesScreen provider={provider} onBack={() => setView("main")} />;
   }
   if (view === "wordbooks") {
-    return <WordbookLibraryScreen provider={provider} onBack={() => setView("main")} />;
+    return (
+      <Suspense
+        fallback={
+          <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
+            <ScreenHeader title="词书库" onBack={() => setView("main")} backLabel="返回设置" />
+            <p className="text-sm text-text-muted">正在加载词书目录…</p>
+          </main>
+        }
+      >
+        <WordbookLibraryScreen provider={provider} onBack={() => setView("main")} />
+      </Suspense>
+    );
   }
   return (
     <SettingsMainView

@@ -41,7 +41,7 @@
  *     必须注明（红线）；官方词表授权不在本任务范围；
  *   - 存储：共享词条池（全部词书词条 ∪ 去重，约 1.5 万词）+
  *     每本词书 term 索引（"\n" 连接，term 无换行、无损往返）；
- *     独立打包 10 本约 5.3 MB，共享池方案约 1.5 MB（省 3.6 倍，实测）；
+ *     独立打包 10 本约 6.3 MB，共享池方案约 1.5 MB（省 4.2 倍，实测）；
  *     NOTICE 无新增数据源（词书全部来自已登记的 ECDICT + NGSL 1.2）。
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -150,7 +150,7 @@ function buildTier(tier, cleaned, ngslTerms) {
  * 构建词书库（RAY-262）：共享词条池 + 每本词书 term 索引。
  *
  * 返回 books.data.json 的内容与审计统计；共享池 = 全部词书词条 ∪
- * （term 小写去重），每条释义只存一份，独立打包省 3.6 倍体积（实测）。
+ * （term 小写去重），每条释义只存一份，独立打包省 4.2 倍体积（实测）。
  */
 function buildBooks(cleaned, ngslTerms) {
   const ngslSet = new Set(ngslTerms.map((t) => t.toLowerCase()));

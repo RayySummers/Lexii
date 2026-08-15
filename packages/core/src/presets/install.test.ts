@@ -237,6 +237,30 @@ describe("installPreset（分块安装预设词表）", () => {
     expect(await database.items.count()).toBe(2);
   });
 
+  it("term 去重大小写不敏感（Oscar 评审 suggestion 1）：用户导入大写词条同样命中跳过", async () => {
+    const database = freshDatabase();
+
+    // 用户 CSV 导入含大写开头词条（词书内为全小写）
+    const existing = toSense({ term: "Testword0", definitions: ["用户导入的释义"] }, "en");
+    await database.senses.put(existing);
+
+    const preset = makePreset(makeEntries(3));
+    const result = await installPreset(database, preset, { yield: async () => {} });
+
+    expect(result.status).toBe("installed");
+    if (result.status !== "installed") {
+      throw new Error("unreachable");
+    }
+    expect(result.skippedCount).toBe(1);
+    expect(result.installedCount).toBe(2);
+    // 大写词条不产生重复 Sense / Learning Item
+    expect(await database.senses.count()).toBe(3);
+    expect(await database.items.count()).toBe(2);
+    const kept = await database.senses.get(existing.id);
+    expect(kept?.term).toBe("Testword0");
+    expect(kept?.definitions).toEqual(["用户导入的释义"]);
+  });
+
   it("并发首装加固：起始事务先写 progress=0 占位，早于任何词条落库（RAY-260 suggestion 3）", async () => {
     const database = freshDatabase();
     const preset = makePreset(makeEntries(10));

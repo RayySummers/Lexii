@@ -16,13 +16,11 @@ import {
   exportCsvWordlist,
   exportLexilexiData,
   getPresetInstallState,
-  getWordbookPackage,
   importLexilexiData,
   installPreset,
   openDatabase,
   parseLexilexiExport,
   TIER0_PRESET,
-  WORDBOOK_CATALOG,
 } from "@lexilexi/core";
 import type {
   LexilexiDatabase,
@@ -41,12 +39,28 @@ import type {
 /** 随包内置的预设词表（Tier 0；未来扩展包接入时在此登记） */
 const BUNDLED_PRESETS: readonly PresetPackage[] = [TIER0_PRESET];
 
+/**
+ * 词书模块按需加载（RAY-262 Oscar 评审 suggestion 3）：词书目录与共享池
+ * 约 2 MB，经 "@lexilexi/core/presets/books" 子路径 + 动态 import 拆为
+ * 独立 async chunk，只有打开词书库 / 安装词书时才加载，主 bundle 不再
+ * 携带词书数据（tier0 数据仍随主 bundle，首启安装依赖）。
+ */
+type WordbookModule = typeof import("@lexilexi/core/presets/books");
+
+let wordbookModulePromise: Promise<WordbookModule> | null = null;
+
+function loadWordbookModule(): Promise<WordbookModule> {
+  wordbookModulePromise ??= import("@lexilexi/core/presets/books");
+  return wordbookModulePromise;
+}
+
 /** 词书包惰性缓存：首次访问时 join 共享池（9k+ 词条目引用），避免轮询反复构造 */
 const wordbookPackageCache = new Map<string, PresetPackage>();
 
-function getCachedWordbookPackage(book: WordbookDefinition): PresetPackage {
+async function getCachedWordbookPackage(book: WordbookDefinition): Promise<PresetPackage> {
   let preset = wordbookPackageCache.get(book.id);
   if (!preset) {
+    const { getWordbookPackage } = await loadWordbookModule();
     preset = getWordbookPackage(book);
     wordbookPackageCache.set(book.id, preset);
   }
@@ -92,9 +106,10 @@ export function createIndexedDbSettingsDataProvider(db: LexilexiDatabase): Setti
     },
 
     async getWordbookSummaries(): Promise<WordbookSummary[]> {
+      const { WORDBOOK_CATALOG } = await loadWordbookModule();
       return Promise.all(
         WORDBOOK_CATALOG.map(async (book) => {
-          const state = await getPresetInstallState(db, getCachedWordbookPackage(book));
+          const state = await getPresetInstallState(db, await getCachedWordbookPackage(book));
           return {
             id: state.presetId,
             status: state.status,
@@ -107,11 +122,12 @@ export function createIndexedDbSettingsDataProvider(db: LexilexiDatabase): Setti
     },
 
     async installWordbook(bookId: string): Promise<WordbookInstallResult> {
+      const { WORDBOOK_CATALOG } = await loadWordbookModule();
       const book = WORDBOOK_CATALOG.find((candidate) => candidate.id === bookId);
       if (!book) {
         throw new Error(`未知词书：${bookId}`);
       }
-      const result = await installPreset(db, getCachedWordbookPackage(book));
+      const result = await installPreset(db, await getCachedWordbookPackage(book));
       if (result.status === "already-installed") {
         return { installedCount: 0, skippedCount: 0 };
       }

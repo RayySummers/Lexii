@@ -305,9 +305,12 @@ describe("SettingsScreen", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "浏览并安装词书" }));
 
-    // 二级页标题与分组
-    expect(await screen.findByRole("heading", { name: "词书库" })).toBeInTheDocument();
-    expect(await screen.findByText("考试词汇")).toBeInTheDocument();
+    // 二级页为 React.lazy 加载（词书数据约 2 MB 的独立 chunk）：全量并行
+    // 测试下加载可能超过默认 1s 等待，显式放宽到 5s 避免 flaky。
+    expect(
+      await screen.findByRole("heading", { name: "词书库" }, { timeout: 5000 }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("考试词汇", {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText("冲刺词书")).toBeInTheDocument();
     expect(screen.getByText("专四冲刺（近似词书）")).toBeInTheDocument();
     expect(harness.getWordbookSummaries).toHaveBeenCalledTimes(1);

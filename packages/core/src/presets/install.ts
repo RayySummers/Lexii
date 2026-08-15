@@ -47,7 +47,15 @@ export interface PresetInstallState {
   /** 包稳定标识 */
   presetId: string;
   status: PresetInstallStatus;
-  /** 已安装词条数（来自进度标记；0 = 未开始或未知） */
+  /**
+   * 已处理词条数：
+   * - "installed"：包内词条总数（完成标记存在即视为全量处理）；
+   * - "installing"：进度游标（已处理词条数，含 term 去重跳过的词条；
+   *   进度按条目序号推进，续装不重复处理已跳过词条），语义为
+   *   processedCount（Oscar 评审 nit 2：命名保留为 installedCount
+   *   以兼容 tier0 既有用法，注释说明语义）；
+   * - "not-installed"：0。
+   */
   installedCount: number;
   /** 包内词条总数 */
   totalCount: number;
@@ -169,12 +177,17 @@ export async function installPreset(
           }
           // term 去重（RAY-262）：块内词条按 senses.term 索引一次查重，
           // 已存在（来自其它词书 / 用户导入）的词条跳过，不产生重复学习项。
+          // 大小写不敏感（Oscar 评审 suggestion 1）：词书 term 打包侧全小写，
+          // 用户 CSV 导入可能含大写词条（如 "Apple"，TERM_PATTERN 允许），
+          // anyOfIgnoreCase + 小写规范化比对保证这类词条同样命中跳过。
           const chunkTerms = chunk.map((entry) => entry.term);
           const existingTerms = new Set(
-            await db.senses.where("term").anyOf(chunkTerms).uniqueKeys(),
+            (await db.senses.where("term").anyOfIgnoreCase(chunkTerms).uniqueKeys()).map((key) =>
+              String(key).toLowerCase(),
+            ),
           );
           for (const entry of chunk) {
-            if (existingTerms.has(entry.term)) {
+            if (existingTerms.has(entry.term.toLowerCase())) {
               skippedInChunk += 1;
               continue;
             }
