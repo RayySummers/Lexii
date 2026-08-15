@@ -313,7 +313,11 @@ describe("SettingsScreen", () => {
     expect(await screen.findByText("考试词汇", {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText("冲刺词书")).toBeInTheDocument();
     expect(screen.getByText("专四冲刺（近似词书）")).toBeInTheDocument();
-    expect(harness.getWordbookSummaries).toHaveBeenCalledTimes(1);
+    // getWordbookSummaries 是异步 effect：懒加载拆分后目录内容可能先于
+    // effect 落定，直接断言调用次数存在时序竞态，用 waitFor 等待其稳定。
+    await waitFor(() => {
+      expect(harness.getWordbookSummaries).toHaveBeenCalledTimes(1);
+    });
 
     // 返回设置
     fireEvent.click(screen.getByRole("button", { name: "返回设置" }));

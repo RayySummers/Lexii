@@ -140,6 +140,39 @@ describe("WordbookLibraryScreen", () => {
     });
   });
 
+  it("卸载保护：组件卸载后安装完成，不再刷新状态（mountedRef 守卫）", async () => {
+    const summaries = makeSummaries([{ id: "book-cet6", status: "not-installed" }]);
+    const { provider, getWordbookSummaries, installWordbook } = makeProvider({ summaries });
+    // 安装 promise 由测试手动控制 resolve 时机，模拟组件卸载后才完成
+    let resolveInstall!: (result: { installedCount: number; skippedCount: number }) => void;
+    installWordbook.mockImplementation(
+      () =>
+        new Promise<{ installedCount: number; skippedCount: number }>((resolve) => {
+          resolveInstall = resolve;
+        }),
+    );
+    const { unmount } = render(<WordbookLibraryScreen provider={provider} onBack={() => {}} />);
+
+    await screen.findByText("大学英语六级");
+    const card = screen.getByText("大学英语六级").closest("div");
+    if (!card) {
+      throw new Error("CET6 卡片未找到");
+    }
+    fireEvent.click(within(card).getByRole("button", { name: "安装" }));
+    await waitFor(() => {
+      expect(installWordbook).toHaveBeenCalledWith("book-cet6");
+    });
+
+    unmount();
+
+    // 卸载后安装才完成：mountedRef 守卫应跳过 setState 与 refresh，
+    // getWordbookSummaries 调用次数不再变化（轮询 interval 也已随卸载清理）
+    const callsAtUnmount = getWordbookSummaries.mock.calls.length;
+    resolveInstall({ installedCount: 5000, skippedCount: 0 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(getWordbookSummaries.mock.calls.length).toBe(callsAtUnmount);
+  });
+
   it("安装失败：展示错误提示（不崩溃）", async () => {
     const { provider, installWordbook } = makeProvider({
       summaries: makeSummaries([{ id: "book-cet6", status: "not-installed" }]),
