@@ -50,7 +50,15 @@ function makeHarness(options: { queue?: ReviewCard[] } = {}): ProviderHarness {
     importSampleWordlist,
     exportBackup,
   };
-  return { provider, loadQueue, loadMultipleChoiceQueue, grade, hasAnyItems, importSampleWordlist, exportBackup };
+  return {
+    provider,
+    loadQueue,
+    loadMultipleChoiceQueue,
+    grade,
+    hasAnyItems,
+    importSampleWordlist,
+    exportBackup,
+  };
 }
 
 /** 等待卡片出现：翻面按钮的可达名包含词条 */

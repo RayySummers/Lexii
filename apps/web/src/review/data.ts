@@ -35,7 +35,12 @@ import type {
 import { computeLearnedTodayCount, localDayBounds } from "@lexilexi/stats";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { buildReviewQueue } from "./queue";
-import type { GradeContext, MultipleChoiceQueueResult, ReviewCard, ReviewDataProvider } from "./types";
+import type {
+  GradeContext,
+  MultipleChoiceQueueResult,
+  ReviewCard,
+  ReviewDataProvider,
+} from "./types";
 
 /** 示例词表来源标识（写入 LearningItem.source 与 import 事件，供溯源） */
 const SAMPLE_SOURCE = "内置示例词表";
@@ -142,7 +147,9 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
         .map((pair) => pair.item.id);
       const wrongItems = await db.items.bulkGet(wrongItemIds);
       const wrongSenses = await db.senses.bulkGet(
-        wrongItems.filter((item): item is LearningItem => item !== undefined).map((item) => item.senseId),
+        wrongItems
+          .filter((item): item is LearningItem => item !== undefined)
+          .map((item) => item.senseId),
       );
       const wrongTerms = wrongSenses
         .filter((sense): sense is NonNullable<typeof sense> => sense !== undefined)

@@ -25,9 +25,7 @@ function makeQuestion(overrides: Partial<MultipleChoiceQuestion> = {}): Multiple
 describe("MultipleChoiceCard", () => {
   it("渲染词条与选项", () => {
     const question = makeQuestion();
-    render(
-      <MultipleChoiceCard question={question} selectedIndex={null} onSelect={() => {}} />,
-    );
+    render(<MultipleChoiceCard question={question} selectedIndex={null} onSelect={() => {}} />);
 
     expect(screen.getByText("abandon")).toBeInTheDocument();
     expect(screen.getByText("选择正确的释义")).toBeInTheDocument();
@@ -39,9 +37,7 @@ describe("MultipleChoiceCard", () => {
 
   it("显示选项序号 kbd（1–4）", () => {
     const question = makeQuestion();
-    render(
-      <MultipleChoiceCard question={question} selectedIndex={null} onSelect={() => {}} />,
-    );
+    render(<MultipleChoiceCard question={question} selectedIndex={null} onSelect={() => {}} />);
 
     expect(screen.getByText("1")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
@@ -52,9 +48,7 @@ describe("MultipleChoiceCard", () => {
   it("点击选项触发 onSelect 回调", () => {
     const question = makeQuestion();
     const onSelect = vi.fn();
-    render(
-      <MultipleChoiceCard question={question} selectedIndex={null} onSelect={onSelect} />,
-    );
+    render(<MultipleChoiceCard question={question} selectedIndex={null} onSelect={onSelect} />);
 
     fireEvent.click(screen.getByText("乐队"));
     expect(onSelect).toHaveBeenCalledWith(1);
@@ -62,9 +56,7 @@ describe("MultipleChoiceCard", () => {
 
   it("选择后显示正确/错误标记", () => {
     const question = makeQuestion();
-    render(
-      <MultipleChoiceCard question={question} selectedIndex={1} onSelect={() => {}} />,
-    );
+    render(<MultipleChoiceCard question={question} selectedIndex={1} onSelect={() => {}} />);
 
     // 选了错误选项（乐队），正确选项（放弃）显示 ✓
     expect(screen.getByLabelText("正确")).toBeInTheDocument();
@@ -75,9 +67,7 @@ describe("MultipleChoiceCard", () => {
   it("选择后选项禁用（不可再选）", () => {
     const question = makeQuestion();
     const onSelect = vi.fn();
-    render(
-      <MultipleChoiceCard question={question} selectedIndex={1} onSelect={onSelect} />,
-    );
+    render(<MultipleChoiceCard question={question} selectedIndex={1} onSelect={onSelect} />);
 
     fireEvent.click(screen.getByText("银行"));
     expect(onSelect).not.toHaveBeenCalled();
@@ -85,9 +75,7 @@ describe("MultipleChoiceCard", () => {
 
   it("选择正确选项时只显示 ✓ 无 ✗", () => {
     const question = makeQuestion();
-    render(
-      <MultipleChoiceCard question={question} selectedIndex={0} onSelect={() => {}} />,
-    );
+    render(<MultipleChoiceCard question={question} selectedIndex={0} onSelect={() => {}} />);
 
     expect(screen.getByLabelText("正确")).toBeInTheDocument();
     expect(screen.queryByLabelText("错误")).not.toBeInTheDocument();
@@ -96,9 +84,7 @@ describe("MultipleChoiceCard", () => {
   it("键盘快捷键 1 选择第一个选项", () => {
     const question = makeQuestion();
     const onSelect = vi.fn();
-    render(
-      <MultipleChoiceCard question={question} selectedIndex={null} onSelect={onSelect} />,
-    );
+    render(<MultipleChoiceCard question={question} selectedIndex={null} onSelect={onSelect} />);
 
     fireEvent.keyDown(window, { key: "1" });
     expect(onSelect).toHaveBeenCalledWith(0);
@@ -107,9 +93,7 @@ describe("MultipleChoiceCard", () => {
   it("键盘快捷键 4 选择第四个选项", () => {
     const question = makeQuestion();
     const onSelect = vi.fn();
-    render(
-      <MultipleChoiceCard question={question} selectedIndex={null} onSelect={onSelect} />,
-    );
+    render(<MultipleChoiceCard question={question} selectedIndex={null} onSelect={onSelect} />);
 
     fireEvent.keyDown(window, { key: "4" });
     expect(onSelect).toHaveBeenCalledWith(3);
@@ -118,9 +102,7 @@ describe("MultipleChoiceCard", () => {
   it("已选择后键盘快捷键不触发", () => {
     const question = makeQuestion();
     const onSelect = vi.fn();
-    render(
-      <MultipleChoiceCard question={question} selectedIndex={1} onSelect={onSelect} />,
-    );
+    render(<MultipleChoiceCard question={question} selectedIndex={1} onSelect={onSelect} />);
 
     fireEvent.keyDown(window, { key: "2" });
     expect(onSelect).not.toHaveBeenCalled();
@@ -129,9 +111,7 @@ describe("MultipleChoiceCard", () => {
   it("重复按键（repeat）不触发", () => {
     const question = makeQuestion();
     const onSelect = vi.fn();
-    render(
-      <MultipleChoiceCard question={question} selectedIndex={null} onSelect={onSelect} />,
-    );
+    render(<MultipleChoiceCard question={question} selectedIndex={null} onSelect={onSelect} />);
 
     fireEvent.keyDown(window, { key: "1", repeat: true });
     expect(onSelect).not.toHaveBeenCalled();
@@ -140,9 +120,7 @@ describe("MultipleChoiceCard", () => {
   it("带修饰键不触发", () => {
     const question = makeQuestion();
     const onSelect = vi.fn();
-    render(
-      <MultipleChoiceCard question={question} selectedIndex={null} onSelect={onSelect} />,
-    );
+    render(<MultipleChoiceCard question={question} selectedIndex={null} onSelect={onSelect} />);
 
     fireEvent.keyDown(window, { key: "1", ctrlKey: true });
     expect(onSelect).not.toHaveBeenCalled();
@@ -151,9 +129,7 @@ describe("MultipleChoiceCard", () => {
   it("显示词性标签", () => {
     const sense = makeSense({ term: "abandon", definitions: ["放弃"], pos: "v." });
     const question = makeQuestion({ sense });
-    render(
-      <MultipleChoiceCard question={question} selectedIndex={null} onSelect={() => {}} />,
-    );
+    render(<MultipleChoiceCard question={question} selectedIndex={null} onSelect={() => {}} />);
 
     expect(screen.getByText("v.")).toBeInTheDocument();
   });

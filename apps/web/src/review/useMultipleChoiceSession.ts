@@ -102,7 +102,16 @@ export function useMultipleChoiceSession(
       clearTimeout(advanceTimerRef.current);
       advanceTimerRef.current = null;
     }
-    apply({ phase: "loading", error: null, questions: [], cards: [], index: 0, selectedIndex: null, isCorrect: null, answeredCount: 0 });
+    apply({
+      phase: "loading",
+      error: null,
+      questions: [],
+      cards: [],
+      index: 0,
+      selectedIndex: null,
+      isCorrect: null,
+      answeredCount: 0,
+    });
     try {
       const { questions, cards } = await provider.loadMultipleChoiceQueue(mode);
       if (loadId !== loadIdRef.current) {

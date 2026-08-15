@@ -69,7 +69,11 @@ export function MultipleChoiceCard({ question, selectedIndex, onSelect }: Multip
       </div>
 
       {/* 选项列表 */}
-      <div className="flex flex-col gap-2" role="radiogroup" aria-label={`${sense.term} 的释义选择`}>
+      <div
+        className="flex flex-col gap-2"
+        role="radiogroup"
+        aria-label={`${sense.term} 的释义选择`}
+      >
         {options.map((option, index) => (
           <OptionButton
             key={`${index}:${option.text}`}
@@ -95,7 +99,14 @@ interface OptionButtonProps {
   onSelect(): void;
 }
 
-function OptionButton({ index, option, disabled, selected, revealed, onSelect }: OptionButtonProps) {
+function OptionButton({
+  index,
+  option,
+  disabled,
+  selected,
+  revealed,
+  onSelect,
+}: OptionButtonProps) {
   let stateClass = "border-border hover:border-primary";
   if (revealed && option.isCorrect) {
     stateClass = "border-success bg-success/10";

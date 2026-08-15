@@ -61,7 +61,15 @@ function makeHarness(
     importSampleWordlist,
     exportBackup,
   };
-  return { provider, loadQueue, loadMultipleChoiceQueue, grade, hasAnyItems, importSampleWordlist, exportBackup };
+  return {
+    provider,
+    loadQueue,
+    loadMultipleChoiceQueue,
+    grade,
+    hasAnyItems,
+    importSampleWordlist,
+    exportBackup,
+  };
 }
 
 /** 当前面（未翻面时正面，翻面后背面）的 aria-hidden 状态 */

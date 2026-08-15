@@ -6,9 +6,14 @@
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { DistractorOption, ReviewRating, StudyMode } from "@lexilexi/core";
+import type { DistractorOption, ReviewRating } from "@lexilexi/core";
 import { makeCard } from "./testFixtures";
-import type { GradeContext, MultipleChoiceQueueResult, ReviewCard, ReviewDataProvider } from "./types";
+import type {
+  GradeContext,
+  MultipleChoiceQueueResult,
+  ReviewCard,
+  ReviewDataProvider,
+} from "./types";
 import type { MultipleChoiceQuestion } from "./MultipleChoiceCard";
 import { useMultipleChoiceSession } from "./useMultipleChoiceSession";
 
@@ -38,7 +43,8 @@ function makeHarness(
   } else {
     loadMultipleChoiceQueue.mockResolvedValue({ questions, cards });
   }
-  const grade = vi.fn<(card: ReviewCard, rating: ReviewRating, context: GradeContext) => Promise<void>>();
+  const grade =
+    vi.fn<(card: ReviewCard, rating: ReviewRating, context: GradeContext) => Promise<void>>();
   if (gradeError) {
     grade.mockRejectedValue(gradeError);
   } else {

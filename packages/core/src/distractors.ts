@@ -80,7 +80,13 @@ export function generateOptions(
   const distractors: DistractorOption[] = [];
 
   // 1. 历史常错词定义
-  addFromPool(distractors, used, wrongDefs(allSenses, wrongTerms), "wrong-history", distractorCount);
+  addFromPool(
+    distractors,
+    used,
+    wrongDefs(allSenses, wrongTerms),
+    "wrong-history",
+    distractorCount,
+  );
 
   // 2. 形近词定义
   if (distractors.length < distractorCount) {
