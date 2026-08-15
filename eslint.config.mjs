@@ -6,7 +6,16 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/node_modules/**", "**/coverage/**", "**/.vite/**"] },
+  {
+    ignores: [
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/coverage/**",
+      "**/.vite/**",
+      // vendored 第三方代码（seek-bzip，MIT）：原样保留上游源码，不做风格改造
+      "scripts/presets/lib/vendor/**",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

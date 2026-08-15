@@ -105,7 +105,7 @@ function isUsableExample(text) {
   if (text.length < 5 || text.length > 200) {
     return false;
   }
-  if (/[\{\}\[\]<>]|https?:\/\//.test(text)) {
+  if (/[{}[\]<>]|https?:\/\//.test(text)) {
     return false;
   }
   return /[A-Za-z]/.test(text);
@@ -128,7 +128,12 @@ export function mergeKaikkiEntry(term, lines) {
     examples: [],
     etymology: "",
   };
-  const seen = { synonyms: new Set(), antonyms: new Set(), derived: new Set(), examples: new Set() };
+  const seen = {
+    synonyms: new Set(),
+    antonyms: new Set(),
+    derived: new Set(),
+    examples: new Set(),
+  };
   for (const line of lines) {
     if (!merged.ipaUs && line.ipaUs) merged.ipaUs = line.ipaUs;
     if (!merged.ipaUk && line.ipaUk) merged.ipaUk = line.ipaUk;

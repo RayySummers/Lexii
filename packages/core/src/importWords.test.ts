@@ -176,6 +176,8 @@ describe("toSense（词条内容 → 义项快照，含 RAY-268 富化字段）"
     expect(sense.etymology).toBe("From Old French abandoner.");
     expect(sense.wordParts).toBe("a<加强> · bandon<控制>");
     expect(sense.etymologyZh).toBe("来自古法语 abandoner。");
-    expect(sense.examples).toEqual([{ text: "He abandoned the car.", translation: "他遗弃了那辆车。" }]);
+    expect(sense.examples).toEqual([
+      { text: "He abandoned the car.", translation: "他遗弃了那辆车。" },
+    ]);
   });
 });

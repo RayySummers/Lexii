@@ -54,14 +54,21 @@ async function main() {
   const files = (manifest.files ??= {});
   let changed = false;
   for (const rel of FILES) {
-    const outName = rel.replace(/\.bz2$/, "").split("/").pop();
+    const outName = rel
+      .replace(/\.bz2$/, "")
+      .split("/")
+      .pop();
     const outFile = path.join(OUT_DIR, outName);
     const record = files[rel];
     const existing =
       record && existsSync(outFile)
         ? { sha256: sha256(readFileSync(outFile)), bytes: statSync(outFile).size }
         : null;
-    if (existing && existing.sha256 === record.decompressedSha256 && existing.bytes === record.decompressedBytes) {
+    if (
+      existing &&
+      existing.sha256 === record.decompressedSha256 &&
+      existing.bytes === record.decompressedBytes
+    ) {
       console.log(`已存在且校验通过：${outName}`);
       continue;
     }

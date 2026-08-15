@@ -6,7 +6,7 @@
  */
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
-import type { EnrichmentPresetPackage, LexilexiDatabase, PresetPackage } from "@lexilexi/core";
+import type { LexilexiDatabase, PresetPackage } from "@lexilexi/core";
 import {
   importCsvWordlist,
   installPreset,
@@ -118,7 +118,10 @@ describe("bootstrapPresetData（首启内置词表引导）", () => {
             "",
             "boot<词根>",
             "",
-            [["A boot sentence.", "引导句。"], ["More text.", ""]],
+            [
+              ["A boot sentence.", "引导句。"],
+              ["More text.", ""],
+            ],
           ],
         ],
       },

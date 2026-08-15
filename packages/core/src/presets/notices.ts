@@ -74,8 +74,7 @@ export const THIRD_PARTY_DATA_SOURCES: readonly ThirdPartyDataSource[] = [
     licenseUrl: "https://github.com/openetymology/OpenEtymology/blob/main/DATA_LICENSE.md",
     sourceUrl: "https://github.com/openetymology/OpenEtymology",
     attribution: "OpenEtymology contributors. Data licensed CC BY-SA 4.0.",
-    usage:
-      "富化包词根词缀拆解与中文词源（CET4/CET6/TOEFL/TEM8/GRE8000 五册 EPUB 解析，词条去重）",
+    usage: "富化包词根词缀拆解与中文词源（CET4/CET6/TOEFL/TEM8/GRE8000 五册 EPUB 解析，词条去重）",
     bundledIn: ["core-en-tier0-enrichment", "core-en-tier1-enrichment"],
   },
 ];

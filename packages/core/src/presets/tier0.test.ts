@@ -119,24 +119,13 @@ describe("第三方数据来源登记（数据来源与许可页的事实层）"
     const wikt = THIRD_PARTY_DATA_SOURCES.find((source) => source.id === "wiktionary");
     const tatoeba = THIRD_PARTY_DATA_SOURCES.find((source) => source.id === "tatoeba");
     const ipaDict = THIRD_PARTY_DATA_SOURCES.find((source) => source.id === "ipa-dict");
-    const openEtymology = THIRD_PARTY_DATA_SOURCES.find(
-      (source) => source.id === "openetymology",
-    );
+    const openEtymology = THIRD_PARTY_DATA_SOURCES.find((source) => source.id === "openetymology");
     expect(ecdict?.bundledIn).toContain("core-en-tier0");
     expect(ngsl?.bundledIn).toContain("core-en-tier0");
     // Wiktionary 已随富化包分发（本阶段由「仅交叉校验」转为富化数据源）
-    expect(wikt?.bundledIn).toEqual([
-      "core-en-tier0-enrichment",
-      "core-en-tier1-enrichment",
-    ]);
-    expect(tatoeba?.bundledIn).toEqual([
-      "core-en-tier0-enrichment",
-      "core-en-tier1-enrichment",
-    ]);
-    expect(ipaDict?.bundledIn).toEqual([
-      "core-en-tier0-enrichment",
-      "core-en-tier1-enrichment",
-    ]);
+    expect(wikt?.bundledIn).toEqual(["core-en-tier0-enrichment", "core-en-tier1-enrichment"]);
+    expect(tatoeba?.bundledIn).toEqual(["core-en-tier0-enrichment", "core-en-tier1-enrichment"]);
+    expect(ipaDict?.bundledIn).toEqual(["core-en-tier0-enrichment", "core-en-tier1-enrichment"]);
     expect(openEtymology?.bundledIn).toEqual([
       "core-en-tier0-enrichment",
       "core-en-tier1-enrichment",

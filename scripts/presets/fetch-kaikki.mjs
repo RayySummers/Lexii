@@ -131,7 +131,7 @@ async function downloadRange(url, start, end, partFile, expected, resumeBytes, p
     const now = Date.now();
     if (now - lastLog >= PROGRESS_INTERVAL_MS) {
       const donePart = resumeBytes + bytes;
-      const speed = ((donePart / 1024) / ((now - started + 1) / 1000)).toFixed(0);
+      const speed = (donePart / 1024 / ((now - started + 1) / 1000)).toFixed(0);
       console.log(
         `  分片 ${partIndex}：${(donePart / 1024 / 1024).toFixed(1)} MB / ${(expected / 1024 / 1024).toFixed(1)} MB（${speed} KB/s）`,
       );
@@ -210,7 +210,9 @@ async function main() {
         if (size === manifest.bytes) {
           const actual = await sha256(OUT_FILE);
           if (actual === manifest.sha256) {
-            console.log(`已存在且校验通过：${OUT_FILE}（${(size / 1024 / 1024 / 1024).toFixed(2)} GB）`);
+            console.log(
+              `已存在且校验通过：${OUT_FILE}（${(size / 1024 / 1024 / 1024).toFixed(2)} GB）`,
+            );
             return;
           }
           console.log(`已存在但 SHA256 与 manifest 不符（${actual.slice(0, 16)}…），重新下载…`);
@@ -221,7 +223,9 @@ async function main() {
     }
 
     const { total, lastModified } = await headRequest();
-    console.log(`下载 ${KAIKKI_URL}（${(total / 1024 / 1024 / 1024).toFixed(2)} GB，${connections} 连接并行）…`);
+    console.log(
+      `下载 ${KAIKKI_URL}（${(total / 1024 / 1024 / 1024).toFixed(2)} GB，${connections} 连接并行）…`,
+    );
     const partPrefix = path.join(OUT_DIR, ".kaikki-part");
     const seconds = await downloadParallel(KAIKKI_URL, total, connections, partPrefix);
 

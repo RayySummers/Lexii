@@ -89,7 +89,9 @@ function parseWordEntrySection(section) {
   const morphemes = extractListItems(section, "morphemes").map((item) => {
     const strong = item.match(/<strong>([^<]*)<\/strong>/)?.[1] ?? "";
     const note = item.match(/<span class="note">([^<]*)<\/span>/)?.[1] ?? "";
-    const rest = stripTags(item.replace(/<strong>.*?<\/strong>/, "").replace(/<span.*?<\/span>/, ""));
+    const rest = stripTags(
+      item.replace(/<strong>.*?<\/strong>/, "").replace(/<span.*?<\/span>/, ""),
+    );
     return `${stripTags(strong)}<${rest}${note ? `（${stripTags(note)}）` : ""}>`;
   });
   const wordParts = morphemes.length > 0 ? morphemes.join(" · ") : undefined;

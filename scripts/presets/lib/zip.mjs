@@ -66,33 +66,30 @@ function findEocd(buf) {
 
 /** 常用 HTML 实体解码（XHTML 文本内的 &amp; &lt; &gt; &quot; &#39; &#nnn; &#xHH;） */
 export function decodeHtmlEntities(text) {
-  return text.replace(
-    /&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g,
-    (entity, name) => {
-      if (name.startsWith("#x")) {
-        return String.fromCodePoint(Number.parseInt(name.slice(2), 16));
-      }
-      if (name.startsWith("#")) {
-        return String.fromCodePoint(Number.parseInt(name.slice(1), 10));
-      }
-      switch (name) {
-        case "amp":
-          return "&";
-        case "lt":
-          return "<";
-        case "gt":
-          return ">";
-        case "quot":
-          return '"';
-        case "apos":
-          return "'";
-        case "nbsp":
-          return " ";
-        default:
-          return entity;
-      }
-    },
-  );
+  return text.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (entity, name) => {
+    if (name.startsWith("#x")) {
+      return String.fromCodePoint(Number.parseInt(name.slice(2), 16));
+    }
+    if (name.startsWith("#")) {
+      return String.fromCodePoint(Number.parseInt(name.slice(1), 10));
+    }
+    switch (name) {
+      case "amp":
+        return "&";
+      case "lt":
+        return "<";
+      case "gt":
+        return ">";
+      case "quot":
+        return '"';
+      case "apos":
+        return "'";
+      case "nbsp":
+        return " ";
+      default:
+        return entity;
+    }
+  });
 }
 
 /** 剥除 XML 标签（提取 XHTML 元素文本内容；来源文件结构固定、无嵌套混乱标签） */

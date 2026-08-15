@@ -46,7 +46,9 @@ afterEach(async () => {
 });
 
 /** 生成富化元组：[term, ipaUs, ipaUk, syn, ant, der, ety, wordParts, etyZh, examples] */
-function enrichmentTuple(term: string): [string, string, string, string, string, string, string, string, string, [string, string][]] {
+function enrichmentTuple(
+  term: string,
+): [string, string, string, string, string, string, string, string, string, [string, string][]] {
   return [
     term,
     `/uˈes-${term}/`,
@@ -64,7 +66,20 @@ function enrichmentTuple(term: string): [string, string, string, string, string,
   ];
 }
 
-function makeEnrichmentPreset(entries: [string, string, string, string, string, string, string, string, string, [string, string][]][]): EnrichmentPresetPackage {
+function makeEnrichmentPreset(
+  entries: [
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    [string, string][],
+  ][],
+): EnrichmentPresetPackage {
   return parseEnrichmentPreset(
     {
       id: "test-enrichment",
@@ -123,7 +138,11 @@ describe("resolveEnrichmentEntry / parseEnrichmentPreset（装载校验）", () 
   });
 
   it("空字段词条只携带非空字段；全空词条在包装载时抛错", () => {
-    const emptyEntry = resolveEnrichmentEntry(["bare", "", "", "", "", "", "", "", "", []], 0, "test.json");
+    const emptyEntry = resolveEnrichmentEntry(
+      ["bare", "", "", "", "", "", "", "", "", []],
+      0,
+      "test.json",
+    );
     expect(emptyEntry).toEqual({ term: "bare", examples: [] });
     expect(() =>
       parseEnrichmentPreset(
@@ -150,13 +169,18 @@ describe("resolveEnrichmentEntry / parseEnrichmentPreset（装载校验）", () 
       entries: [enrichmentTuple("a")],
     };
     expect(() => parseEnrichmentPreset({ ...base, id: "" }, "test.json")).toThrow(/缺少富化包 id/);
+    expect(() => parseEnrichmentPreset({ ...base, entries: [["short"]] }, "test.json")).toThrow(
+      /元组长度非法/,
+    );
     expect(() =>
-      parseEnrichmentPreset({ ...base, entries: [["short"]] }, "test.json"),
-    ).toThrow(/元组长度非法/);
-    expect(() =>
-      parseEnrichmentPreset({ ...base, entries: [["", "/i/", "", "", "", "", "", "", "", []]] }, "test.json"),
+      parseEnrichmentPreset(
+        { ...base, entries: [["", "/i/", "", "", "", "", "", "", "", []]] },
+        "test.json",
+      ),
     ).toThrow(/词条为空/);
-    expect(() => parseEnrichmentPreset({ ...base, entries: [] }, "test.json")).toThrow(/词条为空或格式非法/);
+    expect(() => parseEnrichmentPreset({ ...base, entries: [] }, "test.json")).toThrow(
+      /词条为空或格式非法/,
+    );
   });
 });
 
@@ -173,7 +197,10 @@ describe("toEnrichmentMap / 合并口径", () => {
     const map = toEnrichmentMap(pkg);
     const enrichment = map.get("testword")!;
     // 空内容 → 全量填充
-    const filled = mergeEnrichmentIntoContent({ term: "testword", definitions: ["释义"] }, enrichment);
+    const filled = mergeEnrichmentIntoContent(
+      { term: "testword", definitions: ["释义"] },
+      enrichment,
+    );
     expect(filled.ipaUs).toBe("/uˈes-testword/");
     expect(filled.synonyms).toEqual(["near-testword-a", "near-testword-b"]);
     expect(filled.examples).toHaveLength(2);
@@ -215,7 +242,10 @@ describe("backfillEnrichment（存量库回填）", () => {
   it("按 term join 回填既有 Sense：只补字段、不新增词条、不动覆盖外词条", async () => {
     const database = freshDatabase();
     await installPreset(database, makeWordPreset(makeWordEntries(3)), { yield: async () => {} });
-    const pkg = makeEnrichmentPreset([enrichmentTuple("testword0"), enrichmentTuple("uninstalled")]);
+    const pkg = makeEnrichmentPreset([
+      enrichmentTuple("testword0"),
+      enrichmentTuple("uninstalled"),
+    ]);
 
     const result = await backfillEnrichment(database, pkg, { yield: async () => {} });
 

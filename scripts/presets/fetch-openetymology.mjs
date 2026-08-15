@@ -20,11 +20,26 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 /** 固定来源：openetymology/OpenEtymology @ 7d89f36（2026-08-15 抓取时的 main HEAD） */
 const OE_COMMIT = "7d89f3697abf26e305fe2627f181b692c2c10b28";
 const FILES = [
-  { rel: "CET4/CET4.epub", sha256: "878f104ef6e7ae1779cea3a3d4ff6f4db84c17841fba7ec375c359df89b7a1c7" },
-  { rel: "CET6/CET6.epub", sha256: "f3cee386eb02e9a75004147deec358f4fff91058bb85c168f00e9db85ef7b55a" },
-  { rel: "TEM8/TEM8.epub", sha256: "0db749f72a59853712dcbd7b5120c3ae8ee465658fe0262e3ce569793c387c3e" },
-  { rel: "TOEFL/TOEFL.epub", sha256: "822b460b121f0088e19f3d546b2819485127069388ec15b64389f1a14c8d6015" },
-  { rel: "GRE8000/GRE8000.epub", sha256: "e0563269bf0802b65e2265471bdac1ce23cd19d69e3819f1bbe860c2949b7201" },
+  {
+    rel: "CET4/CET4.epub",
+    sha256: "878f104ef6e7ae1779cea3a3d4ff6f4db84c17841fba7ec375c359df89b7a1c7",
+  },
+  {
+    rel: "CET6/CET6.epub",
+    sha256: "f3cee386eb02e9a75004147deec358f4fff91058bb85c168f00e9db85ef7b55a",
+  },
+  {
+    rel: "TEM8/TEM8.epub",
+    sha256: "0db749f72a59853712dcbd7b5120c3ae8ee465658fe0262e3ce569793c387c3e",
+  },
+  {
+    rel: "TOEFL/TOEFL.epub",
+    sha256: "822b460b121f0088e19f3d546b2819485127069388ec15b64389f1a14c8d6015",
+  },
+  {
+    rel: "GRE8000/GRE8000.epub",
+    sha256: "e0563269bf0802b65e2265471bdac1ce23cd19d69e3819f1bbe860c2949b7201",
+  },
   { rel: "DATA_LICENSE.md", sha256: null },
   { rel: "LICENSE", sha256: null },
 ];

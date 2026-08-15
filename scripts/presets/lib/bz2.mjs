@@ -23,6 +23,8 @@ export function bz2Decompress(compressed, errorMessage = "bz2 解压失败") {
     const out = seekBzip.decode(compressed);
     return Buffer.from(out.buffer, out.byteOffset, out.byteLength);
   } catch (err) {
-    throw new Error(`${errorMessage}：${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(`${errorMessage}：${err instanceof Error ? err.message : String(err)}`, {
+      cause: err,
+    });
   }
 }

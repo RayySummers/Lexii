@@ -21,7 +21,6 @@
  * 回填与 installPreset 同一套安全机制：进度标记与块数据同事务提交、
  * 起始事务写 progress=0 占位、每块 check-and-set 防并发双标签页重复回填。
  */
-import { DEFAULT_WORDLIST_LANG } from "../csv";
 import type { Sense } from "../domain";
 import type { LexilexiDatabase } from "../persistence";
 import type { WordEntryContent } from "../importWords";
@@ -78,7 +77,18 @@ export function resolveEnrichmentEntry(
   if (raw.length !== ENRICHMENT_TUPLE_LENGTH) {
     throw new Error(`${sourceName} 富化词条 #${index} 元组长度非法：${raw.length}`);
   }
-  const [term, ipaUsRaw, ipaUkRaw, synonymsRaw, antonymsRaw, derivedRaw, etymologyRaw, wordPartsRaw, etymologyZhRaw, examplesRaw] = raw;
+  const [
+    term,
+    ipaUsRaw,
+    ipaUkRaw,
+    synonymsRaw,
+    antonymsRaw,
+    derivedRaw,
+    etymologyRaw,
+    wordPartsRaw,
+    etymologyZhRaw,
+    examplesRaw,
+  ] = raw;
   if (typeof term !== "string" || term === "") {
     throw new Error(`${sourceName} 富化词条 #${index} 词条为空`);
   }
@@ -98,7 +108,10 @@ export function resolveEnrichmentEntry(
       if (!Array.isArray(pair) || typeof pair[0] !== "string" || pair[0].trim() === "") {
         continue;
       }
-      examples.push({ text: pair[0].trim(), translation: typeof pair[1] === "string" ? pair[1] : "" });
+      examples.push({
+        text: pair[0].trim(),
+        translation: typeof pair[1] === "string" ? pair[1] : "",
+      });
     }
   }
 
@@ -284,8 +297,7 @@ export function mergeEnrichmentIntoSense(
 
 /** 回填结果 */
 export type EnrichmentBackfillResult =
-  | { status: "backfilled"; filledCount: number }
-  | { status: "already-backfilled"; version: string };
+  { status: "backfilled"; filledCount: number } | { status: "already-backfilled"; version: string };
 
 /** 回填选项 */
 export interface EnrichmentBackfillOptions {
@@ -332,8 +344,7 @@ export async function backfillEnrichment(
     progressEntry = await db.meta.get(enrichmentProgressKey(pkg.id));
   }
   const parsed = progressEntry ? Number(progressEntry.value) : 0;
-  let cursor =
-    Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, pkg.entries.length) : 0;
+  let cursor = Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, pkg.entries.length) : 0;
   const total = pkg.entries.length;
   let filled = 0;
 

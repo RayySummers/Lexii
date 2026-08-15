@@ -7,14 +7,14 @@ RAY-258「Tier 0 预设词表打包与内置」与 RAY-268 批次 A「富化管�
 
 ## 数据来源与许可
 
-| 来源                                                                    | 许可                                            | 用途                                                                                     | 出处核对                      |
-| ----------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------- |
-| [ECDICT](https://github.com/skywind3000/ECDICT)                         | MIT（© 2025 Linwei）                            | 主力词库：中文释义 / 音标 / 词性 / 考试分级标签                                          | repo `LICENSE` 文件           |
-| [NGSL 1.2](https://www.newgeneralservicelist.com/)                      | CC BY-SA 4.0                                    | 「高频核心」选词基准（2,809 词），join ECDICT 补释义                                     | 官网下载页声明                |
-| [Wiktionary](https://kaikki.org/dictionary/rawdata.html)（kaikki 提取） | CC BY-SA 4.0 + GFDL                             | 富化：例句（仅编者自造句）/ 近反义词 / 派生词 / 英文词源 / 双音标校验                    | Wiktionary 官方版权页         |
-| [Tatoeba](https://downloads.tatoeba.org/exports/per_language/)          | CC BY 2.0 FR（默认）+ CC0 子集                  | 富化：eng-cmn 双语例句（按句许可过滤，仅保留 CC BY / CC0）                               | ToU §6.2 + 版权页             |
-| [ipa-dict](https://github.com/open-dict-data/ipa-dict)                  | MIT（en_US）/ GPL-3.0（en_UK）                  | 富化：双音标主力（仅摄取 en_US / en_UK，避开 NC 语种文件）                               | repo README 双链声明          |
-| [OpenEtymology](https://github.com/openetymology/OpenEtymology)         | CC BY-SA 4.0                                    | 富化：词根词缀拆解 + 中文词源（五册 EPUB 解析）                                          | repo `DATA_LICENSE.md`        |
+| 来源                                                                    | 许可                           | 用途                                                                  | 出处核对               |
+| ----------------------------------------------------------------------- | ------------------------------ | --------------------------------------------------------------------- | ---------------------- |
+| [ECDICT](https://github.com/skywind3000/ECDICT)                         | MIT（© 2025 Linwei）           | 主力词库：中文释义 / 音标 / 词性 / 考试分级标签                       | repo `LICENSE` 文件    |
+| [NGSL 1.2](https://www.newgeneralservicelist.com/)                      | CC BY-SA 4.0                   | 「高频核心」选词基准（2,809 词），join ECDICT 补释义                  | 官网下载页声明         |
+| [Wiktionary](https://kaikki.org/dictionary/rawdata.html)（kaikki 提取） | CC BY-SA 4.0 + GFDL            | 富化：例句（仅编者自造句）/ 近反义词 / 派生词 / 英文词源 / 双音标校验 | Wiktionary 官方版权页  |
+| [Tatoeba](https://downloads.tatoeba.org/exports/per_language/)          | CC BY 2.0 FR（默认）+ CC0 子集 | 富化：eng-cmn 双语例句（按句许可过滤，仅保留 CC BY / CC0）            | ToU §6.2 + 版权页      |
+| [ipa-dict](https://github.com/open-dict-data/ipa-dict)                  | MIT（en_US）/ GPL-3.0（en_UK） | 富化：双音标主力（仅摄取 en_US / en_UK，避开 NC 语种文件）            | repo README 双链声明   |
+| [OpenEtymology](https://github.com/openetymology/OpenEtymology)         | CC BY-SA 4.0                   | 富化：词根词缀拆解 + 中文词源（五册 EPUB 解析）                       | repo `DATA_LICENSE.md` |
 
 许可义务：MIT 需保留版权声明（见 `packages/core/src/presets/notices.ts` 的
 `THIRD_PARTY_NOTICES`）；CC BY-SA 需署名 + 相同方式共享（内置数据为过滤/合并的派生
@@ -102,10 +102,10 @@ node scripts/presets/build-enrichment.mjs
      补 1 条 kaikki 英文原句兜底，Tier 1 每词至多 3 条；
    - 词根词缀/中文词源：OpenEtymology；英文词源文本：kaikki `etymology_text`。
 4. **产物条目**：紧凑元组 `[term, ipaUs, ipaUk, synonyms, antonyms, derived,
-   etymology, wordParts, etymologyZh, examples]`；词列表以换行符连接；无任何
+etymology, wordParts, etymologyZh, examples]`；词列表以换行符连接；无任何
    富化字段的词条不产出记录。运行时契约见 `packages/core/src/presets/enrichment.ts`
    （parse-don't-validate + 回填），体积口径：Tier 0 富化 brotli < 1MB（任务红线，
-实测 977KB）。
+   实测 977KB）。
 
 三项实验（决策门与覆盖率）实测数字见 `docs/presets/experiment-enrichment.md`。
 

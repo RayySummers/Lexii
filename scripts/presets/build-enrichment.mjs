@@ -156,7 +156,12 @@ async function extractKaikkiForTerms(termSet) {
 }
 
 /** 组装单词语义富化记录（源优先级见文件头；caps/truncate 按 tier 档传入） */
-function buildEnrichmentRecord(term, { kaikki, ipaUsDict, ipaUkDict, oe, tatoebaPairs }, caps, truncate) {
+function buildEnrichmentRecord(
+  term,
+  { kaikki, ipaUsDict, ipaUkDict, oe, tatoebaPairs },
+  caps,
+  truncate,
+) {
   const ipaUs = ipaUsDict.get(term) ?? kaikki.ipaUs ?? oe?.ipaUs ?? "";
   const ipaUk = ipaUkDict.get(term) ?? kaikki.ipaUk ?? oe?.ipaUk ?? "";
   const examples = [];
@@ -204,8 +209,18 @@ function coverageStats(terms, recordFor) {
   for (const term of terms) {
     const record = recordFor(term);
     if (!record) continue;
-    const [, ipaUs, ipaUk, synonyms, antonyms, derived, etymology, wordParts, etymologyZh, examples] =
-      record;
+    const [
+      ,
+      ipaUs,
+      ipaUk,
+      synonyms,
+      antonyms,
+      derived,
+      etymology,
+      wordParts,
+      etymologyZh,
+      examples,
+    ] = record;
     const hasIpaUs = ipaUs !== "";
     const hasIpaUk = ipaUk !== "";
     if (hasIpaUs) domainCounts.ipaUs += 1;
@@ -339,7 +354,9 @@ async function main() {
   const tier0Terms = readTier0Terms();
   const tier1Terms = computeTier1Terms();
   const termSet = new Set([...tier0Terms, ...tier1Terms]);
-  console.log(`Tier 0：${tier0Terms.length} 词；Tier 1：${tier1Terms.length} 词；合计 ${termSet.size} 词`);
+  console.log(
+    `Tier 0：${tier0Terms.length} 词；Tier 1：${tier1Terms.length} 词；合计 ${termSet.size} 词`,
+  );
 
   console.log("加载 ipa-dict / OpenEtymology / Tatoeba …");
   const ipaUsDict = parseIpaDict(path.join(DATA_DIR, "ipa-dict", "en_US.txt"));
@@ -411,12 +428,26 @@ async function main() {
   const tier1Coverage = coverageStats(tier1Terms, recordForTier1);
   // 双音标一致性（ipa-dict 主力 vs kaikki / OpenEtymology 校验源）
   const ipaAgreement = [
-    ipaAgreementStats(tier0Terms, ipaUsDict, kaikkiUsMap(kaikkiByWord, tier0Terms), "kaikki US vs ipa-dict"),
-    ipaAgreementStats(tier0Terms, ipaUkDict, kaikkiUkMap(kaikkiByWord, tier0Terms), "kaikki UK vs ipa-dict"),
     ipaAgreementStats(
       tier0Terms,
       ipaUsDict,
-      new Map([...oeEntries].filter(([t]) => tier0Set(tier0Terms).has(t)).map(([t, e]) => [t, e.ipaUs ?? ""])),
+      kaikkiUsMap(kaikkiByWord, tier0Terms),
+      "kaikki US vs ipa-dict",
+    ),
+    ipaAgreementStats(
+      tier0Terms,
+      ipaUkDict,
+      kaikkiUkMap(kaikkiByWord, tier0Terms),
+      "kaikki UK vs ipa-dict",
+    ),
+    ipaAgreementStats(
+      tier0Terms,
+      ipaUsDict,
+      new Map(
+        [...oeEntries]
+          .filter(([t]) => tier0Set(tier0Terms).has(t))
+          .map(([t, e]) => [t, e.ipaUs ?? ""]),
+      ),
       "OpenEtymology US vs ipa-dict",
     ),
   ];
@@ -458,7 +489,16 @@ async function main() {
 }
 
 function emptyKaikki(term) {
-  return { term, ipaUs: "", ipaUk: "", synonyms: [], antonyms: [], derived: [], examples: [], etymology: "" };
+  return {
+    term,
+    ipaUs: "",
+    ipaUk: "",
+    synonyms: [],
+    antonyms: [],
+    derived: [],
+    examples: [],
+    etymology: "",
+  };
 }
 
 function hasAnyField(record) {
