@@ -22,6 +22,11 @@ let db: LexilexiDatabase | undefined;
 
 beforeEach(() => {
   db = openDatabase(makeOptions());
+  try {
+    window.localStorage.clear();
+  } catch {
+    // 忽略清理失败
+  }
 });
 
 afterEach(async () => {
@@ -164,5 +169,35 @@ describe("createIndexedDbReviewDataProvider", () => {
     await expect(
       provider.grade(card, "easy", { reviewDurationMs: 1_000, revealed: true }),
     ).rejects.toThrow();
+  });
+
+  it("每日新卡上限：设置 5 时 learn 队列只取前 5 张新卡，review 不受影响（RAY-260 suggestion 2）", async () => {
+    window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await provider.importSampleWordlist();
+
+    const learnQueue = await provider.loadQueue("learn");
+    expect(learnQueue).toHaveLength(5);
+    // 复习队列不含新词，额度不影响
+    expect(await provider.loadQueue("review")).toEqual([]);
+  });
+
+  it("每日新卡上限：今日已学词条数扣减额度（已学 2 张后剩余额度只补到上限）", async () => {
+    window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await provider.importSampleWordlist();
+
+    const first = (await provider.loadQueue("learn")).slice(0, 2);
+    for (const card of first) {
+      await provider.grade(card, "good", { reviewDurationMs: 1_000, revealed: true });
+    }
+
+    // 今日已学 2 张新卡 → 剩余额度 3
+    const learnQueue = await provider.loadQueue("learn");
+    expect(learnQueue).toHaveLength(3);
+    const ids = new Set(learnQueue.map((card) => card.item.id));
+    for (const card of first) {
+      expect(ids.has(card.item.id)).toBe(false);
+    }
   });
 });

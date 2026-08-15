@@ -7,6 +7,11 @@
  *   → buildReviewQueue（完整性校验，保持 core 给定的顺序）
  * - grade：gradeReview（读旧状态 → FSRS 排期 → 事件 + 状态单事务原子落库）
  * - importSampleWordlist：importCsvWordlist（内置示例词表，空状态一键体验）
+ *
+ * 每日新卡上限（RAY-260 评审 suggestion 2）：learn / mixed 模式在取队列前，
+ * 用 @lexilexi/stats 的 computeLearnedTodayCount（今天首次被复习的词条数，
+ * 事件投影、无需额外状态）折算「今日剩余新卡额度」传给 core 截取；
+ * review 模式只含复习卡，不触发额度计算。
  */
 import {
   SAMPLE_WORDLIST_CSV,
@@ -14,6 +19,7 @@ import {
   getStudyQueueItemIds,
   gradeReview,
   importCsvWordlist,
+  isReviewEvent,
   openDatabase,
 } from "@lexilexi/core";
 import type {
@@ -24,18 +30,29 @@ import type {
   ReviewRating,
   StudyMode,
 } from "@lexilexi/core";
+import { computeLearnedTodayCount } from "@lexilexi/stats";
+import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { buildReviewQueue } from "./queue";
 import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
 
 /** 示例词表来源标识（写入 LearningItem.source 与 import 事件，供溯源） */
 const SAMPLE_SOURCE = "内置示例词表";
 
+/** 按「每日上限 − 今日已学新词」折算剩余新卡额度（learn/mixed 用；review 用不到） */
+async function resolveNewCardLimit(db: LexilexiDatabase, now: string): Promise<number> {
+  const configured = readDailyNewCardLimit();
+  const reviewEvents = await db.events.where("type").equals("review").toArray();
+  const learnedToday = computeLearnedTodayCount(reviewEvents.filter(isReviewEvent), now);
+  return Math.max(0, configured - learnedToday);
+}
+
 /** 基于已打开的 Lexilexi 数据库创建复习数据源（测试注入 fake-indexeddb 实例） */
 export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewDataProvider {
   return {
     async loadQueue(mode: StudyMode): Promise<ReviewCard[]> {
       const now = new Date().toISOString();
-      const ids = await getStudyQueueItemIds(db, now, mode);
+      const newCardLimit = mode === "review" ? undefined : await resolveNewCardLimit(db, now);
+      const ids = await getStudyQueueItemIds(db, now, mode, { newCardLimit });
       if (ids.length === 0) {
         return [];
       }

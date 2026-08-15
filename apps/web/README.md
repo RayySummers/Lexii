@@ -35,7 +35,7 @@ pnpm build          # tsc --noEmit + vite build
   - `types.ts` — `SettingsDataProvider` / `ImportBackupResult`（UI 与数据源之间的契约）
   - `data.ts` — IndexedDB 数据源：`createIndexedDbSettingsDataProvider`（包装 core 的 `exportLexilexiData` / `exportCsvWordlist` / `parseLexilexiExport` / `importLexilexiData`）
   - `persistenceStatus.ts` — 持久化权限状态（启动申请 + `usePersistenceStatus` hook，监听 `lexilexi:storage-permission`）
-  - `SettingsScreen.tsx` — 设置页 UI：持久化提示、JSON/CSV 导出、JSON 导入、关于（GitHub 仓库链接 + 反馈问题入口，纯外链新窗口打开）与底部版本号（RAY-253 起无数据概览，概览已并入统计页）
+  - `SettingsScreen.tsx` — 设置页 UI：每日新卡上限（默认 20/日，localStorage 持久化）、持久化提示、JSON/CSV 导出、JSON 导入、关于（GitHub 仓库链接 + 反馈问题入口，纯外链新窗口打开）与底部版本号（RAY-253 起无数据概览，概览已并入统计页）
 - `src/stats/` — 统计页（RAY-240）：
   - `types.ts` — `StatsSnapshot`（今日待学 / 已复习 / 连续天数）/ `StatsDataProvider`（UI 与数据源之间的契约）
   - `data.ts` — IndexedDB 数据源：`createIndexedDbStatsDataProvider`（包装 core 的 `getDueItemIds` + stats 包的 `countReviews` / `computeStreak`）；默认工厂自带无 IndexedDB 环境兜底
@@ -58,6 +58,11 @@ pnpm build          # tsc --noEmit + vite build
 - **混合**（mixed）：复习卡为主干，每 2 张复习卡穿插 1 张新词卡
 
 队列筛选、排序与穿插全部在 `packages/core`（算法层）；`apps/web` 只做完整性校验与渲染。
+
+**每日新卡上限**（RAY-260）：learn / mixed 模式的新词侧受上限约束——数据层
+（`review/data.ts`）按「设置值（默认 20/日，设置页可调，localStorage）− 今日已学
+新词数（`@lexilexi/stats` 的 `computeLearnedTodayCount`，事件投影）」折算剩余额度，
+经 `getStudyQueueItemIds` 的 `newCardLimit` 参数截取新词；复习侧不受限。
 
 ## PWA（可安装 + 离线）
 
