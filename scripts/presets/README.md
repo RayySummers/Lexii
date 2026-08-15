@@ -51,24 +51,31 @@ node scripts/presets/build.mjs --tier 2   # 全量产物（不随包分发）
 
 | 层级            | 内容                                           | 实测词条 | 压缩体积（brotli-11） | 分发方式                   |
 | --------------- | ---------------------------------------------- | -------- | --------------------- | -------------------------- |
-| Tier 0 内置核心 | ECDICT tag ∈ {zk,gk,cet4,cet6} ∪ NGSL 1.2 join | 7,195    | 225 KB                | 随 PWA 打包，首启安装      |
-| Tier 1 标准     | 全考试标签 ∪ collins>0 ∪ oxford>0 ∪ 词频>0     | 58,244   | 1.3 MB                | 扩展包产物（本阶段仅生成） |
-| Tier 2 全量     | 清洗后全部合法词条                             | 401,224  | 6.5 MB                | 扩展包产物（本阶段仅生成） |
+| Tier 0 内置核心 | ECDICT tag ∈ {zk,gk,cet4,cet6} ∪ NGSL 1.2 join | 7,195    | 224 KB                | 随 PWA 打包，首启安装      |
+| Tier 1 标准     | 全考试标签 ∪ collins>0 ∪ oxford>0 ∪ 词频>0     | 58,244   | 1.2 MB                | 扩展包产物（本阶段仅生成） |
+| Tier 2 全量     | 清洗后全部合法词条                             | 401,222  | 6.4 MB                | 扩展包产物（本阶段仅生成） |
 
 ## 清洗规则（与 core 侧口径一致）
 
 - 词条形状：`TERM_PATTERN`（英文字母/撇号/连字符/点），过滤短语/词缀/非英语行；
+  唯一定义在 `packages/core/src/termPattern.js`——core 与打包脚本 import 同一文件，
+  无双处维护（RAY-260 评审 nit 1）；
 - 释义：换行与半角 `;` 规范化 → 全角分号分隔；超长按 500 字符在「；」边界截断；
 - 词性：从释义段首剥离词性标记（`n.`/`vt.`/`a.` 等，见 `POS_MARKERS`）并入 `pos` 字段；
+- 领域标记：剥离释义段首的 `[医]`/`[法]`/`[计]` 等 ECDICT 领域标记
+  （`^\[[^\]]+\]`，可连续多个；与词性标记交替剥离，「`n. [医] 解剖`」与
+  「`[医] n. 解剖`」两种形态都剥净，RAY-260 评审 suggestion 1）；
 - 去重：term 小写去重，首现优先；按 term 字典序排序。
 
 ## 产物格式与运行时契约
 
 Tier 0 产物为紧凑元组 JSON：`{ id, version, name, generatedAt, source, entries }`，
-`entries` 为 `[term, definitions, pos, ipa, tags]` 五元组（全字符串）。运行时
+`entries` 为 `[term, definitions, pos, ipa, tags]` 五元组（全字符串）。`definitions`
+以换行符连接多条释义——清洗阶段已保证释义文本内不含换行，换行连接是无损往返
+（全角分号可能出现在释义文本内，不作连接符，RAY-260 评审 nit 3）。运行时
 `packages/core/src/presets/tier0.ts` 装载时做 parse-don't-validate（结构/词条形状/
 去重校验，损坏立即抛错），并由 `packages/core/src/presets/tier0.test.ts` 锁定
-「生成 → 装载」契约（词条数、排序、标签口径）。修改清洗规则后必须：
+「生成 → 装载」契约（词条数、排序、标签口径、领域标记与词性标记剥离）。修改清洗规则后必须：
 
 1. 重新生成 tier0.data.json；2. 更新 tier0.test.ts 的期望值；3. 更新本 README 与
    `docs/presets/experiment.md` 的实测数字。

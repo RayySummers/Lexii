@@ -3,9 +3,10 @@
  *
  * RAY-253：三个模式按钮（学习 / 复习 / 混合）+ 今日待学徽标（RAY-254 起，此前为到期徽标）；
  * 品牌名与介绍文案不再渲染（已归档 docs/archive/homepage-intro-v1.md）。
+ * RAY-260（Oscar 复评 suggestion 2）：有待学词时展示「今日新卡额度剩余 N 张」。
  */
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StudyMode } from "@lexilexi/core";
 import { HomeScreen } from "./HomeScreen";
 import type { StatsDataProvider, StatsSnapshot } from "./stats/types";
@@ -15,7 +16,12 @@ function makeStatsProvider(snapshot: StatsSnapshot): StatsDataProvider {
 }
 
 /** 只含首页徽标关心的字段、其余归零的快照 */
-function badgeSnapshot(dueCount: number, reviewCount: number, streakDays: number): StatsSnapshot {
+function badgeSnapshot(
+  dueCount: number,
+  reviewCount: number,
+  streakDays: number,
+  overrides: Partial<StatsSnapshot> = {},
+): StatsSnapshot {
   return {
     streakDays,
     totalDays: 0,
@@ -25,10 +31,15 @@ function badgeSnapshot(dueCount: number, reviewCount: number, streakDays: number
     dueTomorrowCount: 0,
     reviewCount,
     completedWordCount: 0,
+    ...overrides,
   };
 }
 
 describe("HomeScreen", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("渲染三个模式按钮：学习 / 复习 / 混合", () => {
     render(<HomeScreen onStart={vi.fn()} statsProvider={null} />);
 
@@ -100,5 +111,44 @@ describe("HomeScreen", () => {
     render(<HomeScreen onStart={vi.fn()} statsProvider={null} />);
 
     expect(screen.queryByText(/今日待学/)).not.toBeInTheDocument();
+  });
+
+  it("有待学词时显示今日新卡额度（默认 20 − 今日已学，RAY-260 复评 suggestion 2）", async () => {
+    render(
+      <HomeScreen
+        onStart={vi.fn()}
+        statsProvider={makeStatsProvider(badgeSnapshot(3, 10, 2, { todayLearnCount: 5 }))}
+      />,
+    );
+
+    expect(
+      await screen.findByText("今日新卡额度剩余 15 张，超出部分顺延到之后的日子。"),
+    ).toBeInTheDocument();
+  });
+
+  it("额度按设置值折算；今日已学满时显示剩余 0 张", async () => {
+    window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
+    render(
+      <HomeScreen
+        onStart={vi.fn()}
+        statsProvider={makeStatsProvider(badgeSnapshot(8, 10, 2, { todayLearnCount: 5 }))}
+      />,
+    );
+
+    expect(
+      await screen.findByText("今日新卡额度剩余 0 张，超出部分顺延到之后的日子。"),
+    ).toBeInTheDocument();
+  });
+
+  it("无待学词时不显示额度提示（空状态保持简洁）", async () => {
+    render(
+      <HomeScreen
+        onStart={vi.fn()}
+        statsProvider={makeStatsProvider(badgeSnapshot(0, 10, 2, { todayLearnCount: 3 }))}
+      />,
+    );
+
+    await screen.findByRole("button", { name: "学习" });
+    expect(screen.queryByText(/今日新卡额度/)).not.toBeInTheDocument();
   });
 });

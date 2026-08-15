@@ -1,5 +1,6 @@
 /**
- * 设置页：数据安全 + 导出 / 导入（RAY-245），导航改版（RAY-253）。
+ * 设置页：数据安全 + 导出 / 导入（RAY-245），导航改版（RAY-253），
+ * 每日新卡上限（RAY-260）。
  *
  * - 数据安全：监听 `lexilexi:storage-permission` 事件（经 usePersistenceStatus），
  *   状态为 "denied" 时提示「当前数据可能被清理，建议导出」并提供直达导出入口；
@@ -10,12 +11,26 @@
  *   数据概览已删除（与统计页功能重复）。
  * - 关于（RAY-251）：GitHub 仓库链接 + 反馈问题入口（纯外链跳转，新窗口打开）；
  *   页面底部展示构建时注入的版本号（`APP_VERSION`，来源 package.json，不硬编码）。
+ * - 每日新卡上限（RAY-260 评审 suggestion 2）：默认 20/日，输入框可调
+ *   （1–999），持久化到 localStorage（与主题设置同一模式）。
+ *
+ * 导出/导入/提示状态提升到本组件（SettingsScreen）而非 SettingsMainView：
+ * 进入「数据来源与许可」二级页时 SettingsMainView 卸载，进行中的导出状态与
+ * 结果提示不再丢失（RAY-260 评审 nit 2）。
  *
  * 全部颜色走 design tokens（浅色/深色两套自动生效），不硬编码颜色。
  */
 import { useCallback, useRef, useState } from "react";
+import type { RefObject } from "react";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { APP_VERSION } from "../lib/appVersion";
+import {
+  DAILY_NEW_CARD_LIMIT_MAX,
+  DAILY_NEW_CARD_LIMIT_MIN,
+  isValidDailyNewCardLimit,
+  readDailyNewCardLimit,
+  writeDailyNewCardLimit,
+} from "../lib/dailyNewCardLimit";
 import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
 import { DataSourcesScreen } from "./DataSourcesScreen";
 import { usePersistenceStatus } from "./persistenceStatus";
@@ -48,33 +63,16 @@ function readFileAsText(file: File): Promise<string> {
 export function SettingsScreen({ provider, onExit }: SettingsScreenProps) {
   // 二级视图分发（hooks 规则：主视图的全部 hooks 在 SettingsMainView 内，此处仅一个 state）
   const [view, setView] = useState<"main" | "licenses">("main");
-  if (view === "licenses") {
-    return <DataSourcesScreen provider={provider} onBack={() => setView("main")} />;
-  }
-  return (
-    <SettingsMainView
-      provider={provider}
-      onExit={onExit}
-      onOpenLicenses={() => setView("licenses")}
-    />
-  );
-}
 
-interface SettingsMainViewProps {
-  provider: SettingsDataProvider;
-  onExit(): void;
-  /** 进入「数据来源与许可」二级页 */
-  onOpenLicenses(): void;
-}
-
-function SettingsMainView({ provider, onExit, onOpenLicenses }: SettingsMainViewProps) {
-  const persistence = usePersistenceStatus();
-
+  // 导出/导入/提示状态提升到本层（RAY-260 评审 nit 2）：二级页切换时
+  // SettingsMainView 卸载，进行中的导出与结果提示不再随卸载丢失。
   const [exporting, setExporting] = useState<"json" | "csv" | null>(null);
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // 每日新卡上限输入（初始值读 localStorage；文本态随输入走，合法值即时持久化）
+  const [newCardLimitText, setNewCardLimitText] = useState(() => String(readDailyNewCardLimit()));
 
   const handleExportJson = useCallback(async () => {
     setExporting("json");
@@ -133,14 +131,115 @@ function SettingsMainView({ provider, onExit, onOpenLicenses }: SettingsMainView
     [provider],
   );
 
+  const handleNewCardLimitChange = useCallback((text: string) => {
+    setNewCardLimitText(text);
+    const value = Number(text);
+    if (isValidDailyNewCardLimit(value)) {
+      writeDailyNewCardLimit(value);
+    }
+  }, []);
+
+  // 失焦回落（Oscar 复评 nit 1）：输入被清空或非法时不持久化，但显示文本
+  // 须回落到实际生效值（存储中最近一次合法值），消除显示与生效的短暂不一致。
+  const handleNewCardLimitBlur = useCallback(() => {
+    setNewCardLimitText((current) => {
+      const value = Number(current);
+      return isValidDailyNewCardLimit(value) ? String(value) : String(readDailyNewCardLimit());
+    });
+  }, []);
+
+  if (view === "licenses") {
+    return <DataSourcesScreen provider={provider} onBack={() => setView("main")} />;
+  }
+  return (
+    <SettingsMainView
+      onExit={onExit}
+      onOpenLicenses={() => setView("licenses")}
+      exporting={exporting}
+      importing={importing}
+      notice={notice}
+      error={error}
+      fileInputRef={fileInputRef}
+      onExportJson={handleExportJson}
+      onExportCsv={handleExportCsv}
+      onImportFile={handleImportFile}
+      newCardLimitText={newCardLimitText}
+      onNewCardLimitChange={handleNewCardLimitChange}
+      onNewCardLimitBlur={handleNewCardLimitBlur}
+    />
+  );
+}
+
+interface SettingsMainViewProps {
+  onExit(): void;
+  /** 进入「数据来源与许可」二级页 */
+  onOpenLicenses(): void;
+  /** 导出/导入进行态与结果提示（状态由 SettingsScreen 持有，二级页切换不丢失） */
+  exporting: "json" | "csv" | null;
+  importing: boolean;
+  notice: string | null;
+  error: string | null;
+  fileInputRef: RefObject<HTMLInputElement | null>;
+  onExportJson(): void;
+  onExportCsv(): void;
+  onImportFile(file: File): void;
+  /** 每日新卡上限输入框（文本态 + 变更/失焦回调；合法值由父级即时持久化，失焦回落） */
+  newCardLimitText: string;
+  onNewCardLimitChange(text: string): void;
+  onNewCardLimitBlur(): void;
+}
+
+function SettingsMainView({
+  onExit,
+  onOpenLicenses,
+  exporting,
+  importing,
+  notice,
+  error,
+  fileInputRef,
+  onExportJson,
+  onExportCsv,
+  onImportFile,
+  newCardLimitText,
+  onNewCardLimitChange,
+  onNewCardLimitBlur,
+}: SettingsMainViewProps) {
+  const persistence = usePersistenceStatus();
+
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
       <ScreenHeader title="设置" onBack={onExit} />
 
+      <Section title="学习">
+        <label
+          htmlFor="daily-new-card-limit"
+          className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+          <span>
+            每日新卡上限
+            <span className="mt-1 block text-xs text-text-muted">
+              每天最多学习的新词数（1–999，默认 20）；超出部分顺延到之后的日子，复习不受限制。
+            </span>
+          </span>
+          <input
+            id="daily-new-card-limit"
+            type="number"
+            inputMode="numeric"
+            min={DAILY_NEW_CARD_LIMIT_MIN}
+            max={DAILY_NEW_CARD_LIMIT_MAX}
+            step={1}
+            value={newCardLimitText}
+            onChange={(event) => onNewCardLimitChange(event.target.value)}
+            onBlur={onNewCardLimitBlur}
+            className="w-28 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          />
+        </label>
+      </Section>
+
       <Section title="数据安全">
         <PersistenceBanner
           status={persistence}
-          onExport={handleExportJson}
+          onExport={onExportJson}
           exporting={exporting === "json"}
         />
       </Section>
@@ -152,7 +251,7 @@ function SettingsMainView({ provider, onExit, onOpenLicenses }: SettingsMainView
         <div className="flex flex-col gap-3 sm:flex-row">
           <button
             type="button"
-            onClick={() => void handleExportJson()}
+            onClick={onExportJson}
             disabled={exporting !== null}
             className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -160,7 +259,7 @@ function SettingsMainView({ provider, onExit, onOpenLicenses }: SettingsMainView
           </button>
           <button
             type="button"
-            onClick={() => void handleExportCsv()}
+            onClick={onExportCsv}
             disabled={exporting !== null}
             className="rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -185,7 +284,7 @@ function SettingsMainView({ provider, onExit, onOpenLicenses }: SettingsMainView
           onChange={(event) => {
             const file = event.target.files?.[0];
             if (file) {
-              void handleImportFile(file);
+              void onImportFile(file);
             }
           }}
         />

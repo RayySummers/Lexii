@@ -1,11 +1,16 @@
 /**
- * 首页：三模式入口（学习 / 复习 / 混合）+ 今日待学徽标。
+ * 首页：三模式入口（学习 / 复习 / 混合）+ 今日待学徽标 + 今日新卡额度提示。
  *
  * RAY-253 反馈 1：首页保持简洁——不显示品牌名与介绍文案（原文已归档到
  * docs/archive/homepage-intro-v1.md，供以后建站使用），只保留三个模式按钮。
  *
  * RAY-254：徽标文案「今日到期」→「今日待学」——dueCount 含 reps===0 的新词，
  * 「待学」明确涵盖新词 + 到期复习；统计口径（stats.dueCount 语义）不变。
+ *
+ * RAY-260（Oscar 复评 suggestion 2）：徽标「今日待学」用未截断的到期数，
+ * 与每日新卡上限下实际可学的队列存在数字差（如首装后徽标 7,195、每日只学
+ * 20）。三模式入口下方补一行「今日新卡额度剩余 N 张」，注明超出顺延，
+ * 降低用户困惑——额度 = 设置上限 − 今日已学新词（stats.todayLearnCount）。
  *
  * - 待学徽标数据经 StatsDataProvider（statsProvider 为 null 时不展示，
  *   如无 IndexedDB 的测试环境）；
@@ -14,6 +19,7 @@
  */
 import type { ReactNode } from "react";
 import type { StudyMode } from "@lexilexi/core";
+import { readDailyNewCardLimit } from "./lib/dailyNewCardLimit";
 import { useStats } from "./stats/useStats";
 import type { StatsDataProvider } from "./stats/types";
 
@@ -56,7 +62,26 @@ export function HomeScreen({ onStart, statsProvider }: HomeScreenProps) {
         dueCount={stats?.dueCount ?? null}
         hasReviewed={stats !== null && stats.reviewCount > 0}
       />
+
+      {stats !== null && stats.dueCount > 0 ? (
+        <NewCardQuotaHint learnedToday={stats.todayLearnCount} />
+      ) : null}
     </main>
+  );
+}
+
+/**
+ * 今日新卡额度提示（RAY-260 复评 suggestion 2）：
+ * 额度 = 设置上限 − 今日已学新词数（下限 0）。仅在有待学词（dueCount > 0）
+ * 时展示——徽标数字是未截断的到期数，与 20/日上限下实际可学的队列存在
+ * 数字差，此提示说明二者关系；语义与复习页的实际截取一致（超出顺延）。
+ */
+function NewCardQuotaHint({ learnedToday }: { learnedToday: number }) {
+  const remaining = Math.max(0, readDailyNewCardLimit() - learnedToday);
+  return (
+    <p className="text-sm text-text-muted">
+      今日新卡额度剩余 {remaining} 张，超出部分顺延到之后的日子。
+    </p>
   );
 }
 

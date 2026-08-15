@@ -45,6 +45,9 @@ export function createLexilexiDatabase(
  * 每个版本内先执行数据迁移、再 stores(...) 声明新表集合（见上方迁移示例）。
  * v2（RAY-258）：新增 meta 表（key → value 字符串，预设词表安装进度/完成标记
  * 与未来的扩展包元信息）。纯新增表，无数据迁移，存量数据原样保留。
+ * v3（RAY-260）：memoryStates 增加 fields.due 索引（到期/明日到期查询由
+ * filter 全表扫描改为索引区间查询，评审 suggestion 2 的「为 fields.due
+ * 建索引」部分）；仅新增索引，无数据迁移，存量数据原样保留。
  */
 export function openLexilexiDatabase(db: Dexie): void {
   if (db.isOpen()) {
@@ -56,10 +59,17 @@ export function openLexilexiDatabase(db: Dexie): void {
     memoryStates: "id",
     events: "id, time, type",
   });
-  db.version(DB_SCHEMA_VERSION).stores({
+  db.version(2).stores({
     items: "id",
     senses: "id",
     memoryStates: "id",
+    events: "id, time, type",
+    meta: "key",
+  });
+  db.version(DB_SCHEMA_VERSION).stores({
+    items: "id",
+    senses: "id",
+    memoryStates: "id, fields.due",
     events: "id, time, type",
     meta: "key",
   });

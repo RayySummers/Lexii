@@ -12,6 +12,19 @@ Lexilexi 核心领域模型与本地数据层包。
 - 学习回路：评分 → FSRS 排期 → 事件落库（`gradeReview`）、到期队列（`getDueItemIds`）。
 - **不包含**任何算法实现（FSRS 在 `@lexilexi/fsrs`，评测在 `@lexilexi/eval`，统计在 `@lexilexi/stats`）。
 
+## 数据库 schema 版本链（升级必须走版本迁移，禁止清库重来）
+
+| 版本 | 变更                                                                              | 来源    |
+| ---- | --------------------------------------------------------------------------------- | ------- |
+| v1   | 初始 schema：items / senses / memoryStates / events                               | RAY-242 |
+| v2   | 新增 meta 表（预设词表安装进度/完成标记）                                         | RAY-258 |
+| v3   | memoryStates 新增 `fields.due` 索引（到期查询由 filter 全表扫描改为索引区间查询） | RAY-260 |
+
+到期查询（`getDueItemIds` / `getDueItemIdsInRange` / `getStudyQueueItemIds`）走
+`where("fields.due")` 索引区间（`belowOrEqual` / `between`），与旧 filter 口径一致。
+`getStudyQueueItemIds(db, now, mode, { newCardLimit })` 的 `newCardLimit` 为每日新卡
+上限（按 due 升序截取前 N 条新词；产品默认值 20/日 与设置存储在 apps/web）。
+
 ## 领域模型（四个核心概念）
 
 | 概念          | 类型           | 说明                                                                                                                                         |
@@ -103,8 +116,10 @@ window.addEventListener(STORAGE_PERMISSION_EVENT, (e) => {
 
 数据层关键路径测试位于 `src/*.test.ts`，使用 fake-indexeddb 在 Node 环境运行：
 
-- 迁移红线用例：v1 → v2 升级走 `version/upgrade`，旧数据原样保留（`export.test.ts`）
+- 迁移红线用例：v1 → v2 → v3 升级走 `version/upgrade`，旧数据原样保留、索引自动建立（`persistence.test.ts`）
 - 原子事务、非法流转、导出 round-trip、结构校验
+- 预设词表安装并发安全：progress=0 占位 + 块事务 check-and-set，双标签页同时首启不重复导入（`presets/install.test.ts`）
+- Tier 0 数据形状锁定：词条数、排序、标签、词性/领域标记剥离、义项切分无损（`presets/tier0.test.ts`）
 
 覆盖率报告（运行 `npx vitest run --coverage --coverage.include="src/**/*.ts" --coverage.exclude="src/**/*.test.ts" --coverage.exclude="src/index.ts" --coverage.exclude="src/helpers.ts"`）要求关键路径 100%。
 

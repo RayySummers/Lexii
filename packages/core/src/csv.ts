@@ -11,18 +11,15 @@
  * 未闭合引号）。
  */
 import type { LanguageCode } from "./domain";
+import { TERM_PATTERN } from "./termPattern.js";
+
+export { TERM_PATTERN };
 
 /** 词表默认语言（MVP 固定英语词条） */
 export const DEFAULT_WORDLIST_LANG: LanguageCode = "en";
 
 /** 单行最大解析宽度（词条/释义等字段的上限，防极端输入） */
 const MAX_FIELD_LENGTH = 500;
-
-/**
- * 单词词条模式：字母、撇号、连字符、点（如 "well-known"、"Mr."）。
- * 打包脚本（scripts/presets）与预设词表装载校验共用同一口径。
- */
-export const TERM_PATTERN = /^[A-Za-z][A-Za-z'-]*[.]?$/;
 
 /** 表头列名（不区分大小写） */
 const TERM_HEADERS = new Set(["term", "word"]);

@@ -174,13 +174,19 @@ interface ReviewEvent extends BaseEvent {
 
 ## 9. 数据层与版本迁移
 
-- Dexie 数据库 **`lexilexi`**，`SCHEMA_VERSION = 2`，表：`items`(`id`)、`senses`(`id`)、`memoryStates`(`id`)、`events`(`id`, `time`, `type`)、`meta`(`key`)。
+- Dexie 数据库 **`lexilexi`**，`SCHEMA_VERSION = 3`，表：`items`(`id`)、`senses`(`id`)、`memoryStates`(`id`, `fields.due`)、`events`(`id`, `time`, `type`)、`meta`(`key`)。
 - **schema 升级必须走 `db.version(n).stores(...).upgrade(...)` 迁移**，严禁 `db.delete()` / `db.close()` 后重建（清库重来是红线）。每版迁移函数带独立单元测试。
 - 版本链：v1 = 初始四表；v2（RAY-258）= 新增 `meta` 表（`{ key, value }` 字符串键值，
   承载预设词表安装进度/完成标记 `preset:<id>:progress` / `preset:<id>:done`
   与未来的扩展包元信息）。纯新增表，无数据迁移，存量数据原样保留。
+  v3（RAY-260）= `memoryStates` 新增 `fields.due` 索引：到期/明日到期查询由
+  filter 全表扫描改为索引区间查询（`belowOrEqual` / `between`），仅新增索引，
+  无数据迁移，存量数据原样保留。
 - 数据库操作一律走 `db.transaction("rw", ...)`；同一「评分 → 写状态 + 写事件」必须单事务原子落库。
-- 预设词表安装（`installPreset`）分块事务落库：每 400 词条一个事务（词条 → Sense / Item / Memory State / import 事件 4 记录），进度标记与块同事务提交，中断后从断点续装、不重复导入；完成标记 `preset:<id>:done` 命中即幂等跳过。
+- 预设词表安装（`installPreset`）分块事务落库：每 400 词条一个事务（词条 → Sense / Item / Memory State / import 事件 4 记录），进度标记与块同事务提交，中断后从断点续装、不重复导入；完成标记 `preset:<id>:done` 命中即幂等跳过。并发首装（RAY-260）：起始事务先写 `progress=0` 占位 + 每块事务 check-and-set（进度必须仍是本调用读到的 cursor），双标签页同时首启不产生重复导入。
+- 每日新卡上限（RAY-260）：`getStudyQueueItemIds` 的 `newCardLimit` 按 due 升序截取新词
+  （learn / mixed）；「今日已学新词数」由 review 事件投影（`@lexilexi/stats` 的
+  `computeLearnedTodayCount`）折算，产品默认值 20/日 与设置存储（localStorage 偏好）在 apps/web。
 
 ## 10. 持久化防线（storage.persist）
 

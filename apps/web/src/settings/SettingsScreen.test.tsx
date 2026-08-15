@@ -82,6 +82,7 @@ function stubObjectUrl() {
 describe("SettingsScreen", () => {
   beforeEach(() => {
     vi.mocked(usePersistenceStatus).mockReturnValue(null);
+    window.localStorage.clear();
   });
 
   it("统一导航头：标题「设置」右对齐，返回箭头触发 onExit", () => {
@@ -257,5 +258,90 @@ describe("SettingsScreen", () => {
     // 返回设置页
     fireEvent.click(screen.getByRole("button", { name: "返回设置" }));
     expect(await screen.findByRole("heading", { name: "设置" })).toBeInTheDocument();
+  });
+
+  it("每日新卡上限：默认 20，输入合法值即时持久化（RAY-260 评审 suggestion 2）", async () => {
+    const harness = makeHarness();
+    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+
+    const input = await screen.findByLabelText(/每日新卡上限/);
+    expect(input).toHaveValue(20);
+
+    fireEvent.change(input, { target: { value: "35" } });
+    expect(input).toHaveValue(35);
+    expect(window.localStorage.getItem("lexilexi:daily-new-card-limit")).toBe("35");
+  });
+
+  it("每日新卡上限：非法输入不持久化（存储保持原值）", async () => {
+    const harness = makeHarness();
+    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+
+    const input = await screen.findByLabelText(/每日新卡上限/);
+    // number 输入框对非数字文本会被浏览器清空（value 为空串）
+    fireEvent.change(input, { target: { value: "abc" } });
+    expect(input).toHaveValue(null);
+    expect(window.localStorage.getItem("lexilexi:daily-new-card-limit")).toBeNull();
+  });
+
+  it("每日新卡上限：失焦时显示回落到生效值（Oscar 复评 nit 1）", async () => {
+    const harness = makeHarness();
+    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+
+    const input = await screen.findByLabelText(/每日新卡上限/);
+    // 先设置合法值 35（持久化），再清空输入（非法、不持久化）
+    fireEvent.change(input, { target: { value: "35" } });
+    fireEvent.change(input, { target: { value: "" } });
+    expect(input).toHaveValue(null);
+
+    // 失焦：显示回落到存储中实际生效的值 35
+    fireEvent.blur(input);
+    expect(input).toHaveValue(35);
+    expect(window.localStorage.getItem("lexilexi:daily-new-card-limit")).toBe("35");
+  });
+
+  it("每日新卡上限：合法值失焦归一化显示（不改变生效值）", async () => {
+    const harness = makeHarness();
+    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+
+    const input = await screen.findByLabelText(/每日新卡上限/);
+    fireEvent.change(input, { target: { value: "7" } });
+    fireEvent.blur(input);
+    expect(input).toHaveValue(7);
+    expect(window.localStorage.getItem("lexilexi:daily-new-card-limit")).toBe("7");
+  });
+
+  it("进行中的导出在进入二级页后不丢状态：返回后仍显示导出中并最终提示成功（RAY-260 评审 nit 2）", async () => {
+    const harness = makeHarness();
+    const restore = stubObjectUrl();
+    let resolveExport: ((value: LexilexiExportData) => void) | undefined;
+    harness.exportBackup.mockImplementation(
+      () =>
+        new Promise<LexilexiExportData>((resolve) => {
+          resolveExport = resolve;
+        }),
+    );
+    try {
+      render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+      await screen.findByText("导出数据");
+
+      // 发起导出（挂起中），随即切到「数据来源与许可」再返回
+      fireEvent.click(screen.getByRole("button", { name: "导出 JSON 完整备份" }));
+      expect(await screen.findByRole("button", { name: "导出中…" })).toBeDisabled();
+
+      fireEvent.click(screen.getByRole("button", { name: "查看数据来源与许可" }));
+      expect(await screen.findByRole("heading", { name: "数据来源与许可" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "返回设置" }));
+      expect(await screen.findByRole("heading", { name: "设置" })).toBeInTheDocument();
+
+      // 导出状态未随 SettingsMainView 卸载丢失：仍显示「导出中…」
+      expect(await screen.findByRole("button", { name: "导出中…" })).toBeDisabled();
+
+      // 完成导出后，成功提示落在返回后的主视图上
+      resolveExport?.(EMPTY_EXPORT);
+      expect(await screen.findByText("已导出 JSON 完整备份。")).toBeInTheDocument();
+      expect(harness.exportBackup).toHaveBeenCalledTimes(1);
+    } finally {
+      restore();
+    }
   });
 });

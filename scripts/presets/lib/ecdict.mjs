@@ -10,9 +10,14 @@
  * 本模块只用 Node 内置 API（fs/zlib），无第三方依赖，便于在任何环境复现。
  */
 import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
+import { TERM_PATTERN } from "../../../packages/core/src/termPattern.js";
 
-/** 与 packages/core/src/csv.ts 的 TERM_PATTERN 完全一致（英文单词词条模式） */
-export const TERM_PATTERN = /^[A-Za-z][A-Za-z'-]*[.]?$/;
+/**
+ * 与 core 侧共享的词条模式（唯一物理定义在
+ * packages/core/src/termPattern.js——core 的 csv.ts 与打包脚本 import 同一文件，
+ * 消除双处维护漂移，RAY-260 评审 nit 1）。
+ */
+export { TERM_PATTERN };
 
 /** 与 core 侧一致的单字段上限（500 字符） */
 export const MAX_FIELD_LENGTH = 500;
@@ -56,25 +61,63 @@ export const POS_MARKERS = new Set([
 ]);
 
 /**
- * 从释义段首剥离词性标记：
+ * ECDICT 领域标记（释义段首，如 "[医] 苹果"、"[计] 变量"）。
+ * 仅匹配半角方括号形态；连续多个段首标记全部剥离（如 "[医][化] 水"）。
+ * RAY-260 评审 suggestion 1：打包管线剥离领域标记，避免 "[医] 苹果"
+ * 这类文本原样渲染到复习卡。
+ */
+const DOMAIN_TAG_PATTERN = /^\[[^\]]+\]/;
+
+/** 剥离文本段首的领域标记（可连续多个），返回剩余文本 */
+function stripLeadingDomainTags(text) {
+  let rest = text;
+  while (DOMAIN_TAG_PATTERN.test(rest)) {
+    rest = rest.replace(DOMAIN_TAG_PATTERN, "").trimStart();
+  }
+  return rest;
+}
+
+/**
+ * 从释义段首剥离领域标记与词性标记（交替剥离直至稳定）。
+ *
+ * ECDICT 两种真实形态都要覆盖：
+ * - "[医] 苹果"：领域标记在段首，词性紧随其后（"[医] n. 解剖" 亦见）；
+ * - "n. [医] 解剖"：词性在前、领域标记在后（全量数据中约 4,895 段）。
+ * 单次单向剥离会漏剥其中一种，因此循环交替剥离直到不再变化；
+ * 词性提取口径与 RAY-258 旧实现完全一致（段首 `[a-z]{1,6}.` + 空白、
+ * 大小写归一、按出现顺序去重并入 pos 字段），不破坏现有词性提取。
+ *
+ * @param {string[]} definitions 已按「；」切分的原始释义段
  * @returns {{ definitions: string[], pos: string }} 剥离后的释义与按出现顺序去重的词性串
  */
-export function stripPosMarkers(definitions) {
+export function stripPrefixMarkers(definitions) {
   const posList = [];
   const stripped = [];
   for (const def of definitions) {
-    const match = def.match(/^([a-z]{1,6}\.)\s+/);
-    if (match && POS_MARKERS.has(match[1].toLowerCase())) {
-      const marker = match[1].toLowerCase();
-      if (!posList.includes(marker)) {
-        posList.push(marker);
+    let rest = def;
+    for (;;) {
+      let didStrip = false;
+      const withoutTags = stripLeadingDomainTags(rest);
+      if (withoutTags !== rest) {
+        rest = withoutTags;
+        didStrip = true;
       }
-      const rest = def.slice(match[0].length).trim();
-      if (rest !== "") {
-        stripped.push(rest);
+      const match = rest.match(/^([a-z]{1,6}\.)\s+/);
+      if (match && POS_MARKERS.has(match[1].toLowerCase())) {
+        const marker = match[1].toLowerCase();
+        if (!posList.includes(marker)) {
+          posList.push(marker);
+        }
+        rest = rest.slice(match[0].length).trimStart();
+        didStrip = true;
       }
-    } else {
-      stripped.push(def);
+      if (!didStrip) {
+        break;
+      }
+    }
+    rest = rest.trim();
+    if (rest !== "") {
+      stripped.push(rest);
     }
   }
   return { definitions: stripped, pos: posList.join("；") };
@@ -210,7 +253,9 @@ export function cleanEcdictRow(row) {
   if (rawDefinitions.length === 0 || rawDefinitions.every((d) => d === "")) {
     return { reason: "empty-translation" };
   }
-  const { definitions, pos: extractedPos } = stripPosMarkers(rawDefinitions);
+  // 领域标记 + 词性标记交替剥离（RAY-260 suggestion 1；"[医] n. 解剖" 与
+  // "n. [医] 解剖" 两种形态都能剥净，词性提取口径不变）
+  const { definitions, pos: extractedPos } = stripPrefixMarkers(rawDefinitions);
   if (definitions.length === 0) {
     return { reason: "empty-translation" };
   }

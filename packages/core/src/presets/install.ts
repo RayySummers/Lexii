@@ -7,6 +7,9 @@
  * - 可恢复：进度写入 meta 表（`preset:<id>:progress`），中断后从断点续装，
  *   不会重复导入（每块与进度在同一事务内提交，要么全进要么全回滚）；
  * - 幂等：完成标记（`preset:<id>:done` = 已安装版本）存在时直接跳过；
+ * - 并发安全（RAY-260 评审 suggestion 3）：起始事务先写 progress=0 占位，
+ *   且每块事务校验进度未被并发安装者推进（check-and-set，IndexedDB 串行化
+ *   读写事务使该校验成立），双标签页同时首启不会重复导入；
  * - 每个新条目写入 Sense / Learning Item / Memory State / import 事件
  *   （4 条记录），与 importCsvWordlist 落库形态完全一致，统计与导出路径无感。
  *
@@ -90,7 +93,7 @@ export async function getPresetInstallState(
 }
 
 /**
- * 分块安装预设词表（可恢复、幂等）。
+ * 分块安装预设词表（可恢复、幂等、并发安全）。
  *
  * @param db 已打开的 Lexilexi 数据库
  * @param preset 预设词表包（entries 已由打包侧清洗/排序/去重）
@@ -111,7 +114,20 @@ export async function installPreset(
     return { status: "already-installed", installedVersion: done.value };
   }
 
-  const progressEntry = await db.meta.get(presetProgressKey(preset.id));
+  let progressEntry = await db.meta.get(presetProgressKey(preset.id));
+  if (!progressEntry) {
+    // 并发首装竞态加固（RAY-260 评审 suggestion 3）：进度标记原先在首块
+    // 提交后才写入，双标签页同时首启时另一页在首块窗口内看不到任何标记、
+    // 会从 0 重复导入。现在安装起始事务先写 progress=0 占位（条件写入，
+    // 不覆盖并发安装者已推进的进度），占位后再重读一次进度。
+    await db.transaction("rw", db.meta, async () => {
+      const existing = await db.meta.get(presetProgressKey(preset.id));
+      if (!existing) {
+        await db.meta.put({ key: presetProgressKey(preset.id), value: "0" });
+      }
+    });
+    progressEntry = await db.meta.get(presetProgressKey(preset.id));
+  }
   const parsed = progressEntry ? Number(progressEntry.value) : 0;
   let cursor = Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, preset.entries.length) : 0;
   const startCursor = cursor;
@@ -120,42 +136,75 @@ export async function installPreset(
   while (cursor < total) {
     const chunk = preset.entries.slice(cursor, cursor + PRESET_CHUNK_SIZE);
     const nextCursor = cursor + chunk.length;
-    // 块数据与进度标记同一事务：中断时该块整体回滚，进度停留在上一块末尾
-    await db.transaction(
-      "rw",
-      db.senses,
-      db.items,
-      db.memoryStates,
-      db.events,
-      db.meta,
-      async () => {
-        for (const entry of chunk) {
-          const sense = toSense(entry, lang);
-          const itemId = toItemId(createId("item"));
-          await db.senses.put(sense);
-          await db.items.put({
-            id: itemId,
-            createdAt: time,
-            updatedAt: time,
-            source: `${preset.name}（${preset.id}）`,
-            senseId: sense.id,
-            kind: "word",
-            status: "active",
-          });
-          await db.memoryStates.put(toMemoryState(itemId, time));
-          await db.events.put({
-            id: toEventId(createId("evt", 12)),
-            type: "import",
-            time,
-            itemId,
-            senseId: sense.id,
-            term: sense.term,
-            lang: sense.lang,
-          });
-        }
-        await db.meta.put({ key: presetProgressKey(preset.id), value: String(nextCursor) });
-      },
-    );
+    const expectedCursor = cursor;
+    try {
+      // 块数据与进度标记同一事务：中断时该块整体回滚，进度停留在上一块末尾
+      await db.transaction(
+        "rw",
+        db.senses,
+        db.items,
+        db.memoryStates,
+        db.events,
+        db.meta,
+        async () => {
+          // 并发防线：块事务开始时进度必须仍是本调用读到的 cursor。
+          // IndexedDB 串行化同存储的读写事务，若另一标签页已提交更靠后的
+          // 进度，此处读到的不一致 → 抛错回滚本块（不产生重复导入），
+          // 循环退出后重读进度续装。
+          const current = await db.meta.get(presetProgressKey(preset.id));
+          const currentValue = current ? Number(current.value) : 0;
+          if ((Number.isFinite(currentValue) ? currentValue : 0) !== expectedCursor) {
+            throw new ConcurrentInstallError(preset.id);
+          }
+          for (const entry of chunk) {
+            const sense = toSense(entry, lang);
+            const itemId = toItemId(createId("item"));
+            await db.senses.put(sense);
+            await db.items.put({
+              id: itemId,
+              createdAt: time,
+              updatedAt: time,
+              source: `${preset.name}（${preset.id}）`,
+              senseId: sense.id,
+              kind: "word",
+              status: "active",
+            });
+            await db.memoryStates.put(toMemoryState(itemId, time));
+            await db.events.put({
+              id: toEventId(createId("evt", 12)),
+              type: "import",
+              time,
+              itemId,
+              senseId: sense.id,
+              term: sense.term,
+              lang: sense.lang,
+            });
+          }
+          await db.meta.put({ key: presetProgressKey(preset.id), value: String(nextCursor) });
+        },
+      );
+    } catch (err) {
+      if (!(err instanceof ConcurrentInstallError)) {
+        throw err;
+      }
+      // 并发安装者推进了进度（本块已整体回滚）：先看是否已有人完成安装，
+      // 再重读进度续装；进度未推进且未完成属异常状态，直接报错避免死循环。
+      const doneNow = await db.meta.get(presetDoneKey(preset.id));
+      if (doneNow) {
+        return { status: "already-installed", installedVersion: doneNow.value };
+      }
+      const current = await db.meta.get(presetProgressKey(preset.id));
+      const currentValue = current ? Number(current.value) : 0;
+      const advancedCursor =
+        Number.isFinite(currentValue) && currentValue > cursor
+          ? Math.min(currentValue, total)
+          : cursor;
+      if (advancedCursor === cursor) {
+        throw new ConcurrentInstallError(preset.id);
+      }
+      cursor = advancedCursor;
+      continue;
+    }
     cursor = nextCursor;
     await yieldFn();
   }
@@ -166,4 +215,12 @@ export async function installPreset(
   });
 
   return { status: "installed", installedCount: total - startCursor };
+}
+
+/** 并发安装检测错误（内部哨兵：不面向调用方文案） */
+class ConcurrentInstallError extends Error {
+  constructor(presetId: string) {
+    super(`预设词表安装进度被并发安装者推进：${presetId}`);
+    this.name = "ConcurrentInstallError";
+  }
 }

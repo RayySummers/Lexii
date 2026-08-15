@@ -6,7 +6,7 @@
  * 同一 fake-indexeddb 注入方式（IDBFactory + IDBKeyRange），不依赖浏览器环境。
  */
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
-import { openDatabase, SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
+import { isReviewEvent, openDatabase, SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
 import type { LexilexiDatabase } from "@lexilexi/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIndexedDbReviewDataProvider } from "./data";
@@ -22,6 +22,11 @@ let db: LexilexiDatabase | undefined;
 
 beforeEach(() => {
   db = openDatabase(makeOptions());
+  try {
+    window.localStorage.clear();
+  } catch {
+    // 忽略清理失败
+  }
 });
 
 afterEach(async () => {
@@ -164,5 +169,63 @@ describe("createIndexedDbReviewDataProvider", () => {
     await expect(
       provider.grade(card, "easy", { reviewDurationMs: 1_000, revealed: true }),
     ).rejects.toThrow();
+  });
+
+  it("每日新卡上限：设置 5 时 learn 队列只取前 5 张新卡，review 不受影响（RAY-260 suggestion 2）", async () => {
+    window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await provider.importSampleWordlist();
+
+    const learnQueue = await provider.loadQueue("learn");
+    expect(learnQueue).toHaveLength(5);
+    // 复习队列不含新词，额度不影响
+    expect(await provider.loadQueue("review")).toEqual([]);
+  });
+
+  it("每日新卡上限：今日已学词条数扣减额度（已学 2 张后剩余额度只补到上限）", async () => {
+    window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await provider.importSampleWordlist();
+
+    const first = (await provider.loadQueue("learn")).slice(0, 2);
+    for (const card of first) {
+      await provider.grade(card, "good", { reviewDurationMs: 1_000, revealed: true });
+    }
+
+    // 今日已学 2 张新卡 → 剩余额度 3
+    const learnQueue = await provider.loadQueue("learn");
+    expect(learnQueue).toHaveLength(3);
+    const ids = new Set(learnQueue.map((card) => card.item.id));
+    for (const card of first) {
+      expect(ids.has(card.item.id)).toBe(false);
+    }
+  });
+
+  it("每日新卡上限：昨日已学的词条今日复习不重复扣减今日额度（Oscar 复评 suggestion 1 语义回归）", async () => {
+    window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await provider.importSampleWordlist();
+
+    // 学习 a、b 两张新卡
+    const [cardA, cardB] = (await provider.loadQueue("learn")).slice(0, 2);
+    await provider.grade(cardA!, "good", { reviewDurationMs: 1_000, revealed: true });
+    await provider.grade(cardB!, "good", { reviewDurationMs: 1_000, revealed: true });
+
+    // 把 b 的首复习事件移到昨天：b 的「学习」不属于今天，今日已学只剩 a（1 张）
+    const bReview = await db!.events
+      .where("type")
+      .equals("review")
+      .and((event) => isReviewEvent(event) && event.itemId === cardB!.item.id)
+      .first();
+    expect(bReview).toBeDefined();
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString();
+    await db!.events.put({ ...bReview!, time: yesterday });
+
+    // 今日已学仅剩 a（1 张）→ 剩余额度 4；新词共 12 张，额度先耗尽 → 队列取 4 张
+    const learnQueue = await provider.loadQueue("learn");
+    expect(learnQueue).toHaveLength(4);
+    const ids = new Set(learnQueue.map((card) => card.item.id));
+    expect(ids.has(cardA!.item.id)).toBe(false);
+    expect(ids.has(cardB!.item.id)).toBe(false);
   });
 });

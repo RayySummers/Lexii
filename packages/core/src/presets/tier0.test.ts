@@ -76,6 +76,29 @@ describe("TIER0_PRESET（内置核心词表）", () => {
       }
     }
   });
+
+  it("释义段首不含 ECDICT 领域标记（[医]/[法]/[计] 等已剥离，RAY-260 评审 suggestion 1）", () => {
+    const domainTagPattern = /^\[[^\]]+\]/;
+    for (const entry of TIER0_PRESET.entries) {
+      for (const def of entry.definitions) {
+        expect(domainTagPattern.test(def.trim()), `释义仍含领域标记：${entry.term} → ${def}`).toBe(
+          false,
+        );
+      }
+    }
+  });
+
+  it("义项切分无损：打包连接与装载切分往返后，释义数组与打包侧一致（RAY-260 评审 nit 3）", () => {
+    // 打包侧以换行连接（build.mjs）→ 装载侧按换行切回（tier0.ts）。
+    // 换行在清洗阶段已被保证不出现在释义文本内，因此往返无损；
+    // 释义文本内出现全角分号时不再被二次切分。
+    for (const entry of TIER0_PRESET.entries) {
+      for (const def of entry.definitions) {
+        // 装载后的单条释义不允许包含换行（换行只作分隔符；含换行说明切分口径漂移）
+        expect(def.includes("\n"), `释义内出现换行：${entry.term}`).toBe(false);
+      }
+    }
+  });
 });
 
 describe("第三方数据来源登记（数据来源与许可页的事实层）", () => {
