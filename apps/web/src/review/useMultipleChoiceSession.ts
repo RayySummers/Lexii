@@ -77,6 +77,7 @@ export function useMultipleChoiceSession(
   const [state, setState] = useState<QuizState>(INITIAL_STATE);
   const loadIdRef = useRef(0);
   const gradingRef = useRef(false);
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -84,8 +85,23 @@ export function useMultipleChoiceSession(
     setState((prev) => ({ ...prev, ...patch }));
   }, []);
 
+  // B2：组件卸载时清理自动推进 timer
+  useEffect(() => {
+    return () => {
+      if (advanceTimerRef.current !== null) {
+        clearTimeout(advanceTimerRef.current);
+        advanceTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const load = useCallback(async () => {
     const loadId = ++loadIdRef.current;
+    // B2：重新加载时清理未决的自动推进 timer
+    if (advanceTimerRef.current !== null) {
+      clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    }
     apply({ phase: "loading", error: null, questions: [], cards: [], index: 0, selectedIndex: null, isCorrect: null, answeredCount: 0 });
     try {
       const { questions, cards } = await provider.loadMultipleChoiceQueue(mode);
@@ -140,18 +156,21 @@ export function useMultipleChoiceSession(
       const correct = option.isCorrect;
       apply({ selectedIndex: index, isCorrect: correct });
 
-      // 自动评分 + 推进
+      // B1：在 select 开头捕获当前 loadId，.then() 中比较
+      const capturedLoadId = loadIdRef.current;
       gradingRef.current = true;
       const rating: ReviewRating = correct ? "good" : "again";
       const context: GradeContext = {
-        reviewDurationMs: 0, // 选择题不精确计时
+        reviewDurationMs: 0, // 选择题不精确计时（S2，后续迭代优化）
         revealed: false,
         exerciseType: "multiple-choice",
+        answerWasCorrect: correct, // B3：显式传入
       };
       provider
         .grade(card, rating, context)
         .then(() => {
-          if (loadIdRef.current !== loadIdRef.current) {
+          // B1：用捕获的 loadId 比较，而非自比较
+          if (capturedLoadId !== loadIdRef.current) {
             return;
           }
           gradingRef.current = false;
@@ -159,8 +178,12 @@ export function useMultipleChoiceSession(
           if (current.index + 1 >= current.questions.length) {
             apply({ phase: "done", answeredCount });
           } else {
-            // 延迟推进，让用户看到反馈
-            setTimeout(() => {
+            // B2：timer 存入 ref，带 loadId 守卫
+            advanceTimerRef.current = setTimeout(() => {
+              advanceTimerRef.current = null;
+              if (capturedLoadId !== loadIdRef.current) {
+                return; // B2：重新加载后旧 timer 不推进
+              }
               apply({
                 index: current.index + 1,
                 selectedIndex: null,
@@ -171,6 +194,9 @@ export function useMultipleChoiceSession(
           }
         })
         .catch((error) => {
+          if (capturedLoadId !== loadIdRef.current) {
+            return;
+          }
           gradingRef.current = false;
           apply({ phase: "error", error: toErrorMessage(error) });
         });

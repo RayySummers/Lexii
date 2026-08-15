@@ -39,6 +39,8 @@ export interface GradeContext {
   revealed: boolean;
   /** 练习形式（默认 recall；选择题传 multiple-choice） */
   exerciseType?: ExerciseType;
+  /** 本次作答是否正确（选择题显式传入；卡片翻转路径省略时由 rating !== "again" 推导） */
+  answerWasCorrect?: boolean;
 }
 
 /**

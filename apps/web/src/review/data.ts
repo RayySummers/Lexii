@@ -163,7 +163,7 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
         rating,
         reviewDurationMs: context.reviewDurationMs,
         revealed: context.revealed,
-        answerWasCorrect: rating !== "again",
+        answerWasCorrect: context.answerWasCorrect ?? rating !== "again",
       });
     },
 
