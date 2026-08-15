@@ -14,7 +14,7 @@ pnpm build          # tsc --noEmit + vite build
 ## 结构
 
 - `src/styles/tokens.css` — 语义化 design tokens（浅色/深色两套，组件禁止硬编码颜色）
-- `src/hooks/useTheme.ts` — 主题状态（RAY-261 三档偏好：浅色 / 深色 / 跟随系统，localStorage 持久化；跟随系统档位监听设备主题自动切换）；实际主题通过 `<html data-theme>` 生效
+- `src/hooks/useTheme.ts` — 主题状态（RAY-261 三档偏好：浅色 / 深色 / 跟随系统，localStorage 持久化；跟随系统档位监听设备主题自动切换；跨标签页偏好变更经 storage 事件同步）；实际主题通过 `<html data-theme>` 生效
 - `src/theme/resolve.ts` — 主题解析纯函数：偏好 → 实际主题（light/dark 直接采用，system/缺失/非法跟随系统），与 index.html 内联脚本共用同一套规则
 - `src/theme/themeColor.ts` — 浏览器外壳色同步：`meta theme-color` 跟随主题，值取自 `--lex-bg` token（不硬编码）
 - `src/App.tsx` — 应用外壳：全局导航（统计 / 设置入口，RAY-261 起 header 无主题开关）+ 首页 / 复习 / 设置 / 统计界面切换

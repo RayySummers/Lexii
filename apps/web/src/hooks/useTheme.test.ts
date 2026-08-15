@@ -8,25 +8,28 @@ type MediaQueryChangeHandler = (event: { matches: boolean }) => void;
  * 可控的 matchMedia 假实现：
  * - `matches` 可随 setMatches 变化（模拟设备主题切换）
  * - 记录 change 监听器，setMatches 时同步触发（模拟 prefers-color-scheme 事件）
+ * - 暴露 add/removeEventListener 的 vi.fn，供「仅 system 档位注册监听」断言
  */
 function installMediaQuery(initialMatches: boolean) {
   const changeHandlers = new Set<MediaQueryChangeHandler>();
   let matches = initialMatches;
+  const addEventListener = vi.fn((type: string, handler: MediaQueryChangeHandler) => {
+    if (type === "change") {
+      changeHandlers.add(handler);
+    }
+  });
+  const removeEventListener = vi.fn((type: string, handler: MediaQueryChangeHandler) => {
+    if (type === "change") {
+      changeHandlers.delete(handler);
+    }
+  });
   const fake = {
     get matches() {
       return matches;
     },
     media: "(prefers-color-scheme: dark)",
-    addEventListener: vi.fn((type: string, handler: MediaQueryChangeHandler) => {
-      if (type === "change") {
-        changeHandlers.add(handler);
-      }
-    }),
-    removeEventListener: vi.fn((type: string, handler: MediaQueryChangeHandler) => {
-      if (type === "change") {
-        changeHandlers.delete(handler);
-      }
-    }),
+    addEventListener,
+    removeEventListener,
   };
   window.matchMedia = vi.fn().mockReturnValue(fake) as unknown as typeof matchMedia;
   return {
@@ -37,6 +40,8 @@ function installMediaQuery(initialMatches: boolean) {
         handler({ matches: next });
       }
     },
+    addEventListener,
+    removeEventListener,
   };
 }
 
@@ -190,6 +195,108 @@ describe("useTheme", () => {
     });
     expect(result.current.theme).toBe("light");
     expect(document.documentElement.dataset.theme).toBe("light");
+  });
+
+  it("仅 system 档位注册媒体查询监听，切出后卸载（评审 nit 1）", () => {
+    const media = installMediaQuery(false);
+    const { result } = renderHook(() => useTheme());
+    // 默认 system：注册一次
+    expect(media.addEventListener).toHaveBeenCalledTimes(1);
+    expect(media.removeEventListener).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.setPreference("light");
+    });
+    // 切到 light：卸载监听且不再注册
+    expect(media.removeEventListener).toHaveBeenCalledTimes(1);
+    expect(media.addEventListener).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.setPreference("system");
+    });
+    // 切回 system：重新注册
+    expect(media.addEventListener).toHaveBeenCalledTimes(2);
+  });
+
+  describe("跨标签页同步（storage 事件，评审 suggestion 1）", () => {
+    it("其他标签页变更偏好时自动跟随", () => {
+      installMediaQuery(false);
+      const { result } = renderHook(() => useTheme());
+      expect(result.current.preference).toBe("system");
+      expect(result.current.theme).toBe("light");
+
+      act(() => {
+        window.dispatchEvent(
+          new StorageEvent("storage", {
+            key: THEME_STORAGE_KEY,
+            oldValue: "system",
+            newValue: "dark",
+          }),
+        );
+      });
+      expect(result.current.preference).toBe("dark");
+      expect(result.current.theme).toBe("dark");
+      expect(document.documentElement.dataset.theme).toBe("dark");
+    });
+
+    it("其他标签页清除存储时回落默认「跟随系统」", () => {
+      installMediaQuery(false);
+      const { result } = renderHook(() => useTheme());
+      act(() => {
+        result.current.setPreference("dark");
+      });
+      expect(result.current.preference).toBe("dark");
+
+      act(() => {
+        window.dispatchEvent(
+          new StorageEvent("storage", {
+            key: THEME_STORAGE_KEY,
+            oldValue: "dark",
+            newValue: null,
+          }),
+        );
+      });
+      expect(result.current.preference).toBe("system");
+      expect(result.current.theme).toBe("light"); // 系统浅色（mock）
+    });
+
+    it("非法新值被忽略（保持当前偏好）", () => {
+      installMediaQuery(false);
+      const { result } = renderHook(() => useTheme());
+      act(() => {
+        result.current.setPreference("dark");
+      });
+
+      act(() => {
+        window.dispatchEvent(
+          new StorageEvent("storage", {
+            key: THEME_STORAGE_KEY,
+            oldValue: "dark",
+            newValue: "blue",
+          }),
+        );
+      });
+      expect(result.current.preference).toBe("dark");
+      expect(result.current.theme).toBe("dark");
+    });
+
+    it("无关 storage key 被忽略", () => {
+      installMediaQuery(false);
+      const { result } = renderHook(() => useTheme());
+      expect(result.current.preference).toBe("system");
+
+      act(() => {
+        window.dispatchEvent(
+          new StorageEvent("storage", {
+            key: "lexilexi:daily-new-card-limit",
+            oldValue: "20",
+            newValue: "35",
+          }),
+        );
+      });
+      expect(result.current.preference).toBe("system");
+      expect(result.current.theme).toBe("light");
+    });
   });
 
   it("localStorage 写入被禁用时不崩溃，setPreference 照常生效", () => {

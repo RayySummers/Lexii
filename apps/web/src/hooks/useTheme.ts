@@ -4,6 +4,8 @@
  * - 偏好（ThemePreference）持久化到 localStorage；实际主题（Theme）由偏好 +
  *   系统 prefers-color-scheme 解析得出
  * - 「跟随系统」档位下监听设备主题变化，实际主题自动切换，无需手动操作
+ * - 跨标签页同步（评审 suggestion 1）：监听 window storage 事件，其他标签页
+ *   变更主题偏好时本页自动跟随；存储被清除时回落默认「跟随系统」
  * - 首帧渲染前的 data-theme 由 index.html 内联脚本设置，避免深色模式首帧闪烁（FOUC）
  * - 初始实际主题：DOM 已应用 data-theme 时直接采用（与内联脚本保持一致，防止二次闪烁），
  *   否则按 localStorage → 系统偏好 → 默认浅色解析（resolveTheme）
@@ -82,24 +84,43 @@ export function useTheme(): UseThemeResult {
     syncThemeColorMeta();
   }, [theme]);
 
-  // 跟随系统：preference === "system" 时监听设备主题变化，自动切换实际主题；
-  // 其余档位忽略设备变化（闭包按当前 preference 判断，preference 变化时重挂监听）
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = (event: MediaQueryListEvent) => {
-      if (preference === "system") {
-        setTheme(event.matches ? "dark" : "light");
-      }
-    };
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, [preference]);
-
   const setPreference = useCallback((next: ThemePreference) => {
     setPreferenceState(next);
     const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     setTheme(resolveTheme(next, systemPrefersDark));
   }, []);
+
+  // 跟随系统：仅 system 档位注册设备主题变化监听（评审 nit 1），
+  // 切到 light/dark 档位时卸载监听，不为无关档位保留回调
+  useEffect(() => {
+    if (preference !== "system") {
+      return;
+    }
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = (event: MediaQueryListEvent) => {
+      setTheme(event.matches ? "dark" : "light");
+    };
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, [preference]);
+
+  // 跨标签页同步（评审 suggestion 1）：storage 事件只在本页之外写入时触发，
+  // 本页自身的持久化不会触发本页监听；键匹配时采用新偏好，键被清除时回落默认，
+  // 非法值忽略。同值写入不会产生状态变化（React 状态相同即跳过）。
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== THEME_STORAGE_KEY) {
+        return;
+      }
+      if (isThemePreference(event.newValue)) {
+        setPreference(event.newValue);
+      } else if (event.newValue === null) {
+        setPreference(DEFAULT_THEME_PREFERENCE);
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [setPreference]);
 
   return { theme, preference, setPreference };
 }
