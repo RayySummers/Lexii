@@ -1,6 +1,6 @@
 /**
  * 设置页：数据安全 + 导出 / 导入（RAY-245），导航改版（RAY-253），
- * 每日新卡上限（RAY-260）。
+ * 每日新卡上限（RAY-260），主题三档选单（RAY-261）。
  *
  * - 数据安全：监听 `lexilexi:storage-permission` 事件（经 usePersistenceStatus），
  *   状态为 "denied" 时提示「当前数据可能被清理，建议导出」并提供直达导出入口；
@@ -13,6 +13,9 @@
  *   页面底部展示构建时注入的版本号（`APP_VERSION`，来源 package.json，不硬编码）。
  * - 每日新卡上限（RAY-260 评审 suggestion 2）：默认 20/日，输入框可调
  *   （1–999），持久化到 localStorage（与主题设置同一模式）。
+ * - 主题（RAY-261）：外观分组下拉选单三档（浅色 / 深色 / 跟随系统）。
+ *   状态与持久化由 App 级 `useTheme` 单一数据源持有，本页仅渲染选单并
+ *   经 `onThemePreferenceChange` 回调；header 不再常驻主题开关。
  *
  * 导出/导入/提示状态提升到本组件（SettingsScreen）而非 SettingsMainView：
  * 进入「数据来源与许可」二级页时 SettingsMainView 卸载，进行中的导出状态与
@@ -32,6 +35,7 @@ import {
   writeDailyNewCardLimit,
 } from "../lib/dailyNewCardLimit";
 import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
+import { isThemePreference, type ThemePreference } from "../theme/resolve";
 import { DataSourcesScreen } from "./DataSourcesScreen";
 import { usePersistenceStatus } from "./persistenceStatus";
 import type { SettingsDataProvider } from "./types";
@@ -43,6 +47,9 @@ const GITHUB_ISSUES_URL = "https://github.com/RayySummers/Lexilexi/issues";
 export interface SettingsScreenProps {
   provider: SettingsDataProvider;
   onExit(): void;
+  /** 主题偏好（RAY-261：App 级 useTheme 单一数据源，本页仅选择与回调，不自行持久化） */
+  themePreference: ThemePreference;
+  onThemePreferenceChange(preference: ThemePreference): void;
 }
 
 /** 数据源错误 → 用户可见文案（不暴露内部实现细节） */
@@ -60,7 +67,12 @@ function readFileAsText(file: File): Promise<string> {
   });
 }
 
-export function SettingsScreen({ provider, onExit }: SettingsScreenProps) {
+export function SettingsScreen({
+  provider,
+  onExit,
+  themePreference,
+  onThemePreferenceChange,
+}: SettingsScreenProps) {
   // 二级视图分发（hooks 规则：主视图的全部 hooks 在 SettingsMainView 内，此处仅一个 state）
   const [view, setView] = useState<"main" | "licenses">("main");
 
@@ -166,6 +178,8 @@ export function SettingsScreen({ provider, onExit }: SettingsScreenProps) {
       newCardLimitText={newCardLimitText}
       onNewCardLimitChange={handleNewCardLimitChange}
       onNewCardLimitBlur={handleNewCardLimitBlur}
+      themePreference={themePreference}
+      onThemePreferenceChange={onThemePreferenceChange}
     />
   );
 }
@@ -187,6 +201,9 @@ interface SettingsMainViewProps {
   newCardLimitText: string;
   onNewCardLimitChange(text: string): void;
   onNewCardLimitBlur(): void;
+  /** 主题偏好三档（RAY-261）：App 级 useTheme 单一数据源下发 */
+  themePreference: ThemePreference;
+  onThemePreferenceChange(preference: ThemePreference): void;
 }
 
 function SettingsMainView({
@@ -203,12 +220,42 @@ function SettingsMainView({
   newCardLimitText,
   onNewCardLimitChange,
   onNewCardLimitBlur,
+  themePreference,
+  onThemePreferenceChange,
 }: SettingsMainViewProps) {
   const persistence = usePersistenceStatus();
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
       <ScreenHeader title="设置" onBack={onExit} />
+
+      <Section title="外观">
+        <label
+          htmlFor="theme-preference"
+          className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+          <span>
+            主题
+            <span className="mt-1 block text-xs text-text-muted">
+              浅色、深色或跟随系统（随设备主题自动切换）。
+            </span>
+          </span>
+          <select
+            id="theme-preference"
+            value={themePreference}
+            onChange={(event) => {
+              if (isThemePreference(event.target.value)) {
+                onThemePreferenceChange(event.target.value);
+              }
+            }}
+            className="w-40 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            <option value="light">浅色</option>
+            <option value="dark">深色</option>
+            <option value="system">跟随系统</option>
+          </select>
+        </label>
+      </Section>
 
       <Section title="学习">
         <label

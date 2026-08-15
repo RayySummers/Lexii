@@ -6,6 +6,8 @@
     <script data-lexilexi-theme-init>
       // 在首次渲染前应用主题，避免深色偏好用户看到浅色闪烁（FOUC）。
       // 解析规则必须与 src/theme/resolve.ts 保持一致（themeInitScript.test.ts 会校验）。
+      // RAY-261 三档偏好：存储值为 light / dark 时直接采用；system（及缺失/非法值）
+      // 跟随系统 prefers-color-scheme；「跟随系统」档位的后续自动切换由 useTheme 监听。
       (function () {
         try {
           var stored = window.localStorage.getItem("lexilexi:theme");
