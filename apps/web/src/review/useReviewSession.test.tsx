@@ -1,19 +1,30 @@
 /**
  * 复习会话状态机边界（RAY-239 测试补全）：
  * 连按防抖、翻面守卫、StrictMode 双调用竞态等 useReviewSession 内部时序路径。
+ *
+ * RAY-265：单步撤销（成功可撤销、撤销后不可连退、失败进入 error）与
+ * 标熟（按评分同路径推进队列并落撤销快照）。
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { toEventId } from "@lexilexi/core";
 import type { ReviewRating, StudyMode } from "@lexilexi/core";
 import { makeCard } from "./testFixtures";
-import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
+import type { GradeContext, GradeResult, ReviewCard, ReviewDataProvider } from "./types";
 import { useReviewSession } from "./useReviewSession";
 
 interface Harness {
   provider: ReviewDataProvider;
   loadQueue: ReturnType<typeof vi.fn>;
   grade: ReturnType<typeof vi.fn>;
+  markMastered: ReturnType<typeof vi.fn>;
+  undoGrade: ReturnType<typeof vi.fn>;
   hasAnyItems: ReturnType<typeof vi.fn>;
+}
+
+/** 生成与卡片对齐的评分落库结果（事件 id 随调用次数递增，便于断言） */
+function gradeResultFor(card: ReviewCard, eventSuffix: string): GradeResult {
+  return { reviewEventId: toEventId(`evt_test_${eventSuffix}`), previousMemoryState: card.memory };
 }
 
 function makeHarness(
@@ -31,18 +42,32 @@ function makeHarness(
     loadQueue.mockResolvedValue(queue);
   }
   const grade = vi
-    .fn<(card: ReviewCard, rating: ReviewRating, context: GradeContext) => Promise<void>>()
+    .fn<(card: ReviewCard, rating: ReviewRating, context: GradeContext) => Promise<GradeResult>>()
+    .mockImplementation(async (card) => gradeResultFor(card, "grade"));
+  const markMastered = vi
+    .fn<(card: ReviewCard, context: GradeContext) => Promise<GradeResult>>()
+    .mockImplementation(async (card) => gradeResultFor(card, "mastered"));
+  const undoGrade = vi
+    .fn<
+      (
+        itemId: ReviewCard["item"]["id"],
+        eventId: GradeResult["reviewEventId"],
+        previousMemoryState: GradeResult["previousMemoryState"],
+      ) => Promise<void>
+    >()
     .mockResolvedValue(undefined);
   const hasAnyItems = vi.fn<() => Promise<boolean>>().mockResolvedValue(hasItems);
   const provider: ReviewDataProvider = {
     loadQueue,
     loadMultipleChoiceQueue: vi.fn().mockResolvedValue({ questions: [], cards: [] }),
     grade,
+    markMastered,
+    undoGrade,
     hasAnyItems,
     importSampleWordlist: vi.fn().mockResolvedValue(14),
     exportBackup: vi.fn().mockResolvedValue(null as never),
   };
-  return { provider, loadQueue, grade, hasAnyItems };
+  return { provider, loadQueue, grade, markMastered, undoGrade, hasAnyItems };
 }
 
 describe("useReviewSession 时序边界", () => {
@@ -129,7 +154,9 @@ describe("useReviewSession 时序边界", () => {
     const provider: ReviewDataProvider = {
       loadQueue,
       loadMultipleChoiceQueue: vi.fn().mockResolvedValue({ questions: [], cards: [] }),
-      grade: vi.fn().mockResolvedValue(undefined),
+      grade: vi.fn().mockImplementation(async (c) => gradeResultFor(c, "grade")),
+      markMastered: vi.fn().mockImplementation(async (c) => gradeResultFor(c, "mastered")),
+      undoGrade: vi.fn().mockResolvedValue(undefined),
       hasAnyItems: vi.fn().mockResolvedValue(true),
       importSampleWordlist: vi.fn().mockResolvedValue(14),
       exportBackup: vi.fn().mockResolvedValue(null as never),
@@ -156,7 +183,9 @@ describe("useReviewSession 时序边界", () => {
     const provider: ReviewDataProvider = {
       loadQueue,
       loadMultipleChoiceQueue: vi.fn().mockResolvedValue({ questions: [], cards: [] }),
-      grade: vi.fn().mockResolvedValue(undefined),
+      grade: vi.fn().mockImplementation(async (c) => gradeResultFor(c, "grade")),
+      markMastered: vi.fn().mockImplementation(async (c) => gradeResultFor(c, "mastered")),
+      undoGrade: vi.fn().mockResolvedValue(undefined),
       hasAnyItems: vi.fn().mockResolvedValue(false),
       importSampleWordlist,
       exportBackup: vi.fn().mockResolvedValue(null as never),
@@ -195,5 +224,128 @@ describe("useReviewSession 时序边界", () => {
     // 下一张卡：翻面状态复位
     expect(result.current.flipped).toBe(false);
     expect(result.current.index).toBe(1);
+  });
+});
+
+describe("RAY-265 单步撤销与标熟", () => {
+  it("评分后 canUndo；撤销回到该卡且快照清空（连续只能撤销一次，不允许连退）", async () => {
+    const first = makeCard();
+    first.sense.term = "apple";
+    const second = makeCard();
+    second.sense.term = "book";
+    const harness = makeHarness({ queue: [first, second] });
+    const { result } = renderHook(() => useReviewSession(harness.provider, "review"));
+    await waitFor(() => expect(result.current.phase).toBe("reviewing"));
+
+    await act(async () => {
+      await result.current.grade("good");
+    });
+    expect(result.current.canUndo).toBe(true);
+    expect(result.current.index).toBe(1);
+
+    await act(async () => {
+      await result.current.undo();
+    });
+    expect(harness.undoGrade).toHaveBeenCalledWith(
+      first.item.id,
+      toEventId("evt_test_grade"),
+      first.memory,
+    );
+    expect(result.current.phase).toBe("reviewing");
+    expect(result.current.index).toBe(0);
+    expect(result.current.current?.sense.term).toBe("apple");
+    expect(result.current.gradedCount).toBe(0);
+    expect(result.current.canUndo).toBe(false); // 快照已清空，不允许连退
+
+    // 再次评分后重新获得一次撤销机会
+    await act(async () => {
+      await result.current.grade("good");
+    });
+    expect(result.current.canUndo).toBe(true);
+    expect(result.current.index).toBe(1);
+  });
+
+  it("done 态撤销：回到最后一张卡重新评分，计数不虚增", async () => {
+    const card = makeCard();
+    const harness = makeHarness({ queue: [card] });
+    const { result } = renderHook(() => useReviewSession(harness.provider, "review"));
+    await waitFor(() => expect(result.current.phase).toBe("reviewing"));
+
+    await act(async () => {
+      await result.current.grade("good");
+    });
+    expect(result.current.phase).toBe("done");
+    expect(result.current.gradedCount).toBe(1);
+    expect(result.current.canUndo).toBe(true);
+
+    await act(async () => {
+      await result.current.undo();
+    });
+    expect(result.current.phase).toBe("reviewing");
+    expect(result.current.index).toBe(0);
+    expect(result.current.gradedCount).toBe(0);
+    expect(result.current.canUndo).toBe(false);
+  });
+
+  it("标熟：与评分同路径推进队列并留撤销快照，撤销后回到该卡", async () => {
+    const first = makeCard();
+    const second = makeCard();
+    const harness = makeHarness({ queue: [first, second] });
+    const { result } = renderHook(() => useReviewSession(harness.provider, "review"));
+    await waitFor(() => expect(result.current.phase).toBe("reviewing"));
+
+    await act(async () => {
+      await result.current.markMastered();
+    });
+    expect(harness.markMastered).toHaveBeenCalledTimes(1);
+    expect(result.current.index).toBe(1);
+    expect(result.current.canUndo).toBe(true);
+
+    await act(async () => {
+      await result.current.undo();
+    });
+    expect(result.current.index).toBe(0);
+    expect(harness.undoGrade).toHaveBeenCalledTimes(1);
+  });
+
+  it("无可撤销快照时 undo 无效；撤销失败进入 error 态", async () => {
+    const card = makeCard();
+    const harness = makeHarness({ queue: [card] });
+    const { result } = renderHook(() => useReviewSession(harness.provider, "review"));
+    await waitFor(() => expect(result.current.phase).toBe("reviewing"));
+
+    expect(result.current.canUndo).toBe(false);
+    await act(async () => {
+      await result.current.undo();
+    });
+    expect(harness.undoGrade).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.grade("good");
+    });
+    harness.undoGrade.mockRejectedValueOnce(new Error("回滚失败"));
+    await act(async () => {
+      await result.current.undo();
+    });
+    expect(result.current.phase).toBe("error");
+    expect(result.current.error).toBe("回滚失败");
+  });
+
+  it("撤销恢复的卡：memory 回退为评分前状态（再评分与到期预览一致）", async () => {
+    const first = makeCard();
+    const second = makeCard();
+    const harness = makeHarness({ queue: [first, second] });
+    const { result } = renderHook(() => useReviewSession(harness.provider, "review"));
+    await waitFor(() => expect(result.current.phase).toBe("reviewing"));
+
+    await act(async () => {
+      await result.current.grade("easy");
+    });
+    await act(async () => {
+      await result.current.undo();
+    });
+    // 评分前的记忆状态：从未评分，lastRating 为 null
+    expect(result.current.current?.memory.fields.lastRating).toBeNull();
+    expect(result.current.current?.item.id).toBe(first.item.id);
   });
 });

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { toEventId } from "@lexilexi/core";
 import type { LexilexiExportData, StudyMode } from "@lexilexi/core";
 import { App } from "./App";
 import { makeCard } from "./review/testFixtures";
@@ -20,10 +21,16 @@ const EMPTY_EXPORT: LexilexiExportData = {
 
 /** 测试接缝：注入 mock 复习数据源工厂，避免渲染时触碰浏览器 IndexedDB */
 function makeReviewProviderFactory(queue: ReviewCard[] = [makeCard()]) {
+  const gradeResultFor = (card: ReviewCard) => ({
+    reviewEventId: toEventId("evt_test_grade"),
+    previousMemoryState: card.memory,
+  });
   const provider: ReviewDataProvider = {
     loadQueue: vi.fn<(mode: StudyMode) => Promise<ReviewCard[]>>().mockResolvedValue(queue),
     loadMultipleChoiceQueue: vi.fn().mockResolvedValue({ questions: [], cards: [] }),
-    grade: vi.fn().mockResolvedValue(undefined),
+    grade: vi.fn().mockImplementation(async (card) => gradeResultFor(card)),
+    markMastered: vi.fn().mockImplementation(async (card) => gradeResultFor(card)),
+    undoGrade: vi.fn().mockResolvedValue(undefined),
     hasAnyItems: vi.fn().mockResolvedValue(queue.length > 0),
     importSampleWordlist: vi.fn().mockResolvedValue(14),
     exportBackup: vi.fn().mockResolvedValue(EMPTY_EXPORT),

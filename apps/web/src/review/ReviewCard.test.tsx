@@ -15,7 +15,14 @@ import { makeSense } from "./testFixtures";
 /** 受控翻面容器：点击卡片真实翻转（ReviewCard 的 flipped 由父级持有） */
 function Harness({ sense }: { sense: Sense }) {
   const [flipped, setFlipped] = useState(false);
-  return <ReviewCard sense={sense} flipped={flipped} onFlip={() => setFlipped((v) => !v)} />;
+  return (
+    <ReviewCard
+      sense={sense}
+      flipped={flipped}
+      onFlip={() => setFlipped((v) => !v)}
+      ratingHint="按 1–3（或 A / H / G）评分"
+    />
+  );
 }
 
 /** 富化字段齐全的词条（形态照真实数据：音标自带斜杠、词根词缀带 <含义>） */

@@ -3,13 +3,17 @@
  *
  * 与 ReviewScreen.test.tsx 的主交互用例互补：专攻快捷键的修饰键/重复键/
  * 焦点行为（防误触发）与评分失败恢复路径。
+ * 本文件统一在四档（Anki 传统）下运行，档位切换的三档/四档差异
+ * 由 ReviewScreen.test.tsx 覆盖。
  */
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { toEventId } from "@lexilexi/core";
 import type { LexilexiExportData, ReviewRating, StudyMode } from "@lexilexi/core";
+import { RATING_TIER_STORAGE_KEY } from "../lib/ratingTiers";
 import { ReviewScreen } from "./ReviewScreen";
 import { makeCard } from "./testFixtures";
-import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
+import type { GradeContext, GradeResult, ReviewCard, ReviewDataProvider } from "./types";
 
 interface ProviderHarness {
   provider: ReviewDataProvider;
@@ -32,13 +36,20 @@ const EMPTY_EXPORT: LexilexiExportData = {
   events: [],
 };
 
+beforeEach(() => {
+  window.localStorage.setItem(RATING_TIER_STORAGE_KEY, "four");
+});
+
 function makeHarness(options: { queue?: ReviewCard[] } = {}): ProviderHarness {
   const { queue = [] } = options;
   const loadQueue = vi.fn<(mode: StudyMode) => Promise<ReviewCard[]>>().mockResolvedValue(queue);
   const loadMultipleChoiceQueue = vi.fn().mockResolvedValue({ questions: [], cards: [] });
   const grade = vi
-    .fn<(card: ReviewCard, rating: ReviewRating, context: GradeContext) => Promise<void>>()
-    .mockResolvedValue(undefined);
+    .fn<(card: ReviewCard, rating: ReviewRating, context: GradeContext) => Promise<GradeResult>>()
+    .mockImplementation(async (card) => ({
+      reviewEventId: toEventId("evt_test_grade"),
+      previousMemoryState: card.memory,
+    }));
   const hasAnyItems = vi.fn<() => Promise<boolean>>().mockResolvedValue(queue.length > 0);
   const importSampleWordlist = vi.fn<() => Promise<number>>().mockResolvedValue(14);
   const exportBackup = vi.fn<() => Promise<LexilexiExportData>>().mockResolvedValue(EMPTY_EXPORT);
@@ -46,6 +57,11 @@ function makeHarness(options: { queue?: ReviewCard[] } = {}): ProviderHarness {
     loadQueue,
     loadMultipleChoiceQueue,
     grade,
+    markMastered: vi.fn().mockImplementation(async (card) => ({
+      reviewEventId: toEventId("evt_test_mastered"),
+      previousMemoryState: card.memory,
+    })),
+    undoGrade: vi.fn().mockResolvedValue(undefined),
     hasAnyItems,
     importSampleWordlist,
     exportBackup,

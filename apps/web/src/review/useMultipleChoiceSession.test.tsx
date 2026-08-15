@@ -6,10 +6,12 @@
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { toEventId } from "@lexilexi/core";
 import type { DistractorOption, ReviewRating } from "@lexilexi/core";
 import { makeCard } from "./testFixtures";
 import type {
   GradeContext,
+  GradeResult,
   MultipleChoiceQueueResult,
   ReviewCard,
   ReviewDataProvider,
@@ -44,17 +46,27 @@ function makeHarness(
     loadMultipleChoiceQueue.mockResolvedValue({ questions, cards });
   }
   const grade =
-    vi.fn<(card: ReviewCard, rating: ReviewRating, context: GradeContext) => Promise<void>>();
+    vi.fn<
+      (card: ReviewCard, rating: ReviewRating, context: GradeContext) => Promise<GradeResult>
+    >();
   if (gradeError) {
     grade.mockRejectedValue(gradeError);
   } else {
-    grade.mockResolvedValue(undefined);
+    grade.mockImplementation(async (card) => ({
+      reviewEventId: toEventId("evt_test_grade"),
+      previousMemoryState: card.memory,
+    }));
   }
   const hasAnyItems = vi.fn<() => Promise<boolean>>().mockResolvedValue(hasItems);
   const provider: ReviewDataProvider = {
     loadQueue: vi.fn().mockResolvedValue([]),
     loadMultipleChoiceQueue,
     grade,
+    markMastered: vi.fn().mockImplementation(async (card) => ({
+      reviewEventId: toEventId("evt_test_mastered"),
+      previousMemoryState: card.memory,
+    })),
+    undoGrade: vi.fn().mockResolvedValue(undefined),
     hasAnyItems,
     importSampleWordlist: vi.fn().mockResolvedValue(14),
     exportBackup: vi.fn().mockResolvedValue(null as never),

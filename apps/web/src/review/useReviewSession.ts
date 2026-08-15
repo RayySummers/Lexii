@@ -10,12 +10,31 @@
  *
  * 计时：每张卡显示时刻记录 cardShownAt，评分时差值得 reviewDurationMs
  * （与 core gradeReview 的输入对齐）；翻面只影响 revealed 标记，不影响计时。
+ *
+ * RAY-265 单步撤销：每次评分 / 标熟成功后保存撤销快照（被评卡下标 +
+ * 事件 id + 评分前状态），可返回上一步撤销这一次操作；连续只能撤销一次
+ * ——撤销成功后快照清空，不允许连退。撤销完整回滚调度状态与学习记录
+ * （core undoReview 单事务），统计口径随事件删除自然一致。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReviewRating, StudyMode } from "@lexilexi/core";
+import type { EventId, MemoryState, ReviewRating, StudyMode } from "@lexilexi/core";
 import type { GradeContext, ReviewCard, ReviewDataProvider } from "../review/types";
 
 export type SessionPhase = "loading" | "empty" | "no-due" | "reviewing" | "done" | "error";
+
+/** 一次评分 / 标熟的撤销快照（单步撤销证据） */
+export interface UndoSnapshot {
+  /** 被评卡在队列中的下标（撤销后回到这张卡） */
+  index: number;
+  /** 被评卡（memory 已回退为评分前状态，撤销后重新展示） */
+  card: ReviewCard;
+  /** 落库的复习事件 id（撤销时删除） */
+  eventId: EventId;
+  /** 评分前的记忆状态（撤销时原样恢复） */
+  previousMemoryState: MemoryState;
+  /** 评分前的已评数（撤销时恢复，完成页计数不虚增） */
+  gradedCountBefore: number;
+}
 
 export interface ReviewSession {
   phase: SessionPhase;
@@ -34,10 +53,16 @@ export interface ReviewSession {
   error: string | null;
   /** 导入示例词表进行中 */
   importing: boolean;
+  /** 是否可撤销上一步（每次评分/标熟后为 true，撤销成功或新操作后清空） */
+  canUndo: boolean;
   /** 翻面（可在正面/背面间切换） */
   flip(): void;
   /** 评分并进入下一张卡；队列评完进入 done */
   grade(rating: ReviewRating): Promise<void>;
+  /** 标熟（RAY-265）：记录「已熟」评级并按长间隔排期，然后进入下一张卡 */
+  markMastered(): Promise<void>;
+  /** 撤销上一步评分 / 标熟（单步；连续只能撤销一次） */
+  undo(): Promise<void>;
   /** 空状态一键导入内置示例词表，成功后直接进入复习 */
   importSample(): Promise<void>;
   /** 数据源失败后重试加载 */
@@ -52,6 +77,8 @@ interface SessionState {
   gradedCount: number;
   error: string | null;
   importing: boolean;
+  /** 撤销快照（null = 当前无撤销目标） */
+  undoSnapshot: UndoSnapshot | null;
 }
 
 const INITIAL_STATE: SessionState = {
@@ -62,6 +89,7 @@ const INITIAL_STATE: SessionState = {
   gradedCount: 0,
   error: null,
   importing: false,
+  undoSnapshot: null,
 };
 
 /** 数据源错误 → 统一错误文案（不向用户暴露内部实现细节） */
@@ -94,6 +122,7 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
         gradedCount: 0,
         error: null,
         importing: false,
+        undoSnapshot: null,
       });
     },
     [apply],
@@ -101,7 +130,14 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
 
   const load = useCallback(async () => {
     const loadId = ++loadIdRef.current;
-    apply({ phase: "loading", error: null, cards: [], index: 0, flipped: false });
+    apply({
+      phase: "loading",
+      error: null,
+      cards: [],
+      index: 0,
+      flipped: false,
+      undoSnapshot: null,
+    });
     try {
       const [queue, hasItems] = await Promise.all([
         provider.loadQueue(mode),
@@ -135,8 +171,21 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
     apply({ flipped: !current.flipped });
   }, [apply]);
 
-  const grade = useCallback(
-    async (rating: ReviewRating) => {
+  /**
+   * 提交一次「评分落库 + 队列推进」操作（grade / markMastered 共用路径）。
+   * 成功后保存撤销快照（RAY-265）：新快照覆盖旧快照，撤销目标始终是
+   * 「上一步」操作；进入下一张卡或 done。
+   */
+  const commitGrade = useCallback(
+    async (
+      run: (
+        card: ReviewCard,
+        context: GradeContext,
+      ) => Promise<{
+        reviewEventId: EventId;
+        previousMemoryState: MemoryState;
+      }>,
+    ) => {
       if (gradingRef.current) {
         return; // 防止连按 / 键盘重复触发对同一张卡产生两次评分
       }
@@ -153,8 +202,9 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
         revealed: current.flipped,
       };
       gradingRef.current = true;
+      let result: { reviewEventId: EventId; previousMemoryState: MemoryState };
       try {
-        await provider.grade(card, rating, context);
+        result = await run(card, context);
       } catch (error) {
         gradingRef.current = false;
         apply({ phase: "error", error: toErrorMessage(error) });
@@ -162,15 +212,77 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
       }
       gradingRef.current = false;
       const gradedCount = current.gradedCount + 1;
+      const undoSnapshot: UndoSnapshot = {
+        index: current.index,
+        card: { ...card, memory: result.previousMemoryState },
+        eventId: result.reviewEventId,
+        previousMemoryState: result.previousMemoryState,
+        gradedCountBefore: current.gradedCount,
+      };
       if (current.index + 1 >= current.cards.length) {
-        apply({ phase: "done", gradedCount });
+        apply({ phase: "done", gradedCount, undoSnapshot });
       } else {
         cardShownAtRef.current = Date.now();
-        apply({ phase: "reviewing", index: current.index + 1, flipped: false, gradedCount });
+        apply({
+          phase: "reviewing",
+          index: current.index + 1,
+          flipped: false,
+          gradedCount,
+          undoSnapshot,
+        });
       }
     },
     [provider, apply],
   );
+
+  const grade = useCallback(
+    async (rating: ReviewRating) => {
+      await commitGrade((card, context) => provider.grade(card, rating, context));
+    },
+    [provider, commitGrade],
+  );
+
+  const markMastered = useCallback(async () => {
+    await commitGrade((card, context) => provider.markMastered(card, context));
+  }, [provider, commitGrade]);
+
+  /** 撤销上一步评分 / 标熟（单步：成功后快照清空，不允许连退） */
+  const undo = useCallback(async () => {
+    const current = stateRef.current;
+    const snapshot = current.undoSnapshot;
+    if (!snapshot) {
+      return;
+    }
+    if (current.phase !== "reviewing" && current.phase !== "done") {
+      return;
+    }
+    try {
+      await provider.undoGrade(
+        snapshot.card.item.id,
+        snapshot.eventId,
+        snapshot.previousMemoryState,
+      );
+    } catch (error) {
+      apply({ phase: "error", error: toErrorMessage(error) });
+      return;
+    }
+    cardShownAtRef.current = Date.now();
+    // 队列中该卡的记忆状态回退为评分前状态（到期预览与再次评分保持一致）
+    const cards = [...current.cards];
+    if (cards[snapshot.index]?.item.id === snapshot.card.item.id) {
+      cards[snapshot.index] = snapshot.card;
+    }
+    apply({
+      phase: "reviewing",
+      cards,
+      index: snapshot.index,
+      flipped: false,
+      gradedCount: snapshot.gradedCountBefore,
+      error: null,
+      importing: false,
+      undoSnapshot: null,
+    });
+  }, [provider, apply]);
 
   const importSample = useCallback(async () => {
     apply({ importing: true });
@@ -197,8 +309,11 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
     totalCount: state.cards.length,
     error: state.error,
     importing: state.importing,
+    canUndo: state.undoSnapshot !== null,
     flip,
     grade,
+    markMastered,
+    undo,
     importSample,
     retry,
   };

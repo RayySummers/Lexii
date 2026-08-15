@@ -12,7 +12,7 @@ import type { CardInput, RecordLogItem } from "@lexilexi/fsrs";
 import type { IsoDate } from "./domain";
 import type { ExerciseType, ReviewEvent, ReviewRating } from "./events";
 import { createId, toEventId } from "./id";
-import type { ItemId, SenseId } from "./id";
+import type { EventId, ItemId, SenseId } from "./id";
 import type { MemoryState, MemoryStateFields } from "./memory";
 import type { LexilexiDatabase } from "./persistence";
 
@@ -34,6 +34,12 @@ export interface GradeReviewInput {
   answerWasCorrect: boolean;
   /** 用户输入（可选；recall 形式下即输入的拼写，不含答案口令类内容；超长截断） */
   response?: string;
+  /**
+   * 标熟（RAY-265）：本次评分来自「标熟」操作。必须与 rating === "easy"
+   * 同传（已熟 → FSRS 长间隔的唯一映射，核心层强制该契约，防止调用方
+   * 写入自相矛盾的记录）；落库事件带 mastered 标记，调度重放不受影响。
+   */
+  mastered?: boolean;
   /** 评分发生时刻（ISO；默认调用方当前时间） */
   time?: IsoDate;
 }
@@ -44,6 +50,8 @@ export interface GradeReviewResult {
   reviewEvent: ReviewEvent;
   /** 排期后的新记忆状态（已原子落库） */
   nextMemoryState: MemoryState;
+  /** 评分前的记忆状态（单步撤销回滚用；撤销 = 恢复该状态 + 删除事件） */
+  previousMemoryState: MemoryState;
 }
 
 /** response 字段长度上限（防御脏输入；recall 拼写输入远超此值无意义） */
@@ -144,6 +152,7 @@ export async function gradeReview(
       ...(input.response !== undefined
         ? { response: input.response.slice(0, MAX_RESPONSE_LENGTH) }
         : {}),
+      ...(input.mastered === true ? { mastered: true } : {}),
       elapsedDays: elapsedDaysSince(previous.fields.lastReviewAt, new Date(time)),
     };
     const nextMemoryState: MemoryState = {
@@ -154,14 +163,68 @@ export async function gradeReview(
     // 与 recordReview 相同的原子性契约：事件 + 状态同一事务写入，二者必同时生效
     await db.events.put(reviewEvent);
     await db.memoryStates.put(nextMemoryState);
-    return { reviewEvent, nextMemoryState };
+    return { reviewEvent, nextMemoryState, previousMemoryState: previous };
+  });
+}
+
+/** 单步撤销的输入（RAY-265：撤销最近一次评分 / 标熟） */
+export interface UndoReviewInput {
+  /** 学习条目 */
+  itemId: ItemId;
+  /** 被撤销的复习事件 id（gradeReview 结果的 reviewEvent.id） */
+  eventId: EventId;
+  /** 评分前的记忆状态（gradeReview 结果的 previousMemoryState，原样恢复） */
+  previousMemoryState: MemoryState;
+  /** 撤销发生时刻（ISO；默认调用方当前时间，写回状态的 updatedAt） */
+  time?: IsoDate;
+}
+
+/**
+ * 单步撤销（RAY-265 红线：完整回滚该次操作的全部本地记录）。
+ *
+ * 一次评分只写「复习事件 + 新记忆状态」两条记录，撤销 = 同一事务内
+ * 删除该事件 + 恢复评分前的记忆状态。统计口径天然一致：统计全部从
+ * 事件流投影，事件被删除即等于该次评分从未发生。
+ *
+ * 防线（防止破坏「MemoryState 是事件流的投影」不变量）：
+ * - 事件必须存在、是 review 类型且属于该条目；
+ * - 当前库内记忆状态必须仍对应该事件（updatedAt 与事件时间一致）——
+ *   若之后又发生了新评分（更晚的事件），撤销旧事件会让新事件失去投影，
+ *   此时拒绝撤销（单步撤销场景下正常不会出现，防线为防御性兜底）。
+ */
+export async function undoReview(db: LexilexiDatabase, input: UndoReviewInput): Promise<void> {
+  if (input.previousMemoryState.itemId !== input.itemId) {
+    throw new Error(
+      `撤销状态与条目不一致：${input.previousMemoryState.itemId} !== ${input.itemId}`,
+    );
+  }
+  const time = input.time ?? new Date().toISOString();
+  if (Number.isNaN(Date.parse(time))) {
+    throw new RangeError(`Invalid time: ${time}`);
+  }
+  await db.transaction("rw", db.events, db.memoryStates, async () => {
+    const event = await db.events.get(input.eventId);
+    if (!event || event.type !== "review" || event.itemId !== input.itemId) {
+      throw new Error(`复习记录不存在或已撤销：${input.eventId}`);
+    }
+    const current = await db.memoryStates.get(input.itemId);
+    if (!current) {
+      throw new Error(`记忆状态不存在：${input.itemId}`);
+    }
+    if (current.updatedAt !== event.time) {
+      throw new Error(`该评分之后存在更新的复习记录，无法撤销：${input.eventId}`);
+    }
+    await db.memoryStates.put({ ...input.previousMemoryState, updatedAt: time });
+    await db.events.delete(input.eventId);
   });
 }
 
 /**
  * 输入校验（防御式，拒绝绕过类型检查的脏输入）：
  * - reviewDurationMs 必须为非负有限数（负数/NaN/Infinity 说明调用方有 bug）；
- * - time 若提供必须是合法时间（非法串会污染事件时间轴）。
+ * - time 若提供必须是合法时间（非法串会污染事件时间轴）；
+ * - mastered 标记必须与 rating === "easy" 同传（已熟 → 长间隔的唯一映射，
+ *   RAY-265 口径；核心层强制，防止 UI 层写入自相矛盾的记录）。
  * 评分档位由调度器入口校验（RangeError）；response 超长截断不报错。
  */
 function validateGradeReviewInput(input: GradeReviewInput): void {
@@ -170,6 +233,9 @@ function validateGradeReviewInput(input: GradeReviewInput): void {
   }
   if (input.time !== undefined && Number.isNaN(Date.parse(input.time))) {
     throw new RangeError(`Invalid time: ${input.time}`);
+  }
+  if (input.mastered === true && input.rating !== "easy") {
+    throw new RangeError(`标熟必须映射 easy 评分（当前：${input.rating}）`);
   }
 }
 

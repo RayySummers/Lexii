@@ -439,3 +439,44 @@ describe("SettingsScreen", () => {
     }
   });
 });
+
+describe("RAY-265 学习设置：评分档位与发音口音", () => {
+  it("评分档位默认三档；切换四档即时持久化到 localStorage", async () => {
+    renderSettings();
+    await screen.findByText("学习");
+
+    const select = screen.getByLabelText(/评分档位/);
+    expect(select).toHaveValue("three");
+    expect(window.localStorage.getItem("lexilexi:rating-tiers")).toBeNull(); // 未显式设置
+
+    fireEvent.change(select, { target: { value: "four" } });
+    expect(select).toHaveValue("four");
+    expect(window.localStorage.getItem("lexilexi:rating-tiers")).toBe("four");
+  });
+
+  it("评分档位读取已存储的四档", async () => {
+    window.localStorage.setItem("lexilexi:rating-tiers", "four");
+    renderSettings();
+    await screen.findByText("学习");
+    expect(screen.getByLabelText(/评分档位/)).toHaveValue("four");
+  });
+
+  it("发音口音默认美式；切换英式即时持久化到 localStorage", async () => {
+    renderSettings();
+    await screen.findByText("学习");
+
+    const select = screen.getByLabelText(/发音口音/);
+    expect(select).toHaveValue("us");
+
+    fireEvent.change(select, { target: { value: "uk" } });
+    expect(select).toHaveValue("uk");
+    expect(window.localStorage.getItem("lexilexi:pronunciation-accent")).toBe("uk");
+  });
+
+  it("发音口音读取已存储的英式", async () => {
+    window.localStorage.setItem("lexilexi:pronunciation-accent", "uk");
+    renderSettings();
+    await screen.findByText("学习");
+    expect(screen.getByLabelText(/发音口音/)).toHaveValue("uk");
+  });
+});

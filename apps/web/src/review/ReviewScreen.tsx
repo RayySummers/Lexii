@@ -5,13 +5,23 @@
  *   空状态（无词导入 / 今日无到期）/ 错误重试；
  * - 键盘快捷键（等价于按钮，满足验收点 3）：
  *     空格 / 回车 → 翻面（焦点在按钮上时交给按钮原生行为，避免双触发）
- *     1–4 或 A / H / G / E → Again / Hard / Good / Easy
+ *     三档（默认）：1–3 或 A / H / G → 不认识 / 模糊 / 认识
+ *     四档（Anki 传统）：1–4 或 A / H / G / E → Again / Hard / Good / Easy
  * - 评分按钮副文案为各档到期时间预览（@lexilexi/fsrs Scheduler.preview）。
+ *
+ * RAY-265：
+ * - 评分档位默认三档（认识 / 模糊 / 不认识），设置内可切四档；
+ * - 工具栏提供「发音」（浏览器语音合成，美/英口音随设置）与「标熟」
+ *   （词保留词书、按已熟长间隔调度）；
+ * - 每次评分 / 标熟后可单步撤销（连续只能撤销一次，不可连退）。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
 import type { ReviewRating, StudyMode } from "@lexilexi/core";
-import { BackArrowIcon } from "../components/icons";
+import { BackArrowIcon, SpeakerIcon, UndoIcon } from "../components/icons";
+import { readPronunciationAccent, speakWord } from "../lib/pronunciation";
+import { readRatingTierMode } from "../lib/ratingTiers";
+import type { RatingTierMode } from "../lib/ratingTiers";
 import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
 import { ReviewCard } from "./ReviewCard";
 import { RatingButtons } from "./RatingButtons";
@@ -42,7 +52,7 @@ const NO_QUEUE_COPY: Record<StudyMode, { title: string; body: string }> = {
   },
 };
 
-/** 当前卡四档评分的到期文案（预览计算轻量，无需 memo） */
+/** 当前卡评分的到期文案（预览计算轻量，无需 memo） */
 function computeDueLabels(card: ReviewCardData): Record<ReviewRating, string> {
   const now = new Date();
   const preview = previewGradeDueLabels(card.memory.fields, now);
@@ -54,12 +64,34 @@ function computeDueLabels(card: ReviewCardData): Record<ReviewRating, string> {
   };
 }
 
+/** 背面评分快捷键提示（随档位模式切换） */
+function ratingHintFor(mode: RatingTierMode): string {
+  return mode === "three" ? "按 1–3（或 A / H / G）评分" : "按 1–4（或 A / H / G / E）评分";
+}
+
 export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
   const session = useReviewSession(provider, mode);
   const dueLabels = session.current ? computeDueLabels(session.current) : null;
+  // 评分档位（RAY-265）：会话内固定读取一次；改设置后下次进入复习生效
+  const [tierMode] = useState<RatingTierMode>(() => readRatingTierMode());
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const [speakNotice, setSpeakNotice] = useState<string | null>(null);
+  // 朗读目标经 ref 读取（session 每次渲染换身份，useCallback 依赖其字段会
+  // 让回调每次重建；ref 与提交同步即可保证点击时读到当前卡）
+  const currentCardRef = useRef(session.current);
+
+  /** 朗读当前词条（浏览器语音合成，口音随设置；不支持时给出一次性提示） */
+  const handleSpeak = useCallback(() => {
+    const card = currentCardRef.current;
+    if (!card) {
+      return;
+    }
+    if (!speakWord(card.sense.term, readPronunciationAccent())) {
+      setSpeakNotice("当前浏览器不支持语音合成，无法发音。");
+    }
+  }, []);
 
   const handleExport = useCallback(async () => {
     setExporting(true);
@@ -88,6 +120,7 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
   const phaseRef = useRef(session.phase);
   const flipRef = useRef(flip);
   const gradeRef = useRef(grade);
+  const tierModeRef = useRef(tierMode);
 
   // 每次提交后同步 ref（react-hooks/refs 禁止渲染期写 ref；useLayoutEffect
   // 在 DOM 提交后、浏览器绘制前同步执行——用户键盘事件派发前 ref 必然已
@@ -98,6 +131,8 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
     phaseRef.current = session.phase;
     flipRef.current = flip;
     gradeRef.current = grade;
+    tierModeRef.current = tierMode;
+    currentCardRef.current = session.current;
   });
 
   useEffect(() => {
@@ -122,7 +157,7 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
         }
         return;
       }
-      const rating = ratingFromKey(event.key);
+      const rating = ratingFromKey(event.key, tierModeRef.current);
       if (rating && phaseRef.current === "reviewing") {
         event.preventDefault();
         void gradeRef.current(rating);
@@ -183,7 +218,15 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
         </p>
       ) : null}
 
-      <PhaseContent session={session} dueLabels={dueLabels} mode={mode} onExit={onExit} />
+      <PhaseContent
+        session={session}
+        dueLabels={dueLabels}
+        mode={mode}
+        tierMode={tierMode}
+        onSpeak={handleSpeak}
+        speakNotice={speakNotice}
+        onExit={onExit}
+      />
     </main>
   );
 }
@@ -192,11 +235,25 @@ interface PhaseContentProps {
   session: ReviewSession;
   dueLabels: Record<ReviewRating, string> | null;
   mode: StudyMode;
+  /** 评分档位模式（三档默认 / 四档 Anki 传统） */
+  tierMode: RatingTierMode;
+  /** 朗读当前词条 */
+  onSpeak(): void;
+  /** 发音不可用的提示（null = 无提示） */
+  speakNotice: string | null;
   onExit(): void;
 }
 
 /** 按会话阶段渲染对应内容（独立于容器，便于逐阶段阅读） */
-function PhaseContent({ session, dueLabels, mode, onExit }: PhaseContentProps) {
+function PhaseContent({
+  session,
+  dueLabels,
+  mode,
+  tierMode,
+  onSpeak,
+  speakNotice,
+  onExit,
+}: PhaseContentProps) {
   switch (session.phase) {
     case "loading":
       return (
@@ -264,6 +321,7 @@ function PhaseContent({ session, dueLabels, mode, onExit }: PhaseContentProps) {
               ? `共学习 ${session.gradedCount} 张卡片`
               : `共复习 ${session.gradedCount} 张卡片`}
           </p>
+          {session.canUndo ? <UndoButton onUndo={() => void session.undo()} /> : null}
           <button
             type="button"
             onClick={onExit}
@@ -283,12 +341,62 @@ function PhaseContent({ session, dueLabels, mode, onExit }: PhaseContentProps) {
             sense={session.current.sense}
             flipped={session.flipped}
             onFlip={session.flip}
+            ratingHint={ratingHintFor(tierMode)}
           />
-          <RatingButtons dueLabels={dueLabels} onGrade={(rating) => void session.grade(rating)} />
+          <div className="flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={onSpeak}
+              aria-label={`朗读 ${session.current.sense.term} 的发音`}
+              className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            >
+              <SpeakerIcon className="h-4 w-4" />
+              发音
+            </button>
+            <button
+              type="button"
+              onClick={() => void session.markMastered()}
+              aria-label="标熟：这个词我已掌握，按很长的间隔以后再复习（词仍在词书中）"
+              className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold transition-colors hover:border-success hover:bg-success/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            >
+              <span aria-hidden="true" className="text-base leading-none text-success">
+                熟
+              </span>
+              标熟
+            </button>
+          </div>
+          <RatingButtons
+            dueLabels={dueLabels}
+            mode={tierMode}
+            onGrade={(rating) => void session.grade(rating)}
+          />
+          {speakNotice ? (
+            <p role="status" className="text-center text-xs text-text-muted">
+              {speakNotice}
+            </p>
+          ) : null}
+          {session.canUndo ? <UndoButton onUndo={() => void session.undo()} /> : null}
           <p className="text-center text-xs text-text-muted">
-            空格翻面 · 数字键 1–4 或字母 A / H / G / E 评分
+            空格翻面 ·{" "}
+            {tierMode === "three"
+              ? "数字键 1–3 或字母 A / H / G 评分"
+              : "数字键 1–4 或字母 A / H / G / E 评分"}
           </p>
         </>
       );
   }
+}
+
+/** 单步撤销按钮（每次评分 / 标熟后可见；撤销成功后消失，不可连退） */
+function UndoButton({ onUndo }: { onUndo(): void }) {
+  return (
+    <button
+      type="button"
+      onClick={onUndo}
+      className="flex w-fit items-center gap-1.5 self-center rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text-muted transition-colors hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+    >
+      <UndoIcon className="h-4 w-4" />
+      撤销上一步
+    </button>
+  );
 }

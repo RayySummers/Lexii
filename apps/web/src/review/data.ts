@@ -5,7 +5,10 @@
  * - loadQueue：getStudyQueueItemIds（按模式筛选 + 排序 + 混合穿插）→
  *   bulkGet（条目 / 义项 / 记忆状态，各一次批量往返，不在循环里逐条查询）
  *   → buildReviewQueue（完整性校验，保持 core 给定的顺序）
- * - grade：gradeReview（读旧状态 → FSRS 排期 → 事件 + 状态单事务原子落库）
+ * - grade：gradeReview（读旧状态 → FSRS 排期 → 事件 + 状态单事务原子落库），
+ *   返回事件 id 与评分前状态（撤销证据）
+ * - markMastered：gradeReview(rating=easy, mastered=true)（标熟，RAY-265）
+ * - undoGrade：undoReview（删除事件 + 恢复评分前状态，单事务原子回滚）
  * - importSampleWordlist：importCsvWordlist（内置示例词表，空状态一键体验）
  *
  * 每日新卡上限（RAY-260 评审 suggestion 2）：learn / mixed 模式在取队列前，
@@ -22,8 +25,11 @@ import {
   importCsvWordlist,
   isReviewEvent,
   openDatabase,
+  undoReview,
 } from "@lexilexi/core";
 import type {
+  EventId,
+  ItemId,
   LearningItem,
   LexilexiDatabase,
   LexilexiExportData,
@@ -37,6 +43,7 @@ import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { buildReviewQueue } from "./queue";
 import type {
   GradeContext,
+  GradeResult,
   MultipleChoiceQueueResult,
   ReviewCard,
   ReviewDataProvider,
@@ -162,8 +169,12 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
       return { questions, cards };
     },
 
-    async grade(card: ReviewCard, rating: ReviewRating, context: GradeContext): Promise<void> {
-      await gradeReview(db, {
+    async grade(
+      card: ReviewCard,
+      rating: ReviewRating,
+      context: GradeContext,
+    ): Promise<GradeResult> {
+      const result = await gradeReview(db, {
         itemId: card.item.id,
         senseId: card.sense.id,
         exerciseType: context.exerciseType ?? "recall",
@@ -172,6 +183,37 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
         revealed: context.revealed,
         answerWasCorrect: context.answerWasCorrect ?? rating !== "again",
       });
+      return {
+        reviewEventId: result.reviewEvent.id,
+        previousMemoryState: result.previousMemoryState,
+      };
+    },
+
+    async markMastered(card: ReviewCard, context: GradeContext): Promise<GradeResult> {
+      // 标熟（RAY-265）：记录一次「已熟」评级——映射 FSRS easy（长间隔），
+      // 词保留词书、不挂起不剔除；mastered 标记随事件落库供追溯。
+      const result = await gradeReview(db, {
+        itemId: card.item.id,
+        senseId: card.sense.id,
+        exerciseType: context.exerciseType ?? "recall",
+        rating: "easy",
+        mastered: true,
+        reviewDurationMs: context.reviewDurationMs,
+        revealed: context.revealed,
+        answerWasCorrect: true,
+      });
+      return {
+        reviewEventId: result.reviewEvent.id,
+        previousMemoryState: result.previousMemoryState,
+      };
+    },
+
+    async undoGrade(
+      itemId: ItemId,
+      eventId: EventId,
+      previousMemoryState: MemoryState,
+    ): Promise<void> {
+      await undoReview(db, { itemId, eventId, previousMemoryState });
     },
 
     async hasAnyItems(): Promise<boolean> {

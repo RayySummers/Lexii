@@ -35,6 +35,14 @@ import {
   writeDailyNewCardLimit,
 } from "../lib/dailyNewCardLimit";
 import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
+import {
+  isPronunciationAccent,
+  readPronunciationAccent,
+  writePronunciationAccent,
+} from "../lib/pronunciation";
+import type { PronunciationAccent } from "../lib/pronunciation";
+import { isRatingTierMode, readRatingTierMode, writeRatingTierMode } from "../lib/ratingTiers";
+import type { RatingTierMode } from "../lib/ratingTiers";
 import { isThemePreference, type ThemePreference } from "../theme/resolve";
 import { DataSourcesScreen } from "./DataSourcesScreen";
 import { usePersistenceStatus } from "./persistenceStatus";
@@ -94,6 +102,12 @@ export function SettingsScreen({
   const fileInputRef = useRef<HTMLInputElement>(null);
   // 每日新卡上限输入（初始值读 localStorage；文本态随输入走，合法值即时持久化）
   const [newCardLimitText, setNewCardLimitText] = useState(() => String(readDailyNewCardLimit()));
+  // 评分档位（RAY-265：三档默认，可切四档）与发音口音（美/英），
+  // 与每日新卡上限同一 localStorage 持久化模式；选单只产出合法值。
+  const [ratingTier, setRatingTier] = useState<RatingTierMode>(() => readRatingTierMode());
+  const [pronunciationAccent, setPronunciationAccent] = useState<PronunciationAccent>(() =>
+    readPronunciationAccent(),
+  );
 
   const handleExportJson = useCallback(async () => {
     setExporting("json");
@@ -169,6 +183,22 @@ export function SettingsScreen({
     });
   }, []);
 
+  /** 评分档位切换（RAY-265）：选单只产出合法值，直接持久化 */
+  const handleRatingTierChange = useCallback((value: string) => {
+    if (isRatingTierMode(value)) {
+      setRatingTier(value);
+      writeRatingTierMode(value);
+    }
+  }, []);
+
+  /** 发音口音切换（RAY-265）：选单只产出合法值，直接持久化 */
+  const handlePronunciationAccentChange = useCallback((value: string) => {
+    if (isPronunciationAccent(value)) {
+      setPronunciationAccent(value);
+      writePronunciationAccent(value);
+    }
+  }, []);
+
   if (view === "licenses") {
     return <DataSourcesScreen provider={provider} onBack={() => setView("main")} />;
   }
@@ -202,6 +232,10 @@ export function SettingsScreen({
       newCardLimitText={newCardLimitText}
       onNewCardLimitChange={handleNewCardLimitChange}
       onNewCardLimitBlur={handleNewCardLimitBlur}
+      ratingTier={ratingTier}
+      onRatingTierChange={handleRatingTierChange}
+      pronunciationAccent={pronunciationAccent}
+      onPronunciationAccentChange={handlePronunciationAccentChange}
       themePreference={themePreference}
       onThemePreferenceChange={onThemePreferenceChange}
     />
@@ -227,6 +261,12 @@ interface SettingsMainViewProps {
   newCardLimitText: string;
   onNewCardLimitChange(text: string): void;
   onNewCardLimitBlur(): void;
+  /** 评分档位（RAY-265：三档默认 / 四档 Anki 传统） */
+  ratingTier: RatingTierMode;
+  onRatingTierChange(value: string): void;
+  /** 发音口音（RAY-265：美式 / 英式，浏览器语音合成） */
+  pronunciationAccent: PronunciationAccent;
+  onPronunciationAccentChange(value: string): void;
   /** 主题偏好三档（RAY-261）：App 级 useTheme 单一数据源下发 */
   themePreference: ThemePreference;
   onThemePreferenceChange(preference: ThemePreference): void;
@@ -247,6 +287,10 @@ function SettingsMainView({
   newCardLimitText,
   onNewCardLimitChange,
   onNewCardLimitBlur,
+  ratingTier,
+  onRatingTierChange,
+  pronunciationAccent,
+  onPronunciationAccentChange,
   themePreference,
   onThemePreferenceChange,
 }: SettingsMainViewProps) {
@@ -307,6 +351,46 @@ function SettingsMainView({
             onBlur={onNewCardLimitBlur}
             className="w-28 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           />
+        </label>
+        <label
+          htmlFor="rating-tiers"
+          className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+          <span>
+            评分档位
+            <span className="mt-1 block text-xs text-text-muted">
+              默认三档（认识 / 模糊 / 不认识）；可选四档（Anki 传统，含 Easy）。
+            </span>
+          </span>
+          <select
+            id="rating-tiers"
+            value={ratingTier}
+            onChange={(event) => onRatingTierChange(event.target.value)}
+            className="w-40 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            <option value="three">三档（默认）</option>
+            <option value="four">四档（Anki 传统）</option>
+          </select>
+        </label>
+        <label
+          htmlFor="pronunciation-accent"
+          className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+          <span>
+            发音口音
+            <span className="mt-1 block text-xs text-text-muted">
+              美式 / 英式；使用浏览器语音合成，离线可用，无需联网。
+            </span>
+          </span>
+          <select
+            id="pronunciation-accent"
+            value={pronunciationAccent}
+            onChange={(event) => onPronunciationAccentChange(event.target.value)}
+            className="w-40 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            <option value="us">美式</option>
+            <option value="uk">英式</option>
+          </select>
         </label>
       </Section>
 

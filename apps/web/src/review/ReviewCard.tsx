@@ -21,9 +21,11 @@ export interface ReviewCardProps {
   sense: Sense;
   flipped: boolean;
   onFlip(): void;
+  /** 背面评分快捷键提示（RAY-265：三档 / 四档文案不同，由界面层传入） */
+  ratingHint: string;
 }
 
-export function ReviewCard({ sense, flipped, onFlip }: ReviewCardProps) {
+export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardProps) {
   const wordParts = parseWordParts(sense.wordParts ?? "");
   return (
     <div className="[perspective:1200px]">
@@ -110,9 +112,7 @@ export function ReviewCard({ sense, flipped, onFlip }: ReviewCardProps) {
               <WordChips words={sense.antonyms ?? []} />
             </CardSection>
           </div>
-          <span className="mt-4 text-center text-xs text-text-muted">
-            按 1–4（或 A / H / G / E）评分
-          </span>
+          <span className="mt-4 text-center text-xs text-text-muted">{ratingHint}</span>
         </CardFace>
       </button>
     </div>
