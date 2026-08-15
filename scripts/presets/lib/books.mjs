@@ -15,11 +15,21 @@
  *   必须注明（红线）。
  *
  * RAY-274 调整（冲刺词书补词与 GRE 剔除）：
- * - 真题高频词补入：从 mikigo/english-chinese-words（Apache-2.0）提取的
- *   真题词频分析数据，专四 595 词 / 专八 684 词，合并进对应冲刺词书；
+ * - 真题高频词补入（P1，PR1）：从 mikigo/english-chinese-words
+ *   （Apache-2.0）提取的真题词频分析数据，专四 595 词 / 专八 684 词，
+ *   合并进对应冲刺词书；
+ * - 基础通用词补入（P1.5，PR2）：从 Cale 的 RAY-264 覆盖率校验报告
+ *   「专四冲刺 P2 大纲词汇缺失清单」中挑选同时带 zk（中考）+ gk（高考）
+ *   标签的基础通用词 408 个（about/accept/agree/available/basic/become/
+ *   believe 等），词条从 ECDICT（MIT）提取，合并进两本冲刺词书；
+ *   「任何英语考试的阅读基础，不应缺失」（Jack 2026-08-15 P1.5 裁定）；
  * - GRE 剔除：剔除 ECDICT GRE 标签中不在外部考试参考词表
  *   （大纲词汇 kaCVanime/CEFR-VS-CN + 真题高频词）中的词条
- *   （专四 698 词 / 专八 2633 词），为补词腾空间。
+ *   （专四 698 词 / 专八 2633 词），为补词腾空间；
+ * - 专八截断：补入词（P1 + P1.5）在截断排序中置前优先保留——基础词的
+ *   ECDICT frq 位次靠后（如 about frq=46、become frq=139），直接参与
+ *   词频截断会被裁掉，与「补入词必须落地」的验收口径相悖（PR1 实测
+ *   有 24 个 P1 词因此未进入专八词书，如 democratic/draw/trial）。
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -106,6 +116,22 @@ function getP1Words() {
 }
 
 /**
+ * RAY-274 PR2：P1.5 基础通用词补入列表。
+ * 从 Cale 的 RAY-264 报告「专四冲刺 P2 大纲词汇缺失清单」挑选、
+ * 带 zk+gk 双标签的基础通用词（408 词，about/accept/agree/available/
+ * basic/become/believe 等）。词条数据本身从 ECDICT（MIT）提取，
+ * 本文件仅作选词清单（与 P1 真题高频词同一模式）。
+ * 两本冲刺词书共用；模块级缓存。
+ */
+let _p15WordsCache = null;
+function getP15Words() {
+  if (!_p15WordsCache) {
+    _p15WordsCache = loadWordSet("sources/p15-basic-words.txt");
+  }
+  return _p15WordsCache;
+}
+
+/**
  * RAY-274：外部考试参考词表（大纲词汇 + 真题高频词）。
  * GRE 标签词中不在此集合的词条将从冲刺词书中剔除。
  */
@@ -124,14 +150,16 @@ function getExternalRefWords() {
  * 按词书定义选词（含「专八冲刺」词频截断），返回 id → 词条数组的 Map。
  * 词条按 term 升序排列（与共享池顺序一致）。
  *
- * RAY-274：冲刺词书在标准 tag 筛选后追加真题高频词补入（P1），
- * 并剔除不在外部考试参考词表中的 GRE 标签词。
+ * RAY-274：冲刺词书在标准 tag 筛选后追加真题高频词补入（P1）与
+ * 基础通用词补入（P1.5），并剔除不在外部考试参考词表中的 GRE 标签词。
+ * 专八截断排序将补入词置前优先保留，保证补入词不被词频截断裁掉。
  *
  * @param {Array<import("./ecdict.mjs").CleanedEntry>} cleanedAll 清洗后的全部词条
  * @returns {Map<string, Array<import("./ecdict.mjs").CleanedEntry>>}
  */
 export function selectBookEntries(cleanedAll) {
   const externalRef = getExternalRefWords();
+  const p15Words = getP15Words();
   const bookEntriesById = new Map();
   for (const def of BOOK_DEFS) {
     let entries = cleanedAll
@@ -146,24 +174,32 @@ export function selectBookEntries(cleanedAll) {
       );
     }
 
-    // RAY-274：冲刺词书 — 补入真题高频词（P1）须在截断之前执行，
-    // 使截断目标（专四词数）已含 P1 补入词，专八截断后词数与专四一致。
+    // RAY-274：冲刺词书 — 补入词（P1 真题高频词 + P1.5 基础通用词）
+    // 须在截断之前执行，使截断目标（专四词数）已含补入词，
+    // 专八截断后词数与专四一致。
     if (def.id === "book-tem4" || def.id === "book-tem8") {
       const termSet = new Set(entries.map((e) => e.term.toLowerCase()));
       const p1Words = getP1Words()[def.id];
-      if (p1Words) {
-        const p1Entries = cleanedAll.filter(
-          (entry) =>
-            p1Words.has(entry.term.toLowerCase()) && !termSet.has(entry.term.toLowerCase()),
-        );
-        entries = [...entries, ...p1Entries].sort((a, b) => a.term.localeCompare(b.term));
-      }
+      const wanted = new Set([...(p1Words ?? []), ...p15Words]);
+      const additions = cleanedAll.filter(
+        (entry) => wanted.has(entry.term.toLowerCase()) && !termSet.has(entry.term.toLowerCase()),
+      );
+      entries = [...entries, ...additions].sort((a, b) => a.term.localeCompare(b.term));
     }
 
     if (def.cutoffToId) {
       const targetCount = bookEntriesById.get(def.cutoffToId).length;
+      // RAY-274 PR2：补入词（P1 + P1.5）在截断排序中置前优先保留——
+      // 基础词的 ECDICT frq 位次靠后（about frq=46），直接参与词频截断
+      // 会被裁掉；其余词条截断口径不变（frq desc → bnc desc → term asc）。
+      const pinned = new Set([...(getP1Words()[def.id] ?? []), ...p15Words]);
       entries = [...entries]
-        .sort(byFrequencyDesc)
+        .sort((a, b) => {
+          const ap = pinned.has(a.term.toLowerCase());
+          const bp = pinned.has(b.term.toLowerCase());
+          if (ap !== bp) return ap ? -1 : 1;
+          return byFrequencyDesc(a, b);
+        })
         .slice(0, targetCount)
         .sort((a, b) => a.term.localeCompare(b.term));
     }

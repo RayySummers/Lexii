@@ -111,15 +111,16 @@ describe("createIndexedDbSettingsDataProvider", () => {
     async () => {
       const provider = createIndexedDbSettingsDataProvider(db!);
 
-      // 先装六级（5406 词），再装专四冲刺（8569 词）
+      // 先装六级（5406 词），再装专四冲刺（8733 词）
       // RAY-274 GRE 剔除使 132 个带 GRE 标签的六级词从专四词书中移除，
-      // 因此重叠 = 5406 - 132 = 5274；去重后总数 = 5406 + (8569 - 5274) = 8701
+      // 但 PR2 P1.5 基础词补入有 4 词同时带六级标签（净回流），
+      // 因此重叠 = 5406 - 132 + 4 = 5278；去重后总数 = 5406 + (8733 - 5278) = 8861
       await provider.installWordbook("book-cet6");
       const tem4 = await provider.installWordbook("book-tem4");
 
-      expect(tem4.skippedCount).toBe(5274);
-      expect(tem4.installedCount).toBe(8569 - 5274);
-      expect(await db!.items.count()).toBe(8701);
+      expect(tem4.skippedCount).toBe(5278);
+      expect(tem4.installedCount).toBe(8733 - 5278);
+      expect(await db!.items.count()).toBe(8861);
 
       // 两本词书状态均为已装
       const after = await provider.getWordbookSummaries();

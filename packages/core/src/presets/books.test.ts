@@ -6,6 +6,8 @@
  * 冲刺词书口径红线。生成物由 scripts/presets/build.mjs --books 产出，
  * 本测试保证「生成 → 装载」契约不被破坏（如脚本输出格式变更须同步此处）。
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { TERM_PATTERN } from "../csv";
 import {
@@ -27,8 +29,8 @@ const EXPECTED_TERM_COUNTS: Record<string, number> = {
   "book-toefl": 6970,
   "book-ielts": 5038,
   "book-gre": 7504,
-  "book-tem4": 8569,
-  "book-tem8": 8569,
+  "book-tem4": 8733,
+  "book-tem8": 8733,
 };
 
 describe("WORDBOOK_CATALOG（词书目录）", () => {
@@ -60,11 +62,40 @@ describe("WORDBOOK_CATALOG（词书目录）", () => {
     }
   });
 
-  it("冲刺词书同词数（GRE 剔除 + 真题补入后截断至同量级）", () => {
+  it("冲刺词书同词数（GRE 剔除 + 真题补入 + 基础词补入后截断至同量级）", () => {
     const tem4 = WORDBOOK_CATALOG.find((book) => book.id === "book-tem4");
     const tem8 = WORDBOOK_CATALOG.find((book) => book.id === "book-tem8");
     expect(tem8?.terms.length).toBe(tem4?.terms.length);
     expect(tem8?.terms.length).toBeGreaterThan(8000);
+  });
+
+  it("RAY-274 PR2：P1.5 基础通用词补入清单全部落地于两本冲刺词书（词条完整）", () => {
+    // 选词清单与打包侧同一份源文件（scripts/presets/sources/p15-basic-words.txt）
+    const p15 = new Set(
+      readFileSync(
+        fileURLToPath(
+          new URL("../../../../scripts/presets/sources/p15-basic-words.txt", import.meta.url),
+        ),
+        "utf-8",
+      )
+        .split("\n")
+        .map((w) => w.trim().toLowerCase())
+        .filter((w) => w !== ""),
+    );
+    expect(p15.size).toBeGreaterThanOrEqual(300);
+    expect(p15.size).toBeLessThanOrEqual(500);
+    const tem4 = WORDBOOK_CATALOG.find((book) => book.id === "book-tem4")!;
+    const tem8 = WORDBOOK_CATALOG.find((book) => book.id === "book-tem8")!;
+    const tem4Lower = new Set(tem4.terms.map((t) => t.toLowerCase()));
+    const tem8Lower = new Set(tem8.terms.map((t) => t.toLowerCase()));
+    for (const word of p15) {
+      expect(tem4Lower.has(word), `tem4 → ${word}`).toBe(true);
+      expect(tem8Lower.has(word), `tem8 → ${word}`).toBe(true);
+      // 词条从 ECDICT 提取：共享池中须有完整释义（word/translation 非空）
+      const entry = WORDBOOK_POOL.get(word);
+      expect(entry, `pool → ${word}`).toBeTruthy();
+      expect(entry!.definitions.length, `definitions → ${word}`).toBeGreaterThan(0);
+    }
   });
 
   it("冲刺词书命名与描述注明「层次近似词书，非官方专四/专八名单」（口径红线）", () => {
@@ -143,15 +174,16 @@ describe("getWordbookPackage（词书定义 → 可安装包）", () => {
     }
   });
 
-  it("组合词书词条来自对应标签集合 ∪ 真题高频词补入（RAY-274）", () => {
+  it("组合词书词条来自对应标签集合 ∪ 补入词（P1 真题高频词 + P1.5 基础通用词）（RAY-274）", () => {
     const tem4 = WORDBOOK_CATALOG.find((book) => book.id === "book-tem4");
     const cet6 = WORDBOOK_CATALOG.find((book) => book.id === "book-cet6");
     const toefl = WORDBOOK_CATALOG.find((book) => book.id === "book-toefl");
-    // RAY-274：冲刺词书现在包含 ECDICT {cet6,toefl} 标签词 + 真题高频词补入（P1），
-    // P1 词不一定有 cet6/toefl 标签，但仍属于词书的有效内容。
+    // RAY-274：冲刺词书现在包含 ECDICT {cet6,toefl} 标签词 + 补入词
+    // （P1 真题高频词 / P1.5 基础通用词），补入词不一定有 cet6/toefl
+    // 标签，但仍属于词书的有效内容。
     const tagAllowed = new Set([...(cet6?.terms ?? []), ...(toefl?.terms ?? [])]);
     const preset = getWordbookPackage(tem4!);
-    // 断言：词条要么来自标签集合，要么在共享池中有完整词条数据（P1 补入词）
+    // 断言：词条要么来自标签集合，要么在共享池中有完整词条数据（补入词）
     for (const entry of preset.entries) {
       const inTagSet = tagAllowed.has(entry.term);
       const inPool = WORDBOOK_POOL.has(entry.term.toLowerCase());
