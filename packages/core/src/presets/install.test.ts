@@ -7,7 +7,7 @@
  */
 import type { DexieOptions } from "dexie";
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LexilexiDatabase } from "../persistence";
 import { openDatabase } from "../persistence";
 import {
@@ -171,6 +171,63 @@ describe("installPreset（分块安装预设词表）", () => {
     const result = await installPreset(database, preset, { yield: async () => {} });
     expect(result).toEqual({ status: "installed", installedCount: 0 });
     expect(await database.items.count()).toBe(0);
+    expect((await database.meta.get(presetDoneKey(preset.id)))?.value).toBe(preset.version);
+  });
+
+  it("并发首装加固：起始事务先写 progress=0 占位，早于任何词条落库（RAY-260 suggestion 3）", async () => {
+    const database = freshDatabase();
+    const preset = makePreset(makeEntries(10));
+
+    const metaPutEntries: Array<{ key: string; value: string }> = [];
+    const sensesPutTerms: string[] = [];
+    const originalMetaPut = database.meta.put.bind(database.meta);
+    const originalSensesPut = database.senses.put.bind(database.senses);
+    const metaPutSpy = vi.spyOn(database.meta, "put").mockImplementation((record) => {
+      metaPutEntries.push({ key: record.key, value: record.value });
+      return originalMetaPut(record);
+    });
+    const sensesPutSpy = vi.spyOn(database.senses, "put").mockImplementation((record) => {
+      sensesPutTerms.push(record.term);
+      return originalSensesPut(record);
+    });
+    try {
+      await installPreset(database, preset, { yield: async () => {} });
+    } finally {
+      metaPutSpy.mockRestore();
+      sensesPutSpy.mockRestore();
+    }
+
+    // 第一条 meta 写入必须是 progress=0 占位（起始事务，早于任何词条落库）
+    expect(metaPutEntries[0]).toEqual({ key: presetProgressKey(preset.id), value: "0" });
+    // 词条落库发生在占位之后（meta 事件序：占位 → 块提交进度 → 完成标记）
+    expect(sensesPutTerms).toHaveLength(10);
+    const progressWrites = metaPutEntries.filter(
+      (entry) => entry.key === presetProgressKey(preset.id),
+    );
+    expect(progressWrites.map((entry) => entry.value)).toEqual(["0", "10"]);
+    const doneWrites = metaPutEntries.filter((entry) => entry.key === presetDoneKey(preset.id));
+    expect(doneWrites.map((entry) => entry.value)).toEqual([preset.version]);
+  });
+
+  it("并发首装竞态：两个 installPreset 同时启动不产生重复导入", async () => {
+    const database = freshDatabase();
+    const total = PRESET_CHUNK_SIZE * 2 + 30;
+    const preset = makePreset(makeEntries(total));
+
+    const [first, second] = await Promise.all([
+      installPreset(database, preset, { yield: async () => {} }),
+      installPreset(database, preset, { yield: async () => {} }),
+    ]);
+
+    // 无论哪个调用先完成/续装，最终落库数恰好等于包内词条数（无重复导入）
+    for (const result of [first, second]) {
+      expect(["installed", "already-installed"]).toContain(result.status);
+    }
+    expect(await database.items.count()).toBe(total);
+    expect(await database.senses.count()).toBe(total);
+    expect(await database.memoryStates.count()).toBe(total);
+    expect(await database.events.where("type").equals("import").count()).toBe(total);
+    expect(await database.meta.get(presetProgressKey(preset.id))).toBeUndefined();
     expect((await database.meta.get(presetDoneKey(preset.id)))?.value).toBe(preset.version);
   });
 });
