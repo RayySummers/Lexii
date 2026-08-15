@@ -142,7 +142,8 @@ Tier 0 产物为紧凑元组 JSON：`{ id, version, name, generatedAt, source, e
 ## 首启导入耗时基准
 
 `pnpm --filter @lexilexi/core bench`（vitest bench，Node + fake-indexeddb）：
-全量 Tier 0（7,195 词条 × 4 记录，分块 400/块）冷装实测 ~1.4s（单样本，内存实现
-口径）；富化内联冷装与存量库回填基准（RAY-268 实验三）见
+全量 Tier 0（7,195 词条 × 4 记录，分块 400/块）冷装实测 ~1.1s（单样本，内存实现
+口径）；富化内联冷装与存量库回填基准（RAY-268 实验三，回填已按 Oscar 评审
+suggestion 1 重构为单次全量读 + 主键 CAS 写回）见
 `docs/presets/experiment-enrichment.md`。真实设备数据待真机试用复测。安装器分块
 事务 + 块间让出事件循环，UI 不阻塞；中断后从断点续装（进度写入 meta 表，与块同事务）。

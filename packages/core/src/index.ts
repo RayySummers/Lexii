@@ -101,6 +101,7 @@ export {
   ENRICHMENT_CHUNK_SIZE,
   enrichmentDoneKey,
   enrichmentProgressKey,
+  markEnrichmentDone,
   mergeEnrichmentIntoContent,
   mergeEnrichmentIntoSense,
   parseEnrichmentPreset,

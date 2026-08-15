@@ -6,8 +6,10 @@
  * - toEnrichmentMap：小写词条索引；
  * - mergeEnrichmentIntoContent / mergeEnrichmentIntoSense：只在目标字段
  *   缺失/为空时填充，绝不覆盖既有内容；
- * - backfillEnrichment：存量库回填（幂等 / 进度断点续填 / 不改 schema /
- *   不新增词条 / 不触碰富化包覆盖不到的词条）。
+ * - backfillEnrichment：存量库回填（单次全量读建内存 Map 分块写回 /
+ *   完成标记比对版本 / 幂等 / 进度断点续填 / 不改 schema / 不新增词条 /
+ *   不触碰富化包覆盖不到的词条）；
+ * - markEnrichmentDone：新装路径完成标记（含残留进度清理）。
  */
 import type { DexieOptions } from "dexie";
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
@@ -21,6 +23,7 @@ import {
   ENRICHMENT_CHUNK_SIZE,
   enrichmentDoneKey,
   enrichmentProgressKey,
+  markEnrichmentDone,
   mergeEnrichmentIntoContent,
   mergeEnrichmentIntoSense,
   parseEnrichmentPreset,
@@ -79,11 +82,12 @@ function makeEnrichmentPreset(
     string,
     [string, string][],
   ][],
+  version = "1.0.0",
 ): EnrichmentPresetPackage {
   return parseEnrichmentPreset(
     {
       id: "test-enrichment",
-      version: "1.0.0",
+      version,
       name: "测试富化包",
       generatedAt: "2026-08-15T00:00:00.000Z",
       source: "测试来源（CC BY）",
@@ -279,6 +283,36 @@ describe("backfillEnrichment（存量库回填）", () => {
     expect(again).toEqual({ status: "already-backfilled", version: pkg.version });
   });
 
+  it("完成标记比对版本（suggestion 2）：版本不一致重跑回填，一致才跳过", async () => {
+    const database = freshDatabase();
+    await installPreset(database, makeWordPreset(makeWordEntries(1)), { yield: async () => {} });
+    // v1 只带 ipaUs
+    const pkgV1 = makeEnrichmentPreset([
+      ["testword0", "/uˈes-v1/", "", "", "", "", "", "", "", []],
+    ]);
+    await backfillEnrichment(database, pkgV1, { yield: async () => {} });
+
+    // 同版本 → 跳过
+    const same = await backfillEnrichment(database, pkgV1, { yield: async () => {} });
+    expect(same).toEqual({ status: "already-backfilled", version: "1.0.0" });
+
+    // v2 扩字段 → 版本不一致重跑，新字段补进存量词条（扩字段/换数据后
+    // 存量用户能收到新回填；合并口径幂等，重跑安全）
+    const pkgV2 = makeEnrichmentPreset(
+      [["testword0", "/uˈes-v2/", "", "", "", "", "", "v2<词根>", "", []]],
+      "2.0.0",
+    );
+    const rerun = await backfillEnrichment(database, pkgV2, { yield: async () => {} });
+    expect(rerun).toEqual({ status: "backfilled", filledCount: 1 });
+    const updated = await database.senses.filter((s) => s.term === "testword0").first();
+    expect(updated?.wordParts).toBe("v2<词根>");
+    expect(updated?.ipaUs).toBe("/uˈes-v1/"); // 已填字段不被覆盖（合并口径）
+    expect((await database.meta.get(enrichmentDoneKey(pkgV2.id)))?.value).toBe("2.0.0");
+    // 重跑后同版本再次跳过
+    const after = await backfillEnrichment(database, pkgV2, { yield: async () => {} });
+    expect(after).toEqual({ status: "already-backfilled", version: "2.0.0" });
+  });
+
   it("进度断点续填：不重复处理已完成的词条", async () => {
     const database = freshDatabase();
     await installPreset(database, makeWordPreset(makeWordEntries(3)), { yield: async () => {} });
@@ -347,5 +381,21 @@ describe("backfillEnrichment（存量库回填）", () => {
     expect(result).toEqual({ status: "backfilled", filledCount: total });
     const last = await database.senses.filter((s) => s.term === `testword${total - 1}`).first();
     expect(last?.ipaUs).toBe(`/uˈes-testword${total - 1}/`);
+  });
+});
+
+describe("markEnrichmentDone（新装路径完成标记，suggestion 3）", () => {
+  it("写包版本完成标记并清理残留进度，之后回填直接跳过", async () => {
+    const database = freshDatabase();
+    const pkg = makeEnrichmentPreset([enrichmentTuple("testword0")]);
+    // 残留进度（模拟中断续填留下的断点）
+    await database.meta.put({ key: enrichmentProgressKey(pkg.id), value: "3" });
+
+    await markEnrichmentDone(database, pkg);
+
+    expect((await database.meta.get(enrichmentDoneKey(pkg.id)))?.value).toBe(pkg.version);
+    expect(await database.meta.get(enrichmentProgressKey(pkg.id))).toBeUndefined();
+    const result = await backfillEnrichment(database, pkg, { yield: async () => {} });
+    expect(result).toEqual({ status: "already-backfilled", version: pkg.version });
   });
 });
