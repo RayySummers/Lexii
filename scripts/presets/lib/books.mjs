@@ -23,6 +23,7 @@
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { TAG_LABELS } from "./ecdict.mjs";
 
 /**
@@ -91,11 +92,18 @@ function loadWordSet(relPath) {
  * RAY-274：真题高频词补入列表（来源：mikigo/english-chinese-words，Apache-2.0）。
  * 专四 595 词 / 专八 684 词，基于真题词频分析。在 build 时从 sources/ 加载，
  * 合并进对应冲刺词书（去重后净增专四 130 词 / 专八 235 词）。
+ * 模块级缓存，避免每次 selectBookEntries 调用重复读取文件。
  */
-const P1_WORDS = {
-  "book-tem4": () => loadWordSet("sources/zhenti-tem4-words.txt"),
-  "book-tem8": () => loadWordSet("sources/zhenti-tem8-words.txt"),
-};
+let _p1WordsCache = null;
+function getP1Words() {
+  if (!_p1WordsCache) {
+    _p1WordsCache = {
+      "book-tem4": loadWordSet("sources/zhenti-tem4-words.txt"),
+      "book-tem8": loadWordSet("sources/zhenti-tem8-words.txt"),
+    };
+  }
+  return _p1WordsCache;
+}
 
 /**
  * RAY-274：外部考试参考词表（大纲词汇 + 真题高频词）。
@@ -111,9 +119,6 @@ function getExternalRefWords() {
   }
   return _externalRefCache;
 }
-
-// fileURLToPath import needed for loadWordSet
-import { fileURLToPath } from "node:url";
 
 /**
  * 按词书定义选词（含「专八冲刺」词频截断），返回 id → 词条数组的 Map。
@@ -145,7 +150,7 @@ export function selectBookEntries(cleanedAll) {
     // 使截断目标（专四词数）已含 P1 补入词，专八截断后词数与专四一致。
     if (def.id === "book-tem4" || def.id === "book-tem8") {
       const termSet = new Set(entries.map((e) => e.term.toLowerCase()));
-      const p1Words = P1_WORDS[def.id]?.();
+      const p1Words = getP1Words()[def.id];
       if (p1Words) {
         const p1Entries = cleanedAll.filter(
           (entry) => p1Words.has(entry.term.toLowerCase()) && !termSet.has(entry.term.toLowerCase()),
