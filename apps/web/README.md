@@ -61,8 +61,12 @@ pnpm build          # tsc --noEmit + vite build
 
 **每日新卡上限**（RAY-260）：learn / mixed 模式的新词侧受上限约束——数据层
 （`review/data.ts`）按「设置值（默认 20/日，设置页可调，localStorage）− 今日已学
-新词数（`@lexilexi/stats` 的 `computeLearnedTodayCount`，事件投影）」折算剩余额度，
-经 `getStudyQueueItemIds` 的 `newCardLimit` 参数截取新词；复习侧不受限。
+新词数」折算剩余额度，经 `getStudyQueueItemIds` 的 `newCardLimit` 参数截取新词；
+复习侧不受限。读取路径（Oscar 复评 suggestion 1）：今日复习事件走 time 索引区间
+查询，「是否今日首次复习」反向扫描时间索引取证据、候选集清零即提前停止，
+不再整表读历史事件；「今日已学」口径复用 `@lexilexi/stats` 的
+`computeLearnedTodayCount`（事件投影）。首页有待学词时展示「今日新卡额度剩余
+N 张」，说明徽标数字（未截断到期数）与每日实际可学队列的关系（复评 suggestion 2）。
 
 ## PWA（可安装 + 离线）
 

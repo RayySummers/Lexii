@@ -11,7 +11,7 @@
  * 每日新卡上限（RAY-260 评审 suggestion 2）：learn / mixed 模式在取队列前，
  * 用 @lexilexi/stats 的 computeLearnedTodayCount（今天首次被复习的词条数，
  * 事件投影、无需额外状态）折算「今日剩余新卡额度」传给 core 截取；
- * review 模式只含复习卡，不触发额度计算。
+ * review 模式只含复习卡，不触发额度计算。读取路径见 resolveNewCardLimit。
  */
 import {
   SAMPLE_WORDLIST_CSV,
@@ -27,10 +27,11 @@ import type {
   LexilexiDatabase,
   LexilexiExportData,
   MemoryState,
+  ReviewEvent,
   ReviewRating,
   StudyMode,
 } from "@lexilexi/core";
-import { computeLearnedTodayCount } from "@lexilexi/stats";
+import { computeLearnedTodayCount, localDayBounds } from "@lexilexi/stats";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { buildReviewQueue } from "./queue";
 import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
@@ -38,11 +39,53 @@ import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
 /** 示例词表来源标识（写入 LearningItem.source 与 import 事件，供溯源） */
 const SAMPLE_SOURCE = "内置示例词表";
 
-/** 按「每日上限 − 今日已学新词」折算剩余新卡额度（learn/mixed 用；review 用不到） */
+/**
+ * 按「每日上限 − 今日已学新词」折算剩余新卡额度（learn/mixed 用；review 用不到）。
+ *
+ * 扩展性（Oscar 复评 suggestion 1）：不整表读 review 事件——
+ * - 今日事件走 time 索引区间（本地日 [00:00, 次日 00:00)），读取量随当日
+ *   复习次数增长，不随历史累积；
+ * - 「是否今日首次复习」的证据从今日 00:00 反向扫描时间索引、只收集命中
+ *   候选词条的事件，候选集清零即提前停止——日常复习用户每次只读几十条
+ *   最近的前日事件。最坏情形（今日复习的全是新导入词，历史中无证据）退化为
+ *   一次早前历史扫描，与旧实现同阶，绝不更差。
+ */
 async function resolveNewCardLimit(db: LexilexiDatabase, now: string): Promise<number> {
   const configured = readDailyNewCardLimit();
-  const reviewEvents = await db.events.where("type").equals("review").toArray();
-  const learnedToday = computeLearnedTodayCount(reviewEvents.filter(isReviewEvent), now);
+  const bounds = localDayBounds(now);
+
+  // 1. 今日复习事件（time 索引区间查询）
+  const todayReviews = (
+    await db.events
+      .where("time")
+      .between(bounds.start, bounds.end, true, false)
+      .filter((event) => event.type === "review")
+      .toArray()
+  ).filter(isReviewEvent);
+  if (todayReviews.length === 0) {
+    return configured;
+  }
+
+  // 2. 首次复习证据：今日之前存在 review 事件的词条，其「学习」不属于今天。
+  //    反向扫描（从今日 00:00 往回，时间上由近及远），每命中一个候选词条
+  //    取一条证据并移出候选集；候选集清零即提前停止。
+  const candidates = new Set(todayReviews.map((event) => event.itemId));
+  const earlierEvidence: ReviewEvent[] = [];
+  await db.events
+    .where("time")
+    .below(bounds.start)
+    .reverse()
+    .filter((event) => isReviewEvent(event) && candidates.has(event.itemId))
+    .until(() => candidates.size === 0)
+    .each((event) => {
+      if (isReviewEvent(event) && candidates.delete(event.itemId)) {
+        earlierEvidence.push(event);
+      }
+    });
+
+  // 3. 「今日已学新词」口径复用 @lexilexi/stats 纯函数：给定集合内每词条的
+  //    最早 review 事件落在今天即计为今日新学（todayReviews ∪ 早前证据）。
+  const learnedToday = computeLearnedTodayCount([...todayReviews, ...earlierEvidence], now);
   return Math.max(0, configured - learnedToday);
 }
 

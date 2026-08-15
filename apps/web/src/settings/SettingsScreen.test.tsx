@@ -283,6 +283,33 @@ describe("SettingsScreen", () => {
     expect(window.localStorage.getItem("lexilexi:daily-new-card-limit")).toBeNull();
   });
 
+  it("每日新卡上限：失焦时显示回落到生效值（Oscar 复评 nit 1）", async () => {
+    const harness = makeHarness();
+    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+
+    const input = await screen.findByLabelText(/每日新卡上限/);
+    // 先设置合法值 35（持久化），再清空输入（非法、不持久化）
+    fireEvent.change(input, { target: { value: "35" } });
+    fireEvent.change(input, { target: { value: "" } });
+    expect(input).toHaveValue(null);
+
+    // 失焦：显示回落到存储中实际生效的值 35
+    fireEvent.blur(input);
+    expect(input).toHaveValue(35);
+    expect(window.localStorage.getItem("lexilexi:daily-new-card-limit")).toBe("35");
+  });
+
+  it("每日新卡上限：合法值失焦归一化显示（不改变生效值）", async () => {
+    const harness = makeHarness();
+    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+
+    const input = await screen.findByLabelText(/每日新卡上限/);
+    fireEvent.change(input, { target: { value: "7" } });
+    fireEvent.blur(input);
+    expect(input).toHaveValue(7);
+    expect(window.localStorage.getItem("lexilexi:daily-new-card-limit")).toBe("7");
+  });
+
   it("进行中的导出在进入二级页后不丢状态：返回后仍显示导出中并最终提示成功（RAY-260 评审 nit 2）", async () => {
     const harness = makeHarness();
     const restore = stubObjectUrl();

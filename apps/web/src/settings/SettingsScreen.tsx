@@ -139,6 +139,15 @@ export function SettingsScreen({ provider, onExit }: SettingsScreenProps) {
     }
   }, []);
 
+  // 失焦回落（Oscar 复评 nit 1）：输入被清空或非法时不持久化，但显示文本
+  // 须回落到实际生效值（存储中最近一次合法值），消除显示与生效的短暂不一致。
+  const handleNewCardLimitBlur = useCallback(() => {
+    setNewCardLimitText((current) => {
+      const value = Number(current);
+      return isValidDailyNewCardLimit(value) ? String(value) : String(readDailyNewCardLimit());
+    });
+  }, []);
+
   if (view === "licenses") {
     return <DataSourcesScreen provider={provider} onBack={() => setView("main")} />;
   }
@@ -156,6 +165,7 @@ export function SettingsScreen({ provider, onExit }: SettingsScreenProps) {
       onImportFile={handleImportFile}
       newCardLimitText={newCardLimitText}
       onNewCardLimitChange={handleNewCardLimitChange}
+      onNewCardLimitBlur={handleNewCardLimitBlur}
     />
   );
 }
@@ -173,9 +183,10 @@ interface SettingsMainViewProps {
   onExportJson(): void;
   onExportCsv(): void;
   onImportFile(file: File): void;
-  /** 每日新卡上限输入框（文本态 + 变更回调；合法值由父级即时持久化） */
+  /** 每日新卡上限输入框（文本态 + 变更/失焦回调；合法值由父级即时持久化，失焦回落） */
   newCardLimitText: string;
   onNewCardLimitChange(text: string): void;
+  onNewCardLimitBlur(): void;
 }
 
 function SettingsMainView({
@@ -191,6 +202,7 @@ function SettingsMainView({
   onImportFile,
   newCardLimitText,
   onNewCardLimitChange,
+  onNewCardLimitBlur,
 }: SettingsMainViewProps) {
   const persistence = usePersistenceStatus();
 
@@ -218,6 +230,7 @@ function SettingsMainView({
             step={1}
             value={newCardLimitText}
             onChange={(event) => onNewCardLimitChange(event.target.value)}
+            onBlur={onNewCardLimitBlur}
             className="w-28 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           />
         </label>
