@@ -1,6 +1,6 @@
 # 预设词表质量校验报告（RAY-258 质量门槛）
 
-> 生成时间：2026-08-14T18:31:00.904Z（脚本：scripts/presets/verify-quality.mjs）
+> 生成时间：2026-08-15T05:15:53.547Z（脚本：scripts/presets/verify-quality.mjs）
 > 校验口径（RAY-258 口径约束）：NGSL 高频核心词以 Wiktionary 交叉校验 + 抽样校对
 > 作为内置包质量门槛；ECDICT 中文释义为 MVP 基线。
 

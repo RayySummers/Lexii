@@ -7,6 +7,11 @@
  *
  * 词条在打包侧已按 TERM_PATTERN 过滤、按 term 去重、释义非空；
  * 装载校验为「同一口径的第二道防线」（防御式，不重复清洗逻辑）。
+ *
+ * 释义连接符：打包侧（scripts/presets/build.mjs）以换行符连接多条释义——
+ * 清洗阶段已保证释义文本内不含真实换行与字面 "\n"，换行连接与装载侧
+ * split("\n") 是无损往返（全角分号可能出现在释义文本内，不作分隔符，
+ * RAY-260 评审 nit 3）。
  */
 import { TERM_PATTERN } from "../csv";
 import type { PresetPackage, PresetWordEntry } from "./types";
@@ -37,7 +42,7 @@ function convertEntry(raw: readonly string[], index: number): PresetWordEntry {
     throw new Error(`tier0.data.json 词条 #${index} 词条形状非法："${term}"`);
   }
   const definitions = defs
-    .split("；")
+    .split("\n")
     .map((part) => part.trim())
     .filter((part) => part !== "");
   if (definitions.length === 0) {

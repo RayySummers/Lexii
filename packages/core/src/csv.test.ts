@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { CsvFormatError, parseCsvWordlist } from "./csv";
+import { CsvFormatError, parseCsvWordlist, TERM_PATTERN } from "./csv";
+import { TERM_PATTERN as SHARED_TERM_PATTERN } from "./termPattern.js";
+
+describe("TERM_PATTERN 共享常量（RAY-260 评审 nit 1：消除双处维护）", () => {
+  it("csv.ts 与打包脚本引用的唯一物理定义是同一对象", () => {
+    // termPattern.js 是唯一物理定义：csv.ts 经 re-export 暴露，
+    // scripts/presets/lib/ecdict.mjs 直接 import 同一文件（无第二份定义）。
+    expect(TERM_PATTERN).toBe(SHARED_TERM_PATTERN);
+    expect(TERM_PATTERN.source).toBe("^[A-Za-z][A-Za-z'-]*[.]?$");
+  });
+});
 
 describe("parseCsvWordlist（CSV 词表解析与格式校验）", () => {
   it("解析标准两列格式（无表头）：term,definition", () => {

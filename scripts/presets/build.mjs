@@ -18,7 +18,11 @@
  *   - 释义清洗：换行 → 全角分号；超长按 500 字符在「；」边界截断；
  *     短语/词缀/非英语词条按 core 侧 TERM_PATTERN 过滤；term 小写去重首现优先。
  *   - 生成格式为紧凑元组数组 [term, definitions, pos, ipa, tags]，
- *     由 packages/core/src/presets/tier0.ts 在运行时校验并转成类型化模型。
+ *     definitions 以换行符（"\n"）连接——清洗阶段（normalizeTranslation）
+ *     已保证释义文本内不含真实换行与字面 "\n"，换行连接是唯一无损分隔符；
+ *     全角分号（「；」）可能在释义文本内出现，若沿用会二次切分
+ *     （RAY-260 评审 nit 3）。由 packages/core/src/presets/tier0.ts
+ *     在运行时按 "\n" 切回并转成类型化模型。
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -95,7 +99,7 @@ function toTuple(entry, ngslSet) {
   }
   return [
     entry.term,
-    entry.definitions.join("；"),
+    entry.definitions.join("\n"),
     entry.pos ?? "",
     entry.ipa ?? "",
     tags.join(" "),
