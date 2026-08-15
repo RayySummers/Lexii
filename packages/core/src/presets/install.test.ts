@@ -10,6 +10,7 @@ import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LexilexiDatabase } from "../persistence";
 import { openDatabase } from "../persistence";
+import { toSense } from "../importWords";
 import {
   getPresetInstallState,
   installPreset,
@@ -139,7 +140,11 @@ describe("installPreset（分块安装预设词表）", () => {
 
     // 第二次安装：续装剩余，无重复
     const result = await installPreset(database, preset, { yield: async () => {} });
-    expect(result).toEqual({ status: "installed", installedCount: total - PRESET_CHUNK_SIZE });
+    expect(result).toEqual({
+      status: "installed",
+      installedCount: total - PRESET_CHUNK_SIZE,
+      skippedCount: 0,
+    });
     expect(await database.items.count()).toBe(total);
     expect(await database.senses.count()).toBe(total);
     expect((await database.meta.get(presetDoneKey(preset.id)))?.value).toBe(preset.version);
@@ -169,9 +174,91 @@ describe("installPreset（分块安装预设词表）", () => {
     const database = freshDatabase();
     const preset = makePreset([]);
     const result = await installPreset(database, preset, { yield: async () => {} });
-    expect(result).toEqual({ status: "installed", installedCount: 0 });
+    expect(result).toEqual({ status: "installed", installedCount: 0, skippedCount: 0 });
     expect(await database.items.count()).toBe(0);
     expect((await database.meta.get(presetDoneKey(preset.id)))?.value).toBe(preset.version);
+  });
+
+  it("term 去重（RAY-262）：库中已存在的词条跳过，不产生重复学习项", async () => {
+    const database = freshDatabase();
+
+    // 先安装第一本词书（与第二本有部分重叠词条）
+    const overlapping = makeEntries(10);
+    const first = makePreset(overlapping);
+    await installPreset(database, first, { yield: async () => {} });
+
+    // 第二本：前 4 条与第一本重叠，后 6 条为新词
+    const secondEntries = [
+      ...overlapping.slice(0, 4),
+      ...makeEntries(6).map((entry, i) => ({ ...entry, term: `newword${i}` })),
+    ];
+    const second = makePreset(secondEntries);
+    second.id = "test-tier1";
+    second.name = "测试扩展词表";
+    const result = await installPreset(database, second, { yield: async () => {} });
+
+    expect(result.status).toBe("installed");
+    if (result.status !== "installed") {
+      throw new Error("unreachable");
+    }
+    expect(result.installedCount).toBe(6);
+    expect(result.skippedCount).toBe(4);
+    // 重叠词条不重复生成 Sense / Item / MemoryState / import 事件
+    expect(await database.senses.count()).toBe(16);
+    expect(await database.items.count()).toBe(16);
+    expect(await database.memoryStates.count()).toBe(16);
+    expect(await database.events.where("type").equals("import").count()).toBe(16);
+    // 重叠词条的 Sense 保持第一本的写入形态（不被第二本覆盖）
+    const kept = await database.senses.filter((s) => s.term === "testword0").toArray();
+    expect(kept).toHaveLength(1);
+    expect(kept[0]?.definitions).toEqual(["释义0", "第二义0"]);
+    // 新词正常落库
+    const added = await database.senses.filter((s) => s.term === "newword0").toArray();
+    expect(added).toHaveLength(1);
+  });
+
+  it("term 去重不覆盖已有 Sense：释义保持用户既有数据（安装绝不改写）", async () => {
+    const database = freshDatabase();
+
+    // 用户已导入同 term 词条（不同释义形态）
+    const existing = toSense({ term: "testword0", definitions: ["用户既有释义"] }, "en");
+    await database.senses.put(existing);
+
+    const preset = makePreset(makeEntries(3));
+    const result = await installPreset(database, preset, { yield: async () => {} });
+
+    expect(result.status).toBe("installed");
+    if (result.status !== "installed") {
+      throw new Error("unreachable");
+    }
+    expect(result.skippedCount).toBe(1);
+    const kept = await database.senses.get(existing.id);
+    expect(kept?.definitions).toEqual(["用户既有释义"]);
+    expect(await database.items.count()).toBe(2);
+  });
+
+  it("term 去重大小写不敏感（Oscar 评审 suggestion 1）：用户导入大写词条同样命中跳过", async () => {
+    const database = freshDatabase();
+
+    // 用户 CSV 导入含大写开头词条（词书内为全小写）
+    const existing = toSense({ term: "Testword0", definitions: ["用户导入的释义"] }, "en");
+    await database.senses.put(existing);
+
+    const preset = makePreset(makeEntries(3));
+    const result = await installPreset(database, preset, { yield: async () => {} });
+
+    expect(result.status).toBe("installed");
+    if (result.status !== "installed") {
+      throw new Error("unreachable");
+    }
+    expect(result.skippedCount).toBe(1);
+    expect(result.installedCount).toBe(2);
+    // 大写词条不产生重复 Sense / Learning Item
+    expect(await database.senses.count()).toBe(3);
+    expect(await database.items.count()).toBe(2);
+    const kept = await database.senses.get(existing.id);
+    expect(kept?.term).toBe("Testword0");
+    expect(kept?.definitions).toEqual(["用户导入的释义"]);
   });
 
   it("并发首装加固：起始事务先写 progress=0 占位，早于任何词条落库（RAY-260 suggestion 3）", async () => {

@@ -96,9 +96,19 @@ export type {
   PresetInstallState,
   PresetInstallStatus,
 } from "./presets/install";
-export type { PresetPackage, PresetWordEntry, ThirdPartyDataSource } from "./presets/types";
+export type {
+  PresetPackage,
+  PresetWordEntry,
+  ThirdPartyDataSource,
+  WordbookCategory,
+  WordbookDefinition,
+} from "./presets/types";
 export { THIRD_PARTY_DATA_SOURCES, THIRD_PARTY_NOTICES } from "./presets/notices";
 export { TIER0_PRESET, TIER0_PRESET_ROW_COUNT } from "./presets/tier0";
+// 词书库运行时 API（WORDBOOK_CATALOG / WORDBOOK_POOL / getWordbookPackage 等）
+// 走 "@lexilexi/core/presets/books" 子路径导出：books.data.json 约 2 MB，
+// 静态 re-export 会把词书数据打进所有消费者主 bundle；子路径 + 动态 import
+// 使 Vite 将其拆为按需加载的 async chunk（RAY-262 Oscar 评审 suggestion 3）。
 export {
   getDueItemIds,
   getDueItemIdsInRange,

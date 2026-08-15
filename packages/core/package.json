@@ -8,6 +8,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./presets/books": {
+      "types": "./src/presets/books.ts",
+      "default": "./src/presets/books.ts"
     }
   },
   "main": "./src/index.ts",

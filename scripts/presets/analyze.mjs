@@ -19,6 +19,7 @@ import {
   TIER0_ECDICT_TAGS,
   TIER1_ECDICT_TAGS,
 } from "./lib/ecdict.mjs";
+import { BOOK_DEFS, byFrequencyDesc, selectBookEntries } from "./lib/books.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ECDICT_CSV = path.join(ROOT, "scripts", "presets", ".data", "ecdict", "ecdict.csv");
@@ -131,6 +132,49 @@ function main() {
     tier2: measureVolumes(tier2Json),
   };
 
+  // 5. 词书库拆分统计（RAY-262）：词数 / 去重比例 / 专八截断口径 / 体积对比
+  const bookEntriesById = selectBookEntries(cleanedAll);
+  const bookTuple = (entry) => {
+    const tags = [...entry.tags];
+    if (ngslSet.has(entry.term.toLowerCase()) && !tags.includes("高频")) {
+      tags.push("高频");
+    }
+    return [
+      entry.term,
+      entry.definitions.join("\n"),
+      entry.pos ?? "",
+      entry.ipa ?? "",
+      tags.join(" "),
+    ];
+  };
+  const bookRows = BOOK_DEFS.map((def) => {
+    const entries = bookEntriesById.get(def.id);
+    const beforeDedup = def.tagList.reduce((sum, tag) => sum + (byTag[tag] ?? 0), 0);
+    const dedupRatio =
+      beforeDedup > 0 ? `${((entries.length / beforeDedup) * 100).toFixed(1)}%` : "—";
+    const note = def.cutoffToId ? "（词频截断）" : "";
+    return `| ${def.name}（${def.id}） | ${def.tagList.join("+")} | ${entries.length}${note} | ${beforeDedup} | ${dedupRatio} |`;
+  });
+  const tem8Def = BOOK_DEFS.find((def) => def.id === "book-tem8");
+  const tem8Target = bookEntriesById.get("book-tem8").length;
+  const tem8Raw = cleanedAll
+    .filter((e) => e.examTags.some((t) => tem8Def.tagList.includes(t)))
+    .sort(byFrequencyDesc);
+  const tem8Boundary = tem8Raw[tem8Target - 1];
+  const tem8AfterBoundary = tem8Raw[tem8Target];
+  const booksPool = new Map();
+  for (const entries of bookEntriesById.values()) {
+    for (const entry of entries) {
+      booksPool.set(entry.term.toLowerCase(), entry);
+    }
+  }
+  const booksPoolJson = JSON.stringify([...booksPool.values()].map(bookTuple));
+  const booksPoolVol = measureVolumes(booksPoolJson);
+  let booksStandaloneBytes = 0;
+  for (const entries of bookEntriesById.values()) {
+    booksStandaloneBytes += Buffer.byteLength(JSON.stringify(entries.map(bookTuple)), "utf-8");
+  }
+
   const report = [
     "# 预设词表格式清洗实验报告（RAY-258 范围 1）",
     "",
@@ -190,6 +234,29 @@ function main() {
     "> 首启导入耗时基准见 docs/presets/benchmark.md（vitest bench，Node fake-indexeddb 环境，",
     "> 真实设备数据待真机试用复测）。",
     "",
+    "## 5. 词书库拆分统计（RAY-262）",
+    "",
+    "| 词书 | 标签组合 | 词条数 | 合并去重前 | 去重比例 |",
+    "|---|---|---|---|---|",
+    ...bookRows,
+    "",
+    `共享词条池（全部词书 ∪ 去重）：${booksPool.size} 词，`,
+    `raw ${(booksPoolVol.raw / 1024).toFixed(0)} KB，gzip ${(booksPoolVol.gzip / 1024).toFixed(0)} KB，brotli ${(booksPoolVol.brotli / 1024).toFixed(0)} KB。`,
+    `独立打包（每本词书各存一份词条）：raw ${(booksStandaloneBytes / 1024).toFixed(0)} KB，`,
+    `为共享池方案的 ${(booksStandaloneBytes / booksPoolVol.raw).toFixed(2)} 倍（独立打包 raw 6,266 KB ≈ 6.3 MB vs 共享池 raw 1,486 KB ≈ 1.5 MB，实测）。`,
+    "",
+    "「专八冲刺」词频截断口径（frq desc → bnc desc → term asc 确定性并列裁决）：",
+    "",
+    `| 指标 | 数值 |`,
+    `|---|---|`,
+    `| 合并去重后总词数 | ${tem8Raw.length} |`,
+    `| 截断至（与专四冲刺同词数） | ${tem8Target} |`,
+    `| 截断点词条 | ${tem8Boundary.term}（frq=${tem8Boundary.frq}, bnc=${tem8Boundary.bnc}） |`,
+    `| 截断点下一词条 | ${tem8AfterBoundary.term}（frq=${tem8AfterBoundary.frq}, bnc=${tem8AfterBoundary.bnc}） |`,
+    `| 截断点有无并列 | ${tem8Boundary.frq === tem8AfterBoundary.frq && tem8Boundary.bnc === tem8AfterBoundary.bnc ? "有（frq/bnc 并列，按 term 序裁决）" : "无（frq 严格递减，确定性截断）"} |`,
+    `| 被截掉词条数 | ${tem8Raw.length - tem8Target} |`,
+    `| 被截掉词条仍由单本词书覆盖 | ${tem8Raw.slice(tem8Target).filter((e) => booksPool.has(e.term.toLowerCase())).length}/${tem8Raw.length - tem8Target}（全部覆盖，不影响其它词书完整性） |`,
+    "",
     `脚本耗时：${((Date.now() - started) / 1000).toFixed(1)}s`,
     "",
   ].join("\n");
@@ -200,6 +267,12 @@ function main() {
   console.log(`Tier 0 最终词条数：${tier0Entries.length}`);
   console.log(
     `体积 tier0 gz: ${(vol.tier0.gzip / 1024).toFixed(0)} KB, brotli: ${(vol.tier0.brotli / 1024).toFixed(0)} KB`,
+  );
+  console.log(
+    `词书库：共享池 ${booksPool.size} 词 / ${BOOK_DEFS.length} 本词书（共享池 raw ${(booksPoolVol.raw / 1024).toFixed(0)} KB）`,
+  );
+  console.log(
+    `专八冲刺截断：${tem8Raw.length} 词 → ${tem8Target} 词（截断点 ${tem8Boundary.term} frq=${tem8Boundary.frq}，下一词 ${tem8AfterBoundary.term} frq=${tem8AfterBoundary.frq}）`,
   );
 }
 

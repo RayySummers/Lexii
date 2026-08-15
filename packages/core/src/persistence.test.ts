@@ -222,7 +222,7 @@ describe("suspendItem / unsuspendItem / deleteItem", () => {
   });
 });
 
-describe("schema 版本迁移（v1 → v2 → v3，存量数据保留）", () => {
+describe("schema 版本迁移（v1 → v2 → v3 → v4，存量数据保留）", () => {
   it("v1 旧库打开后自动升级到最新版，存量数据原样保留，meta 表可用", async () => {
     const options = makeOptions();
 
@@ -242,9 +242,9 @@ describe("schema 版本迁移（v1 → v2 → v3，存量数据保留）", () =>
     await legacy.table("events").put(makeReviewEvent(legacyItem.id, legacyItem.senseId));
     legacy.close();
 
-    // 2. 用当前版本打开同一数据库 → Dexie 自动执行 v2/v3 升级
+    // 2. 用当前版本打开同一数据库 → Dexie 自动执行 v2/v3/v4 升级
     const upgraded = openDatabase(options);
-    expect(upgraded.verno).toBe(3);
+    expect(upgraded.verno).toBe(4);
     expect(await upgraded.senses.count()).toBe(1);
     expect(await upgraded.items.count()).toBe(1);
     expect(await upgraded.memoryStates.count()).toBe(1);
@@ -285,9 +285,9 @@ describe("schema 版本迁移（v1 → v2 → v3，存量数据保留）", () =>
     await v2.table("meta").put({ key: "preset:test:progress", value: "7" });
     v2.close();
 
-    // 2. 当前版本打开 → 升级到 v3（memoryStates 增加 fields.due 索引）
+    // 2. 当前版本打开 → 升级到 v4（memoryStates 增加 fields.due 索引）
     const upgraded = openDatabase(options);
-    expect(upgraded.verno).toBe(3);
+    expect(upgraded.verno).toBe(4);
     expect(await upgraded.items.get(legacyItem.id)).toEqual(legacyItem);
     expect(await upgraded.memoryStates.get(legacyItem.id)).toEqual(state);
     expect((await upgraded.meta.get("preset:test:progress"))?.value).toBe("7");
@@ -301,9 +301,9 @@ describe("schema 版本迁移（v1 → v2 → v3，存量数据保留）", () =>
     await upgraded.delete();
   });
 
-  it("全新库直接以 v3 创建（含 meta 表与 fields.due 索引）", async () => {
+  it("全新库直接以 v4 创建（含 meta 表、fields.due 与 senses.term 索引）", async () => {
     const database = freshDatabase();
-    expect(database.verno).toBe(3);
+    expect(database.verno).toBe(4);
     expect(await database.meta.count()).toBe(0);
     // fields.due 索引可用（空库查询不报错即证明索引已建）
     const dueIds = await database.memoryStates
@@ -311,5 +311,52 @@ describe("schema 版本迁移（v1 → v2 → v3，存量数据保留）", () =>
       .belowOrEqual("2999-01-01T00:00:00.000Z")
       .primaryKeys();
     expect(dueIds).toHaveLength(0);
+    // senses.term 索引可用（词书安装查重依赖；空库查询不报错即证明索引已建）
+    const terms = await database.senses.where("term").equals("apple").primaryKeys();
+    expect(terms).toHaveLength(0);
+  });
+
+  it("v3 旧库升级到 v4：senses.term 索引自动建立，存量数据保留且可索引查询（RAY-262）", async () => {
+    const options = makeOptions();
+
+    // 1. 按 v3 schema 建库（RAY-260 形态）并写入存量数据
+    const v3 = new Dexie("lexilexi", options);
+    v3.version(1).stores({
+      items: "id",
+      senses: "id",
+      memoryStates: "id",
+      events: "id, time, type",
+    });
+    v3.version(2).stores({
+      items: "id",
+      senses: "id",
+      memoryStates: "id",
+      events: "id, time, type",
+      meta: "key",
+    });
+    v3.version(3).stores({
+      items: "id",
+      senses: "id",
+      memoryStates: "id, fields.due",
+      events: "id, time, type",
+      meta: "key",
+    });
+    await v3.open();
+    const sense = makeSense();
+    await v3.table("senses").put(sense);
+    await v3.table("items").put(makeLearningItem(sense.id));
+    await v3.table("meta").put({ key: "preset:test:done", value: "1.0.0" });
+    v3.close();
+
+    // 2. 当前版本打开 → 升级到 v4（senses 增加 term 索引），存量数据原样保留
+    const upgraded = openDatabase(options);
+    expect(upgraded.verno).toBe(4);
+    expect(await upgraded.senses.get(sense.id)).toEqual(sense);
+    expect((await upgraded.meta.get("preset:test:done"))?.value).toBe("1.0.0");
+
+    // 3. 升级后 term 索引可查询存量记录（词书安装去重依赖）
+    const terms = await upgraded.senses.where("term").equals(sense.term).primaryKeys();
+    expect(terms).toContain(sense.id);
+    await upgraded.delete();
   });
 });

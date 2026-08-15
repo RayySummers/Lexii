@@ -37,6 +37,8 @@ function makeSettingsProviderFactory() {
     exportWordlistCsv: vi.fn().mockResolvedValue("term,definition,pos"),
     importBackup: vi.fn().mockResolvedValue({ items: 0, senses: 0, memoryStates: 0, events: 0 }),
     getPresetSummaries: vi.fn().mockResolvedValue([]),
+    getWordbookSummaries: vi.fn().mockResolvedValue([]),
+    installWordbook: vi.fn().mockResolvedValue({ installedCount: 0, skippedCount: 0 }),
   };
   return { provider, factory: vi.fn().mockReturnValue(provider) };
 }

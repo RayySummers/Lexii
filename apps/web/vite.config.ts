@@ -19,6 +19,13 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
   },
+  // 体积告警阈值：词书数据惰性 chunk（约 1.99 MB，仅打开词书库时加载）
+  // 是拆包后的固有体积，持续触发默认 500 KB 告警属噪声。主 bundle 回退
+  // 由 build 脚本末尾的 verify-bundle-split.mjs 硬校验（< 1.5 MB）兜底，
+  // 故全局阈值提到 2.5 MB 只消噪声、不放水。
+  build: {
+    chunkSizeWarningLimit: 2500,
+  },
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
