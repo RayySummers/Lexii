@@ -46,6 +46,20 @@ export interface Sense {
   pos?: string;
   /** 音标（可选） */
   ipa?: string;
+  /** 美式音标（可选，富化数据提供；UI 优先展示双音标，缺省回退 ipa） */
+  ipaUs?: string;
+  /** 英式音标（可选，富化数据提供） */
+  ipaUk?: string;
+  /** 近义词（可选，富化数据提供） */
+  synonyms?: string[];
+  /** 反义词（可选，富化数据提供） */
+  antonyms?: string[];
+  /** 派生词（可选，富化数据提供） */
+  derived?: string[];
+  /** 词根词缀拆解（可选，富化数据提供，如 "a<加强> · bandon<控制>"） */
+  wordParts?: string;
+  /** 中文词源说明（可选，富化数据提供） */
+  etymologyZh?: string;
   /** 发音文件（可选，本地 Blob URL） */
   audioUrl?: string;
   /** 词源（可选，YAML 前端不导入则缺省） */

@@ -3,11 +3,16 @@ dist/
 coverage/
 pnpm-lock.yaml
 
+# vendored 第三方代码（seek-bzip，MIT）：原样保留上游源码
+scripts/presets/lib/vendor/
+
 # 脚本生成的产物与 vendored 数据（scripts/presets 管线生成，不手改格式）
 packages/core/src/presets/tier0.data.json
 packages/core/src/presets/books.data.json
+packages/core/src/presets/enrichment.tier0.data.json
 docs/presets/experiment.md
 docs/presets/quality-check.md
+docs/presets/experiment-enrichment.md
 scripts/presets/sources/ngsl/NGSL_12_stats.csv
 scripts/presets/.data/
 scripts/presets/output/

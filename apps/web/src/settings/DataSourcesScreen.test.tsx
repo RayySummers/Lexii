@@ -94,7 +94,8 @@ describe("DataSourcesScreen", () => {
 
     expect(await screen.findByText("MIT")).toBeInTheDocument();
     expect(screen.getAllByText("CC BY-SA 4.0").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByRole("link", { name: "来源主页" }).length).toBe(3);
+    // 六个来源（ECDICT / NGSL / Wiktionary / Tatoeba / ipa-dict / OpenEtymology）
+    expect(screen.getAllByRole("link", { name: "来源主页" }).length).toBe(6);
     // 署名文本同时出现在来源卡片与 NOTICE 全文，允许多处匹配
     expect(
       screen.getAllByText(/Browne, C\., Culligan, B\. & Phillips, J\./).length,

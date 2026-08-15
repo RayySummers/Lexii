@@ -10,7 +10,7 @@
  */
 import { newCardFields } from "@lexilexi/fsrs";
 import { DEFAULT_WORDLIST_LANG, parseCsvWordlist } from "./csv";
-import type { IsoDate, LanguageCode, LearningItem, Sense } from "./domain";
+import type { ExampleSentence, IsoDate, LanguageCode, LearningItem, Sense } from "./domain";
 import { createId, toEventId, toItemId, toSenseId } from "./id";
 import type { MemoryState } from "./memory";
 import type { LexilexiDatabase } from "./persistence";
@@ -81,13 +81,23 @@ export async function importCsvWordlist(
   return { importedCount: entries.length, itemIds };
 }
 
-/** 词条内容（CSV 行 / 预设词表条目共用：义项快照的输入形态） */
+/** 词条内容（CSV 行 / 预设词表条目 / 富化合并共用：义项快照的输入形态） */
 export interface WordEntryContent {
   term: string;
   definitions: string[];
   pos?: string;
   ipa?: string;
   tags?: string[];
+  /** 富化字段（可选，见 presets/enrichment.ts 的合并口径） */
+  ipaUs?: string;
+  ipaUk?: string;
+  synonyms?: string[];
+  antonyms?: string[];
+  derived?: string[];
+  etymology?: string;
+  wordParts?: string;
+  etymologyZh?: string;
+  examples?: ExampleSentence[];
 }
 
 /** 词条内容 → Sense（内容快照；释义用全角分号拆分多条） */
@@ -99,8 +109,16 @@ export function toSense(entry: WordEntryContent, lang: LanguageCode): Sense {
     definitions: entry.definitions,
     ...(entry.pos ? { pos: entry.pos } : {}),
     ...(entry.ipa ? { ipa: entry.ipa } : {}),
+    ...(entry.ipaUs ? { ipaUs: entry.ipaUs } : {}),
+    ...(entry.ipaUk ? { ipaUk: entry.ipaUk } : {}),
+    ...(entry.synonyms ? { synonyms: entry.synonyms } : {}),
+    ...(entry.antonyms ? { antonyms: entry.antonyms } : {}),
+    ...(entry.derived ? { derived: entry.derived } : {}),
+    ...(entry.etymology ? { etymology: entry.etymology } : {}),
+    ...(entry.wordParts ? { wordParts: entry.wordParts } : {}),
+    ...(entry.etymologyZh ? { etymologyZh: entry.etymologyZh } : {}),
     tags: entry.tags ?? [],
-    examples: [],
+    examples: entry.examples ?? [],
   };
 }
 

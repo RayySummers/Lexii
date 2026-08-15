@@ -1,17 +1,27 @@
 /**
- * 首启预设词表引导（RAY-258 Tier 0 内置核心词表）。
+ * 首启预设词表引导（RAY-258 Tier 0 内置核心词表 + RAY-268 富化数据）。
  *
  * 口径：开箱零网络即可完整使用核心学习流程（local-first）。
- * - 全新数据库（无任何条目与事件）→ 安装 Tier 0 预设词表；
- * - 已有数据（老用户 / 已导入过词库）→ 跳过，绝不擅自塞词；
- * - 安装中曾中断 → 从进度断点续装（installPreset 的可恢复契约）；
+ * - 全新数据库（无任何条目与事件）→ 安装 Tier 0 预设词表，富化字段
+ *   随安装内联填充（installPreset 的 options.enrichment）；
+ * - 已有数据（老用户 / 已导入过词库）→ 跳过安装，绝不擅自塞词；
+ *   富化字段由 backfillEnrichment 回填（只补字段、不新增词条、不清库）；
+ * - 安装/回填中曾中断 → 从进度断点续装（installPreset /
+ *   backfillEnrichment 的可恢复契约，幂等）；
  * - 任何失败都不阻塞启动（fire-and-forget，错误仅记录 console）。
  *
- * 数据层算法全部在 @lexilexi/core（getPresetInstallState / installPreset），
- * 本模块只做「何时装」的产品口径判断（apps/web 不做算法实现）。
+ * 数据层算法全部在 @lexilexi/core（getPresetInstallState / installPreset /
+ * backfillEnrichment），本模块只做「何时装/填」的产品口径判断
+ * （apps/web 不做算法实现）。
  */
-import { getPresetInstallState, installPreset, openDatabase, TIER0_PRESET } from "@lexilexi/core";
-import type { LexilexiDatabase, PresetPackage } from "@lexilexi/core";
+import {
+  backfillEnrichment,
+  getPresetInstallState,
+  installPreset,
+  openDatabase,
+  TIER0_PRESET,
+} from "@lexilexi/core";
+import type { EnrichmentPresetPackage, LexilexiDatabase, PresetPackage } from "@lexilexi/core";
 
 export type BootstrapOutcome =
   | { status: "installed"; installedCount: number }
@@ -24,10 +34,12 @@ export type BootstrapOutcome =
  *
  * @param db 已打开的数据库（测试注入 fake-indexeddb 实例）
  * @param preset 内置预设包（默认 Tier 0 核心词表；测试注入小包）
+ * @param enrichment 富化数据包（可选；随安装内联填充新装词条）
  */
 export async function bootstrapPresetData(
   db: LexilexiDatabase,
   preset: PresetPackage = TIER0_PRESET,
+  enrichment?: EnrichmentPresetPackage,
 ): Promise<BootstrapOutcome> {
   try {
     const state = await getPresetInstallState(db, preset);
@@ -40,7 +52,7 @@ export async function bootstrapPresetData(
         return { status: "skipped-existing-data" };
       }
     }
-    const result = await installPreset(db, preset);
+    const result = await installPreset(db, preset, enrichment ? { enrichment } : {});
     return result.status === "installed"
       ? { status: "installed", installedCount: result.installedCount }
       : { status: "already-installed" };
@@ -53,7 +65,7 @@ export async function bootstrapPresetData(
 }
 
 /**
- * 浏览器入口（main.tsx 启动时调用）：打开默认数据库并后台安装。
+ * 浏览器入口（main.tsx 启动时调用）：打开默认数据库并后台安装 + 富化回填。
  * 绝不抛错、绝不阻塞启动；失败静默记录（首启安装失败不影响已有功能，
  * 用户仍可手动导入词库）。
  */
@@ -61,9 +73,19 @@ export function bootstrapTier0Preset(db?: LexilexiDatabase): void {
   void (async () => {
     try {
       const database = db ?? openDatabase();
-      const outcome = await bootstrapPresetData(database);
+      // 富化数据包按需加载（子路径 + 动态 import，MB 级 JSON 不进主 bundle，
+      // 与词书库 books.data.json 同口径）
+      const { ENRICHMENT_TIER0_PRESET } = await import("@lexilexi/core/presets/enrichment");
+      const outcome = await bootstrapPresetData(database, TIER0_PRESET, ENRICHMENT_TIER0_PRESET);
       if (outcome.status === "error") {
         console.error("[presets] 内置核心词表安装失败：", outcome.message);
+      }
+      // 富化回填（RAY-268 存量库路径）：按 term 补字段，幂等
+      // （enrichment:<id>:done 标记命中即跳过），新装词条已在安装时内联
+      // 填充，回填只改「缺失/为空」的字段，两路径口径一致。
+      const backfill = await backfillEnrichment(database, ENRICHMENT_TIER0_PRESET);
+      if (backfill.status === "backfilled" && backfill.filledCount > 0) {
+        console.info(`[presets] 富化回填完成：${backfill.filledCount} 条词条`);
       }
     } catch (err) {
       console.error("[presets] 内置核心词表引导异常：", err);

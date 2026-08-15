@@ -49,19 +49,33 @@ interface Sense {
   definitions: string[]; // 中文释义，≥1 条（第一条为主释义）
   pos?: string; // 词性，如 "n." / "v."（导入词库通常有）
   ipa?: string; // 音标
+  ipaUs?: string; // 美式音标（富化数据；UI 优先展示双音标，缺省回退 ipa）
+  ipaUk?: string; // 英式音标（富化数据）
+  synonyms?: string[]; // 近义词（富化数据）
+  antonyms?: string[]; // 反义词（富化数据）
+  derived?: string[]; // 派生词（富化数据）
+  wordParts?: string; // 词根词缀拆解，如 "a<加强> · bandon<控制>"（富化数据）
+  etymologyZh?: string; // 中文词源说明（富化数据）
   audioUrl?: string; // 发音文件（PWA 内本地 Blob URL）
-  etymology?: string; // 词源（YAML 前端不导入则缺省）
+  etymology?: string; // 词源（YAML 前端不导入则缺省；富化包为英文词源文本）
   tags: string[]; // 如 ["四级", "高频"]
   examples: ExampleSentence[];
 }
 interface ExampleSentence {
   text: string; // 英文例句
-  translation: string; // 中文翻译
+  translation: string; // 中文翻译（富化包 kaikki 补足句可为空串）
 }
 ```
 
 - Sense 是**内容**，不含任何调度状态。内容修正（改释义、补例句）直接 `put`，不影响调度。
 - `audioUrl` 不得指向外部服务（local-first 红线）。
+- 富化字段（RAY-268 批次 A：`ipaUs`/`ipaUk`/`synonyms`/`antonyms`/`derived`/
+  `wordParts`/`etymologyZh`）为**记录级可选字段**，不涉及新索引、不改表结构，
+  因此不触发 IndexedDB schema 版本迁移（与 learningSteps 等记录级字段演进的
+  先例一致）；存量库通过 `backfillEnrichment` 按 `senses.term` 索引回填
+  （只补「缺失/为空」的字段，绝不覆盖用户既有内容，不清库）。
+- 富化字段缺失即未提供：UI 与导出路径按可选字段处理（导出/导入整体序列化
+  Sense 记录，新字段自动往返）。
 
 ## 5. Memory State
 

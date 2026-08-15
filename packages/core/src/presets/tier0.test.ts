@@ -102,9 +102,9 @@ describe("TIER0_PRESET（内置核心词表）", () => {
 });
 
 describe("第三方数据来源登记（数据来源与许可页的事实层）", () => {
-  it("登记 ECDICT / NGSL / Wiktionary 三项，许可与出处可核对", () => {
+  it("登记 ECDICT / NGSL / Wiktionary / Tatoeba / ipa-dict / OpenEtymology，许可与出处可核对", () => {
     const ids = THIRD_PARTY_DATA_SOURCES.map((source) => source.id);
-    expect(ids).toEqual(["ecdict", "ngsl", "wiktionary"]);
+    expect(ids).toEqual(["ecdict", "ngsl", "wiktionary", "tatoeba", "ipa-dict", "openetymology"]);
     for (const source of THIRD_PARTY_DATA_SOURCES) {
       expect(source.license).toBeTruthy();
       expect(source.licenseUrl).toMatch(/^https:\/\//);
@@ -113,19 +113,32 @@ describe("第三方数据来源登记（数据来源与许可页的事实层）"
     }
   });
 
-  it("Tier 0 随包分发的来源包含 ECDICT 与 NGSL，不含 Wiktionary（仅交叉校验）", () => {
+  it("Tier 0 随包分发的来源包含 ECDICT 与 NGSL；富化来源随富化包分发（RAY-268）", () => {
     const ecdict = THIRD_PARTY_DATA_SOURCES.find((source) => source.id === "ecdict");
     const ngsl = THIRD_PARTY_DATA_SOURCES.find((source) => source.id === "ngsl");
     const wikt = THIRD_PARTY_DATA_SOURCES.find((source) => source.id === "wiktionary");
+    const tatoeba = THIRD_PARTY_DATA_SOURCES.find((source) => source.id === "tatoeba");
+    const ipaDict = THIRD_PARTY_DATA_SOURCES.find((source) => source.id === "ipa-dict");
+    const openEtymology = THIRD_PARTY_DATA_SOURCES.find((source) => source.id === "openetymology");
     expect(ecdict?.bundledIn).toContain("core-en-tier0");
     expect(ngsl?.bundledIn).toContain("core-en-tier0");
-    expect(wikt?.bundledIn).toEqual([]);
+    // Wiktionary 已随富化包分发（本阶段由「仅交叉校验」转为富化数据源）
+    expect(wikt?.bundledIn).toEqual(["core-en-tier0-enrichment", "core-en-tier1-enrichment"]);
+    expect(tatoeba?.bundledIn).toEqual(["core-en-tier0-enrichment", "core-en-tier1-enrichment"]);
+    expect(ipaDict?.bundledIn).toEqual(["core-en-tier0-enrichment", "core-en-tier1-enrichment"]);
+    expect(openEtymology?.bundledIn).toEqual([
+      "core-en-tier0-enrichment",
+      "core-en-tier1-enrichment",
+    ]);
   });
 
-  it("NOTICE 包含 MIT 版权声明与 NGSL 署名义务文本", () => {
+  it("NOTICE 包含 MIT 版权声明、NGSL 署名义务与富化来源署名文本", () => {
     expect(THIRD_PARTY_NOTICES).toContain("MIT License");
     expect(THIRD_PARTY_NOTICES).toContain("Copyright (c) 2025 Linwei");
     expect(THIRD_PARTY_NOTICES).toContain("Browne, C., Culligan, B. & Phillips, J.");
     expect(THIRD_PARTY_NOTICES).toContain("CC BY-SA 4.0");
+    expect(THIRD_PARTY_NOTICES).toContain("Tatoeba");
+    expect(THIRD_PARTY_NOTICES).toContain("ipa-dict");
+    expect(THIRD_PARTY_NOTICES).toContain("OpenEtymology");
   });
 });
