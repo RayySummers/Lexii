@@ -177,12 +177,11 @@ function validateGradeReviewInput(input: GradeReviewInput): void {
  * 查询到期条目 id（due <= now 的全部记忆状态；MVP 新卡 due 为导入时刻，
  * 导入即到期。学习步骤中的卡片到期时间由 FSRS 排期决定）。
  *
- * 性能说明（评审建议 #4）：filter 是 Dexie 全表扫描，MVP 词库规模（数百条目）
- * 无碍；词库变大后应给 fields.due 建索引（需走 DB schema 版本迁移）或改
- * bounds 查询，届时本条注释随实现一起更新。
+ * 查询走 fields.due 索引（DB schema v3，RAY-260 评审 suggestion 2）：
+ * belowOrEqual 区间查询，不再是 filter 全表扫描。
  */
 export async function getDueItemIds(db: LexilexiDatabase, now: IsoDate): Promise<ItemId[]> {
-  const due = await db.memoryStates.filter((state) => state.fields.due <= now).toArray();
+  const due = await db.memoryStates.where("fields.due").belowOrEqual(now).toArray();
   return due.map((state) => state.itemId);
 }
 
@@ -204,16 +203,28 @@ export const INTERLEAVE_REVIEW_STEP = 2;
  * - mixed：复习卡为主干，每 INTERLEAVE_REVIEW_STEP 张复习卡穿插 1 张
  *   新词卡；任一侧耗尽后按序补齐另一侧（interleaveCards 纯函数）。
  *
+ * 每日新卡上限（RAY-260 评审 suggestion 2）：`options.newCardLimit` 提供时，
+ * 新词在按 due 升序排序后截取前 N 条（learn 与 mixed 均生效；review 模式
+ * 不含新词、不受影响）。N 由调用方按「每日上限 − 今日已学新词数」折算后
+ * 传入，core 只做截取，不持有产品口径（默认值 20/日 与设置存储都在
+ * apps/web）。
+ *
  * 排序为（due, createdAt）双键——新卡 due 与 createdAt 同源（导入时刻），
  * 同一批导入的新词按导入顺序稳定；同 due 的复习卡按记忆状态创建时间决胜，
  * 与 UI 层旧排序口径保持一致。
  */
+export interface StudyQueueOptions {
+  /** 每日新卡上限（按 due 升序截取前 N 条新词；undefined = 不限制） */
+  newCardLimit?: number;
+}
+
 export async function getStudyQueueItemIds(
   db: LexilexiDatabase,
   now: IsoDate,
   mode: StudyMode,
+  options: StudyQueueOptions = {},
 ): Promise<ItemId[]> {
-  const dueStates = await db.memoryStates.filter((state) => state.fields.due <= now).toArray();
+  const dueStates = await db.memoryStates.where("fields.due").belowOrEqual(now).toArray();
   const newStates: MemoryState[] = [];
   const reviewStates: MemoryState[] = [];
   for (const state of dueStates) {
@@ -225,7 +236,10 @@ export async function getStudyQueueItemIds(
   }
   newStates.sort(compareStatesByDue);
   reviewStates.sort(compareStatesByDue);
-  const newIds = newStates.map((state) => state.itemId);
+  const { newCardLimit } = options;
+  const cappedNewStates =
+    newCardLimit !== undefined && newCardLimit >= 0 ? newStates.slice(0, newCardLimit) : newStates;
+  const newIds = cappedNewStates.map((state) => state.itemId);
   const reviewIds = reviewStates.map((state) => state.itemId);
   switch (mode) {
     case "learn":
@@ -276,15 +290,14 @@ function compareStatesByDue(a: MemoryState, b: MemoryState): number {
  * @lexilexi/stats 的 localDayBounds 换算（本地日 00:00 到次日 00:00），
  * 与夏令时无关。
  *
- * 性能说明同 getDueItemIds：filter 为 Dexie 全表扫描，MVP 词库规模无碍。
+ * 查询走 fields.due 索引（DB schema v3，RAY-260）：between 区间查询
+ * （含下界、不含上界），与 filter 半开区间口径完全一致。
  */
 export async function getDueItemIdsInRange(
   db: LexilexiDatabase,
   from: IsoDate,
   to: IsoDate,
 ): Promise<ItemId[]> {
-  const due = await db.memoryStates
-    .filter((state) => state.fields.due >= from && state.fields.due < to)
-    .toArray();
+  const due = await db.memoryStates.where("fields.due").between(from, to, true, false).toArray();
   return due.map((state) => state.itemId);
 }

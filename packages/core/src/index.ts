@@ -106,4 +106,9 @@ export {
   gradeReview,
   memoryFieldsToCardInput,
 } from "./studyLoop";
-export type { GradeReviewInput, GradeReviewResult, StudyMode } from "./studyLoop";
+export type {
+  GradeReviewInput,
+  GradeReviewResult,
+  StudyMode,
+  StudyQueueOptions,
+} from "./studyLoop";

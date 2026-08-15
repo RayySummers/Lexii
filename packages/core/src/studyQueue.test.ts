@@ -192,4 +192,78 @@ describe("getStudyQueueItemIds（学习 / 复习 / 混合三模式）", () => {
     expect(await getStudyQueueItemIds(database, NOW, "review")).toEqual([]);
     expect(await getStudyQueueItemIds(database, NOW, "mixed")).toEqual([]);
   });
+
+  describe("每日新卡上限（RAY-260 评审 suggestion 2）", () => {
+    it("learn：newCardLimit 截取 due 升序前 N 条新词", async () => {
+      const database = freshDatabase();
+      const ids = await seed(database, [
+        { id: "a", due: "2026-08-13T08:00:00.000Z", reps: 0 },
+        { id: "b", due: "2026-08-13T09:00:00.000Z", reps: 2 },
+        { id: "c", due: "2026-08-13T10:00:00.000Z", reps: 0 },
+        { id: "d", due: "2026-08-13T11:00:00.000Z", reps: 0 },
+        { id: "e", due: "2026-08-13T12:00:00.000Z", reps: 0 },
+      ]);
+
+      expect(await getStudyQueueItemIds(database, NOW, "learn", { newCardLimit: 2 })).toEqual([
+        idOf(ids, "a"),
+        idOf(ids, "c"),
+      ]);
+      // 未设上限：全部新词照常返回
+      expect(await getStudyQueueItemIds(database, NOW, "learn")).toEqual([
+        idOf(ids, "a"),
+        idOf(ids, "c"),
+        idOf(ids, "d"),
+        idOf(ids, "e"),
+      ]);
+    });
+
+    it("mixed：新词侧受 newCardLimit 限制，复习侧不受影响", async () => {
+      const database = freshDatabase();
+      const ids = await seed(database, [
+        { id: "a", due: "2026-08-13T08:00:00.000Z", reps: 0 },
+        { id: "b", due: "2026-08-13T09:00:00.000Z", reps: 2 },
+        { id: "c", due: "2026-08-13T10:00:00.000Z", reps: 0 },
+        { id: "d", due: "2026-08-13T11:00:00.000Z", reps: 5 },
+        { id: "e", due: "2026-08-13T12:00:00.000Z", reps: 0 },
+      ]);
+
+      // 新词 3 张、限 1：只穿插最早到期的一张新词
+      expect(await getStudyQueueItemIds(database, NOW, "mixed", { newCardLimit: 1 })).toEqual([
+        idOf(ids, "b"),
+        idOf(ids, "d"),
+        idOf(ids, "a"),
+      ]);
+    });
+
+    it("newCardLimit = 0：新词清零，复习照常", async () => {
+      const database = freshDatabase();
+      const ids = await seed(database, [
+        { id: "a", due: "2026-08-13T08:00:00.000Z", reps: 0 },
+        { id: "b", due: "2026-08-13T09:00:00.000Z", reps: 2 },
+      ]);
+
+      expect(await getStudyQueueItemIds(database, NOW, "learn", { newCardLimit: 0 })).toEqual([]);
+      expect(await getStudyQueueItemIds(database, NOW, "mixed", { newCardLimit: 0 })).toEqual([
+        idOf(ids, "b"),
+      ]);
+      expect(await getStudyQueueItemIds(database, NOW, "review", { newCardLimit: 0 })).toEqual([
+        idOf(ids, "b"),
+      ]);
+    });
+
+    it("review 模式不含新词，newCardLimit 对其无影响", async () => {
+      const database = freshDatabase();
+      const ids = await seed(database, [
+        { id: "b", due: "2026-08-13T09:00:00.000Z", reps: 2 },
+        { id: "d", due: "2026-08-13T11:00:00.000Z", reps: 5 },
+        { id: "e", due: "2026-08-13T12:00:00.000Z", reps: 1 },
+      ]);
+
+      expect(await getStudyQueueItemIds(database, NOW, "review", { newCardLimit: 1 })).toEqual([
+        idOf(ids, "b"),
+        idOf(ids, "d"),
+        idOf(ids, "e"),
+      ]);
+    });
+  });
 });
