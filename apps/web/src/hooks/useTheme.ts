@@ -105,10 +105,17 @@ export function useTheme(): UseThemeResult {
   }, [preference]);
 
   // 跨标签页同步（评审 suggestion 1）：storage 事件只在本页之外写入时触发，
-  // 本页自身的持久化不会触发本页监听；键匹配时采用新偏好，键被清除时回落默认，
-  // 非法值忽略。同值写入不会产生状态变化（React 状态相同即跳过）。
+  // 本页自身的持久化不会触发本页监听。三种情形分别处理：
+  // - key === null：其他标签页执行 storage.clear()（全清），偏好必然被清空，
+  //   与 removeItem 同样回落默认「跟随系统」（复审补充 nit）
+  // - key 匹配且值合法：采用新偏好；key 匹配但值被移除（null）：回落默认
+  // - 无关 key / 非法值：忽略。同值写入不会产生状态变化（React 状态相同即跳过）。
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
+      if (event.key === null) {
+        setPreference(DEFAULT_THEME_PREFERENCE);
+        return;
+      }
       if (event.key !== THEME_STORAGE_KEY) {
         return;
       }

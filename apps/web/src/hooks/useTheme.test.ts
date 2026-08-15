@@ -297,6 +297,27 @@ describe("useTheme", () => {
       expect(result.current.preference).toBe("system");
       expect(result.current.theme).toBe("light");
     });
+
+    it("其他标签页 storage.clear() 全清（key === null）时回落默认「跟随系统」（复审补充 nit）", () => {
+      installMediaQuery(false);
+      const { result } = renderHook(() => useTheme());
+      act(() => {
+        result.current.setPreference("dark");
+      });
+      expect(result.current.preference).toBe("dark");
+
+      act(() => {
+        window.dispatchEvent(
+          new StorageEvent("storage", {
+            key: null,
+            oldValue: null,
+            newValue: null,
+          }),
+        );
+      });
+      expect(result.current.preference).toBe("system");
+      expect(result.current.theme).toBe("light"); // 系统浅色（mock）
+    });
   });
 
   it("localStorage 写入被禁用时不崩溃，setPreference 照常生效", () => {
