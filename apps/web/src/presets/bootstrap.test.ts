@@ -167,27 +167,23 @@ describe("bootstrapPresetData（首启内置词表引导）", () => {
 });
 
 describe("bootstrapTier0Preset（入口：新装写完成标记跳过存量回填，suggestion 3）", () => {
-  it(
-    "全新库：安装内联富化后写完成标记，不再跑全量回填",
-    async () => {
-      const database = freshDatabase();
-      bootstrapTier0Preset(database);
-      // fire-and-forget 入口：等待完成标记落库（真实 Tier 0 全量安装，
-      // fake-indexeddb 口径 ~1.3s；全套件并行下放宽到 60s）
-      await vi.waitFor(
-        async () => {
-          const done = await database.meta.get(enrichmentDoneKey("web-test-enrichment"));
-          expect(done?.value).toBe("1.0.0");
-        },
-        { timeout: 30_000, interval: 50 },
-      );
-      // mock 富化包覆盖词表首词 "a"：安装时已内联填充
-      const sense = await database.senses.filter((s) => s.term === "a").first();
-      expect(sense?.ipaUs).toBe("/uˈes-mock/");
-      // 完成标记写入即清理残留进度
-      const progress = await database.meta.get(enrichmentProgressKey("web-test-enrichment"));
-      expect(progress).toBeUndefined();
-    },
-    60_000,
-  );
+  it("全新库：安装内联富化后写完成标记，不再跑全量回填", async () => {
+    const database = freshDatabase();
+    bootstrapTier0Preset(database);
+    // fire-and-forget 入口：等待完成标记落库（真实 Tier 0 全量安装，
+    // fake-indexeddb 口径 ~1.3s；全套件并行下放宽到 60s）
+    await vi.waitFor(
+      async () => {
+        const done = await database.meta.get(enrichmentDoneKey("web-test-enrichment"));
+        expect(done?.value).toBe("1.0.0");
+      },
+      { timeout: 30_000, interval: 50 },
+    );
+    // mock 富化包覆盖词表首词 "a"：安装时已内联填充
+    const sense = await database.senses.filter((s) => s.term === "a").first();
+    expect(sense?.ipaUs).toBe("/uˈes-mock/");
+    // 完成标记写入即清理残留进度
+    const progress = await database.meta.get(enrichmentProgressKey("web-test-enrichment"));
+    expect(progress).toBeUndefined();
+  }, 60_000);
 });

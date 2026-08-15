@@ -300,8 +300,7 @@ export function mergeEnrichmentIntoSense(
 
 /** 回填结果 */
 export type EnrichmentBackfillResult =
-  | { status: "backfilled"; filledCount: number }
-  | { status: "already-backfilled"; version: string };
+  { status: "backfilled"; filledCount: number } | { status: "already-backfilled"; version: string };
 
 /** 回填选项 */
 export interface EnrichmentBackfillOptions {

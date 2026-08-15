@@ -287,7 +287,9 @@ describe("backfillEnrichment（存量库回填）", () => {
     const database = freshDatabase();
     await installPreset(database, makeWordPreset(makeWordEntries(1)), { yield: async () => {} });
     // v1 只带 ipaUs
-    const pkgV1 = makeEnrichmentPreset([["testword0", "/uˈes-v1/", "", "", "", "", "", "", "", []]]);
+    const pkgV1 = makeEnrichmentPreset([
+      ["testword0", "/uˈes-v1/", "", "", "", "", "", "", "", []],
+    ]);
     await backfillEnrichment(database, pkgV1, { yield: async () => {} });
 
     // 同版本 → 跳过
