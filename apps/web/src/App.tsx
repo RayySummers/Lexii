@@ -17,8 +17,9 @@
  */
 import { useCallback, useState } from "react";
 import type { StudyMode } from "@lexilexi/core";
-import { HomeScreen } from "./HomeScreen";
+import { HomeScreen, type StudyFormat } from "./HomeScreen";
 import { useTheme } from "./hooks/useTheme";
+import { QuizScreen } from "./review/QuizScreen";
 import { ReviewScreen } from "./review/ReviewScreen";
 import { createDefaultReviewDataProvider } from "./review/data";
 import type { ReviewDataProvider } from "./review/types";
@@ -52,11 +53,13 @@ export function App({
   const statsProvider = useStatsProvider(statsProviderFactory);
   const [view, setView] = useState<View>("home");
   const [reviewMode, setReviewMode] = useState<StudyMode>("review");
+  const [studyFormat, setStudyFormat] = useState<StudyFormat>("card");
 
   const startStudy = useCallback(
-    (mode: StudyMode) => {
+    (mode: StudyMode, format: StudyFormat) => {
       setReviewProvider((current) => current ?? reviewProviderFactory());
       setReviewMode(mode);
+      setStudyFormat(format);
       setView("review");
     },
     [reviewProviderFactory],
@@ -97,7 +100,11 @@ export function App({
       </header>
 
       {view === "review" && reviewProvider ? (
-        <ReviewScreen provider={reviewProvider} mode={reviewMode} onExit={goHome} />
+        studyFormat === "quiz" ? (
+          <QuizScreen provider={reviewProvider} mode={reviewMode} onExit={goHome} />
+        ) : (
+          <ReviewScreen provider={reviewProvider} mode={reviewMode} onExit={goHome} />
+        )
       ) : view === "settings" && settingsProvider ? (
         <SettingsScreen
           provider={settingsProvider}

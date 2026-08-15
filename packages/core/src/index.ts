@@ -146,3 +146,5 @@ export type {
   StudyMode,
   StudyQueueOptions,
 } from "./studyLoop";
+export { editDistance, generateOptions } from "./distractors";
+export type { DistractorOption } from "./distractors";

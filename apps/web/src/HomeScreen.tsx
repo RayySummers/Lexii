@@ -1,5 +1,6 @@
 /**
- * 首页：三模式入口（学习 / 复习 / 混合）+ 今日待学徽标 + 今日新卡额度提示。
+ * 首页：三模式入口（学习 / 复习 / 混合）+ 学习形式切换（卡片 / 选择题）
+ *      + 今日待学徽标 + 今日新卡额度提示。
  *
  * RAY-253 反馈 1：首页保持简洁——不显示品牌名与介绍文案（原文已归档到
  * docs/archive/homepage-intro-v1.md，供以后建站使用），只保留三个模式按钮。
@@ -12,20 +13,26 @@
  * 20）。三模式入口下方补一行「今日新卡额度剩余 N 张」，注明超出顺延，
  * 降低用户困惑——额度 = 设置上限 − 今日已学新词（stats.todayLearnCount）。
  *
+ * RAY-269：新增选择题学习模式。首页添加学习形式切换（卡片 / 选择题），
+ * 用户可先选形式再选模式。默认卡片形式（向后兼容）。
+ *
  * - 待学徽标数据经 StatsDataProvider（statsProvider 为 null 时不展示，
  *   如无 IndexedDB 的测试环境）；
- * - 仅承载展示与导航，队列数据一律由 ReviewScreen 按模式加载；
+ * - 仅承载展示与导航，队列数据一律由 ReviewScreen / QuizScreen 按模式加载；
  * - 全部颜色走 design tokens（浅色/深色两套自动生效）。
  */
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { StudyMode } from "@lexilexi/core";
 import { readDailyNewCardLimit } from "./lib/dailyNewCardLimit";
 import { useStats } from "./stats/useStats";
 import type { StatsDataProvider } from "./stats/types";
 
+/** 学习形式：卡片翻转 vs 选择题 */
+export type StudyFormat = "card" | "quiz";
+
 export interface HomeScreenProps {
-  /** 进入对应学习模式（学习 / 复习 / 混合） */
-  onStart(mode: StudyMode): void;
+  /** 进入对应学习模式（学习 / 复习 / 混合）与形式（卡片 / 选择题） */
+  onStart(mode: StudyMode, format: StudyFormat): void;
   /** 统计数据源（今日待学徽标；null = 环境不支持，不展示徽标） */
   statsProvider: StatsDataProvider | null;
 }
@@ -37,17 +44,48 @@ const MODES = [
   { mode: "mixed", title: "混合", subtitle: "复习穿插新词" },
 ] as const satisfies readonly { mode: StudyMode; title: string; subtitle: string }[];
 
+/** 学习形式切换配置 */
+const FORMATS = [
+  { format: "card" as const, title: "卡片", subtitle: "翻转记忆" },
+  { format: "quiz" as const, title: "选择题", subtitle: "辨识练习" },
+];
+
 export function HomeScreen({ onStart, statsProvider }: HomeScreenProps) {
   const { stats } = useStats(statsProvider);
+  const [format, setFormat] = useState<StudyFormat>("card");
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-16">
+      {/* 学习形式切换 */}
+      <div className="flex items-center gap-2" role="radiogroup" aria-label="学习形式">
+        {FORMATS.map(({ format: f, title, subtitle }) => (
+          <button
+            key={f}
+            type="button"
+            role="radio"
+            aria-checked={format === f}
+            onClick={() => setFormat(f)}
+            className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
+              format === f
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border bg-surface text-text-muted hover:border-primary"
+            }`}
+          >
+            <span>{title}</span>
+            <span aria-hidden="true" className="text-xs opacity-60">
+              {subtitle}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* 三模式入口 */}
       <div className="grid gap-4 sm:grid-cols-3">
         {MODES.map(({ mode, title, subtitle }) => (
           <button
             key={mode}
             type="button"
-            onClick={() => onStart(mode)}
+            onClick={() => onStart(mode, format)}
             className="flex flex-col gap-1 rounded-2xl border border-border bg-surface p-6 text-left transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
             <span className="text-xl font-semibold">{title}</span>

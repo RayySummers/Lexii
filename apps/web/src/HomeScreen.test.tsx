@@ -67,7 +67,7 @@ describe("HomeScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: label }));
     expect(onStart).toHaveBeenCalledTimes(1);
-    expect(onStart).toHaveBeenCalledWith(mode);
+    expect(onStart).toHaveBeenCalledWith(mode, "card");
   });
 
   it("今日有待学词时显示待学徽标", async () => {

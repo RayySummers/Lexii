@@ -14,6 +14,7 @@ import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
 interface ProviderHarness {
   provider: ReviewDataProvider;
   loadQueue: ReturnType<typeof vi.fn>;
+  loadMultipleChoiceQueue: ReturnType<typeof vi.fn>;
   grade: ReturnType<typeof vi.fn>;
   hasAnyItems: ReturnType<typeof vi.fn>;
   importSampleWordlist: ReturnType<typeof vi.fn>;
@@ -45,6 +46,7 @@ function makeHarness(
   } else {
     loadQueue.mockResolvedValue(queue);
   }
+  const loadMultipleChoiceQueue = vi.fn().mockResolvedValue({ questions: [], cards: [] });
   const grade = vi
     .fn<(card: ReviewCard, rating: ReviewRating, context: GradeContext) => Promise<void>>()
     .mockResolvedValue(undefined);
@@ -53,12 +55,13 @@ function makeHarness(
   const exportBackup = vi.fn<() => Promise<LexilexiExportData>>().mockResolvedValue(EMPTY_EXPORT);
   const provider: ReviewDataProvider = {
     loadQueue,
+    loadMultipleChoiceQueue,
     grade,
     hasAnyItems,
     importSampleWordlist,
     exportBackup,
   };
-  return { provider, loadQueue, grade, hasAnyItems, importSampleWordlist, exportBackup };
+  return { provider, loadQueue, loadMultipleChoiceQueue, grade, hasAnyItems, importSampleWordlist, exportBackup };
 }
 
 /** 当前面（未翻面时正面，翻面后背面）的 aria-hidden 状态 */

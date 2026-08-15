@@ -36,6 +36,7 @@ function makeHarness(
   const hasAnyItems = vi.fn<() => Promise<boolean>>().mockResolvedValue(hasItems);
   const provider: ReviewDataProvider = {
     loadQueue,
+    loadMultipleChoiceQueue: vi.fn().mockResolvedValue({ questions: [], cards: [] }),
     grade,
     hasAnyItems,
     importSampleWordlist: vi.fn().mockResolvedValue(14),
@@ -127,6 +128,7 @@ describe("useReviewSession 时序边界", () => {
       .mockResolvedValueOnce([card]);
     const provider: ReviewDataProvider = {
       loadQueue,
+      loadMultipleChoiceQueue: vi.fn().mockResolvedValue({ questions: [], cards: [] }),
       grade: vi.fn().mockResolvedValue(undefined),
       hasAnyItems: vi.fn().mockResolvedValue(true),
       importSampleWordlist: vi.fn().mockResolvedValue(14),
@@ -153,6 +155,7 @@ describe("useReviewSession 时序边界", () => {
       .mockRejectedValue(new Error("导入失败"));
     const provider: ReviewDataProvider = {
       loadQueue,
+      loadMultipleChoiceQueue: vi.fn().mockResolvedValue({ questions: [], cards: [] }),
       grade: vi.fn().mockResolvedValue(undefined),
       hasAnyItems: vi.fn().mockResolvedValue(false),
       importSampleWordlist,
