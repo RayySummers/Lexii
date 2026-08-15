@@ -14,6 +14,7 @@ import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
 interface ProviderHarness {
   provider: ReviewDataProvider;
   loadQueue: ReturnType<typeof vi.fn>;
+  loadMultipleChoiceQueue: ReturnType<typeof vi.fn>;
   grade: ReturnType<typeof vi.fn>;
   hasAnyItems: ReturnType<typeof vi.fn>;
   importSampleWordlist: ReturnType<typeof vi.fn>;
@@ -34,6 +35,7 @@ const EMPTY_EXPORT: LexilexiExportData = {
 function makeHarness(options: { queue?: ReviewCard[] } = {}): ProviderHarness {
   const { queue = [] } = options;
   const loadQueue = vi.fn<(mode: StudyMode) => Promise<ReviewCard[]>>().mockResolvedValue(queue);
+  const loadMultipleChoiceQueue = vi.fn().mockResolvedValue({ questions: [], cards: [] });
   const grade = vi
     .fn<(card: ReviewCard, rating: ReviewRating, context: GradeContext) => Promise<void>>()
     .mockResolvedValue(undefined);
@@ -42,12 +44,21 @@ function makeHarness(options: { queue?: ReviewCard[] } = {}): ProviderHarness {
   const exportBackup = vi.fn<() => Promise<LexilexiExportData>>().mockResolvedValue(EMPTY_EXPORT);
   const provider: ReviewDataProvider = {
     loadQueue,
+    loadMultipleChoiceQueue,
     grade,
     hasAnyItems,
     importSampleWordlist,
     exportBackup,
   };
-  return { provider, loadQueue, grade, hasAnyItems, importSampleWordlist, exportBackup };
+  return {
+    provider,
+    loadQueue,
+    loadMultipleChoiceQueue,
+    grade,
+    hasAnyItems,
+    importSampleWordlist,
+    exportBackup,
+  };
 }
 
 /** 等待卡片出现：翻面按钮的可达名包含词条 */

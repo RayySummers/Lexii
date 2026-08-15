@@ -22,6 +22,7 @@ const EMPTY_EXPORT: LexilexiExportData = {
 function makeReviewProviderFactory(queue: ReviewCard[] = [makeCard()]) {
   const provider: ReviewDataProvider = {
     loadQueue: vi.fn<(mode: StudyMode) => Promise<ReviewCard[]>>().mockResolvedValue(queue),
+    loadMultipleChoiceQueue: vi.fn().mockResolvedValue({ questions: [], cards: [] }),
     grade: vi.fn().mockResolvedValue(undefined),
     hasAnyItems: vi.fn().mockResolvedValue(queue.length > 0),
     importSampleWordlist: vi.fn().mockResolvedValue(14),

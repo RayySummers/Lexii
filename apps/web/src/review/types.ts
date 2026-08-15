@@ -8,6 +8,7 @@
  *   `GradeReviewInput` 对应字段对齐
  */
 import type {
+  ExerciseType,
   LearningItem,
   LexilexiExportData,
   MemoryState,
@@ -15,6 +16,7 @@ import type {
   Sense,
   StudyMode,
 } from "@lexilexi/core";
+import type { MultipleChoiceQuestion } from "./MultipleChoiceCard";
 
 /** 复习队列中的一张卡 */
 export interface ReviewCard {
@@ -23,12 +25,22 @@ export interface ReviewCard {
   memory: MemoryState;
 }
 
+/** 选择题队列（卡片 + 题目配对） */
+export interface MultipleChoiceQueueResult {
+  questions: MultipleChoiceQuestion[];
+  cards: ReviewCard[];
+}
+
 /** 一次评分所需的会话上下文（UI 采集，对应 core gradeReview 输入字段） */
 export interface GradeContext {
   /** 卡片出现到评分（毫秒，非负） */
   reviewDurationMs: number;
   /** 评分前是否翻面看过答案 */
   revealed: boolean;
+  /** 练习形式（默认 recall；选择题传 multiple-choice） */
+  exerciseType?: ExerciseType;
+  /** 本次作答是否正确（选择题显式传入；卡片翻转路径省略时由 rating !== "again" 推导） */
+  answerWasCorrect?: boolean;
 }
 
 /**
@@ -47,6 +59,14 @@ export interface ReviewDataProvider {
    * 顺序由 @lexilexi/core 的 getStudyQueueItemIds 决定（含混合穿插）。
    */
   loadQueue(mode: StudyMode): Promise<ReviewCard[]>;
+  /**
+   * 按学习模式加载选择题队列（RAY-269）。
+   *
+   * 返回与 loadQueue 相同的卡片队列，每张卡额外附带选择题题目
+   * （1 正确 + 3 混淆项，来源：历史常错词 / 形近词 / 近义词）。
+   * cards[i] 与 questions[i] 一一对应。
+   */
+  loadMultipleChoiceQueue(mode: StudyMode): Promise<MultipleChoiceQueueResult>;
   /** 评分并原子落库（排期由 @lexilexi/core 完成） */
   grade(card: ReviewCard, rating: ReviewRating, context: GradeContext): Promise<void>;
   /** 词库是否为空（决定空状态：无词导入 vs 今日无到期） */

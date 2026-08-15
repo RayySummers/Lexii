@@ -16,6 +16,7 @@
 import {
   SAMPLE_WORDLIST_CSV,
   exportLexilexiData,
+  generateOptions,
   getStudyQueueItemIds,
   gradeReview,
   importCsvWordlist,
@@ -34,7 +35,12 @@ import type {
 import { computeLearnedTodayCount, localDayBounds } from "@lexilexi/stats";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { buildReviewQueue } from "./queue";
-import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
+import type {
+  GradeContext,
+  MultipleChoiceQueueResult,
+  ReviewCard,
+  ReviewDataProvider,
+} from "./types";
 
 /** 示例词表来源标识（写入 LearningItem.source 与 import 事件，供溯源） */
 const SAMPLE_SOURCE = "内置示例词表";
@@ -114,15 +120,57 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
       );
     },
 
+    async loadMultipleChoiceQueue(mode: StudyMode): Promise<MultipleChoiceQueueResult> {
+      const now = new Date().toISOString();
+      const newCardLimit = mode === "review" ? undefined : await resolveNewCardLimit(db, now);
+      const ids = await getStudyQueueItemIds(db, now, mode, { newCardLimit });
+      if (ids.length === 0) {
+        return { questions: [], cards: [] };
+      }
+      const [items, memories] = await Promise.all([
+        db.items.bulkGet(ids),
+        db.memoryStates.bulkGet(ids),
+      ]);
+      const kept = alignCompletePairs(items, memories);
+      const senses = await db.senses.bulkGet(kept.map((pair) => pair.item.senseId));
+      const cards = buildReviewQueue(
+        kept.map((pair) => pair.item),
+        senses,
+        kept.map((pair) => pair.memory),
+        now,
+      );
+      // 加载全部义项（混淆项生成用；词库规模数千条，单次全量可接受）
+      const allSenses = await db.senses.toArray();
+      // 查询历史常错词：laps es > 0 的条目的 term
+      const wrongItemIds = kept
+        .filter((pair) => pair.memory.fields.lapses > 0)
+        .map((pair) => pair.item.id);
+      const wrongItems = await db.items.bulkGet(wrongItemIds);
+      const wrongSenses = await db.senses.bulkGet(
+        wrongItems
+          .filter((item): item is LearningItem => item !== undefined)
+          .map((item) => item.senseId),
+      );
+      const wrongTerms = wrongSenses
+        .filter((sense): sense is NonNullable<typeof sense> => sense !== undefined)
+        .map((sense) => sense.term);
+
+      const questions = cards.map((card) => ({
+        sense: card.sense,
+        options: generateOptions(card.sense, allSenses, wrongTerms),
+      }));
+      return { questions, cards };
+    },
+
     async grade(card: ReviewCard, rating: ReviewRating, context: GradeContext): Promise<void> {
       await gradeReview(db, {
         itemId: card.item.id,
         senseId: card.sense.id,
-        exerciseType: "recall",
+        exerciseType: context.exerciseType ?? "recall",
         rating,
         reviewDurationMs: context.reviewDurationMs,
         revealed: context.revealed,
-        answerWasCorrect: rating !== "again",
+        answerWasCorrect: context.answerWasCorrect ?? rating !== "again",
       });
     },
 
