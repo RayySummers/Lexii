@@ -66,7 +66,12 @@ describe("App", () => {
 
   beforeEach(() => {
     window.localStorage.clear();
-    window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as unknown as typeof matchMedia;
+    // useTheme 会注册 prefers-color-scheme change 监听（RAY-261），mock 需提供对应 API
+    window.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }) as unknown as typeof matchMedia;
   });
 
   afterEach(() => {
@@ -83,18 +88,39 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "混合" })).toBeInTheDocument();
   });
 
-  it("点击按钮在浅色/深色主题间切换并写入 data-theme（图标按钮，可达名不变）", () => {
+  it("RAY-261：header 不再常驻主题开关（仅统计 / 设置入口）", () => {
     render(<App reviewProviderFactory={makeReviewProviderFactory().factory} />);
-    const button = screen.getByRole("button", { name: "切换到深色模式" });
+    expect(screen.queryByRole("button", { name: /切换到/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "统计" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();
+  });
+
+  it("RAY-261：设置页下拉选单切换主题偏好并写入 data-theme", async () => {
+    const { factory } = makeSettingsProviderFactory();
+    render(
+      <App
+        reviewProviderFactory={makeReviewProviderFactory().factory}
+        settingsProviderFactory={factory}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "设置" }));
+    const select = await screen.findByLabelText(/主题/);
+    // 无持久化值 → 默认跟随系统；系统浅色（mock）→ 实际主题 light
+    expect(select).toHaveValue("system");
     expect(document.documentElement.dataset.theme).toBe("light");
 
-    fireEvent.click(button);
-    expect(screen.getByRole("button", { name: "切换到浅色模式" })).toBeInTheDocument();
+    fireEvent.change(select, { target: { value: "dark" } });
     expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(window.localStorage.getItem("lexilexi:theme")).toBe("dark");
 
-    fireEvent.click(screen.getByRole("button", { name: "切换到浅色模式" }));
-    expect(screen.getByRole("button", { name: "切换到深色模式" })).toBeInTheDocument();
+    fireEvent.change(select, { target: { value: "light" } });
     expect(document.documentElement.dataset.theme).toBe("light");
+    expect(window.localStorage.getItem("lexilexi:theme")).toBe("light");
+
+    fireEvent.change(select, { target: { value: "system" } });
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(window.localStorage.getItem("lexilexi:theme")).toBe("system");
   });
 
   it("点击复习进入复习界面（惰性创建数据源，模式为 review），返回首页退出", async () => {

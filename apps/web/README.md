@@ -14,12 +14,13 @@ pnpm build          # tsc --noEmit + vite build
 ## 结构
 
 - `src/styles/tokens.css` — 语义化 design tokens（浅色/深色两套，组件禁止硬编码颜色）
-- `src/hooks/useTheme.ts` — 主题状态：localStorage 优先，其次跟随系统偏好；通过 `<html data-theme>` 生效
+- `src/hooks/useTheme.ts` — 主题状态（RAY-261 三档偏好：浅色 / 深色 / 跟随系统，localStorage 持久化；跟随系统档位监听设备主题自动切换）；实际主题通过 `<html data-theme>` 生效
+- `src/theme/resolve.ts` — 主题解析纯函数：偏好 → 实际主题（light/dark 直接采用，system/缺失/非法跟随系统），与 index.html 内联脚本共用同一套规则
 - `src/theme/themeColor.ts` — 浏览器外壳色同步：`meta theme-color` 跟随主题，值取自 `--lex-bg` token（不硬编码）
-- `src/App.tsx` — 应用外壳：全局导航（统计 / 设置入口 + 主题图标切换）+ 首页 / 复习 / 设置 / 统计界面切换
+- `src/App.tsx` — 应用外壳：全局导航（统计 / 设置入口，RAY-261 起 header 无主题开关）+ 首页 / 复习 / 设置 / 统计界面切换
 - `src/HomeScreen.tsx` — 首页：三模式按钮（学习 / 复习 / 混合）+ 今日待学徽标（无品牌名与介绍文案，已归档 docs/archive/homepage-intro-v1.md）
 - `src/components/ScreenHeader.tsx` — 内部页面统一导航头（左侧返回箭头、标题右对齐，设置页与统计页共用）
-- `src/components/icons.tsx` — 内联 SVG 图标（返回箭头 / 太阳 / 月亮，stroke 继承 currentColor，不硬编码颜色）
+- `src/components/icons.tsx` — 内联 SVG 图标（返回箭头，stroke 继承 currentColor，不硬编码颜色；主题太阳/月亮图标已随 RAY-261 移除）
 - `src/components/StatCard.tsx` — 统计数值卡片（统计页）
 - `src/lib/download.ts` — 文件下载工具（`downloadTextFile` / `datedFilename` / `serializeBackup`，纯前端无网络）
 - `src/lib/appVersion.ts` — 构建时注入的版本号 `APP_VERSION`（vite.config.ts `define` 读取 `apps/web/package.json` 的 version；发版只改 package.json，UI 自动跟随）
@@ -35,7 +36,7 @@ pnpm build          # tsc --noEmit + vite build
   - `types.ts` — `SettingsDataProvider` / `ImportBackupResult`（UI 与数据源之间的契约）
   - `data.ts` — IndexedDB 数据源：`createIndexedDbSettingsDataProvider`（包装 core 的 `exportLexilexiData` / `exportCsvWordlist` / `parseLexilexiExport` / `importLexilexiData`）
   - `persistenceStatus.ts` — 持久化权限状态（启动申请 + `usePersistenceStatus` hook，监听 `lexilexi:storage-permission`）
-  - `SettingsScreen.tsx` — 设置页 UI：每日新卡上限（默认 20/日，localStorage 持久化）、持久化提示、JSON/CSV 导出、JSON 导入、关于（GitHub 仓库链接 + 反馈问题入口，纯外链新窗口打开）与底部版本号（RAY-253 起无数据概览，概览已并入统计页）
+  - `SettingsScreen.tsx` — 设置页 UI：主题三档下拉选单（浅色 / 深色 / 跟随系统，RAY-261）、每日新卡上限（默认 20/日，localStorage 持久化）、持久化提示、JSON/CSV 导出、JSON 导入、关于（GitHub 仓库链接 + 反馈问题入口，纯外链新窗口打开）与底部版本号（RAY-253 起无数据概览，概览已并入统计页）
 - `src/stats/` — 统计页（RAY-240）：
   - `types.ts` — `StatsSnapshot`（今日待学 / 已复习 / 连续天数）/ `StatsDataProvider`（UI 与数据源之间的契约）
   - `data.ts` — IndexedDB 数据源：`createIndexedDbStatsDataProvider`（包装 core 的 `getDueItemIds` + stats 包的 `countReviews` / `computeStreak`）；默认工厂自带无 IndexedDB 环境兜底

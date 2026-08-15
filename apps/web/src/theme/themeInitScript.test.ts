@@ -45,6 +45,9 @@ describe("index.html 主题初始化内联脚本", () => {
     // 反向用例：存储值与系统偏好方向相反时，才能暴露「key 漂移导致读到 null」的问题
     ["localStorage 存 light 且系统深色", "light", true],
     ["localStorage 存 dark 且系统浅色", "dark", false],
+    // RAY-261 三档：system 档位与缺失/非法值一样跟随系统
+    ["localStorage 存 system 且系统深色", "system", true],
+    ["localStorage 存 system 且系统浅色", "system", false],
     ["无持久化值且系统深色", null, true],
     ["无持久化值且系统浅色", null, false],
     ["非法持久化值且系统深色", "blue", true],

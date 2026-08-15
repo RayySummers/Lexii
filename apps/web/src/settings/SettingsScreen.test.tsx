@@ -2,13 +2,18 @@
  * 设置页交互测试（mock 数据源 + mock 持久化状态 hook，不依赖 IndexedDB）。
  *
  * 覆盖验收点：持久化 denied 提示 + 直达导出、JSON/CSV 导出、JSON 导入
- * 成功/失败、统一导航头（RAY-253：左侧返回箭头、标题右对齐）。
+ * 成功/失败、统一导航头（RAY-253：左侧返回箭头、标题右对齐）、
+ * 主题三档下拉选单（RAY-261）。
  * 数据概览已随 RAY-253 反馈 6 删除（与统计页重复），不再有相关用例。
+ *
+ * 主题偏好由 App 级 useTheme 持有：本页测试只验证选单渲染受控与回调
+ * 参数正确；解析、应用与持久化行为在 useTheme.test.ts 覆盖。
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LexilexiExportData } from "@lexilexi/core";
 import { APP_VERSION } from "../lib/appVersion";
+import type { ThemePreference } from "../theme/resolve";
 import { usePersistenceStatus } from "./persistenceStatus";
 import { SettingsScreen } from "./SettingsScreen";
 import type { ImportBackupResult, PresetSummary, SettingsDataProvider } from "./types";
@@ -79,6 +84,26 @@ function stubObjectUrl() {
   };
 }
 
+interface RenderSettingsOptions {
+  provider?: SettingsDataProvider;
+  onExit?: () => void;
+  /** 主题偏好（RAY-261 必传 props；默认跟随系统） */
+  themePreference?: ThemePreference;
+  onThemePreferenceChange?: (preference: ThemePreference) => void;
+}
+
+/** 统一渲染设置页：主题 props 提供默认值，与主题无关的用例无需重复传参 */
+function renderSettings(options: RenderSettingsOptions = {}) {
+  return render(
+    <SettingsScreen
+      provider={options.provider ?? makeHarness().provider}
+      onExit={options.onExit ?? (() => {})}
+      themePreference={options.themePreference ?? "system"}
+      onThemePreferenceChange={options.onThemePreferenceChange ?? vi.fn()}
+    />,
+  );
+}
+
 describe("SettingsScreen", () => {
   beforeEach(() => {
     vi.mocked(usePersistenceStatus).mockReturnValue(null);
@@ -87,7 +112,7 @@ describe("SettingsScreen", () => {
 
   it("统一导航头：标题「设置」右对齐，返回箭头触发 onExit", () => {
     const onExit = vi.fn();
-    render(<SettingsScreen provider={makeHarness().provider} onExit={onExit} />);
+    renderSettings({ onExit });
 
     const heading = screen.getByRole("heading", { name: "设置" });
     expect(heading).toBeInTheDocument();
@@ -97,8 +122,38 @@ describe("SettingsScreen", () => {
     expect(onExit).toHaveBeenCalledTimes(1);
   });
 
+  it("RAY-261 外观：下拉选单三档选项齐全且随 preference 受控", async () => {
+    renderSettings({ themePreference: "light" });
+    await screen.findByText("外观");
+
+    const select = screen.getByLabelText(/主题/);
+    expect(select).toHaveValue("light");
+    expect(screen.getByRole("option", { name: "浅色" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "深色" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "跟随系统" })).toBeInTheDocument();
+  });
+
+  it("RAY-261 外观：选择档位经回调上报（本页不自行持久化）", async () => {
+    const onThemePreferenceChange = vi.fn();
+    renderSettings({ themePreference: "system", onThemePreferenceChange });
+    await screen.findByText("外观");
+
+    const select = screen.getByLabelText(/主题/);
+    fireEvent.change(select, { target: { value: "dark" } });
+    expect(onThemePreferenceChange).toHaveBeenCalledWith("dark");
+
+    fireEvent.change(select, { target: { value: "light" } });
+    expect(onThemePreferenceChange).toHaveBeenCalledWith("light");
+
+    fireEvent.change(select, { target: { value: "system" } });
+    expect(onThemePreferenceChange).toHaveBeenCalledWith("system");
+    expect(onThemePreferenceChange).toHaveBeenCalledTimes(3);
+    // 设置页只上报回调，主题持久化由 App 级 useTheme 负责
+    expect(window.localStorage.getItem("lexilexi:theme")).toBeNull();
+  });
+
   it("不渲染数据概览（RAY-253 反馈 6：与统计页重复，已删除）", async () => {
-    render(<SettingsScreen provider={makeHarness().provider} onExit={() => {}} />);
+    renderSettings();
 
     await screen.findByText("数据安全");
     expect(screen.queryByText("数据概览")).not.toBeInTheDocument();
@@ -112,7 +167,7 @@ describe("SettingsScreen", () => {
     const harness = makeHarness();
     const restore = stubObjectUrl();
     try {
-      render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+      renderSettings({ provider: harness.provider });
 
       expect(
         await screen.findByText("当前数据可能被浏览器清理，建议导出备份。"),
@@ -128,7 +183,7 @@ describe("SettingsScreen", () => {
   it("持久化已获保护：显示确认文案（非警告）", async () => {
     vi.mocked(usePersistenceStatus).mockReturnValue("persisted");
     const harness = makeHarness();
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+    renderSettings({ provider: harness.provider });
 
     expect(await screen.findByText("本地数据已受浏览器持久化保护。")).toBeInTheDocument();
     expect(screen.queryByText("当前数据可能被浏览器清理，建议导出备份。")).not.toBeInTheDocument();
@@ -137,7 +192,7 @@ describe("SettingsScreen", () => {
   it("不支持环境：静默降级不提示", async () => {
     vi.mocked(usePersistenceStatus).mockReturnValue("unsupported");
     const harness = makeHarness();
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+    renderSettings({ provider: harness.provider });
 
     await screen.findByText("数据安全");
     expect(screen.queryByText("当前数据可能被浏览器清理，建议导出备份。")).not.toBeInTheDocument();
@@ -148,7 +203,7 @@ describe("SettingsScreen", () => {
     const harness = makeHarness();
     const restore = stubObjectUrl();
     try {
-      render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+      renderSettings({ provider: harness.provider });
       await screen.findByText("导出数据");
 
       fireEvent.click(screen.getByRole("button", { name: "导出 JSON 完整备份" }));
@@ -163,7 +218,7 @@ describe("SettingsScreen", () => {
     const harness = makeHarness();
     const restore = stubObjectUrl();
     try {
-      render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+      renderSettings({ provider: harness.provider });
       await screen.findByText("导出数据");
 
       fireEvent.click(screen.getByRole("button", { name: "导出 CSV 词表" }));
@@ -177,7 +232,7 @@ describe("SettingsScreen", () => {
   it("导入 JSON 成功：显示恢复计数", async () => {
     const harness = makeHarness();
     harness.importBackup.mockResolvedValue({ items: 3, senses: 3, memoryStates: 3, events: 3 });
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+    renderSettings({ provider: harness.provider });
     await screen.findByText("导入数据");
 
     const file = new File(['{"format":"lexilexi"}'], "backup.json", { type: "application/json" });
@@ -190,7 +245,7 @@ describe("SettingsScreen", () => {
   it("导入失败：显示明确错误提示", async () => {
     const harness = makeHarness();
     harness.importBackup.mockRejectedValue(new Error("导出文件版本不兼容"));
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+    renderSettings({ provider: harness.provider });
     await screen.findByText("导入数据");
 
     const file = new File(["{}"], "backup.json", { type: "application/json" });
@@ -201,7 +256,7 @@ describe("SettingsScreen", () => {
 
   it("关于：渲染 GitHub 仓库链接（新窗口打开）", async () => {
     const harness = makeHarness();
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+    renderSettings({ provider: harness.provider });
     await screen.findByText("关于");
 
     const link = screen.getByRole("link", { name: "GitHub 仓库" });
@@ -212,7 +267,7 @@ describe("SettingsScreen", () => {
 
   it("关于：反馈问题入口指向 GitHub Issues（新窗口打开）", async () => {
     const harness = makeHarness();
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+    renderSettings({ provider: harness.provider });
     await screen.findByText("关于");
 
     const link = screen.getByRole("link", { name: "反馈问题" });
@@ -223,7 +278,7 @@ describe("SettingsScreen", () => {
 
   it("底部展示与构建注入一致的版本号", async () => {
     const harness = makeHarness();
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+    renderSettings({ provider: harness.provider });
     await screen.findByText("关于");
 
     // 断言 UI 走 APP_VERSION（构建注入），不硬编码具体版本——发版 bump package.json 后测试自动跟随
@@ -232,7 +287,7 @@ describe("SettingsScreen", () => {
 
   it("数据来源与许可：入口进入二级页并展示来源与许可声明，返回按钮回到设置", async () => {
     const harness = makeHarness();
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+    renderSettings({ provider: harness.provider });
 
     fireEvent.click(await screen.findByRole("button", { name: "查看数据来源与许可" }));
 
@@ -262,7 +317,7 @@ describe("SettingsScreen", () => {
 
   it("每日新卡上限：默认 20，输入合法值即时持久化（RAY-260 评审 suggestion 2）", async () => {
     const harness = makeHarness();
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+    renderSettings({ provider: harness.provider });
 
     const input = await screen.findByLabelText(/每日新卡上限/);
     expect(input).toHaveValue(20);
@@ -274,7 +329,7 @@ describe("SettingsScreen", () => {
 
   it("每日新卡上限：非法输入不持久化（存储保持原值）", async () => {
     const harness = makeHarness();
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+    renderSettings({ provider: harness.provider });
 
     const input = await screen.findByLabelText(/每日新卡上限/);
     // number 输入框对非数字文本会被浏览器清空（value 为空串）
@@ -285,7 +340,7 @@ describe("SettingsScreen", () => {
 
   it("每日新卡上限：失焦时显示回落到生效值（Oscar 复评 nit 1）", async () => {
     const harness = makeHarness();
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+    renderSettings({ provider: harness.provider });
 
     const input = await screen.findByLabelText(/每日新卡上限/);
     // 先设置合法值 35（持久化），再清空输入（非法、不持久化）
@@ -301,7 +356,7 @@ describe("SettingsScreen", () => {
 
   it("每日新卡上限：合法值失焦归一化显示（不改变生效值）", async () => {
     const harness = makeHarness();
-    render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+    renderSettings({ provider: harness.provider });
 
     const input = await screen.findByLabelText(/每日新卡上限/);
     fireEvent.change(input, { target: { value: "7" } });
@@ -321,7 +376,7 @@ describe("SettingsScreen", () => {
         }),
     );
     try {
-      render(<SettingsScreen provider={harness.provider} onExit={() => {}} />);
+      renderSettings({ provider: harness.provider });
       await screen.findByText("导出数据");
 
       // 发起导出（挂起中），随即切到「数据来源与许可」再返回

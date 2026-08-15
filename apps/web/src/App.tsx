@@ -1,9 +1,13 @@
 /**
- * 应用外壳：全局导航（统计 / 设置入口 + 主题图标切换）+ 首页 / 复习 / 设置 / 统计界面切换。
+ * 应用外壳：全局导航（统计 / 设置入口）+ 首页 / 复习 / 设置 / 统计界面切换。
  *
  * RAY-253 导航改版：
- * - 头部不再显示品牌名（反馈 1），只保留统计 / 设置入口与主题图标（反馈 2）；
+ * - 头部不再显示品牌名（反馈 1），只保留统计 / 设置入口（反馈 2）；
  * - 首页三模式按钮（学习 / 复习 / 混合）经 `reviewMode` 传入复习界面（反馈 1）。
+ *
+ * RAY-261 主题改版：
+ * - header 不再常驻主题开关；主题偏好（浅色 / 深色 / 跟随系统）改为
+ *   设置页下拉选单，经 `useTheme`（App 级单一数据源）下发到设置页。
  *
  * 数据源注入：`reviewProviderFactory` / `settingsProviderFactory` /
  * `statsProviderFactory` 是测试接缝——测试传入 mock 工厂，生产环境使用
@@ -13,7 +17,6 @@
  */
 import { useCallback, useState } from "react";
 import type { StudyMode } from "@lexilexi/core";
-import { MoonIcon, SunIcon } from "./components/icons";
 import { HomeScreen } from "./HomeScreen";
 import { useTheme } from "./hooks/useTheme";
 import { ReviewScreen } from "./review/ReviewScreen";
@@ -43,7 +46,7 @@ export function App({
   settingsProviderFactory = createDefaultSettingsDataProvider,
   statsProviderFactory = createDefaultStatsDataProvider,
 }: AppProps) {
-  const { theme, toggleTheme } = useTheme();
+  const { preference, setPreference } = useTheme();
   const [reviewProvider, setReviewProvider] = useState<ReviewDataProvider | null>(null);
   const [settingsProvider, setSettingsProvider] = useState<SettingsDataProvider | null>(null);
   const statsProvider = useStatsProvider(statsProviderFactory);
@@ -91,21 +94,17 @@ export function App({
         >
           设置
         </button>
-        <button
-          type="button"
-          onClick={toggleTheme}
-          aria-label={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
-          aria-pressed={theme === "dark"}
-          className="rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-        >
-          {theme === "dark" ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
-        </button>
       </header>
 
       {view === "review" && reviewProvider ? (
         <ReviewScreen provider={reviewProvider} mode={reviewMode} onExit={goHome} />
       ) : view === "settings" && settingsProvider ? (
-        <SettingsScreen provider={settingsProvider} onExit={goHome} />
+        <SettingsScreen
+          provider={settingsProvider}
+          onExit={goHome}
+          themePreference={preference}
+          onThemePreferenceChange={setPreference}
+        />
       ) : view === "stats" && statsProvider ? (
         <StatsScreen provider={statsProvider} onExit={goHome} />
       ) : (
