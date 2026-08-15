@@ -12,6 +12,10 @@
     "./presets/books": {
       "types": "./src/presets/books.ts",
       "default": "./src/presets/books.ts"
+    },
+    "./presets/enrichment": {
+      "types": "./src/presets/enrichmentTier0.ts",
+      "default": "./src/presets/enrichmentTier0.ts"
     }
   },
   "main": "./src/index.ts",

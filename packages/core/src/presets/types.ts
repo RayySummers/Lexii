@@ -88,3 +88,44 @@ export interface ThirdPartyDataSource {
   /** 该来源数据随哪些包分发（空数组 = 未随包分发） */
   bundledIn: readonly string[];
 }
+
+/**
+ * 富化词条元组（打包侧 scripts/presets/build-enrichment.mjs 生成）：
+ * [term, ipaUs, ipaUk, synonyms, antonyms, derived, etymology,
+ *  wordParts, etymologyZh, examples]。
+ * - 词列表（synonyms/antonyms/derived）以换行符连接；
+ * - examples 为 [英文, 中文译文] 对数组（kaikki 补足句译文为空串）；
+ * - 字符串可为空（运行时按字段缺失处理）。
+ */
+export type EnrichmentPresetEntry = [
+  term: string,
+  ipaUs: string,
+  ipaUk: string,
+  synonyms: string,
+  antonyms: string,
+  derived: string,
+  etymology: string,
+  wordParts: string,
+  etymologyZh: string,
+  examples: [string, string][],
+];
+
+/**
+ * 富化数据包（Tier 0 随 PWA 打包；Tier 1 扩展包产物同构）。
+ *
+ * 与 PresetPackage 的区别：富化包不引入新词条，只按 term join 补全
+ * 已有 Sense 的内容字段（例句/近反义/派生/词根词缀/双音标），安装
+ * 与回填逻辑见 install.ts / enrichment.ts。
+ */
+export interface EnrichmentPresetPackage {
+  id: string;
+  version: string;
+  /** 面向用户的名称 */
+  name: string;
+  /** 生成时间（ISO） */
+  generatedAt: string;
+  /** 来源与许可声明（许可证溯源） */
+  source: string;
+  /** 富化词条列表（打包侧已按 term 排序去重） */
+  entries: EnrichmentPresetEntry[];
+}

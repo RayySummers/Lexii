@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LexilexiDatabase } from "../persistence";
 import { openDatabase } from "../persistence";
 import { toSense } from "../importWords";
+import { parseEnrichmentPreset } from "./enrichment";
 import {
   getPresetInstallState,
   installPreset,
@@ -316,5 +317,49 @@ describe("installPreset（分块安装预设词表）", () => {
     expect(await database.events.where("type").equals("import").count()).toBe(total);
     expect(await database.meta.get(presetProgressKey(preset.id))).toBeUndefined();
     expect((await database.meta.get(presetDoneKey(preset.id)))?.value).toBe(preset.version);
+  });
+
+  it("富化内联（RAY-268 新装路径）：安装时按 term 填充富化字段", async () => {
+    const database = freshDatabase();
+    const preset = makePreset(makeEntries(3));
+    const enrichment = parseEnrichmentPreset(
+      {
+        id: "test-enrichment",
+        version: "1.0.0",
+        name: "测试富化包",
+        generatedAt: "2026-08-15T00:00:00.000Z",
+        source: "测试来源（CC BY）",
+        entries: [
+          [
+            "testword0",
+            "/uˈes0/",
+            "/uˈkeɪ0/",
+            "syn-a\nsyn-b",
+            "",
+            "",
+            "From Latin.",
+            "",
+            "",
+            [["A sentence.", "一句。"]],
+          ],
+        ],
+      },
+      "test-enrichment.json",
+    );
+
+    const result = await installPreset(database, preset, { enrichment, yield: async () => {} });
+
+    expect(result).toEqual({ status: "installed", installedCount: 3, skippedCount: 0 });
+    const sense0 = await database.senses.filter((s) => s.term === "testword0").first();
+    expect(sense0?.ipaUs).toBe("/uˈes0/");
+    expect(sense0?.ipaUk).toBe("/uˈkeɪ0/");
+    expect(sense0?.synonyms).toEqual(["syn-a", "syn-b"]);
+    expect(sense0?.etymology).toBe("From Latin.");
+    expect(sense0?.examples).toEqual([{ text: "A sentence.", translation: "一句。" }]);
+    expect(sense0?.ipa).toBe("/test/"); // 原 ECDICT 音标保留
+    // 无富化词条的词条不受影响
+    const sense1 = await database.senses.filter((s) => s.term === "testword1").first();
+    expect(sense1?.ipaUs).toBeUndefined();
+    expect(sense1?.examples).toEqual([]);
   });
 });

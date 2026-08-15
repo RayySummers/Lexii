@@ -6,8 +6,14 @@
  */
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
-import type { LexilexiDatabase, PresetPackage } from "@lexilexi/core";
-import { importCsvWordlist, installPreset, openDatabase, presetProgressKey } from "@lexilexi/core";
+import type { EnrichmentPresetPackage, LexilexiDatabase, PresetPackage } from "@lexilexi/core";
+import {
+  importCsvWordlist,
+  installPreset,
+  openDatabase,
+  parseEnrichmentPreset,
+  presetProgressKey,
+} from "@lexilexi/core";
 import { bootstrapPresetData } from "./bootstrap";
 
 function makeOptions(): { indexedDB: IDBFactory; IDBKeyRange: typeof IDBKeyRange } {
@@ -90,5 +96,48 @@ describe("bootstrapPresetData（首启内置词表引导）", () => {
     const outcome = await bootstrapPresetData(database, preset);
     expect(outcome.status).toBe("installed");
     expect(await database.items.count()).toBe(1200);
+  });
+
+  it("富化内联（RAY-268 新装路径）：引导安装时随词条填充富化字段", async () => {
+    const database = freshDatabase();
+    const enrichment = parseEnrichmentPreset(
+      {
+        id: "web-test-enrichment",
+        version: "1.0.0",
+        name: "测试富化包",
+        generatedAt: "2026-08-15T00:00:00.000Z",
+        source: "测试来源（CC BY）",
+        entries: [
+          [
+            "bootword0",
+            "/uˈes/",
+            "/uˈkeɪ/",
+            "syn-a\nsyn-b",
+            "",
+            "",
+            "",
+            "boot<词根>",
+            "",
+            [["A boot sentence.", "引导句。"], ["More text.", ""]],
+          ],
+        ],
+      },
+      "web-test-enrichment.json",
+    );
+
+    const outcome = await bootstrapPresetData(database, makePreset(3), enrichment);
+    expect(outcome).toEqual({ status: "installed", installedCount: 3 });
+    const sense = await database.senses.filter((s) => s.term === "bootword0").first();
+    expect(sense?.ipaUs).toBe("/uˈes/");
+    expect(sense?.ipaUk).toBe("/uˈkeɪ/");
+    expect(sense?.synonyms).toEqual(["syn-a", "syn-b"]);
+    expect(sense?.wordParts).toBe("boot<词根>");
+    expect(sense?.examples).toEqual([
+      { text: "A boot sentence.", translation: "引导句。" },
+      { text: "More text.", translation: "" },
+    ]);
+    // 富化包覆盖不到的词条不受影响
+    const other = await database.senses.filter((s) => s.term === "bootword1").first();
+    expect(other?.ipaUs).toBeUndefined();
   });
 });

@@ -96,7 +96,25 @@ export type {
   PresetInstallState,
   PresetInstallStatus,
 } from "./presets/install";
+export {
+  backfillEnrichment,
+  ENRICHMENT_CHUNK_SIZE,
+  enrichmentDoneKey,
+  enrichmentProgressKey,
+  mergeEnrichmentIntoContent,
+  mergeEnrichmentIntoSense,
+  parseEnrichmentPreset,
+  resolveEnrichmentEntry,
+  toEnrichmentMap,
+} from "./presets/enrichment";
 export type {
+  EnrichmentBackfillOptions,
+  EnrichmentBackfillResult,
+  EnrichmentEntry,
+} from "./presets/enrichment";
+export type {
+  EnrichmentPresetEntry,
+  EnrichmentPresetPackage,
   PresetPackage,
   PresetWordEntry,
   ThirdPartyDataSource,
@@ -105,6 +123,11 @@ export type {
 } from "./presets/types";
 export { THIRD_PARTY_DATA_SOURCES, THIRD_PARTY_NOTICES } from "./presets/notices";
 export { TIER0_PRESET, TIER0_PRESET_ROW_COUNT } from "./presets/tier0";
+// 富化数据包（ENRICHMENT_TIER0_PRESET / ENRICHMENT_TIER0_ENTRY_COUNT）
+// 走 "@lexilexi/core/presets/enrichment" 子路径导出：enrichment.tier0.data.json
+// 体积与 books.data.json 同量级（MB 级），静态 re-export 会打进所有消费者
+// 主 bundle；子路径 + 动态 import 使 Vite 将其拆为按需加载的 async chunk
+// （与 RAY-262 Oscar 评审 suggestion 3 同口径）。
 // 词书库运行时 API（WORDBOOK_CATALOG / WORDBOOK_POOL / getWordbookPackage 等）
 // 走 "@lexilexi/core/presets/books" 子路径导出：books.data.json 约 2 MB，
 // 静态 re-export 会把词书数据打进所有消费者主 bundle；子路径 + 动态 import

@@ -3,7 +3,7 @@ import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
 import { CsvFormatError, parseCsvWordlist } from "./csv";
 import { isImportEvent } from "./events";
-import { importCsvWordlist } from "./importWords";
+import { importCsvWordlist, toSense } from "./importWords";
 import type { LexilexiDatabase } from "./persistence";
 import { openDatabase } from "./persistence";
 import { SAMPLE_WORDLIST, SAMPLE_WORDLIST_CSV, SAMPLE_WORDLIST_ROW_COUNT } from "./sampleWordlist";
@@ -134,5 +134,48 @@ describe("内置示例词表（许可干净）", () => {
     expect(await database.events.where("type").equals("import").count()).toBe(
       SAMPLE_WORDLIST_ROW_COUNT,
     );
+  });
+});
+
+describe("toSense（词条内容 → 义项快照，含 RAY-268 富化字段）", () => {
+  it("基础字段直通，未提供的字段省略或缺省", () => {
+    const sense = toSense({ term: "apple", definitions: ["苹果"] }, "en");
+    expect(sense.term).toBe("apple");
+    expect(sense.definitions).toEqual(["苹果"]);
+    expect(sense.lang).toBe("en");
+    expect(sense.ipa).toBeUndefined();
+    expect(sense.ipaUs).toBeUndefined();
+    expect(sense.tags).toEqual([]);
+    expect(sense.examples).toEqual([]);
+  });
+
+  it("富化字段随内容快照直通（不丢字段、不改形态）", () => {
+    const sense = toSense(
+      {
+        term: "abandon",
+        definitions: ["放弃"],
+        pos: "v.",
+        ipa: "/əˈbændən/",
+        ipaUs: "/əˈbændən/",
+        ipaUk: "/əˈbændən/",
+        synonyms: ["desert", "forsake"],
+        antonyms: ["keep"],
+        derived: ["abandonment"],
+        etymology: "From Old French abandoner.",
+        wordParts: "a<加强> · bandon<控制>",
+        etymologyZh: "来自古法语 abandoner。",
+        examples: [{ text: "He abandoned the car.", translation: "他遗弃了那辆车。" }],
+      },
+      "en",
+    );
+    expect(sense.ipaUs).toBe("/əˈbændən/");
+    expect(sense.ipaUk).toBe("/əˈbændən/");
+    expect(sense.synonyms).toEqual(["desert", "forsake"]);
+    expect(sense.antonyms).toEqual(["keep"]);
+    expect(sense.derived).toEqual(["abandonment"]);
+    expect(sense.etymology).toBe("From Old French abandoner.");
+    expect(sense.wordParts).toBe("a<加强> · bandon<控制>");
+    expect(sense.etymologyZh).toBe("来自古法语 abandoner。");
+    expect(sense.examples).toEqual([{ text: "He abandoned the car.", translation: "他遗弃了那辆车。" }]);
   });
 });

@@ -21,13 +21,18 @@
  *
  * 数据库 schema：meta 表由 DB_SCHEMA_VERSION 2 引入（persistence.ts 版本链）；
  * senses.term 索引由 DB_SCHEMA_VERSION 4 引入（v3→v4 仅新增索引，存量保留）。
+ *
+ * 富化内联（RAY-268）：options.enrichment 传入富化包时，词条落库前按 term
+ * 合并富化字段（见 ./enrichment.ts 合并口径）；仅新装词条受益，存量库
+ * 由 backfillEnrichment 回填。
  */
 import { DEFAULT_WORDLIST_LANG } from "../csv";
 import type { LanguageCode } from "../domain";
 import { createId, toEventId, toItemId } from "../id";
 import { toMemoryState, toSense } from "../importWords";
 import type { LexilexiDatabase } from "../persistence";
-import type { PresetPackage } from "./types";
+import { mergeEnrichmentIntoContent, toEnrichmentMap } from "./enrichment";
+import type { EnrichmentPresetPackage, PresetPackage } from "./types";
 
 /** 每块词条数（4 条记录/词条，400 词条 ≈ 1,600 次 put/事务） */
 export const PRESET_CHUNK_SIZE = 400;
@@ -71,6 +76,11 @@ export interface PresetInstallOptions {
   time?: string;
   /** 块间让出事件循环（测试可注入 no-op；默认 setTimeout 0） */
   yield?: () => Promise<void>;
+  /**
+   * 富化数据包（可选，RAY-268）：安装时按 term 内联填充富化字段
+   * （新装路径；存量库走 backfillEnrichment 回填）。
+   */
+  enrichment?: EnrichmentPresetPackage;
 }
 
 export type PresetInstallResult =
@@ -124,6 +134,9 @@ export async function installPreset(
   const lang = options.lang ?? DEFAULT_WORDLIST_LANG;
   const time = options.time ?? new Date().toISOString();
   const yieldFn = options.yield ?? yieldToMainThread;
+  // 富化内联（RAY-268 新装路径）：安装时按 term 一次建表，词条落库前合并；
+  // 存量库的词条由 backfillEnrichment 另行回填（不清库、不改 schema）。
+  const enrichmentMap = options.enrichment ? toEnrichmentMap(options.enrichment) : null;
 
   const done = await db.meta.get(presetDoneKey(preset.id));
   if (done) {
@@ -191,7 +204,10 @@ export async function installPreset(
               skippedInChunk += 1;
               continue;
             }
-            const sense = toSense(entry, lang);
+            const content = enrichmentMap
+              ? mergeEnrichmentIntoContent(entry, enrichmentMap.get(entry.term.toLowerCase()))
+              : entry;
+            const sense = toSense(content, lang);
             const itemId = toItemId(createId("item"));
             await db.senses.put(sense);
             await db.items.put({
