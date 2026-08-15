@@ -111,14 +111,15 @@ describe("createIndexedDbSettingsDataProvider", () => {
     async () => {
       const provider = createIndexedDbSettingsDataProvider(db!);
 
-      // 先装六级（5406 词），再装专四冲刺（9137 词，含全部六级词 + 托福词）
+      // 先装六级（5406 词），再装专四冲刺（8569 词）
+      // RAY-274 GRE 剔除使 132 个带 GRE 标签的六级词从专四词书中移除，
+      // 因此重叠 = 5406 - 132 = 5274；去重后总数 = 5406 + (8569 - 5274) = 8701
       await provider.installWordbook("book-cet6");
       const tem4 = await provider.installWordbook("book-tem4");
 
-      // 专四冲刺新增 = 9137 - 5406 = 3731（toefl 独有部分），跳过 5406
-      expect(tem4.skippedCount).toBe(5406);
-      expect(tem4.installedCount).toBe(9137 - 5406);
-      expect(await db!.items.count()).toBe(9137);
+      expect(tem4.skippedCount).toBe(5274);
+      expect(tem4.installedCount).toBe(8569 - 5274);
+      expect(await db!.items.count()).toBe(8701);
 
       // 两本词书状态均为已装
       const after = await provider.getWordbookSummaries();
