@@ -6,8 +6,6 @@
  * 冲刺词书口径红线。生成物由 scripts/presets/build.mjs --books 产出，
  * 本测试保证「生成 → 装载」契约不被破坏（如脚本输出格式变更须同步此处）。
  */
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { TERM_PATTERN } from "../csv";
 import {
@@ -18,6 +16,7 @@ import {
   WORDBOOK_POOL,
   WORDBOOK_SOURCE,
 } from "./books";
+import p15BasicWords from "./p15-basic-words.fixture.json";
 
 /** 打包侧审计词数（scripts/presets/build.mjs --books 实测） */
 const EXPECTED_TERM_COUNTS: Record<string, number> = {
@@ -70,18 +69,9 @@ describe("WORDBOOK_CATALOG（词书目录）", () => {
   });
 
   it("RAY-274 PR2：P1.5 基础通用词补入清单全部落地于两本冲刺词书（词条完整）", () => {
-    // 选词清单与打包侧同一份源文件（scripts/presets/sources/p15-basic-words.txt）
-    const p15 = new Set(
-      readFileSync(
-        fileURLToPath(
-          new URL("../../../../scripts/presets/sources/p15-basic-words.txt", import.meta.url),
-        ),
-        "utf-8",
-      )
-        .split("\n")
-        .map((w) => w.trim().toLowerCase())
-        .filter((w) => w !== ""),
-    );
+    // 清单为打包侧 scripts/presets/sources/p15-basic-words.txt 的包内快照
+    // （Oscar N2：测试不读包外文件，跨包解耦；打包侧清单变更时同步此 fixture）。
+    const p15 = new Set(p15BasicWords.map((w) => w.trim().toLowerCase()));
     expect(p15.size).toBeGreaterThanOrEqual(300);
     expect(p15.size).toBeLessThanOrEqual(500);
     const tem4 = WORDBOOK_CATALOG.find((book) => book.id === "book-tem4")!;
