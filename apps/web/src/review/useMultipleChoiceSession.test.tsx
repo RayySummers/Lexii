@@ -184,4 +184,61 @@ describe("useMultipleChoiceSession", () => {
     await waitFor(() => expect(result.current.phase).toBe("error"));
     expect(result.current.error).toBe("落库失败");
   });
+
+  it("select 后立即 retry，旧 timer 不推进新会话（B2 边界）", async () => {
+    const cards = [makeCard(), makeCard(), makeCard()];
+    const harness = makeHarness({ cards });
+    const { result } = renderHook(() => useMultipleChoiceSession(harness.provider, "review"));
+    await waitFor(() => expect(result.current.phase).toBe("quizzing"));
+    expect(result.current.index).toBe(0);
+
+    // select 触发 1 秒自动推进 timer
+    await act(async () => {
+      result.current.select(0);
+    });
+    expect(result.current.selectedIndex).toBe(0);
+
+    // 立即 retry → 重新加载，index 归 0，loadId 更新
+    act(() => {
+      result.current.retry();
+    });
+    await waitFor(() => expect(result.current.phase).toBe("quizzing"));
+    expect(result.current.index).toBe(0);
+    expect(result.current.selectedIndex).toBeNull();
+    expect(result.current.answeredCount).toBe(0);
+
+    // 等待旧 timer 周期（1 秒）过去
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1200));
+    });
+
+    // 旧 timer 被 loadId guard 拦截，新会话不受影响
+    expect(result.current.index).toBe(0);
+    expect(result.current.selectedIndex).toBeNull();
+    expect(result.current.answeredCount).toBe(0);
+  });
+
+  it("组件卸载后 timer 被清理，无 setState 调用（B2 边界）", async () => {
+    const cards = [makeCard(), makeCard()];
+    const harness = makeHarness({ cards });
+    const { result, unmount } = renderHook(() =>
+      useMultipleChoiceSession(harness.provider, "review"),
+    );
+    await waitFor(() => expect(result.current.phase).toBe("quizzing"));
+
+    // 选择触发自动推进 timer
+    await act(async () => {
+      result.current.select(0);
+    });
+    expect(result.current.selectedIndex).toBe(0);
+
+    // 在 timer 触发前卸载组件
+    unmount();
+
+    // 等待超过 timer 周期，验证无 React 警告
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1500));
+    });
+    // 若 unmount 未清理 timer，React 会对 unmounted 组件 setState 发出警告
+  });
 });
