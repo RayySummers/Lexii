@@ -29,7 +29,16 @@ permissions:
 
 concurrency:
   group: pages-dev
-  cancel-in-progress: true
+# 并发控制（RAY-297 Oscar 评审 suggestion 1）：两通道共用同一部署串行队列。
+# group 统一为 pages、cancel-in-progress: false —— 部署按触发顺序排队落盘：
+# - 发版时 dev 部署（由 main 合入触发）与 release 部署（由 tag 推送触发）几乎
+#   必然重叠，若各自并行且后落盘的 dev 携带上一版 tag 的根路径快照，
+#   会把刚发布的稳定版覆盖回旧版；串行化后 release 部署总是最后落盘；
+# - 不能用 true：反向顺序（dev 部署后触发）会把 release 部署取消掉，
+#   且取消后无自动重触发，刚打的 tag 永远发不出去。
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build-deploy:

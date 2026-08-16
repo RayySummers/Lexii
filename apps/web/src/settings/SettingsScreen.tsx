@@ -139,6 +139,7 @@ export function SettingsScreen({
   const [devPanelTapState, setDevPanelTapState] = useState(() => ({
     unlocked: readDevPanelUnlocked(),
     taps: 0,
+    lastTapAt: 0,
   }));
 
   const handleExportJson = useCallback(async () => {
@@ -239,16 +240,15 @@ export function SettingsScreen({
     }
   }, []);
 
-  /** 版本号连点（RAY-297）：累计 N 次翻转解锁状态并持久化；未到阈值只计数 */
+  /** 版本号连点（RAY-297）：累计 N 次翻转解锁状态并持久化；未到阈值只计数。
+   *  Oscar 评审 nit 1：localStorage 写入放在 updater 外（updater 保持纯函数）。 */
   const handleVersionTap = useCallback(() => {
-    setDevPanelTapState((current) => {
-      const next = nextTapState(current);
-      if (next.unlocked !== current.unlocked) {
-        writeDevPanelUnlocked(next.unlocked);
-      }
-      return next;
-    });
-  }, []);
+    const next = nextTapState(devPanelTapState, Date.now());
+    if (next.unlocked !== devPanelTapState.unlocked) {
+      writeDevPanelUnlocked(next.unlocked);
+    }
+    setDevPanelTapState(next);
+  }, [devPanelTapState]);
 
   if (view === "licenses") {
     return <DataSourcesScreen provider={provider} onBack={() => setView("main")} />;
