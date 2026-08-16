@@ -18,8 +18,8 @@ export {
   EVENT_SCHEMA_VERSION,
   EXPORT_FORMAT_VERSION,
 } from "./constants";
-export { createId, hasIdPrefix, toEventId, toItemId, toSenseId } from "./id";
-export type { EventId, IdPrefix, ItemId, SenseId } from "./id";
+export { createId, hasIdPrefix, toEventId, toItemId, toNotebookEntryId, toSenseId } from "./id";
+export type { EventId, IdPrefix, ItemId, NotebookEntryId, SenseId } from "./id";
 export type {
   ExampleSentence,
   IsoDate,
@@ -143,12 +143,26 @@ export {
   undoReview,
 } from "./studyLoop";
 export type {
+  DueQueryOptions,
   GradeReviewInput,
   GradeReviewResult,
   StudyMode,
   StudyQueueOptions,
   UndoReviewInput,
 } from "./studyLoop";
+export {
+  addToNotebook,
+  getActiveNotebookItemIds,
+  listNotebookEntries,
+  NOTEBOOK_SOURCE,
+  removeFromNotebook,
+} from "./notebook";
+export type {
+  AddToNotebookInput,
+  NotebookEntry,
+  NotebookEntryStatus,
+  RemoveFromNotebookInput,
+} from "./notebook";
 export {
   editDistance,
   generateOptions,

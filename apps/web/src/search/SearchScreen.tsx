@@ -19,13 +19,17 @@
  *   配合保证清空后不残留上一轮结果（Oscar 评审 suggestion 1 修复口径）；
  * - 错误态：主提示为固定友好文案，原始错误信息折叠在「错误详情」中
  *   （与统计页同一模式），不直接透出内部实现细节；
+ * - RAY-284 生词本加词入口：每条结果行带「加词」按钮（已在生词本的行
+ *   显示「已在生词本」标记），幂等加词、反馈加词结果；生词本标记在
+ *   进入页面时读一次（本页移出生词本后回到本页时以重新进入为准）；
  * - 全部颜色走 design tokens（浅色/深色自动生效），不硬编码颜色。
  *
  * 说明文案为过渡版（Vega 的正式文案交付后替换）。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { SenseId } from "@lexilexi/core";
 import { ScreenHeader } from "../components/ScreenHeader";
-import { CloseIcon, SearchIcon } from "../components/icons";
+import { CloseIcon, PlusIcon, SearchIcon } from "../components/icons";
 import {
   loadSearchHistory,
   recordSearchHistory,
@@ -73,6 +77,10 @@ export function SearchScreen({ provider, onExit, historyStorage }: SearchScreenP
   const [history, setHistory] = useState<string[]>(() =>
     loadSearchHistory(resolveHistoryStorage(historyStorage)),
   );
+  // 生词本覆盖的义项 id 集合（RAY-284：结果行「已在生词本」标记；进入页面读一次）
+  const [notebookSenseIds, setNotebookSenseIds] = useState<ReadonlySet<string> | null>(null);
+  // 加词反馈（最近一次加词操作的结果；null = 无反馈）
+  const [addNotice, setAddNotice] = useState<string | null>(null);
   // 请求序号：只采纳最新一次检索的响应，过期响应丢弃
   const requestSeqRef = useRef(0);
   // 输入框引用：点选历史词条后焦点回到输入框（历史列表随输入卸载，避免焦点丢失）
@@ -90,6 +98,27 @@ export function SearchScreen({ provider, onExit, historyStorage }: SearchScreenP
       })
       .catch(() => {
         // 判定失败静默：按「非空」处理，检索路径自有错误展示
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [provider]);
+
+  // 生词本义项集合（RAY-284：结果行标记；失败静默按空集合处理，
+  // 加词路径自有错误展示）
+  useEffect(() => {
+    let cancelled = false;
+    void provider
+      .getNotebookSenseIds()
+      .then((ids) => {
+        if (!cancelled) {
+          setNotebookSenseIds(new Set(ids));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setNotebookSenseIds(new Set());
+        }
       });
     return () => {
       cancelled = true;
@@ -161,6 +190,21 @@ export function SearchScreen({ provider, onExit, historyStorage }: SearchScreenP
     [historyStorage],
   );
 
+  // 把义项加入生词本（RAY-284）：幂等；成功后该义项进入「已在生词本」标记集合
+  const handleAddToNotebook = useCallback(
+    async (senseId: SenseId) => {
+      setAddNotice(null);
+      try {
+        const result = await provider.addToNotebook(senseId);
+        setNotebookSenseIds((previous) => new Set([...(previous ?? []), senseId]));
+        setAddNotice(result === "added" ? "已加入生词本" : "已在生词本中");
+      } catch (error) {
+        setAddNotice(`加入失败：${toErrorMessage(error)}`);
+      }
+    },
+    [provider],
+  );
+
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
       <ScreenHeader title="搜词" onBack={onExit} />
@@ -189,8 +233,11 @@ export function SearchScreen({ provider, onExit, historyStorage }: SearchScreenP
         error={error}
         emptyLibrary={emptyLibrary}
         history={history}
+        notebookSenseIds={notebookSenseIds}
+        addNotice={addNotice}
         onSelectHistory={handleHistorySelect}
         onRemoveHistory={handleHistoryRemove}
+        onAddToNotebook={handleAddToNotebook}
       />
     </main>
   );
@@ -205,8 +252,13 @@ interface SearchContentProps {
   emptyLibrary: boolean;
   /** 本地搜索历史（最新在前；仅本地存储，不上传） */
   history: string[];
+  /** 生词本覆盖的义项 id 集合（null = 尚未加载完成；RAY-284） */
+  notebookSenseIds: ReadonlySet<string> | null;
+  /** 最近一次加词操作反馈（null = 无） */
+  addNotice: string | null;
   onSelectHistory(term: string): void;
   onRemoveHistory(term: string): void;
+  onAddToNotebook(senseId: SenseId): void;
 }
 
 /** 按状态渲染检索区内容（独立于容器，便于逐状态阅读与测试） */
@@ -217,8 +269,11 @@ function SearchContent({
   error,
   emptyLibrary,
   history,
+  notebookSenseIds,
+  addNotice,
   onSelectHistory,
   onRemoveHistory,
+  onAddToNotebook,
 }: SearchContentProps) {
   if (error) {
     // 友好文案 + 原始信息折叠（与统计页同一模式，Oscar 评审 nit 1）：
@@ -298,9 +353,19 @@ function SearchContent({
       <p role="status" className="text-sm text-text-muted">
         找到 {results.length} 条结果
       </p>
+      {addNotice ? (
+        <p role="status" className="text-xs text-text-muted">
+          {addNotice}
+        </p>
+      ) : null}
       <ul className="flex flex-col gap-3">
         {results.map((result) => (
-          <SearchResultRow key={result.sense.id} result={result} />
+          <SearchResultRow
+            key={result.sense.id}
+            result={result}
+            inNotebook={notebookSenseIds?.has(result.sense.id) ?? false}
+            onAddToNotebook={onAddToNotebook}
+          />
         ))}
       </ul>
     </>
@@ -350,8 +415,17 @@ function SearchHistoryList({ history, onSelect, onRemove }: SearchHistoryListPro
   );
 }
 
-/** 单条结果：词条 + 词性/音标 + 释义 */
-function SearchResultRow({ result }: { result: SearchResult }) {
+/** 单条结果：词条 + 词性/音标 + 释义 + 加词入口（RAY-284） */
+function SearchResultRow({
+  result,
+  inNotebook,
+  onAddToNotebook,
+}: {
+  result: SearchResult;
+  /** 该义项是否已在生词本（标记集合加载完成前按 false 处理） */
+  inNotebook: boolean;
+  onAddToNotebook(senseId: SenseId): void;
+}) {
   const { sense } = result;
   return (
     <li className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface p-4">
@@ -361,6 +435,23 @@ function SearchResultRow({ result }: { result: SearchResult }) {
         {sense.ipa ? <span className="text-xs text-text-muted">/{sense.ipa}/</span> : null}
       </span>
       <p className="text-sm leading-relaxed text-text-muted">{sense.definitions.join("；")}</p>
+      <div className="flex items-center justify-end">
+        {inNotebook ? (
+          <span className="rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium text-text-muted">
+            已在生词本
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onAddToNotebook(sense.id)}
+            aria-label={`把「${sense.term}」加入生词本`}
+            className="flex items-center gap-1 rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium text-text-muted transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            <PlusIcon className="h-3.5 w-3.5" />
+            加词
+          </button>
+        )}
+      </div>
     </li>
   );
 }

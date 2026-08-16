@@ -18,11 +18,15 @@
  *
  * RAY-280：导出备份入口已从本页移到设置页（真机反馈），本页不再提供
  * 导出按钮，导出功能本身不变（设置页仍导出完整可恢复 JSON）。
+ *
+ * RAY-284：工具栏新增「加词」——把当前卡的词加入生词本（幂等：已在
+ * 生词本时提示「已在生词本中」）；生词本词条进入现有 FSRS 调度
+ * （加入即到期），是否进入学习列表由首页开关控制。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
 import type { ReviewRating, StudyMode } from "@lexilexi/core";
-import { BackArrowIcon, SpeakerIcon, UndoIcon } from "../components/icons";
+import { BackArrowIcon, PlusIcon, SpeakerIcon, UndoIcon } from "../components/icons";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { primeSpeechEngine, readPronunciationAccent, speakWord } from "../lib/pronunciation";
 import { readRatingTierMode } from "../lib/ratingTiers";
@@ -56,6 +60,11 @@ const NO_QUEUE_COPY: Record<StudyMode, { title: string; body: string }> = {
     body: "今天没有到期词，也没有待学习的新词。休息一下，或返回首页换一种模式。",
   },
 };
+
+/** 数据源错误 → 原始错误信息（加词失败反馈用；不暴露内部实现细节给主界面） */
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 /** 当前卡评分的到期文案（预览计算轻量，无需 memo）；
  * 分钟级（「X 分钟后复习」类，RAY-279）为 null，不展示 */
@@ -93,6 +102,11 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
   // 评分档位（RAY-265）：会话内固定读取一次；改设置后下次进入复习生效
   const [tierMode] = useState<RatingTierMode>(() => readRatingTierMode());
   const [speakNotice, setSpeakNotice] = useState<string | null>(null);
+  // 加词反馈（RAY-284）：按卡锚定——反馈记录其所属卡 id，切卡后不再展示
+  const [notebookNotice, setNotebookNotice] = useState<{
+    itemId: string;
+    text: string;
+  } | null>(null);
   // 朗读目标经 ref 读取（session 每次渲染换身份，useCallback 依赖其字段会
   // 让回调每次重建；ref 与提交同步即可保证点击时读到当前卡）
   const currentCardRef = useRef(session.current);
@@ -114,6 +128,24 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
       },
     });
   }, []);
+
+  /** 把当前卡加入生词本（RAY-284）：幂等，反馈按卡锚定 */
+  const handleAddToNotebook = useCallback(async () => {
+    const card = currentCardRef.current;
+    if (!card) {
+      return;
+    }
+    setNotebookNotice(null);
+    try {
+      const result = await provider.addToNotebook(card.sense.id);
+      setNotebookNotice({
+        itemId: card.item.id,
+        text: result === "added" ? "已加入生词本" : "已在生词本中",
+      });
+    } catch (error) {
+      setNotebookNotice({ itemId: card.item.id, text: `加入失败：${toErrorMessage(error)}` });
+    }
+  }, [provider]);
 
   // 键盘监听：监听器生命周期与组件绑定（空依赖），阶段与回调经 ref 读取。
   // 之前依赖 [phase] 会在阶段切换时移除/重挂监听——重挂窗口内（或闭包
@@ -211,6 +243,8 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
         tierMode={tierMode}
         onSpeak={handleSpeak}
         speakNotice={speakNotice}
+        onAddToNotebook={handleAddToNotebook}
+        notebookNotice={notebookNotice}
         onExit={onExit}
       />
     </main>
@@ -228,6 +262,10 @@ interface PhaseContentProps {
   onSpeak(): void;
   /** 发音不可用的提示（null = 无提示） */
   speakNotice: string | null;
+  /** 把当前卡加入生词本（RAY-284） */
+  onAddToNotebook(): void;
+  /** 加词结果反馈（按卡锚定：itemId 不属于当前卡时不展示） */
+  notebookNotice: { itemId: string; text: string } | null;
   onExit(): void;
 }
 
@@ -239,6 +277,8 @@ function PhaseContent({
   tierMode,
   onSpeak,
   speakNotice,
+  onAddToNotebook,
+  notebookNotice,
   onExit,
 }: PhaseContentProps) {
   switch (session.phase) {
@@ -354,6 +394,15 @@ function PhaseContent({
               </span>
               标熟
             </button>
+            <button
+              type="button"
+              onClick={onAddToNotebook}
+              aria-label={`把「${session.current.sense.term}」加入生词本`}
+              className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            >
+              <PlusIcon className="h-4 w-4" />
+              加词
+            </button>
           </div>
           <RatingButtons
             dueLabels={dueLabels}
@@ -363,6 +412,11 @@ function PhaseContent({
           {speakNotice ? (
             <p role="status" className="text-center text-xs text-text-muted">
               {speakNotice}
+            </p>
+          ) : null}
+          {notebookNotice && notebookNotice.itemId === session.current.item.id ? (
+            <p role="status" className="text-center text-xs text-text-muted">
+              {notebookNotice.text}
             </p>
           ) : null}
           {session.canUndo ? <UndoButton onUndo={() => void session.undo()} /> : null}

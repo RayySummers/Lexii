@@ -6,14 +6,15 @@
 
 ## 1. 核心概念总览
 
-| 概念              | 是什么                                                       | 生命周期                                               |
-| ----------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
-| **Learning Item** | 用户要掌握的最小学习对象：一个词条的**一个词义**             | 导入词库创建 → 用户删除                                |
-| **Sense**         | 词义快照（词条、语言、释义），是 Learning Item 的内容部分    | 属于 Learning Item，随 item 删除                       |
-| **Memory State**  | 该词义在 FSRS-7 下的记忆状态（稳定度、难度、下次复习时间等） | 每个 Learning Item 恰好一份，随复习更新                |
-| **Event**         | 一次复习（或导入、删除等）产生的细粒度原始记录，append-only  | 永久保留（删除型事件除外），是统计与评分的唯一事实来源 |
+| 概念                          | 是什么                                                         | 生命周期                                               |
+| ----------------------------- | -------------------------------------------------------------- | ------------------------------------------------------ |
+| **Learning Item**             | 用户要掌握的最小学习对象：一个词条的**一个词义**               | 导入词库创建 → 用户删除                                |
+| **Sense**                     | 词义快照（词条、语言、释义），是 Learning Item 的内容部分      | 属于 Learning Item，随 item 删除                       |
+| **Memory State**              | 该词义在 FSRS-7 下的记忆状态（稳定度、难度、下次复习时间等）   | 每个 Learning Item 恰好一份，随复习更新                |
+| **Event**                     | 一次复习（或导入、删除等）产生的细粒度原始记录，append-only    | 永久保留（删除型事件除外），是统计与评分的唯一事实来源 |
+| **Notebook Entry**（RAY-284） | 「词条加入生词本」的记录，1─1 锚定其调度载体（生词本学习条目） | 加词创建 → 移出标记 removed（记录保留）                |
 
-关系：`Learning Item 1─1 Sense`，`Learning Item 1─1 Memory State`，`Learning Item 1─N Event`。
+关系：`Learning Item 1─1 Sense`（生词本条目复用词库既有义项，因此实际为 `Learning Item N─1 Sense`：词书条目与生词本条目可共享同一义项、各自独立调度），`Learning Item 1─1 Memory State`，`Learning Item 1─N Event`，`Notebook Entry 1─1 Learning Item`（生词本条目）。
 
 ## 2. 设计取舍（与 FSRS-7 的对接契约）
 
@@ -28,8 +29,8 @@ interface LearningItem {
   id: ItemId; // nanoid(10)，带类型前缀 "item"
   createdAt: IsoDate; // ISO-8601 毫秒时间戳（UTC）
   updatedAt: IsoDate;
-  source: string; // 来源词库标识（如 "导入:四级词表.csv"），与词典来源/许可证溯源挂钩
-  senseId: SenseId; // 1─1 指向 Sense
+  source: string; // 来源词库标识（如 "导入:四级词表.csv"；生词本条目为 "生词本"），与词典来源/许可证溯源挂钩
+  senseId: SenseId; // 指向 Sense；N─1（生词本条目复用词库既有义项，见 §4.1）
   kind: "word"; // MVP 仅词条；未来可扩展 "phrase" / "sentence"
   status: ItemStatus; // "active" | "suspended" | "deleted"
 }
@@ -76,6 +77,35 @@ interface ExampleSentence {
   （只补「缺失/为空」的字段，绝不覆盖用户既有内容，不清库）。
 - 富化字段缺失即未提供：UI 与导出路径按可选字段处理（导出/导入整体序列化
   Sense 记录，新字段自动往返）。
+
+### 4.1 生词本条目（Notebook Entry，RAY-284）
+
+```ts
+interface NotebookEntry {
+  id: NotebookEntryId; // nanoid(10)，带类型前缀 "nb"
+  itemId: ItemId; // 该词的调度载体：生词本学习条目（独立于词书条目的调度实例）
+  senseId: SenseId; // 复用词库既有义项（加词入口指向的义项），不复制内容
+  term: string; // 词条原文（列表展示冗余字段）
+  addedAt: IsoDate; // 加入时刻
+  status: "active" | "removed"; // active ⇢ removed（移出，记录保留为历史）
+  removedAt: IsoDate | null; // 移出时刻（active 恒为 null）
+}
+```
+
+- 口径（Jack 拍板）：生词本独立于词书——无论学什么词书，都可选择学习列表
+  是否包含生词本；生词进入现有调度（FSRS），不另起调度；导出/导入沿用现有
+  数据格式、可完整恢复。
+- 加词（`addToNotebook`）：单事务创建 生词本学习条目（source = `"生词本"`）+
+  Memory State（`newCardFields` 初始化，加入即到期）+ `import` 事件（与词表
+  导入同类型，来源由 item.source 区分）+ NotebookEntry 记录；同一义项重复
+  加词幂等（active 条目按 senseId 查重，直接返回既有记录）。
+- 移出（`removeFromNotebook`）：条目标记 `removed`（保留历史）+ 底层学习条目
+  软删除（`status = "deleted"` + delete-item 事件，与 deleteItem 同语义）；
+  词书中同词条目（另一调度实例）不受影响。
+- 学习列表开关：`getStudyQueueItemIds` / `getDueItemIds` /
+  `getDueItemIdsInRange` 的 `includeNotebook` 选项（默认 true）关闭时按
+  `notebookEntries.status === "active"` 排除生词本条目；偏好存储（localStorage）
+  在 apps/web，core 只接收选项、不持有产品口径。
 
 ## 5. Memory State
 
@@ -176,19 +206,20 @@ interface ReviewEvent extends BaseEvent {
 
 ## 8. 存储决策（每个实体为什么存、存在哪、留多久）
 
-| 实体          | 为什么存       | 存在哪                   | 保留                             | 是否共享          |
-| ------------- | -------------- | ------------------------ | -------------------------------- | ----------------- |
-| Learning Item | 学习对象主记录 | IndexedDB `items`        | 直到用户删除                     | 否（local-first） |
-| Sense         | 词义内容       | IndexedDB `senses`       | 同 Learning Item                 | 否                |
-| Memory State  | 调度状态       | IndexedDB `memoryStates` | 同 Learning Item                 | 否                |
-| Event         | 唯一事实来源   | IndexedDB `events`       | **永久**（删除型事件本身是记录） | 否                |
+| 实体           | 为什么存       | 存在哪                      | 保留                             | 是否共享          |
+| -------------- | -------------- | --------------------------- | -------------------------------- | ----------------- |
+| Learning Item  | 学习对象主记录 | IndexedDB `items`           | 直到用户删除                     | 否（local-first） |
+| Sense          | 词义内容       | IndexedDB `senses`          | 同 Learning Item                 | 否                |
+| Memory State   | 调度状态       | IndexedDB `memoryStates`    | 同 Learning Item                 | 否                |
+| Event          | 唯一事实来源   | IndexedDB `events`          | **永久**（删除型事件本身是记录） | 否                |
+| Notebook Entry | 生词本成员记录 | IndexedDB `notebookEntries` | removed 记录保留为历史           | 否                |
 
 - 事件永不压缩（不聚合为汇总行）；未来容量压力通过「冻结期 + 导出归档」处理，仍禁止静默丢弃。
 - 默认 local-first：词库、FSRS 状态、学习历史、事件日志一律不出本地；任何外部发送能力若未来加入，需用户显式同意（隐私红线）。
 
 ## 9. 数据层与版本迁移
 
-- Dexie 数据库 **`lexilexi`**，`SCHEMA_VERSION = 4`，表：`items`(`id`)、`senses`(`id`, `term`)、`memoryStates`(`id`, `fields.due`)、`events`(`id`, `time`, `type`)、`meta`(`key`)。
+- Dexie 数据库 **`lexilexi`**，`SCHEMA_VERSION = 5`，表：`items`(`id`)、`senses`(`id`, `term`)、`memoryStates`(`id`, `fields.due`)、`events`(`id`, `time`, `type`)、`meta`(`key`)、`notebookEntries`(`id`, `senseId`, `status`)。
 - **schema 升级必须走 `db.version(n).stores(...).upgrade(...)` 迁移**，严禁 `db.delete()` / `db.close()` 后重建（清库重来是红线）。每版迁移函数带独立单元测试。
 - 版本链：v1 = 初始四表；v2（RAY-258）= 新增 `meta` 表（`{ key, value }` 字符串键值，
   承载预设词表安装进度/完成标记 `preset:<id>:progress` / `preset:<id>:done`
@@ -197,6 +228,10 @@ interface ReviewEvent extends BaseEvent {
   filter 全表扫描改为索引区间查询（`belowOrEqual` / `between`），仅新增索引，
   无数据迁移，存量数据原样保留。v4（RAY-262）= `senses` 新增 `term` 索引
   （预设词书安装按 term 查重去重），仅新增索引，存量数据原样保留。
+  v5（RAY-284）= 新增 `notebookEntries` 表（`senseId` 索引按义项查重去重、
+  `status` 索引按 active 列表）。纯新增表，无数据迁移，存量数据原样保留；
+  版本与 P0 数据任务错开（RAY-288 纯展示、RAY-270 只读事件流，均不改
+  schema），禁止两线并发改 schema（红线）。
 - 升级不丢数据回归防线（RAY-276）：`upgradePath.test.ts` 以 alpha.2 的 v1
   schema 直接建库、按旧版本落库形态写入已学词/新词/学习记录，再由当前
   `openDatabase` 执行 v1→v4 迁移链，断言四表数量与到期队列完整。
@@ -219,6 +254,9 @@ interface ReviewEvent extends BaseEvent {
 
 ## 11. 导出/导入
 
-- **导出必须完整可恢复**：`exportLexilexiData()` 产出单文件 JSON，含 `items`、`senses`、`memoryStates`、`events` 四张表 + schema 版本号；`importLexilexiData()` 能将其原样导回（JSON round-trip 测试保证）。`meta` 表为安装/偏好标记（非学习数据），不随导出；备份恢复后若库中已有数据，首启引导按「已有数据」跳过内置词表安装，不会重复导入。
+- **导出必须完整可恢复**：`exportLexilexiData()` 产出单文件 JSON，含 `items`、`senses`、`memoryStates`、`events`、`notebookEntries` 五张表 + schema 版本号；`importLexilexiData()` 能将其原样导回（JSON round-trip 测试保证）。`meta` 表为安装/偏好标记（非学习数据），不随导出；备份恢复后若库中已有数据，首启引导按「已有数据」跳过内置词表安装，不会重复导入。
+- 导出格式版本（`EXPORT_FORMAT_VERSION = 1`）不变：`notebookEntries` 为 RAY-284
+  新增字段，**旧备份（无该字段）导入时按空生词本处理**，绝不因备份格式升级
+  拒绝恢复；新导出含该字段，可完整恢复生词本。
 - 导入时同 `id` 冲突按「导入覆盖」处理，版本高于当前的不合法数据明确报错，绝不静默清库。
 - **低版本导入策略（v1 定稿，v0 无此字段）**：`dbSchemaVersion === 当前版本` 直接导入；`dbSchemaVersion < 当前版本` 允许导入，**不隐式迁移**——记录数据为 `put` 覆盖，未来 schema 升级时由数据库自身的 `version(n).upgrade()` 迁移链在打开时补齐（导入路径本身不做表结构改写）。若未来引入破坏性 schema 变更导致旧版无法安全导入，须在 `importLexilexiData` 显式拒绝并给出升级指引，且必须随新版本更新本文档。

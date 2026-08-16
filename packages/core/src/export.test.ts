@@ -9,6 +9,7 @@ import { DB_SCHEMA_VERSION, EXPORT_FORMAT_VERSION } from "./constants";
 import type { LexilexiExportData } from "./export";
 import { SAMPLE_WORDLIST_CSV, SAMPLE_WORDLIST_ROW_COUNT } from "./sampleWordlist";
 import { importCsvWordlist } from "./importWords";
+import { addToNotebook } from "./notebook";
 import { makeLearningItem, makeMemoryState, makeReviewEvent, makeSense, now } from "./helpers";
 
 /** 每个测试用独立的 fake-indexeddb 实例 */
@@ -181,6 +182,7 @@ describe("exportLexilexiData / importLexilexiData", () => {
       senses: [],
       memoryStates: [],
       events: [],
+      notebookEntries: [],
     };
     await expect(importLexilexiData(target, future)).rejects.toThrow("版本不兼容");
     await expect(
@@ -241,12 +243,67 @@ describe("parseLexilexiExport（结构校验）", () => {
 });
 
 describe("表结构", () => {
-  it("四张表均存在且可操作", async () => {
+  it("五张表均存在且可操作", async () => {
     const db = openDatabase(makeOptions());
-    for (const table of [db.items, db.senses, db.memoryStates, db.events]) {
+    for (const table of [db.items, db.senses, db.memoryStates, db.events, db.notebookEntries]) {
       await table.clear();
       expect(await table.count()).toBe(0);
     }
     await db.delete();
+  });
+});
+
+describe("生词本随导出/导入完整恢复（RAY-284）", () => {
+  it("notebookEntries 随 JSON 原样导回（round-trip），五张表完整恢复", async () => {
+    const source = openDatabase(makeOptions());
+    await makeExport(source);
+    const sense = makeSense("sense_nb");
+    await source.senses.put(sense);
+    const entry = await addToNotebook(source, { senseId: sense.id, now: now() });
+
+    const data = await exportLexilexiData(source, now());
+    expect(data.notebookEntries).toEqual([entry]);
+
+    const roundTripped = parseLexilexiExport(JSON.stringify(data));
+    expect(roundTripped.notebookEntries).toEqual([entry]);
+
+    const target = openDatabase(makeOptions());
+    await importLexilexiData(target, roundTripped);
+    expect(await target.notebookEntries.toArray()).toEqual([entry]);
+    // 生词本底层条目 / 记忆状态 / import 事件一并恢复
+    expect(await target.items.get(entry.itemId)).toBeDefined();
+    expect(await target.memoryStates.get(entry.itemId)).toBeDefined();
+
+    await source.delete();
+    await target.delete();
+  });
+
+  it("旧备份（本字段引入前导出，无 notebookEntries）解析为空生词本并可导入", async () => {
+    const db = openDatabase(makeOptions());
+    await makeExport(db);
+    const legacy = await exportLexilexiData(db, now());
+    await db.delete();
+
+    // 模拟旧版本导出文件：移除 notebookEntries 字段
+    const legacyJson = JSON.parse(JSON.stringify(legacy)) as Record<string, unknown>;
+    delete legacyJson.notebookEntries;
+
+    const parsed = parseLexilexiExport(JSON.stringify(legacyJson));
+    expect(parsed.notebookEntries).toEqual([]);
+
+    const target = openDatabase(makeOptions());
+    await importLexilexiData(target, parsed);
+    expect(await target.notebookEntries.count()).toBe(0);
+    expect(await target.items.count()).toBe(1); // 旧备份四表数据照常恢复
+    await target.delete();
+  });
+
+  it("notebookEntries 非法（非数组 / 元素非对象）时明确拒绝", () => {
+    const base =
+      '{"format":"lexilexi","exportFormatVersion":1,"dbSchemaVersion":1,"exportedAt":"2026-01-01T00:00:00.000Z","items":[],"senses":[],"memoryStates":[],"events":[]';
+    expect(() => parseLexilexiExport(`${base},"notebookEntries":"x"}`)).toThrow("notebookEntries");
+    expect(() => parseLexilexiExport(`${base},"notebookEntries":[1]}`)).toThrow(
+      "notebookEntries 的元素",
+    );
   });
 });

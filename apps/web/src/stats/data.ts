@@ -3,7 +3,8 @@
  *
  * 聚合口径（对应 docs/domain-model.md §7 事件流唯一事实来源）：
  * - dueCount：getDueItemIds（core 公开 API，due <= 今日结束的记忆状态数，
- *   日历日口径含积压与今天稍后到期的卡，RAY-276；未截断，首页徽标用）
+ *   日历日口径含积压与今天稍后到期的卡，RAY-276；未截断，首页徽标用）；
+ *   生词本开关关闭时排除生词本条目（RAY-284，与学习队列同口径）
  * - newCardsRemainingToday：getStudyQueueItemIds("learn")（未截断的新词队列
  *   长度，「剩余新卡数」与学习队列同口径）经 @lexilexi/stats 的
  *   computeNewCardsRemainingToday 按「每日新卡上限 − 今日已学」与剩余新卡
@@ -46,6 +47,7 @@ import {
   localDayBounds,
 } from "@lexilexi/stats";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
+import { readIncludeNotebook } from "../lib/notebookPreference";
 import type { StatsDataProvider, StatsSnapshot } from "./types";
 
 /** 基于已打开的 Lexilexi 数据库创建统计数据源（测试注入 fake-indexeddb 实例） */
@@ -54,10 +56,12 @@ export function createIndexedDbStatsDataProvider(db: LexilexiDatabase): StatsDat
     async loadStats(): Promise<StatsSnapshot> {
       const now = new Date().toISOString();
       const tomorrow = localDayBounds(now, 1);
+      // 生词本开关（RAY-284）：到期/待学统计与学习队列同口径（调用时读取偏好）
+      const includeNotebook = readIncludeNotebook();
       const [dueIds, dueTomorrowIds, newCardIds, reviewEvents] = await Promise.all([
-        getDueItemIds(db, now),
-        getDueItemIdsInRange(db, tomorrow.start, tomorrow.end),
-        getStudyQueueItemIds(db, now, "learn"),
+        getDueItemIds(db, now, { includeNotebook }),
+        getDueItemIdsInRange(db, tomorrow.start, tomorrow.end, { includeNotebook }),
+        getStudyQueueItemIds(db, now, "learn", { includeNotebook }),
         db.events.where("type").equals("review").toArray(),
       ]);
       // where 查询返回 Event[]，经类型守卫收窄为 ReviewEvent[] 供 stats 纯函数使用

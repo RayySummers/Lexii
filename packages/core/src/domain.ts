@@ -80,9 +80,9 @@ export interface LearningItem {
   id: ItemId;
   createdAt: IsoDate;
   updatedAt: IsoDate;
-  /** 来源词库标识（如 "导入:四级词表.csv"），与词典来源/许可证溯源挂钩 */
+  /** 来源词库标识（如 "导入:四级词表.csv"；生词本条目为 "生词本"），与词典来源/许可证溯源挂钩 */
   source: string;
-  /** 1─1 指向 Sense */
+  /** 指向 Sense；N─1（RAY-284：生词本条目复用词库既有义项，同一义项可被多个条目共享、各自独立调度） */
   senseId: SenseId;
   kind: ItemKind;
   status: ItemStatus;

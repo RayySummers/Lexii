@@ -6,6 +6,8 @@
  * - 多条释义用全角分号「；」连接（与导入解析的拆分规则一致，保证导回）；
  * - 字段含逗号 / 引号 / 换行时按 RFC 4180 加引号并转义（"" → "）；
  * - 只导出未删除（active / suspended）条目，按 createdAt 升序（稳定可复现）；
+ * - 同一义项被多个条目共享（生词本条目复用词库义项，RAY-284）时按
+ *   senseId 去重，一词只导出一行；
  * - 导出文本前置 UTF-8 BOM（Windows 中文版 Excel 打开中文释义不乱码；
  *   parseCsvWordlist 会忽略 BOM，round-trip 不受影响）。
  *
@@ -44,18 +46,25 @@ export function serializeWordlistCsv(entries: readonly CsvWordEntry[]): string {
   return lines.join("\n");
 }
 
-/** 导出当前词表为 CSV 文本（仅未删除条目，按 createdAt 升序；前置 UTF-8 BOM） */
+/** 导出当前词表为 CSV 文本（仅未删除条目，按 createdAt 升序；按 senseId 去重；前置 UTF-8 BOM） */
 export async function exportCsvWordlist(db: LexilexiDatabase): Promise<string> {
   return db.transaction("r", db.items, db.senses, async () => {
     const items = await db.items.toArray();
     const kept = items.filter((item) => item.status !== "deleted").sort(byCreatedAt);
     const senses = await db.senses.bulkGet(kept.map((item) => item.senseId));
     const entries: CsvWordEntry[] = [];
+    // 生词本条目复用词库义项（同一 senseId 被多个条目共享，RAY-284）：
+    // 按 senseId 去重，一词只导出一行
+    const seenSenseIds = new Set<string>();
     for (let i = 0; i < kept.length; i += 1) {
       const sense = senses[i];
       if (!sense) {
         continue; // 义项缺失的脏数据跳过，不产出空行（与复习队列的对齐策略一致）
       }
+      if (seenSenseIds.has(sense.id)) {
+        continue;
+      }
+      seenSenseIds.add(sense.id);
       entries.push(toCsvEntry(sense));
     }
     return UTF8_BOM + serializeWordlistCsv(entries);

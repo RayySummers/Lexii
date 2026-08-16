@@ -15,6 +15,7 @@ import type { DexieOptions, Table } from "dexie";
 import type { IsoDate, LearningItem, Sense } from "./domain";
 import type { Event } from "./events";
 import type { MemoryState } from "./memory";
+import type { NotebookEntry } from "./notebook";
 import { DB_SCHEMA_VERSION } from "./constants";
 import { createId, toEventId } from "./id";
 
@@ -51,6 +52,8 @@ export function createLexilexiDatabase(
  * v4（RAY-262）：senses 增加 term 索引（预设词书安装按 term 查重去重，
  * 重叠词书与用户已导入词条不重复生成学习项）；仅新增索引，无数据迁移，
  * 存量数据原样保留。
+ * v5（RAY-284）：新增 notebookEntries 表（生词本条目）。纯新增表，
+ * 无数据迁移，存量数据原样保留；版本与 P0 数据任务错开（红线）。
  */
 export function openLexilexiDatabase(db: Dexie): void {
   if (db.isOpen()) {
@@ -76,12 +79,20 @@ export function openLexilexiDatabase(db: Dexie): void {
     events: "id, time, type",
     meta: "key",
   });
+  db.version(4).stores({
+    items: "id",
+    senses: "id, term",
+    memoryStates: "id, fields.due",
+    events: "id, time, type",
+    meta: "key",
+  });
   db.version(DB_SCHEMA_VERSION).stores({
     items: "id",
     senses: "id, term",
     memoryStates: "id, fields.due",
     events: "id, time, type",
     meta: "key",
+    notebookEntries: "id, senseId, status",
   });
 }
 
@@ -97,6 +108,7 @@ export interface LexilexiTables {
   memoryStates: Table<MemoryState, string>;
   events: Table<Event, string>;
   meta: Table<MetaRecord, string>;
+  notebookEntries: Table<NotebookEntry, string>;
 }
 
 export interface LexilexiDatabase extends Dexie {
@@ -105,6 +117,7 @@ export interface LexilexiDatabase extends Dexie {
   memoryStates: Table<MemoryState, string>;
   events: Table<Event, string>;
   meta: Table<MetaRecord, string>;
+  notebookEntries: Table<NotebookEntry, string>;
 }
 
 /**

@@ -33,6 +33,7 @@ const EMPTY_EXPORT: LexilexiExportData = {
   senses: [],
   memoryStates: [],
   events: [],
+  notebookEntries: [],
 };
 
 const DEFAULT_PRESET_SUMMARIES: PresetSummary[] = [

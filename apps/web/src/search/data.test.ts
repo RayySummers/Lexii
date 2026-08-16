@@ -84,3 +84,18 @@ describe("createIndexedDbSearchDataProvider", () => {
     expect(results[0]!.kind).toBe("definition");
   });
 });
+
+describe("搜词页生词本加词入口（RAY-284，数据源集成）", () => {
+  it("getNotebookSenseIds：空生词本返回空；加词后返回对应义项 id", async () => {
+    const sense = makeSense(9, { term: "apple", definitions: ["苹果"] });
+    await db!.senses.put(sense);
+    const provider = createIndexedDbSearchDataProvider(db!);
+
+    expect(await provider.getNotebookSenseIds()).toEqual([]);
+
+    expect(await provider.addToNotebook(sense.id)).toBe("added");
+    expect(await provider.getNotebookSenseIds()).toEqual([sense.id]);
+    // 幂等：重复加词返回 already
+    expect(await provider.addToNotebook(sense.id)).toBe("already");
+  });
+});

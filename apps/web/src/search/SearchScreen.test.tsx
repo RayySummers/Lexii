@@ -31,11 +31,13 @@ function makeResult(term: string, definitions: string[]): SearchResult {
   return { sense, kind: "term-prefix" };
 }
 
-/** mock 搜词数据源工厂：search / hasAnySenses 均返回可配置的 vi.fn */
+/** mock 搜词数据源工厂：search / hasAnySenses / 生词本方法均返回可配置的 vi.fn */
 function makeProvider(overrides: Partial<SearchDataProvider> = {}): SearchDataProvider {
   return {
     search: vi.fn<(query: string) => Promise<SearchResult[]>>().mockResolvedValue([]),
     hasAnySenses: vi.fn().mockResolvedValue(true),
+    getNotebookSenseIds: vi.fn().mockResolvedValue([]),
+    addToNotebook: vi.fn().mockResolvedValue("added"),
     ...overrides,
   };
 }
@@ -315,5 +317,76 @@ describe("SearchScreen", () => {
     expect(screen.queryByRole("button", { name: "apple" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "banana" })).toBeInTheDocument();
     expect(storedHistory()).toEqual(["banana"]);
+  });
+});
+
+describe("SearchScreen 生词本加词入口（RAY-284）", () => {
+  it("结果行点「加词」：调用 addToNotebook，反馈已加入并把该行标记为「已在生词本」", async () => {
+    const addToNotebook = vi.fn().mockResolvedValue("added");
+    const provider = makeProvider({
+      search: vi
+        .fn<(query: string) => Promise<SearchResult[]>>()
+        .mockResolvedValue([makeResult("apple", ["苹果"])]),
+      addToNotebook,
+    });
+    render(<SearchScreen provider={provider} onExit={() => {}} />);
+
+    typeQuery("app");
+    const addButton = await screen.findByRole("button", { name: "把「apple」加入生词本" });
+    fireEvent.click(addButton);
+
+    expect(await screen.findByText("已加入生词本")).toBeInTheDocument();
+    expect(addToNotebook).toHaveBeenCalledWith(toSenseId("sense_ui_apple"));
+    // 该行不再有加词按钮，改为「已在生词本」标记
+    expect(screen.queryByRole("button", { name: "把「apple」加入生词本" })).not.toBeInTheDocument();
+    expect(screen.getByText("已在生词本")).toBeInTheDocument();
+  });
+
+  it("已在生词本的结果行直接显示「已在生词本」标记（进入页面读一次）", async () => {
+    const provider = makeProvider({
+      search: vi
+        .fn<(query: string) => Promise<SearchResult[]>>()
+        .mockResolvedValue([makeResult("apple", ["苹果"]), makeResult("apply", ["申请"])]),
+      getNotebookSenseIds: vi.fn().mockResolvedValue([toSenseId("sense_ui_apple")]),
+    });
+    render(<SearchScreen provider={provider} onExit={() => {}} />);
+
+    typeQuery("app");
+    await screen.findByText("找到 2 条结果");
+
+    expect(screen.getByText("已在生词本")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "把「apple」加入生词本" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "把「apply」加入生词本" })).toBeInTheDocument();
+  });
+
+  it("重复加词（provider 返回 already）反馈「已在生词本中」", async () => {
+    const provider = makeProvider({
+      search: vi
+        .fn<(query: string) => Promise<SearchResult[]>>()
+        .mockResolvedValue([makeResult("apple", ["苹果"])]),
+      addToNotebook: vi.fn().mockResolvedValue("already"),
+    });
+    render(<SearchScreen provider={provider} onExit={() => {}} />);
+
+    typeQuery("app");
+    fireEvent.click(await screen.findByRole("button", { name: "把「apple」加入生词本" }));
+
+    expect(await screen.findByText("已在生词本中")).toBeInTheDocument();
+  });
+
+  it("加词失败展示失败反馈，按钮保持可再次点击", async () => {
+    const provider = makeProvider({
+      search: vi
+        .fn<(query: string) => Promise<SearchResult[]>>()
+        .mockResolvedValue([makeResult("apple", ["苹果"])]),
+      addToNotebook: vi.fn().mockRejectedValue(new Error("义项不存在")),
+    });
+    render(<SearchScreen provider={provider} onExit={() => {}} />);
+
+    typeQuery("app");
+    fireEvent.click(await screen.findByRole("button", { name: "把「apple」加入生词本" }));
+
+    expect(await screen.findByText("加入失败：义项不存在")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "把「apple」加入生词本" })).toBeInTheDocument();
   });
 });

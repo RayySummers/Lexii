@@ -1,7 +1,7 @@
 /**
  * 领域实体 id：nanoid 字符串，带类型前缀，便于在事件流与日志中区分实体。
  *
- * 前缀约定：item（学习条目）、sense（义项）、evt（事件）。
+ * 前缀约定：item（学习条目）、sense（义项）、evt（事件）、nb（生词本条目）。
  * 条目与义项的 id 不校验实体存在性（可能先出现在事件里）。
  */
 
@@ -14,8 +14,11 @@ export type SenseId = string & { readonly __senseId: unique symbol };
 /** 事件 id */
 export type EventId = string & { readonly __eventId: unique symbol };
 
+/** 生词本条目 id */
+export type NotebookEntryId = string & { readonly __notebookEntryId: unique symbol };
+
 /** id 类型的字母前缀 */
-export type IdPrefix = "item" | "sense" | "evt";
+export type IdPrefix = "item" | "sense" | "evt" | "nb";
 
 /** 随机串字母表（去除易混淆的 l/1/O/0） */
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -47,6 +50,11 @@ export function toSenseId(id: string): SenseId {
 /** 从任意字符串转成 EventId */
 export function toEventId(id: string): EventId {
   return id as EventId;
+}
+
+/** 从任意字符串转成 NotebookEntryId */
+export function toNotebookEntryId(id: string): NotebookEntryId {
+  return id as NotebookEntryId;
 }
 
 /** 判断字符串是否带指定类型前缀 */

@@ -250,10 +250,18 @@ function validateGradeReviewInput(input: GradeReviewInput): void {
  *
  * 查询走 fields.due 索引（DB schema v3，RAY-260 评审 suggestion 2）：
  * belowOrEqual 区间查询，不再是 filter 全表扫描。
+ *
+ * 生词本开关（RAY-284）：`options.includeNotebook === false` 时排除
+ * 生词本条目（学习列表不包含生词本），与 getStudyQueueItemIds 同口径。
  */
-export async function getDueItemIds(db: LexilexiDatabase, now: IsoDate): Promise<ItemId[]> {
+export async function getDueItemIds(
+  db: LexilexiDatabase,
+  now: IsoDate,
+  options: DueQueryOptions = {},
+): Promise<ItemId[]> {
   const due = await db.memoryStates.where("fields.due").belowOrEqual(endOfLocalDay(now)).toArray();
-  return due.map((state) => state.itemId);
+  const excluded = await resolveExcludedNotebookItemIds(db, options.includeNotebook);
+  return due.filter((state) => !excluded?.has(state.itemId)).map((state) => state.itemId);
 }
 
 /** 学习模式：决定首页三个入口（学习 / 复习 / 混合）各加载哪类队列 */
@@ -284,10 +292,16 @@ export const INTERLEAVE_REVIEW_STEP = 2;
  * 排序为（due, createdAt）双键——新卡 due 与 createdAt 同源（导入时刻），
  * 同一批导入的新词按导入顺序稳定；同 due 的复习卡按记忆状态创建时间决胜，
  * 与 UI 层旧排序口径保持一致。
+ *
+ * 生词本开关（RAY-284）：`options.includeNotebook === false` 时排除
+ * 生词本条目（学习列表不包含生词本）——生词本词条与其独立调度实例
+ * 一并移出学习/复习/混合队列，词书条目不受影响。
  */
 export interface StudyQueueOptions {
   /** 每日新卡上限（按 due 升序截取前 N 条新词；undefined = 不限制） */
   newCardLimit?: number;
+  /** 学习列表是否包含生词本条目（默认 true = 包含；false = 排除） */
+  includeNotebook?: boolean;
 }
 
 export async function getStudyQueueItemIds(
@@ -300,9 +314,13 @@ export async function getStudyQueueItemIds(
     .where("fields.due")
     .belowOrEqual(endOfLocalDay(now))
     .toArray();
+  const excluded = await resolveExcludedNotebookItemIds(db, options.includeNotebook);
   const newStates: MemoryState[] = [];
   const reviewStates: MemoryState[] = [];
   for (const state of dueStates) {
+    if (excluded?.has(state.itemId)) {
+      continue;
+    }
     if (state.fields.reps === 0) {
       newStates.push(state);
     } else {
@@ -367,12 +385,40 @@ function compareStatesByDue(a: MemoryState, b: MemoryState): number {
  *
  * 查询走 fields.due 索引（DB schema v3，RAY-260）：between 区间查询
  * （含下界、不含上界），与 filter 半开区间口径完全一致。
+ *
+ * 生词本开关（RAY-284）：`options.includeNotebook === false` 时排除
+ * 生词本条目，与 getDueItemIds / getStudyQueueItemIds 同口径。
  */
 export async function getDueItemIdsInRange(
   db: LexilexiDatabase,
   from: IsoDate,
   to: IsoDate,
+  options: DueQueryOptions = {},
 ): Promise<ItemId[]> {
   const due = await db.memoryStates.where("fields.due").between(from, to, true, false).toArray();
-  return due.map((state) => state.itemId);
+  const excluded = await resolveExcludedNotebookItemIds(db, options.includeNotebook);
+  return due.filter((state) => !excluded?.has(state.itemId)).map((state) => state.itemId);
+}
+
+/** 到期查询的公共选项 */
+export interface DueQueryOptions {
+  /** 学习列表是否包含生词本条目（默认 true = 包含；false = 排除） */
+  includeNotebook?: boolean;
+}
+
+/**
+ * 解析「学习列表不包含生词本」时应排除的条目 id 集合。
+ *
+ * - includeNotebook 为 true / undefined（默认）→ null（不过滤，零额外查询）；
+ * - false → 查询 active 生词本条目（status 索引），返回其 itemId 集合。
+ */
+async function resolveExcludedNotebookItemIds(
+  db: LexilexiDatabase,
+  includeNotebook: boolean | undefined,
+): Promise<Set<string> | null> {
+  if (includeNotebook !== false) {
+    return null;
+  }
+  const entries = await db.notebookEntries.where("status").equals("active").toArray();
+  return new Set(entries.map((entry) => entry.itemId));
 }

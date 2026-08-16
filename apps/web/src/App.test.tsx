@@ -6,6 +6,7 @@ import { App } from "./App";
 import { makeCard } from "./review/testFixtures";
 import type { ReviewCard, ReviewDataProvider } from "./review/types";
 import type { SearchDataProvider } from "./search/types";
+import type { NotebookDataProvider } from "./notebook/types";
 import type { SettingsDataProvider } from "./settings/types";
 import type { StatsDataProvider } from "./stats/types";
 import {
@@ -22,6 +23,7 @@ const EMPTY_EXPORT: LexilexiExportData = {
   senses: [],
   memoryStates: [],
   events: [],
+  notebookEntries: [],
 };
 
 /** 测试接缝：注入 mock 复习数据源工厂，避免渲染时触碰浏览器 IndexedDB */
@@ -38,6 +40,7 @@ function makeReviewProviderFactory(queue: ReviewCard[] = [makeCard()]) {
     undoGrade: vi.fn().mockResolvedValue(undefined),
     hasAnyItems: vi.fn().mockResolvedValue(queue.length > 0),
     importSampleWordlist: vi.fn().mockResolvedValue(14),
+    addToNotebook: vi.fn().mockResolvedValue("added"),
   };
   return { provider, factory: vi.fn().mockReturnValue(provider) };
 }
@@ -60,6 +63,17 @@ function makeSearchProviderFactory() {
   const provider: SearchDataProvider = {
     search: vi.fn().mockResolvedValue([]),
     hasAnySenses: vi.fn().mockResolvedValue(true),
+    getNotebookSenseIds: vi.fn().mockResolvedValue([]),
+    addToNotebook: vi.fn().mockResolvedValue("added"),
+  };
+  return { provider, factory: vi.fn().mockReturnValue(provider) };
+}
+
+/** 测试接缝：注入 mock 生词本数据源工厂 */
+function makeNotebookProviderFactory() {
+  const provider: NotebookDataProvider = {
+    loadEntries: vi.fn().mockResolvedValue([]),
+    removeWord: vi.fn().mockResolvedValue(undefined),
   };
   return { provider, factory: vi.fn().mockReturnValue(provider) };
 }
@@ -120,6 +134,7 @@ describe("App", () => {
     render(<App reviewProviderFactory={makeReviewProviderFactory().factory} />);
     expect(screen.queryByRole("button", { name: /切换到/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "搜词" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "生词本" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "统计" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();
   });
@@ -315,5 +330,44 @@ describe("App", () => {
         FIRST_OPEN_DIALOG_DISMISSED_VALUE,
       );
     });
+  });
+});
+
+describe("App 生词本入口（RAY-284）", () => {
+  const originalMatchMedia = window.matchMedia;
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem(FIRST_OPEN_DIALOG_STORAGE_KEY, FIRST_OPEN_DIALOG_DISMISSED_VALUE);
+    window.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }) as unknown as typeof matchMedia;
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+    delete document.documentElement.dataset.theme;
+  });
+
+  it("点击生词本进入生词本页（惰性创建数据源），返回首页退出", async () => {
+    const { factory } = makeNotebookProviderFactory();
+    render(
+      <App
+        reviewProviderFactory={makeReviewProviderFactory().factory}
+        notebookProviderFactory={factory}
+      />,
+    );
+
+    // 未进入生词本页前不创建数据源
+    expect(factory).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "生词本" }));
+    expect(await screen.findByRole("heading", { name: "生词本还是空的" })).toBeInTheDocument();
+    expect(factory).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "返回首页" }));
+    expect(screen.getByRole("button", { name: "学习" })).toBeInTheDocument();
   });
 });

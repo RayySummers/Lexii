@@ -36,11 +36,15 @@ import type {
   MemoryState,
   ReviewEvent,
   ReviewRating,
+  SenseId,
   StudyMode,
 } from "@lexilexi/core";
 import { computeLearnedTodayCount, localDayBounds } from "@lexilexi/stats";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
+import { readIncludeNotebook } from "../lib/notebookPreference";
 import { readQuizDirectionPreference, resolveQuizDirection } from "../lib/quizDirection";
+import { addWordToNotebook } from "../notebook/data";
+import type { AddToNotebookResult } from "../notebook/types";
 import type { MultipleChoiceQuestion } from "./MultipleChoiceCard";
 import { buildReviewQueue } from "./queue";
 import type {
@@ -111,7 +115,11 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
     async loadQueue(mode: StudyMode): Promise<ReviewCard[]> {
       const now = new Date().toISOString();
       const newCardLimit = mode === "review" ? undefined : await resolveNewCardLimit(db, now);
-      const ids = await getStudyQueueItemIds(db, now, mode, { newCardLimit });
+      const ids = await getStudyQueueItemIds(db, now, mode, {
+        newCardLimit,
+        // 生词本开关（RAY-284）：调用时读取偏好，切开关后下次加载即生效
+        includeNotebook: readIncludeNotebook(),
+      });
       if (ids.length === 0) {
         return [];
       }
@@ -144,7 +152,9 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
         return { remainingNewCardQuota: null, hasDueNewWords: false };
       }
       const remaining = await resolveNewCardLimit(db, now);
-      const uncappedNewIds = await getStudyQueueItemIds(db, now, "learn");
+      const uncappedNewIds = await getStudyQueueItemIds(db, now, "learn", {
+        includeNotebook: readIncludeNotebook(),
+      });
       const items = await db.items.bulkGet(uncappedNewIds);
       const hasDueNewWords = items.some((item) => item !== undefined && item.status === "active");
       return { remainingNewCardQuota: remaining, hasDueNewWords };
@@ -153,7 +163,10 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
     async loadMultipleChoiceQueue(mode: StudyMode): Promise<MultipleChoiceQueueResult> {
       const now = new Date().toISOString();
       const newCardLimit = mode === "review" ? undefined : await resolveNewCardLimit(db, now);
-      const ids = await getStudyQueueItemIds(db, now, mode, { newCardLimit });
+      const ids = await getStudyQueueItemIds(db, now, mode, {
+        newCardLimit,
+        includeNotebook: readIncludeNotebook(),
+      });
       if (ids.length === 0) {
         return { questions: [], cards: [] };
       }
@@ -271,6 +284,11 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
     async importSampleWordlist(): Promise<number> {
       const result = await importCsvWordlist(db, SAMPLE_WORDLIST_CSV, { source: SAMPLE_SOURCE });
       return result.importedCount;
+    },
+
+    async addToNotebook(senseId: SenseId): Promise<AddToNotebookResult> {
+      // 复习卡页加词入口（RAY-284）：幂等加词，生词进入现有 FSRS 调度
+      return addWordToNotebook(db, senseId);
     },
   };
 }
