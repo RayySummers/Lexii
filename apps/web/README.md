@@ -38,10 +38,10 @@ pnpm build          # tsc --noEmit + vite build
   - `persistenceStatus.ts` — 持久化权限状态（启动申请 + `usePersistenceStatus` hook，监听 `lexilexi:storage-permission`）
   - `SettingsScreen.tsx` — 设置页 UI：主题三档下拉选单（浅色 / 深色 / 跟随系统，RAY-261）、每日新卡上限（默认 20/日，localStorage 持久化）、持久化提示、JSON/CSV 导出、JSON 导入、关于（GitHub 仓库链接 + 反馈问题入口，纯外链新窗口打开）与底部版本号（RAY-253 起无数据概览，概览已并入统计页）
 - `src/stats/` — 统计页（RAY-240）：
-  - `types.ts` — `StatsSnapshot`（今日待学 / 已复习 / 连续天数）/ `StatsDataProvider`（UI 与数据源之间的契约）
-  - `data.ts` — IndexedDB 数据源：`createIndexedDbStatsDataProvider`（包装 core 的 `getDueItemIds` + stats 包的 `countReviews` / `computeStreak`）；默认工厂自带无 IndexedDB 环境兜底
+  - `types.ts` — `StatsSnapshot`（今日待学 / 已复习 / 连续天数等 8 项 + 首页徽标共用的 `dueCount`）/ `StatsDataProvider`（UI 与数据源之间的契约）
+  - `data.ts` — IndexedDB 数据源：`createIndexedDbStatsDataProvider`（包装 core 的 `getDueItemIds` / `getStudyQueueItemIds` + stats 包的 `countReviews` / `computeStreak` / `computeNewCardsRemainingToday`）；默认工厂自带无 IndexedDB 环境兜底
   - `useStats.ts` / `useStatsProvider.ts` — 快照加载与数据源创建 hooks（统计页与首页徽标共用）
-  - `StatsScreen.tsx` — 统计页 UI：8 项统计卡片 + 加载 / 空状态 / 错误重试（RAY-253 起统一导航头）
+  - `StatsScreen.tsx` — 统计页 UI：8 项统计卡片 + 加载 / 空状态 / 错误重试（RAY-253 起统一导航头）；「今日待学（词条）」自 RAY-295 起显示 `newCardsRemainingToday`——min(每日新卡上限, 今日新卡池) − 今日已学习（下限 0），按每日新卡上限过滤、不再显示全部未学新卡总数；首页徽标仍用未截断的 `dueCount`（RAY-260 口径，另有额度提示说明）
 - `src/review/` — 复习界面（RAY-237，RAY-253 三模式）：
   - `types.ts` — `ReviewCard` / `ReviewDataProvider` / `GradeContext`（UI 与数据源之间的契约）
   - `queue.ts` — `buildReviewQueue`：id 列表 → 可复习卡片（完整性校验，纯函数，保持 core 给定的顺序）

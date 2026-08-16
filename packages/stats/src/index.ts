@@ -17,6 +17,9 @@
  *   时刻的首次评分一一对应。
  * - 今日已复习（次数）= 今天对已学词条的复习次数：今天产生的 review
  *   事件中，去掉每个词条那条「首次复习」（今日已学习）后的余数。
+ * - 今日剩余新卡（词条，RAY-295）= min(每日新卡上限, 剩余新卡数) −
+ *   今日已学习（次数），下限 0——统计页「今日待学」按每日新卡上限
+ *   过滤，不显示未学新卡总数。
  * - 累计已完成（词条）= 至少复习过一次的词条数（不要求 time 合法，
  *   记录存在即算完成过一次）。
  * - 复习结果分类（对/错/遗忘）：rating=again 视为遗忘（用户自评忘记）；
@@ -157,6 +160,36 @@ export function computeReviewedTodayCount(
     count += 1;
   }
   return count;
+}
+
+/**
+ * 今日剩余新卡（词条，RAY-295 统计页「今日待学」口径）：
+ * min(每日新卡上限, 剩余新卡数) − 今日已学习（次数），下限 0。
+ *
+ * 「剩余新卡数」按今日新卡池理解（= 当前剩余未学新卡 + 今日已学，今日
+ * 已学的卡不再属于「剩余」），故上式等价于：
+ *
+ *   min(每日新卡上限 − 今日已学, 当前剩余新卡数)，下限 0
+ *
+ * 即「今日剩余新卡额度」与「实际剩余新卡」取较小者——统计页「今日待学」
+ * 按每日新卡上限过滤，不再显示全部未学新卡总数：
+ * - 剩余新卡 > 上限：显示「上限 − 今日已学」，超出部分顺延；
+ * - 剩余新卡 < 上限：显示实际剩余新卡数（不虚高、也不被已学重复扣减）；
+ * - 今日已学满额度（或剩余新卡为 0）：显示 0。
+ *
+ * 与首页徽标（未截断的 dueCount，RAY-260 口径）刻意不同：徽标另有
+ * 「今日新卡额度剩余 N 张」提示说明二者关系；本函数只管统计页数值。
+ *
+ * @param dailyLimit 每日新卡上限（设置值；非负整数）
+ * @param remainingNewCards 当前剩余未学新卡数（reps === 0 的到期记忆状态数）
+ * @param learnedToday 今日已学习（次数，见 computeLearnedTodayCount）
+ */
+export function computeNewCardsRemainingToday(
+  dailyLimit: number,
+  remainingNewCards: number,
+  learnedToday: number,
+): number {
+  return Math.min(Math.max(0, dailyLimit - learnedToday), remainingNewCards);
 }
 
 /**

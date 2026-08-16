@@ -32,6 +32,7 @@ function badgeSnapshot(
     todayReviewCount: 0,
     dueCount,
     dueTomorrowCount: 0,
+    newCardsRemainingToday: 0,
     reviewCount,
     completedWordCount: 0,
     ...overrides,

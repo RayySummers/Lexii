@@ -19,6 +19,7 @@ import {
 import type { LexilexiDatabase } from "@lexilexi/core";
 import { localDayBounds } from "@lexilexi/stats";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DAILY_NEW_CARD_LIMIT_STORAGE_KEY } from "../lib/dailyNewCardLimit";
 import { createIndexedDbReviewDataProvider } from "../review/data";
 import {
   createEmptyStatsDataProvider,
@@ -35,6 +36,9 @@ let db: LexilexiDatabase | undefined;
 
 beforeEach(() => {
   db = openDatabase(makeOptions());
+  // 「每日新卡上限」走 localStorage：清理后一律回落默认值 20，
+  // 各用例按需显式设置（与 HomeScreen.test 同一口径）
+  window.localStorage.clear();
 });
 
 afterEach(async () => {
@@ -48,12 +52,16 @@ describe("createIndexedDbStatsDataProvider", () => {
     expect(await provider.loadStats()).toEqual(EMPTY_STATS);
   });
 
-  it("导入示例词表后到期数 = 词条数（新卡导入即到期），其余统计为零", async () => {
+  it("导入示例词表后到期数 = 词条数（新卡导入即到期），其余统计为零；今日待学按默认上限 20 过滤 = 14（剩余新卡 < 上限）", async () => {
     const provider = createIndexedDbStatsDataProvider(db!);
     await importCsvWordlist(db!, SAMPLE_WORDLIST_CSV, { source: "test" });
 
     const stats = await provider.loadStats();
-    expect(stats).toEqual({ ...EMPTY_STATS, dueCount: SAMPLE_WORDLIST_ROW_COUNT });
+    expect(stats).toEqual({
+      ...EMPTY_STATS,
+      dueCount: SAMPLE_WORDLIST_ROW_COUNT,
+      newCardsRemainingToday: SAMPLE_WORDLIST_ROW_COUNT,
+    });
   });
 
   it("评分一张卡后：累计次数/词条/天数/今日学习各 +1，今日复习为 0；该卡 10 分钟后到期仍属今日待学（日历日口径）", async () => {
@@ -81,6 +89,8 @@ describe("createIndexedDbStatsDataProvider", () => {
       expect(stats.todayLearnCount).toBe(1);
       expect(stats.todayReviewCount).toBe(0);
       expect(stats.dueTomorrowCount).toBe(0);
+      // RAY-295：今日待学 = min(20 − 1, 剩余 13) = 13（不被已学重复扣减）
+      expect(stats.newCardsRemainingToday).toBe(SAMPLE_WORDLIST_ROW_COUNT - 1);
     } finally {
       vi.useRealTimers();
     }
@@ -168,6 +178,65 @@ describe("createIndexedDbStatsDataProvider", () => {
     expect(stats.dueCount).toBe(1); // 仅导入的词条今日到期
     expect(stats.dueTomorrowCount).toBe(1); // 仅明天中午那条
     expect(firstItem.id).toBeDefined();
+  });
+
+  describe("今日待学按每日新卡上限过滤（RAY-295）", () => {
+    /** 生成 N 行合法词表 CSV（term 仅含字母且唯一，避免义项合并） */
+    function csvWith(rowCount: number): string {
+      return Array.from({ length: rowCount }, (_, i) => {
+        const term = `w${String.fromCharCode(97 + Math.floor(i / 26))}${String.fromCharCode(97 + (i % 26))}`;
+        return `${term},词${i},n.`;
+      }).join("\n");
+    }
+
+    it("剩余新卡 > 上限：设置上限 5 时今日待学 = 5（不显示全部 14 张）", async () => {
+      window.localStorage.setItem(DAILY_NEW_CARD_LIMIT_STORAGE_KEY, "5");
+      const provider = createIndexedDbStatsDataProvider(db!);
+      await importCsvWordlist(db!, SAMPLE_WORDLIST_CSV, { source: "test" });
+
+      const stats = await provider.loadStats();
+      expect(stats.dueCount).toBe(SAMPLE_WORDLIST_ROW_COUNT); // 未截断口径不变（首页徽标用）
+      expect(stats.newCardsRemainingToday).toBe(5);
+    });
+
+    it("剩余新卡 > 上限（默认上限 20）：25 张新卡时今日待学 = 20", async () => {
+      const provider = createIndexedDbStatsDataProvider(db!);
+      await importCsvWordlist(db!, csvWith(25), { source: "test" });
+
+      const stats = await provider.loadStats();
+      expect(stats.dueCount).toBe(25);
+      expect(stats.newCardsRemainingToday).toBe(20);
+    });
+
+    it("今日已学后扣减：学 3 张（14 张词表）后今日待学 = 11", async () => {
+      const statsProvider = createIndexedDbStatsDataProvider(db!);
+      const reviewProvider = createIndexedDbReviewDataProvider(db!);
+      await importCsvWordlist(db!, SAMPLE_WORDLIST_CSV, { source: "test" });
+
+      const cards = await reviewProvider.loadQueue("learn");
+      for (const card of cards.slice(0, 3)) {
+        await reviewProvider.grade(card, "good", { reviewDurationMs: 1_000, revealed: true });
+      }
+
+      const stats = await statsProvider.loadStats();
+      expect(stats.todayLearnCount).toBe(3);
+      expect(stats.newCardsRemainingToday).toBe(SAMPLE_WORDLIST_ROW_COUNT - 3);
+    });
+
+    it("已学满今日额度：上限 1 学 1 张后今日待学 = 0", async () => {
+      window.localStorage.setItem(DAILY_NEW_CARD_LIMIT_STORAGE_KEY, "1");
+      const statsProvider = createIndexedDbStatsDataProvider(db!);
+      const reviewProvider = createIndexedDbReviewDataProvider(db!);
+      await importCsvWordlist(db!, SAMPLE_WORDLIST_CSV, { source: "test" });
+
+      const card = (await reviewProvider.loadQueue("learn"))[0]!;
+      await reviewProvider.grade(card, "good", { reviewDurationMs: 1_000, revealed: true });
+
+      const stats = await statsProvider.loadStats();
+      expect(stats.todayLearnCount).toBe(1);
+      expect(stats.newCardsRemainingToday).toBe(0);
+      expect(stats.dueCount).toBe(SAMPLE_WORDLIST_ROW_COUNT); // 未截断口径不变
+    });
   });
 });
 

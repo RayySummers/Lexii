@@ -3,7 +3,12 @@
  *
  * 聚合口径（对应 docs/domain-model.md §7 事件流唯一事实来源）：
  * - dueCount：getDueItemIds（core 公开 API，due <= 今日结束的记忆状态数，
- *   日历日口径含积压与今天稍后到期的卡，RAY-276）
+ *   日历日口径含积压与今天稍后到期的卡，RAY-276；未截断，首页徽标用）
+ * - newCardsRemainingToday：getStudyQueueItemIds("learn")（未截断的新词队列
+ *   长度，「剩余新卡数」与学习队列同口径）经 @lexilexi/stats 的
+ *   computeNewCardsRemainingToday 按「每日新卡上限 − 今日已学」与剩余新卡
+ *   数取较小者（RAY-295：统计页「今日待学」按每日新卡上限过滤，不再
+ *   显示全部未学新卡总数）
  * - dueTomorrowCount：getDueItemIdsInRange + localDayBounds（明天本地日历日
  *   的半开区间 [start, end)，与「今日待学」同为记忆状态口径）
  * - reviewCount / streakDays / totalDays / todayLearnCount / todayReviewCount /
@@ -13,21 +18,31 @@
  * （where("type").equals("review")），不整表 toArray；事件数上万后
  * 只读取 review 子集，其他事件类型（import/edit/suspend…）不进入内存。
  * 到期查询为 Dexie filter 全表扫描，MVP 词库规模（数百条目）无碍
- * （与 core getDueItemIds 的既有说明一致）。
+ * （与 core getDueItemIds 的既有说明一致）。newCardsRemainingToday 的
+ * 新词计数（getStudyQueueItemIds("learn")）与 dueCount 同走 fields.due
+ * 索引区间扫描，不引入新的全表扫描；两次扫描按词库规模线性，可接受。
  *
  * local-first 红线：所有聚合均在本机 IndexedDB 上完成，不发起任何网络请求。
  */
-import { getDueItemIds, getDueItemIdsInRange, isReviewEvent, openDatabase } from "@lexilexi/core";
+import {
+  getDueItemIds,
+  getDueItemIdsInRange,
+  getStudyQueueItemIds,
+  isReviewEvent,
+  openDatabase,
+} from "@lexilexi/core";
 import type { LexilexiDatabase } from "@lexilexi/core";
 import {
   computeCompletedWordCount,
   computeLearnedTodayCount,
+  computeNewCardsRemainingToday,
   computeReviewedTodayCount,
   computeStreak,
   computeTotalDays,
   countReviews,
   localDayBounds,
 } from "@lexilexi/stats";
+import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import type { StatsDataProvider, StatsSnapshot } from "./types";
 
 /** 基于已打开的 Lexilexi 数据库创建统计数据源（测试注入 fake-indexeddb 实例） */
@@ -36,20 +51,27 @@ export function createIndexedDbStatsDataProvider(db: LexilexiDatabase): StatsDat
     async loadStats(): Promise<StatsSnapshot> {
       const now = new Date().toISOString();
       const tomorrow = localDayBounds(now, 1);
-      const [dueIds, dueTomorrowIds, reviewEvents] = await Promise.all([
+      const [dueIds, dueTomorrowIds, newCardIds, reviewEvents] = await Promise.all([
         getDueItemIds(db, now),
         getDueItemIdsInRange(db, tomorrow.start, tomorrow.end),
+        getStudyQueueItemIds(db, now, "learn"),
         db.events.where("type").equals("review").toArray(),
       ]);
       // where 查询返回 Event[]，经类型守卫收窄为 ReviewEvent[] 供 stats 纯函数使用
       const reviews = reviewEvents.filter(isReviewEvent);
+      const todayLearnCount = computeLearnedTodayCount(reviews, now);
       return {
         streakDays: computeStreak(reviews, now),
         totalDays: computeTotalDays(reviews, now),
-        todayLearnCount: computeLearnedTodayCount(reviews, now),
+        todayLearnCount,
         todayReviewCount: computeReviewedTodayCount(reviews, now),
         dueCount: dueIds.length,
         dueTomorrowCount: dueTomorrowIds.length,
+        newCardsRemainingToday: computeNewCardsRemainingToday(
+          readDailyNewCardLimit(),
+          newCardIds.length,
+          todayLearnCount,
+        ),
         reviewCount: countReviews(reviews),
         completedWordCount: computeCompletedWordCount(reviews),
       };
@@ -88,6 +110,7 @@ export const EMPTY_STATS: StatsSnapshot = {
   todayReviewCount: 0,
   dueCount: 0,
   dueTomorrowCount: 0,
+  newCardsRemainingToday: 0,
   reviewCount: 0,
   completedWordCount: 0,
 };

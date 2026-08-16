@@ -15,8 +15,16 @@ export interface StatsSnapshot {
   todayLearnCount: number;
   /** 今日已复习（次数）：今天对已学词条的复习次数（不含今天首次学习） */
   todayReviewCount: number;
-  /** 今日待学（词条）：due <= 今日结束的记忆状态数（日历日口径，含此前积压与今天稍后到期的卡） */
+  /** 今日待学（词条）：due <= 今日结束的记忆状态数（日历日口径，含此前积压与今天稍后到期的卡；未截断，首页徽标用） */
   dueCount: number;
+  /**
+   * 今日剩余新卡（词条，RAY-295 统计页「今日待学」口径）：
+   * min(每日新卡上限, 今日新卡池) − 今日已学习，下限 0——等价于
+   * min(每日新卡上限 − 今日已学习, 当前剩余新卡数)。
+   * 统计页按每日新卡上限过滤，不再显示全部未学新卡总数；
+   * 首页徽标仍使用未截断的 dueCount（RAY-260 口径，另有额度提示说明）。
+   */
+  newCardsRemainingToday: number;
   /** 明日到期（词条）：due 落在明天本地日历日内的记忆状态数 */
   dueTomorrowCount: number;
   /** 累计已完成（次数）：review 事件总数 */

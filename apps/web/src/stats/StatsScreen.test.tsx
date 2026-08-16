@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { StatsScreen } from "./StatsScreen";
 import type { StatsDataProvider, StatsSnapshot } from "./types";
 
-/** 8 个字段互不相同的快照（避免 getByText 撞值） */
+/** 8 个字段互不相同的快照（避免 getByText 撞值；今日待学取 newCardsRemainingToday=9） */
 const FULL_SNAPSHOT: StatsSnapshot = {
   streakDays: 1,
   totalDays: 2,
@@ -16,6 +16,7 @@ const FULL_SNAPSHOT: StatsSnapshot = {
   todayReviewCount: 4,
   dueCount: 5,
   dueTomorrowCount: 6,
+  newCardsRemainingToday: 9,
   reviewCount: 7,
   completedWordCount: 8,
 };
@@ -27,6 +28,7 @@ const EMPTY_SNAPSHOT: StatsSnapshot = {
   todayReviewCount: 0,
   dueCount: 0,
   dueTomorrowCount: 0,
+  newCardsRemainingToday: 0,
   reviewCount: 0,
   completedWordCount: 0,
 };
@@ -48,9 +50,25 @@ describe("StatsScreen", () => {
     expect(screen.getByText("累计已完成（次数）")).toBeInTheDocument();
     expect(screen.getByText("累计已完成（词条）")).toBeInTheDocument();
 
-    for (const value of ["1", "2", "3", "4", "5", "6", "7", "8"]) {
+    // 今日待学显示 newCardsRemainingToday（9），不再显示未截断的 dueCount（5）
+    for (const value of ["1", "2", "3", "4", "6", "7", "8", "9"]) {
       expect(screen.getByText(value)).toBeInTheDocument();
     }
+    expect(screen.queryByText("5")).not.toBeInTheDocument();
+  });
+
+  it("今日待学按每日新卡上限过滤：显示剩余新卡数，不显示全部未学新卡总数（RAY-295）", async () => {
+    render(
+      <StatsScreen
+        provider={makeProvider({ ...EMPTY_SNAPSHOT, dueCount: 7_195, newCardsRemainingToday: 20 })}
+        onExit={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText("今日待学（词条）")).toBeInTheDocument();
+    expect(screen.getByText("20")).toBeInTheDocument();
+    expect(screen.queryByText("7,195")).not.toBeInTheDocument();
+    expect(screen.queryByText("7195")).not.toBeInTheDocument();
   });
 
   it("无学习数据时显示空状态", async () => {
@@ -78,7 +96,12 @@ describe("StatsScreen", () => {
       loadStats: vi
         .fn()
         .mockRejectedValueOnce(new Error("IndexedDB connection failed: boom"))
-        .mockResolvedValue({ ...EMPTY_SNAPSHOT, dueCount: 1, reviewCount: 2, streakDays: 3 }),
+        .mockResolvedValue({
+          ...EMPTY_SNAPSHOT,
+          newCardsRemainingToday: 1,
+          reviewCount: 2,
+          streakDays: 3,
+        }),
     };
     render(<StatsScreen provider={provider} onExit={vi.fn()} />);
 
