@@ -5,11 +5,16 @@
  * 空译文不渲染）、词根词缀拆解与中文词源、近反义词 chips；
  * 以及富化字段缺失时各区块不渲染（退化为既有形态）。
  */
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import type { Sense } from "@lexilexi/core";
-import { ReviewCard } from "./ReviewCard";
+import {
+  CARD_HEIGHT_MAX_REM,
+  CARD_HEIGHT_MIN_REM,
+  CARD_HEIGHT_OFFSET_REM,
+  ReviewCard,
+} from "./ReviewCard";
 import { makeSense } from "./testFixtures";
 
 /** 受控翻面容器：点击卡片真实翻转（ReviewCard 的 flipped 由父级持有） */
@@ -162,11 +167,27 @@ describe("ReviewCard 固定高度与卡片内部滚动（RAY-291）", () => {
     return visible;
   }
 
-  it("卡片高度固定、与内容长度无关：外层容器带视口 clamp 高度（不随内容伸缩）", () => {
+  it("卡片高度固定、与内容长度无关：外层容器内联 clamp 高度（导出常量驱动）", () => {
     render(<Harness sense={makeRichSense()} />);
     const wrapper = cardButton().parentElement as HTMLElement;
-    // 高度只由视口决定（clamp 区间），超长内容由面内滚动区承接
-    expect(wrapper).toHaveClass("h-[clamp(14rem,calc(100dvh_-_26rem),32rem)]");
+    // jsdom 无真实布局，以 style 公式断言（由组件导出的常量驱动，改常量即
+    // 联动断言，不依赖精确 Tailwind 类名——Oscar 评审 PR #45 nit 1 的折中）。
+    // jsdom 会把 calc() 规范化成裸表达式，故按分量断言而非整串等值。
+    const height = wrapper.style.height;
+    expect(height).toContain(`clamp(${CARD_HEIGHT_MIN_REM}rem`);
+    expect(height).toContain("100dvh");
+    expect(height).toContain(`${CARD_HEIGHT_OFFSET_REM}rem`);
+    expect(height).toContain(`${CARD_HEIGHT_MAX_REM}rem`);
+  });
+
+  it("翻面后焦点移到背面滚动区：桌面键盘可用方向键滚动长释义（suggestion 1）", async () => {
+    render(<Harness sense={makeRichSense()} />);
+    flipCard();
+
+    const scrollRegion = screen.getByText("放弃；抛弃").closest(".overflow-y-auto") as HTMLElement;
+    // 滚动区在整卡 <button> 内、tabIndex=-1 不进 tab 序，翻面后程序化聚焦
+    expect(scrollRegion).toHaveAttribute("tabindex", "-1");
+    await waitFor(() => expect(document.activeElement).toBe(scrollRegion));
   });
 
   it("正反面同口径：两面共用同一 CardFace 结构，h-full 填满固定高度卡片", () => {

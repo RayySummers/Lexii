@@ -16,9 +16,12 @@
  * - 整卡是一个可聚焦的 <button>，aria-expanded 表达翻面（展开/收起）状态；
  * - 背面初始不可见且 aria-hidden，翻面后互换，屏幕阅读器只读到当前面；
  * - 双音标带独立 aria-label（美式音标 / 英式音标 / 音标）；
- * - 翻面动画尊重 prefers-reduced-motion（motion-reduce 下无过渡）。
+ * - 翻面动画尊重 prefers-reduced-motion（motion-reduce 下无过渡）；
+ * - 翻面后焦点自动移到背面滚动区（tabindex=-1，不进 tab 序）——
+ *   桌面键盘用户可直接用方向键滚动长释义（Oscar 评审 PR #45 suggestion 1）。
  */
-import type { ReactNode } from "react";
+import { useEffect, useRef } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { Sense } from "@lexilexi/core";
 import { dualPhonetics, parseWordParts } from "./enrichmentUi";
 import type { PhoneticBadge } from "./enrichmentUi";
@@ -31,19 +34,47 @@ export interface ReviewCardProps {
   ratingHint: string;
 }
 
+/**
+ * 固定高度公式常量（RAY-291）：卡片高度 = clamp(MIN, 100dvh − OFFSET, MAX)。
+ *
+ * ⚠ OFFSET 与卡片外布局强耦合：App 头（86px 含按钮边框）+ 页边距（64px）+
+ * 顶部工具栏行（42px）+ 发音/标熟行（38px）+ 评分按钮（64px）+ 底部提示行
+ * （16px）+ 四处 gap-6（96px）≈ 406px ≈ 25.4rem，取 26rem 留约 10px 余量。
+ * 改动卡片外任何尺寸（头部/间距/按钮高度）必须同步 OFFSET——测试以本常量
+ * 校验渲染结果，失同步即红（Oscar 评审 PR #45 suggestion 2：抽命名常量 +
+ * 提醒注释，防失同步）。MIN 防止极端矮屏（横屏手机）不可用，MAX 限制
+ * 高屏/桌面端过高。深色模式与离线不涉及（纯布局，无新依赖）。
+ */
+export const CARD_HEIGHT_MIN_REM = 14;
+export const CARD_HEIGHT_OFFSET_REM = 26;
+export const CARD_HEIGHT_MAX_REM = 32;
+
+/** 卡片固定高度 style（唯一来源：上方常量，见常量注释的耦合提醒） */
+export function cardHeightStyle(): CSSProperties {
+  return {
+    height: `clamp(${CARD_HEIGHT_MIN_REM}rem, calc(100dvh - ${CARD_HEIGHT_OFFSET_REM}rem), ${CARD_HEIGHT_MAX_REM}rem)`,
+  };
+}
+
 export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardProps) {
   const wordParts = parseWordParts(sense.wordParts ?? "");
+  const backScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // 翻面后把焦点移到背面滚动区（suggestion 1）：滚动区在整卡 <button> 内、
+  // 不进入 tab 序（tabIndex=-1），程序化聚焦后桌面键盘用户可用方向键滚动
+  // 长释义；rAF 等翻面状态提交后再聚焦，preventScroll 避免页面整体跳动。
+  useEffect(() => {
+    if (!flipped) {
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      backScrollRef.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [flipped]);
+
   return (
-    /*
-     * 固定高度公式（RAY-291）：100dvh 减去卡片外固定内容约 26rem
-     * （App 头 86px 含按钮边框 + 页边距 64px + 顶部工具栏行 42px +
-     * 发音/标熟行 38px + 评分按钮 64px + 底部提示行 16px + 四处 gap-6
-     * 96px ≈ 406px ≈ 25.4rem，取 26rem 留约 10px 余量），保证常见
-     * 配置下背词页整体落在移动端一屏内；下限 14rem 防止极端矮屏
-     * （如横屏手机）卡片不可用，上限 32rem 限制高屏/桌面端过高。
-     * 深色模式与离线不涉及（纯布局，无新依赖）。
-     */
-    <div className="h-[clamp(14rem,calc(100dvh_-_26rem),32rem)] [perspective:1200px]">
+    <div className="[perspective:1200px]" style={cardHeightStyle()}>
       <button
         type="button"
         onClick={onFlip}
@@ -88,7 +119,9 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardPro
         <CardFace hidden={!flipped} rotated>
           <div
             key={sense.id}
-            className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-6 pb-4 pt-6"
+            ref={backScrollRef}
+            tabIndex={-1}
+            className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-6 pb-4 pt-6 outline-none"
           >
             <span className="flex flex-wrap items-baseline justify-between gap-3">
               <span className="text-2xl font-bold tracking-tight">{sense.term}</span>
