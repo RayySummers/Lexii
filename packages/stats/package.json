@@ -1,6 +1,6 @@
 ﻿{
   "name": "@lexilexi/stats",
-  "version": "0.1.0-alpha.3",
+  "version": "0.1.0-alpha.4",
   "private": true,
   "type": "module",
   "description": "Lexilexi 学习统计包（骨架）",
