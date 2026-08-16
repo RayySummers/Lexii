@@ -35,6 +35,8 @@ function badgeSnapshot(
     newCardsRemainingToday: 0,
     reviewCount,
     completedWordCount: 0,
+    todayStudyDurationMs: 0,
+    totalStudyDurationMs: 0,
     ...overrides,
   };
 }
