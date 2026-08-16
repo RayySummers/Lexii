@@ -7,7 +7,8 @@
  * - 四档（Anki 传统）：Again / Hard / Good / Easy，沿用既有样式与快捷键；
  * - 副文案显示该档评分后的到期时间（previewGradeDueLabels 预览，与真实排期一致）；
  * - 右上角 kbd 提示快捷键（三档 1–3，四档 1–4）；
- * - 移动端网格等宽，sm 以上一行排开，触控目标 ≥ 48px。
+ * - 三档（默认）全视口一排三个（RAY-278 返工：手机端此前 2×2 缺右下角）；
+ *   四档移动端 2×2、sm 以上一排四个；网格等宽，触控目标 ≥ 48px。
  */
 import type { ReviewRating } from "@lexilexi/core";
 import type { RatingTierMode } from "../lib/ratingTiers";
@@ -96,10 +97,12 @@ export interface RatingButtonsProps {
 
 export function RatingButtons({ dueLabels, onGrade, mode }: RatingButtonsProps) {
   const configs = mode === "three" ? THREE_TIER_CONFIGS : FOUR_TIER_CONFIGS;
-  // 类名必须字面量出现（Tailwind 编译期扫描），动态拼接会丢样式
-  const gridClass = mode === "three" ? "sm:grid-cols-3" : "sm:grid-cols-4";
+  // 类名必须字面量出现（Tailwind 编译期扫描），动态拼接会丢样式。
+  // 三档：全视口一排三个（RAY-278 返工，手机端不再 2×2 缺右下角）；
+  // 四档：移动端 2×2 等宽、sm 以上一排四个。
+  const gridClass = mode === "three" ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4";
   return (
-    <div className={`grid grid-cols-2 gap-2 ${gridClass}`} role="group" aria-label="评分">
+    <div className={`grid gap-2 ${gridClass}`} role="group" aria-label="评分">
       {configs.map((config) => (
         <button
           key={config.rating}
