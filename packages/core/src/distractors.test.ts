@@ -108,7 +108,7 @@ describe("generateOptions", () => {
     expect(wrongOptions[0]!.text).toBe("普通的");
   });
 
-  it("优先使用近义词定义", () => {
+  it("同义词条不进混淆池（英译中，RAY-293 剔除修复）", () => {
     const target = makeSense({
       term: "abandon",
       definitions: ["放弃"],
@@ -124,9 +124,9 @@ describe("generateOptions", () => {
       makeSense({ term: "bank", definitions: ["银行"] }),
     ];
     const options = generateOptions(target, all, []);
-    const synOptions = options.filter((o) => o.source === "synonym");
-    expect(synOptions.length).toBeGreaterThanOrEqual(1);
-    expect(synOptions[0]!.text).toBe("遗弃");
+    // 同义释义「遗弃」语义上也说得通，不得作为混淆项出现
+    expect(options.some((o) => o.text === "遗弃")).toBe(false);
+    expect(options.filter((o) => o.isCorrect)).toHaveLength(1);
   });
 
   it("无释义目标返回占位选项", () => {
@@ -198,7 +198,7 @@ describe("generateTermOptions（RAY-293 中译英）", () => {
     expect(wrongOptions[0]!.text).toBe("common");
   });
 
-  it("近义词混淆项取词条原文", () => {
+  it("同义词条不进混淆池（中译英，RAY-293 剔除修复）", () => {
     const target = makeSense({
       term: "abandon",
       definitions: ["放弃"],
@@ -214,9 +214,9 @@ describe("generateTermOptions（RAY-293 中译英）", () => {
       makeSense({ term: "bank", definitions: ["银行"] }),
     ];
     const options = generateTermOptions(target, all, []);
-    const synOptions = options.filter((o) => o.source === "synonym");
-    expect(synOptions.length).toBeGreaterThanOrEqual(1);
-    expect(synOptions[0]!.text).toBe("forsake");
+    // 同义词条 forsake 语义上也说得通，不得作为混淆项出现
+    expect(options.some((o) => o.text === "forsake")).toBe(false);
+    expect(options.filter((o) => o.isCorrect)).toHaveLength(1);
   });
 
   it("形近词混淆项取词条原文", () => {
@@ -251,5 +251,120 @@ describe("generateTermOptions（RAY-293 中译英）", () => {
     expect(termOptions.every((o) => /^[a-z]+$/.test(o.text))).toBe(true);
     expect(defOptions.some((o) => o.text === "放弃")).toBe(true);
     expect(defOptions.every((o) => !/^[a-z]+$/.test(o.text))).toBe(true);
+  });
+});
+
+describe("同义词条剔除（RAY-293 后续修复，两方向通用）", () => {
+  it("同义词条即使命中常错词池也被剔除（英译中）", () => {
+    const target = makeSense({
+      term: "abandon",
+      definitions: ["放弃"],
+      synonyms: ["forsake"],
+    });
+    const synSense = makeSense({ term: "forsake", definitions: ["遗弃"] });
+    const all = [
+      target,
+      synSense,
+      makeSense({ term: "band", definitions: ["乐队"] }),
+      makeSense({ term: "ban", definitions: ["禁令"] }),
+      makeSense({ term: "bandit", definitions: ["强盗"] }),
+      makeSense({ term: "bank", definitions: ["银行"] }),
+    ];
+    // forsake 既是常错词、又是目标词的同义词——必须剔除
+    const options = generateOptions(target, all, ["forsake"]);
+    expect(options.some((o) => o.text === "遗弃")).toBe(false);
+  });
+
+  it("同义词条即使命中常错词池也被剔除（中译英）", () => {
+    const target = makeSense({
+      term: "abandon",
+      definitions: ["放弃"],
+      synonyms: ["forsake"],
+    });
+    const synSense = makeSense({ term: "forsake", definitions: ["遗弃"] });
+    const all = [
+      target,
+      synSense,
+      makeSense({ term: "band", definitions: ["乐队"] }),
+      makeSense({ term: "ban", definitions: ["禁令"] }),
+      makeSense({ term: "bandit", definitions: ["强盗"] }),
+      makeSense({ term: "bank", definitions: ["银行"] }),
+    ];
+    const options = generateTermOptions(target, all, ["forsake"]);
+    expect(options.some((o) => o.text === "forsake")).toBe(false);
+  });
+
+  it("双向口径：自身 synonyms 含目标词的义项同样剔除", () => {
+    const target = makeSense({ term: "abandon", definitions: ["放弃"] });
+    // 目标词未声明 synonyms，但 forsake 的 synonyms 指向目标词——双向同义
+    const backSynSense = makeSense({
+      term: "forsake",
+      definitions: ["遗弃"],
+      synonyms: ["abandon"],
+    });
+    const all = [
+      target,
+      backSynSense,
+      makeSense({ term: "band", definitions: ["乐队"] }),
+      makeSense({ term: "ban", definitions: ["禁令"] }),
+      makeSense({ term: "bandit", definitions: ["强盗"] }),
+      makeSense({ term: "bank", definitions: ["银行"] }),
+    ];
+    const defOptions = generateOptions(target, all, ["forsake"]);
+    const termOptions = generateTermOptions(target, all, ["forsake"]);
+    expect(defOptions.some((o) => o.text === "遗弃")).toBe(false);
+    expect(termOptions.some((o) => o.text === "forsake")).toBe(false);
+  });
+
+  it("随机回退池同样剔除同义词条（其他候选为空时选项不足也不补同义词）", () => {
+    const target = makeSense({
+      term: "abandon",
+      definitions: ["放弃"],
+      synonyms: ["forsake"],
+    });
+    const synSense = makeSense({ term: "forsake", definitions: ["遗弃"] });
+    const all = [target, synSense];
+    const options = generateTermOptions(target, all, []);
+    // 混淆池唯一的候选就是同义词条，剔除后只剩正确项
+    expect(options).toHaveLength(1);
+    expect(options[0]!.isCorrect).toBe(true);
+  });
+
+  it("大小写不敏感：同义词条大写变体同样剔除", () => {
+    const target = makeSense({
+      term: "abandon",
+      definitions: ["放弃"],
+      synonyms: ["Forsake"],
+    });
+    const synSense = makeSense({ term: "forsake", definitions: ["遗弃"] });
+    const all = [
+      target,
+      synSense,
+      makeSense({ term: "band", definitions: ["乐队"] }),
+      makeSense({ term: "ban", definitions: ["禁令"] }),
+      makeSense({ term: "bandit", definitions: ["强盗"] }),
+      makeSense({ term: "bank", definitions: ["银行"] }),
+    ];
+    const options = generateTermOptions(target, all, []);
+    expect(options.some((o) => o.text === "forsake")).toBe(false);
+  });
+
+  it("非同义词条照常进入混淆池（剔除不误伤）", () => {
+    const target = makeSense({
+      term: "abandon",
+      definitions: ["放弃"],
+      synonyms: ["forsake"],
+    });
+    const all = [
+      target,
+      makeSense({ term: "forsake", definitions: ["遗弃"] }),
+      makeSense({ term: "band", definitions: ["乐队"] }),
+      makeSense({ term: "ban", definitions: ["禁令"] }),
+      makeSense({ term: "bandit", definitions: ["强盗"] }),
+      makeSense({ term: "bank", definitions: ["银行"] }),
+    ];
+    const options = generateTermOptions(target, all, []);
+    expect(options.length).toBeGreaterThan(1);
+    expect(options.some((o) => !o.isCorrect)).toBe(true);
   });
 });
