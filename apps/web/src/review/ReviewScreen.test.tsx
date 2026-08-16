@@ -5,7 +5,7 @@
  * 键盘快捷键与按钮等价、标熟、单步撤销、发音、队列推进与完成态、
  * 空状态与错误恢复。
  */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { toEventId } from "@lexilexi/core";
 import type { LexilexiExportData, ReviewRating, StudyMode } from "@lexilexi/core";
@@ -519,14 +519,30 @@ describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
   it("发音：以设置口音朗读当前词条（浏览器语音合成，离线）", async () => {
     const speak = vi.fn();
     const cancel = vi.fn();
+    const resume = vi.fn();
     class FakeUtterance {
       text: string;
       lang = "";
+      volume = 1;
+      rate = 1;
+      voice: SpeechSynthesisVoice | null = null;
+      onstart: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      onerror: ((event: SpeechSynthesisErrorEvent) => void) | null = null;
       constructor(text: string) {
         this.text = text;
       }
     }
-    vi.stubGlobal("speechSynthesis", { speak, cancel });
+    vi.stubGlobal("speechSynthesis", {
+      speak,
+      cancel,
+      resume,
+      getVoices: () => [],
+      addEventListener: () => {},
+      speaking: false,
+      pending: false,
+      paused: false,
+    });
     vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
 
     const card = makeCard();
@@ -546,7 +562,10 @@ describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
     const utterance = speak.mock.calls[0]![0] as FakeUtterance;
     expect(utterance.text).toBe("apple");
     expect(utterance.lang).toBe("en-US"); // 默认美式
-    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(utterance.volume).toBe(1); // RAY-277：显式音量（部分 iOS 默认异常）
+    // RAY-277：队列空闲时不 cancel（iOS cancel→speak 同 tick 竞态吞朗读）
+    expect(cancel).not.toHaveBeenCalled();
+    expect(resume).not.toHaveBeenCalled();
   });
 
   it("发音：环境不支持语音合成时给出提示，不阻塞复习", async () => {
@@ -561,6 +580,53 @@ describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
     fireEvent.click(screen.getByRole("button", { name: /朗读/ }));
 
     expect(await screen.findByText("当前浏览器不支持语音合成，无法发音。")).toBeInTheDocument();
+    // 复习流程不受影响
+    expect(screen.getByRole("button", { name: /评分：认识/ })).toBeInTheDocument();
+  });
+
+  it("发音：设备语音不可用（异步合成失败）时给出降级提示，不阻塞复习（RAY-277）", async () => {
+    const speak = vi.fn();
+    class FakeUtterance {
+      text: string;
+      lang = "";
+      volume = 1;
+      rate = 1;
+      voice: SpeechSynthesisVoice | null = null;
+      onstart: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      onerror: ((event: SpeechSynthesisErrorEvent) => void) | null = null;
+      constructor(text: string) {
+        this.text = text;
+      }
+    }
+    vi.stubGlobal("speechSynthesis", {
+      speak,
+      cancel: () => {},
+      resume: () => {},
+      getVoices: () => [],
+      addEventListener: () => {},
+      speaking: false,
+      pending: false,
+      paused: false,
+    });
+    vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
+
+    const card = makeCard();
+    const harness = makeHarness({ queue: [card] });
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
+    await expectCardShown(card.sense.term);
+
+    fireEvent.click(screen.getByRole("button", { name: /朗读/ }));
+    const utterance = speak.mock.calls[0]![0] as FakeUtterance;
+    act(() => {
+      utterance.onerror?.({ error: "synthesis-unavailable" } as SpeechSynthesisErrorEvent);
+    });
+
+    expect(
+      await screen.findByText(
+        "当前设备无法发声：语音服务不可用，请检查系统语音（TTS）设置后重试。",
+      ),
+    ).toBeInTheDocument();
     // 复习流程不受影响
     expect(screen.getByRole("button", { name: /评分：认识/ })).toBeInTheDocument();
   });

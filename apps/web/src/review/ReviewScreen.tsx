@@ -20,7 +20,7 @@ import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
 import type { ReviewRating, StudyMode } from "@lexilexi/core";
 import { BackArrowIcon, SpeakerIcon, UndoIcon } from "../components/icons";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
-import { readPronunciationAccent, speakWord } from "../lib/pronunciation";
+import { primeSpeechEngine, readPronunciationAccent, speakWord } from "../lib/pronunciation";
 import { readRatingTierMode } from "../lib/ratingTiers";
 import type { RatingTierMode } from "../lib/ratingTiers";
 import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
@@ -84,15 +84,22 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
   // 让回调每次重建；ref 与提交同步即可保证点击时读到当前卡）
   const currentCardRef = useRef(session.current);
 
-  /** 朗读当前词条（浏览器语音合成，口音随设置；不支持时给出一次性提示） */
+  /** 朗读当前词条（浏览器语音合成，口音随设置；不可用时给出一次性提示） */
   const handleSpeak = useCallback(() => {
     const card = currentCardRef.current;
     if (!card) {
       return;
     }
-    if (!speakWord(card.sense.term, readPronunciationAccent())) {
-      setSpeakNotice("当前浏览器不支持语音合成，无法发音。");
-    }
+    setSpeakNotice(null);
+    speakWord(card.sense.term, readPronunciationAccent(), {
+      onUnavailable: (reason) => {
+        setSpeakNotice(
+          reason === "unsupported"
+            ? "当前浏览器不支持语音合成，无法发音。"
+            : "当前设备无法发声：语音服务不可用，请检查系统语音（TTS）设置后重试。",
+        );
+      },
+    });
   }, []);
 
   const handleExport = useCallback(async () => {
@@ -136,6 +143,12 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
     tierModeRef.current = tierMode;
     currentCardRef.current = session.current;
   });
+
+  // 预热语音引擎（RAY-277）：提前触发手机浏览器语音包的异步装载，
+  // 避免用户第一次点击「发音」时 getVoices 仍为空导致无声
+  useEffect(() => {
+    primeSpeechEngine();
+  }, []);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
