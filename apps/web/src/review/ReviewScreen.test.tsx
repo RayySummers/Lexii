@@ -158,6 +158,8 @@ describe("ReviewScreen", () => {
     expect(screen.getByRole("button", { name: /模糊/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /不认识/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Easy/ })).not.toBeInTheDocument();
+    // RAY-279：背词页不再显示「X 分钟后复习」提示（新卡各档均为分钟级）
+    expect(screen.queryByText(/分钟/)).not.toBeInTheDocument();
   });
 
   it("默认三档：数字键 4 与字母 E 不评分（Easy 未提供）", async () => {

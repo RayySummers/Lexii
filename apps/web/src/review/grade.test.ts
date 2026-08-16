@@ -1,7 +1,7 @@
 import { newCardFields } from "@lexilexi/fsrs";
 import { toItemId } from "@lexilexi/core";
 import { describe, expect, it } from "vitest";
-import { formatDueLabel, previewGradeDueLabels, ratingFromKey } from "./grade";
+import { dueLabelForDisplay, formatDueLabel, previewGradeDueLabels, ratingFromKey } from "./grade";
 import { makeMemory } from "./testFixtures";
 
 const NOW = new Date("2026-08-10T12:00:00.000Z");
@@ -63,6 +63,28 @@ describe("formatDueLabel", () => {
 
   it.each(cases)("due=%s → %s", (due, expected) => {
     expect(formatDueLabel(due, NOW)).toBe(expected);
+  });
+});
+
+describe("dueLabelForDisplay（RAY-279：移除「X 分钟后复习」提示）", () => {
+  it("分钟级文案返回 null（不展示）", () => {
+    expect(dueLabelForDisplay("2026-08-10T12:00:30.000Z", NOW)).toBeNull(); // <1分钟
+    expect(dueLabelForDisplay("2026-08-10T12:01:00.000Z", NOW)).toBeNull(); // 1分钟
+    expect(dueLabelForDisplay("2026-08-10T12:06:00.000Z", NOW)).toBeNull(); // 6分钟
+    expect(dueLabelForDisplay("2026-08-10T12:10:00.000Z", NOW)).toBeNull(); // 10分钟
+    expect(dueLabelForDisplay("2026-08-10T12:59:00.000Z", NOW)).toBeNull(); // 59分钟
+  });
+
+  it("小时及以上文案保留", () => {
+    expect(dueLabelForDisplay("2026-08-10T13:00:00.000Z", NOW)).toBe("1小时");
+    expect(dueLabelForDisplay("2026-08-11T12:00:00.000Z", NOW)).toBe("1天");
+    expect(dueLabelForDisplay("2026-09-09T12:00:00.000Z", NOW)).toBe("1个月");
+    expect(dueLabelForDisplay("2027-08-10T12:00:00.000Z", NOW)).toBe("1年");
+  });
+
+  it("过去 / 非法时间兜底「现在」保留（非分钟文案）", () => {
+    expect(dueLabelForDisplay("2026-08-09T12:00:00.000Z", NOW)).toBe("现在");
+    expect(dueLabelForDisplay("not-a-date", NOW)).toBe("现在");
   });
 });
 

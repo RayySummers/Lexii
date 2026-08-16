@@ -71,6 +71,19 @@ export function formatDueLabel(due: IsoDate, now: DateInput): string {
   return `${Math.floor(months / 12)}年`;
 }
 
+/**
+ * 背词页评分按钮的到期副文案（RAY-279 真机反馈收敛口径）。
+ *
+ * 分钟级文案（「X 分钟后复习」类）返回 null（不展示）：
+ * 1/6/10 分钟只描述「不认识」的词在当次会话内的重出节奏，App 无后台
+ * 推送、不会按分钟把人叫回来，这类文案容易被误读为定时提醒。
+ * 小时及以上（真实到期排期）保留原文案。
+ */
+export function dueLabelForDisplay(due: IsoDate, now: DateInput): string | null {
+  const label = formatDueLabel(due, now);
+  return label.endsWith("分钟") ? null : label;
+}
+
 /** 评分档位 → 键盘快捷键（数字键为主，字母键为助记别名） */
 export const RATING_SHORTCUTS: Record<ReviewRating, string> = {
   again: "1",
