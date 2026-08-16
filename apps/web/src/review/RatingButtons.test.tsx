@@ -2,7 +2,8 @@
  * 评分按钮测试（RAY-265：默认三档，设置可切四档）。
  *
  * 覆盖：三档渲染认识 / 模糊 / 不认识且无 Easy；四档渲染
- * Again / Hard / Good / Easy；点击回调携带对应评分档位。
+ * Again / Hard / Good / Easy；点击回调携带对应评分档位；
+ * RAY-278 返工：三档全视口一排三个（移动端不再 2×2 缺右下角）。
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -48,6 +49,28 @@ describe("RatingButtons", () => {
     expect(screen.getByRole("button", { name: /评分：Good/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /评分：Easy/ })).toBeInTheDocument();
     expect(screen.getAllByRole("button")).toHaveLength(4);
+  });
+
+  it("三档全视口一排三个（RAY-278 返工）：base grid-cols-3，非 sm 前缀、非两列", () => {
+    const onGrade = vi.fn();
+    render(<RatingButtons dueLabels={DUE_LABELS} mode="three" onGrade={onGrade} />);
+
+    const grid = screen.getByRole("group", { name: "评分" });
+    const tokens = grid.className.split(/\s+/);
+    expect(tokens).toContain("grid-cols-3");
+    expect(tokens).not.toContain("sm:grid-cols-3");
+    expect(tokens).not.toContain("grid-cols-2");
+  });
+
+  it("四档移动端保持 2×2、sm 以上一排四个（不误伤既有布局）", () => {
+    const onGrade = vi.fn();
+    render(<RatingButtons dueLabels={DUE_LABELS} mode="four" onGrade={onGrade} />);
+
+    const grid = screen.getByRole("group", { name: "评分" });
+    const tokens = grid.className.split(/\s+/);
+    expect(tokens).toContain("grid-cols-2");
+    expect(tokens).toContain("sm:grid-cols-4");
+    expect(tokens).not.toContain("grid-cols-3");
   });
 
   it("四档点击：Easy → easy（含到期副文案）", () => {

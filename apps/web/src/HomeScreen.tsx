@@ -16,9 +16,10 @@
  * RAY-269：新增选择题学习模式。首页添加学习形式切换（卡片 / 选择题），
  * 用户可先选形式再选模式。默认卡片形式（向后兼容）。
  *
- * RAY-278（真机反馈）：三模式按钮改为全视口一排三个——原 `sm:grid-cols-3`
- * 在手机窄屏（<640px）退化为单列堆叠，真机看起来不对齐；改为 base 即
- * `grid-cols-3`，窄屏收窄内边距与字号，避免 320px 视口溢出。
+ * RAY-278（返工裁定，2026-08-16 Rayy 澄清）：手机端三模式按钮竖排
+ * （一排一个）本就是期望形态——`sm:grid-cols-3` 的 <640px 单列堆叠保持
+ * 不动，桌面端（≥640px）一排三个。真实问题在背单词页评分按钮，见
+ * review/RatingButtons.tsx。
  *
  * - 待学徽标数据经 StatsDataProvider（statsProvider 为 null 时不展示，
  *   如无 IndexedDB 的测试环境）；
@@ -83,17 +84,17 @@ export function HomeScreen({ onStart, statsProvider }: HomeScreenProps) {
         ))}
       </div>
 
-      {/* 三模式入口（RAY-278：窄屏也一排三个，不随 sm 断点堆叠） */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+      {/* 三模式入口（RAY-278 返工：移动端竖排为期望形态，桌面一排三个） */}
+      <div className="grid gap-4 sm:grid-cols-3">
         {MODES.map(({ mode, title, subtitle }) => (
           <button
             key={mode}
             type="button"
             onClick={() => onStart(mode, format)}
-            className="flex min-w-0 flex-col gap-1 rounded-2xl border border-border bg-surface p-4 text-left transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:p-6"
+            className="flex flex-col gap-1 rounded-2xl border border-border bg-surface p-6 text-left transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
-            <span className="text-lg font-semibold sm:text-xl">{title}</span>
-            <span aria-hidden="true" className="text-xs leading-snug text-text-muted sm:text-sm">
+            <span className="text-xl font-semibold">{title}</span>
+            <span aria-hidden="true" className="text-sm text-text-muted">
               {subtitle}
             </span>
           </button>

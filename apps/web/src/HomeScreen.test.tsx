@@ -4,8 +4,9 @@
  * RAY-253：三个模式按钮（学习 / 复习 / 混合）+ 今日待学徽标（RAY-254 起，此前为到期徽标）；
  * 品牌名与介绍文案不再渲染（已归档 docs/archive/homepage-intro-v1.md）。
  * RAY-260（Oscar 复评 suggestion 2）：有待学词时展示「今日新卡额度剩余 N 张」。
- * RAY-278（真机反馈）：三模式按钮全视口一排三个——容器必须是 base `grid-cols-3`
- * 而非 `sm:grid-cols-3`（窄屏会退化为单列堆叠）。
+ * RAY-278（返工裁定）：三模式按钮移动端竖排为期望形态——容器必须是
+ * `sm:grid-cols-3`（<640px 单列竖排），不带 base `grid-cols-3`（那会把
+ * 移动端挤成一排三个）。
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -50,7 +51,7 @@ describe("HomeScreen", () => {
     expect(screen.getByRole("button", { name: "混合" })).toBeInTheDocument();
   });
 
-  it("三模式按钮共处一个 base 三列网格（RAY-278：窄屏一排三个，不依赖 sm 断点）", () => {
+  it("三模式按钮移动端竖排、桌面端三列（RAY-278 返工：容器不带 base grid-cols-3）", () => {
     render(<HomeScreen onStart={vi.fn()} statsProvider={null} />);
 
     const modes = [
@@ -63,10 +64,11 @@ describe("HomeScreen", () => {
     const containers = new Set(modes.map((b) => b.parentElement));
     expect(containers.size).toBe(1);
 
-    // 容器为 base grid-cols-3（全视口生效），而非 sm:grid-cols-3（<640px 退化为单列）
+    // 移动端竖排（一排一个）：base 不带三列类；桌面端 ≥sm 才一排三个
     const grid = modes[0]!.parentElement!;
-    expect(grid.className).toContain("grid-cols-3");
-    expect(grid.className).not.toContain("sm:grid-cols-3");
+    const tokens = grid.className.split(/\s+/);
+    expect(tokens).toContain("sm:grid-cols-3");
+    expect(tokens).not.toContain("grid-cols-3");
 
     // 学习形式切换（卡片/选择题）不属于该网格
     expect(grid).not.toContainElement(screen.getByRole("radio", { name: /卡片/ }));
