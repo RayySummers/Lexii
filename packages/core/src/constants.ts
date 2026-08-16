@@ -26,8 +26,12 @@ export const EVENT_SCHEMA_VERSION = 0;
  * v4（RAY-262）：senses 新增 term 索引（预设词书安装按 term 查重，避免
  *   重叠词书/用户已导入词条重复生成学习项）；纯新增索引无数据迁移，
  *   存量数据原样保留。
+ * v5（RAY-284）：新增 notebookEntries 表（生词本条目：id 主键、
+ *   senseId 索引按义项查重去重、status 索引按 active 列表）——
+ *   纯新增表，无数据迁移，存量数据原样保留。schema 版本已与 P0 数据
+ *   任务错开（RAY-288 纯展示、RAY-270 只读事件流，均不改 schema）。
  */
-export const DB_SCHEMA_VERSION = 4;
+export const DB_SCHEMA_VERSION = 5;
 
 /** 导出文件（完整可恢复 JSON）的格式版本 */
 export const EXPORT_FORMAT_VERSION = 1;

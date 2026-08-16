@@ -4,10 +4,19 @@
  * 走真实 @lexilexi/core 路径：手工落库条目的记忆状态（reps / due），
  * 验证 learn / review / mixed 三种模式的筛选与排序、混合穿插节奏与
  * 任一侧耗尽时的补齐行为。
+ *
+ * RAY-284 生词本开关：includeNotebook === false 时生词本条目（及其独立
+ * 调度实例）从三种模式与到期查询中排除，词书条目不受影响。
  */
 import type { DexieOptions } from "dexie";
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
+import {
+  addToNotebook,
+  getActiveNotebookItemIds,
+  getDueItemIds,
+  removeFromNotebook,
+} from "./index";
 import type { IsoDate } from "./domain";
 import { makeLearningItem, makeMemoryState, makeSense } from "./helpers";
 import type { ItemId } from "./id";
@@ -267,5 +276,105 @@ describe("getStudyQueueItemIds（学习 / 复习 / 混合三模式）", () => {
         idOf(ids, "e"),
       ]);
     });
+  });
+});
+
+describe("getStudyQueueItemIds / getDueItemIds（生词本开关，RAY-284）", () => {
+  /** 落库一个生词本条目：义项先入库（复用），返回生词本条目 id 与其学习条目 id */
+  async function seedNotebookEntry(
+    database: LexilexiDatabase,
+    senseSuffix: string,
+    addedAt: IsoDate,
+    reps: number,
+  ): Promise<ItemId> {
+    const sense = makeSense(`sense_nb_${senseSuffix}`);
+    await database.senses.put(sense);
+    const entry = await addToNotebook(database, { senseId: sense.id, now: addedAt });
+    if (reps > 0) {
+      const memory = await database.memoryStates.get(entry.itemId);
+      if (memory) {
+        await database.memoryStates.put({
+          ...memory,
+          fields: { ...memory.fields, reps, due: addedAt },
+        });
+      }
+    }
+    return entry.itemId;
+  }
+
+  it("includeNotebook=false：生词本新词/复习条目从三模式队列排除，词书条目保留", async () => {
+    const database = freshDatabase();
+    const ids = await seed(database, [
+      { id: "a", due: "2026-08-13T08:00:00.000Z", reps: 0 },
+      { id: "b", due: "2026-08-13T09:00:00.000Z", reps: 2 },
+    ]);
+    const notebookNew = await seedNotebookEntry(database, "new", "2026-08-13T07:00:00.000Z", 0);
+    const notebookReview = await seedNotebookEntry(
+      database,
+      "review",
+      "2026-08-13T07:30:00.000Z",
+      3,
+    );
+
+    expect(await getStudyQueueItemIds(database, NOW, "learn", { includeNotebook: false })).toEqual([
+      idOf(ids, "a"),
+    ]);
+    expect(await getStudyQueueItemIds(database, NOW, "review", { includeNotebook: false })).toEqual(
+      [idOf(ids, "b")],
+    );
+    expect(await getStudyQueueItemIds(database, NOW, "mixed", { includeNotebook: false })).toEqual([
+      idOf(ids, "b"),
+      idOf(ids, "a"),
+    ]);
+    expect(notebookNew).toBeDefined();
+    expect(notebookReview).toBeDefined();
+  });
+
+  it("默认（includeNotebook 未传 / true）：生词本条目包含在队列中", async () => {
+    const database = freshDatabase();
+    await seed(database, [{ id: "a", due: "2026-08-13T08:00:00.000Z", reps: 0 }]);
+    const notebookNew = await seedNotebookEntry(database, "new", "2026-08-13T07:00:00.000Z", 0);
+
+    const learnIds = await getStudyQueueItemIds(database, NOW, "learn");
+    expect(learnIds).toContain(notebookNew);
+    expect(learnIds.length).toBe(2);
+    const mixedIds = await getStudyQueueItemIds(database, NOW, "mixed", { includeNotebook: true });
+    expect(mixedIds).toContain(notebookNew);
+  });
+
+  it("移出生词本后：条目移出 active 集合、底层条目软删除（已删条目由 UI 装配层过滤）", async () => {
+    const database = freshDatabase();
+    const ids = await seed(database, [{ id: "a", due: "2026-08-13T08:00:00.000Z", reps: 0 }]);
+    const sense = makeSense("sense_nb_removed");
+    await database.senses.put(sense);
+    const entry = await addToNotebook(database, {
+      senseId: sense.id,
+      now: "2026-08-13T07:00:00.000Z",
+    });
+    await removeFromNotebook(database, {
+      entryId: entry.id,
+      now: "2026-08-13T07:05:00.000Z",
+    });
+
+    // 移出后不再属于 active 生词本集合（开关排除集不含该条目）
+    expect(await getActiveNotebookItemIds(database)).toEqual([]);
+    // 底层条目软删除（与 deleteItem 同语义；buildReviewQueue 会过滤已删条目）
+    expect((await database.items.get(entry.itemId))?.status).toBe("deleted");
+    // 词书条目不受移出影响
+    const learnIds = await getStudyQueueItemIds(database, NOW, "learn", { includeNotebook: false });
+    expect(learnIds).toContain(idOf(ids, "a"));
+  });
+
+  it("getDueItemIds：includeNotebook=false 排除生词本到期条目，默认包含", async () => {
+    const database = freshDatabase();
+    await seed(database, [{ id: "a", due: "2026-08-13T08:00:00.000Z", reps: 0 }]);
+    const notebookNew = await seedNotebookEntry(database, "new", "2026-08-13T07:00:00.000Z", 0);
+
+    const allDue = await getDueItemIds(database, NOW);
+    expect(allDue).toContain(notebookNew);
+    expect(allDue.length).toBe(2);
+    const withoutNotebook = await getDueItemIds(database, NOW, { includeNotebook: false });
+    expect(withoutNotebook).not.toContain(notebookNew);
+    expect(withoutNotebook.length).toBe(1);
   });
 });

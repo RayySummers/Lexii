@@ -16,8 +16,10 @@ import type {
   MemoryState,
   ReviewRating,
   Sense,
+  SenseId,
   StudyMode,
 } from "@lexilexi/core";
+import type { AddToNotebookResult } from "../notebook/types";
 import type { MultipleChoiceQuestion } from "./MultipleChoiceCard";
 
 /** 复习队列中的一张卡 */
@@ -130,4 +132,11 @@ export interface ReviewDataProvider {
   hasAnyItems(): Promise<boolean>;
   /** 导入内置示例词表（空状态一键体验），返回导入条数 */
   importSampleWordlist(): Promise<number>;
+  /**
+   * 把当前复习卡的义项加入生词本（RAY-284，复习卡页加词入口）。
+   *
+   * 幂等：同义项已在生词本时返回 "already"；加词创建独立的生词本学习
+   * 条目（复用同一义项），进入现有 FSRS 调度（加入即到期）。
+   */
+  addToNotebook(senseId: SenseId): Promise<AddToNotebookResult>;
 }

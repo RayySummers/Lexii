@@ -17,13 +17,20 @@
  * （如仅渲染首页的测试）不会抛错。
  *
  * RAY-266：header 新增「搜词」入口（真机反馈找不到搜词入口，验收期优先项）。
+ *
+ * RAY-284：header 新增「生词本」入口（查看/移出已加词条；加词入口在
+ * 搜词页结果行与复习卡页工具栏）；生词本工厂与其余工厂一样惰性创建。
  */
 import { useCallback, useState } from "react";
 import type { StudyMode } from "@lexilexi/core";
+import { BookmarkIcon } from "./components/icons";
 import { FirstOpenDialog } from "./components/FirstOpenDialog";
 import { HomeScreen, type StudyFormat } from "./HomeScreen";
 import { useTheme } from "./hooks/useTheme";
 import { markFirstOpenDialogDismissed, shouldShowFirstOpenDialog } from "./lib/firstOpenDialog";
+import { NotebookScreen } from "./notebook/NotebookScreen";
+import { createDefaultNotebookDataProvider } from "./notebook/data";
+import type { NotebookDataProvider } from "./notebook/types";
 import { QuizScreen } from "./review/QuizScreen";
 import { ReviewScreen } from "./review/ReviewScreen";
 import { createDefaultReviewDataProvider } from "./review/data";
@@ -39,7 +46,7 @@ import { createDefaultStatsDataProvider } from "./stats/data";
 import { useStatsProvider } from "./stats/useStatsProvider";
 import type { StatsDataProvider } from "./stats/types";
 
-type View = "home" | "review" | "search" | "settings" | "stats";
+type View = "home" | "review" | "search" | "notebook" | "settings" | "stats";
 
 export interface AppProps {
   /** 复习数据源工厂（测试注入 mock；默认浏览器 IndexedDB） */
@@ -50,6 +57,8 @@ export interface AppProps {
   statsProviderFactory?: () => StatsDataProvider;
   /** 搜词页数据源工厂（测试注入 mock；默认浏览器 IndexedDB） */
   searchProviderFactory?: () => SearchDataProvider;
+  /** 生词本页数据源工厂（测试注入 mock；默认浏览器 IndexedDB） */
+  notebookProviderFactory?: () => NotebookDataProvider;
 }
 
 export function App({
@@ -57,11 +66,13 @@ export function App({
   settingsProviderFactory = createDefaultSettingsDataProvider,
   statsProviderFactory = createDefaultStatsDataProvider,
   searchProviderFactory = createDefaultSearchDataProvider,
+  notebookProviderFactory = createDefaultNotebookDataProvider,
 }: AppProps) {
   const { preference, setPreference } = useTheme();
   const [reviewProvider, setReviewProvider] = useState<ReviewDataProvider | null>(null);
   const [settingsProvider, setSettingsProvider] = useState<SettingsDataProvider | null>(null);
   const [searchProvider, setSearchProvider] = useState<SearchDataProvider | null>(null);
+  const [notebookProvider, setNotebookProvider] = useState<NotebookDataProvider | null>(null);
   const statsProvider = useStatsProvider(statsProviderFactory);
   const [view, setView] = useState<View>("home");
   const [reviewMode, setReviewMode] = useState<StudyMode>("review");
@@ -94,6 +105,11 @@ export function App({
     setView("search");
   }, [searchProviderFactory]);
 
+  const openNotebook = useCallback(() => {
+    setNotebookProvider((current) => current ?? notebookProviderFactory());
+    setView("notebook");
+  }, [notebookProviderFactory]);
+
   const openStats = useCallback(() => {
     setView("stats");
   }, []);
@@ -112,6 +128,16 @@ export function App({
           className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
         >
           搜词
+        </button>
+        <button
+          type="button"
+          onClick={openNotebook}
+          aria-pressed={view === "notebook"}
+          aria-label="生词本"
+          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        >
+          <BookmarkIcon className="h-4 w-4" />
+          生词本
         </button>
         <button
           type="button"
@@ -139,6 +165,8 @@ export function App({
         )
       ) : view === "search" && searchProvider ? (
         <SearchScreen provider={searchProvider} onExit={goHome} />
+      ) : view === "notebook" && notebookProvider ? (
+        <NotebookScreen provider={notebookProvider} onExit={goHome} />
       ) : view === "settings" && settingsProvider ? (
         <SettingsScreen
           provider={settingsProvider}

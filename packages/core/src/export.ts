@@ -2,14 +2,17 @@
  * 数据导出 / 导入（完整可恢复 JSON）。
  *
  * 对应 docs/domain-model.md §11：
- * - 导出产物含 items / senses / memoryStates / events 四张表 + schema 版本号，
- *   能被 importLexilexiData() 原样导回（JSON round-trip 测试保证）。
+ * - 导出产物含 items / senses / memoryStates / events / notebookEntries 五张表
+ *   + schema 版本号，能被 importLexilexiData() 原样导回（JSON round-trip
+ *   测试保证）。notebookEntries 为 RAY-284 新增：格式版本不变（v1），
+ *   旧备份（无该字段）导入时按空生词本处理，绝不因此拒绝恢复。
  * - 导入时同 id 冲突按「导入覆盖」处理；schema 版本不兼容时明确报错，
  *   绝不静默清库、绝不写半份数据（单事务）。
  */
 import type { IsoDate, LearningItem, Sense } from "./domain";
 import type { Event } from "./events";
 import type { MemoryState } from "./memory";
+import type { NotebookEntry } from "./notebook";
 import { DB_SCHEMA_VERSION, EXPORT_FORMAT_VERSION } from "./constants";
 import type { LexilexiDatabase } from "./persistence";
 
@@ -24,30 +27,34 @@ export interface LexilexiExportData {
   senses: Sense[];
   memoryStates: MemoryState[];
   events: Event[];
+  /** 生词本条目（RAY-284；旧备份缺失时按空数组导入） */
+  notebookEntries: NotebookEntry[];
 }
 
 /**
  * 导出全部学习数据（单读事务快照）。
  *
- * 四张表在同一个只读事务内读取：与并发写入（评分、导入等）串行化，
+ * 五张表在同一个只读事务内读取：与并发写入（评分、导入、加词等）串行化，
  * 不会拍到「items 已写、memoryStates 未写」这类跨表中间态（评审建议 C2）。
  */
 export async function exportLexilexiData(
   db: LexilexiDatabase,
   now: IsoDate,
 ): Promise<LexilexiExportData> {
-  const [items, senses, memoryStates, events] = await db.transaction(
+  const [items, senses, memoryStates, events, notebookEntries] = await db.transaction(
     "r",
     db.items,
     db.senses,
     db.memoryStates,
     db.events,
+    db.notebookEntries,
     async () =>
       Promise.all([
         db.items.toArray(),
         db.senses.toArray(),
         db.memoryStates.toArray(),
         db.events.toArray(),
+        db.notebookEntries.toArray(),
       ]),
   );
   return {
@@ -59,6 +66,7 @@ export async function exportLexilexiData(
     senses,
     memoryStates,
     events,
+    notebookEntries,
   };
 }
 
@@ -84,20 +92,31 @@ export async function importLexilexiData(
       `导出数据由更新版本的 Lexilexi 生成（schema v${data.dbSchemaVersion} > 当前 v${DB_SCHEMA_VERSION}），请先升级应用`,
     );
   }
-  await db.transaction("rw", db.items, db.senses, db.memoryStates, db.events, async () => {
-    for (const item of data.items) {
-      await db.items.put(item);
-    }
-    for (const sense of data.senses) {
-      await db.senses.put(sense);
-    }
-    for (const memoryState of data.memoryStates) {
-      await db.memoryStates.put(memoryState);
-    }
-    for (const event of data.events) {
-      await db.events.put(event);
-    }
-  });
+  await db.transaction(
+    "rw",
+    db.items,
+    db.senses,
+    db.memoryStates,
+    db.events,
+    db.notebookEntries,
+    async () => {
+      for (const item of data.items) {
+        await db.items.put(item);
+      }
+      for (const sense of data.senses) {
+        await db.senses.put(sense);
+      }
+      for (const memoryState of data.memoryStates) {
+        await db.memoryStates.put(memoryState);
+      }
+      for (const event of data.events) {
+        await db.events.put(event);
+      }
+      for (const entry of data.notebookEntries) {
+        await db.notebookEntries.put(entry);
+      }
+    },
+  );
 }
 
 /** 字段级校验：仅结构（必需字段存在、类型正确），不做业务语义校验 */
@@ -127,6 +146,9 @@ function assertArrayOfPlainObjects(
  *
  * 只做结构校验（未知键保留），schema 版本校验由 importLexilexiData 负责；
  * 业务语义校验（必填字段缺失等）在导入事务内由 Dexie 约束抛出。
+ *
+ * notebookEntries（RAY-284）缺失时按空数组处理——旧备份（本字段引入前
+ * 导出）可原样导入，绝不因备份格式升级拒绝恢复。
  */
 export function parseLexilexiExport(json: string): LexilexiExportData {
   let raw: unknown;
@@ -152,5 +174,8 @@ export function parseLexilexiExport(json: string): LexilexiExportData {
   assertArrayOfPlainObjects(raw.senses, "senses");
   assertArrayOfPlainObjects(raw.memoryStates, "memoryStates");
   assertArrayOfPlainObjects(raw.events, "events");
-  return raw as unknown as LexilexiExportData;
+  if (raw.notebookEntries !== undefined) {
+    assertArrayOfPlainObjects(raw.notebookEntries, "notebookEntries");
+  }
+  return { ...raw, notebookEntries: raw.notebookEntries ?? [] } as unknown as LexilexiExportData;
 }

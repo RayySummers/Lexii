@@ -517,3 +517,55 @@ describe("保底填充 + 极端兜底跳题（RAY-293 修正决策，数据源�
     expect(cards).toHaveLength(0);
   });
 });
+
+describe("生词本开关（RAY-284，数据源集成）", () => {
+  it("开关关闭（localStorage 0）时：生词本条目从学习队列排除，词书条目保留", async () => {
+    const provider = createIndexedDbReviewDataProvider(db!);
+    const imported = await provider.importSampleWordlist();
+    expect(imported).toBe(SAMPLE_WORDLIST_ROW_COUNT);
+
+    // 从示例词表中取第一个义项加入生词本（独立调度实例）
+    const learnQueue = await provider.loadQueue("learn");
+    const firstCard = learnQueue[0];
+    if (!firstCard) {
+      throw new Error("学习队列应非空");
+    }
+    await provider.addToNotebook(firstCard.sense.id);
+
+    // 默认（未设置偏好）：生词本条目包含在学习队列中
+    const withNotebook = await provider.loadQueue("learn");
+    expect(withNotebook).toHaveLength(SAMPLE_WORDLIST_ROW_COUNT + 1);
+
+    // 关闭开关：生词本条目排除，回到示例词表规模
+    window.localStorage.setItem("lexilexi:include-notebook", "0");
+    const withoutNotebook = await provider.loadQueue("learn");
+    expect(withoutNotebook).toHaveLength(SAMPLE_WORDLIST_ROW_COUNT);
+    // 生词本条目的独立实例不在队列中
+    const notebookItemIds = new Set(
+      (await db!.notebookEntries.where("status").equals("active").toArray()).map(
+        (entry) => entry.itemId,
+      ),
+    );
+    for (const card of withoutNotebook) {
+      expect(notebookItemIds.has(card.item.id)).toBe(false);
+    }
+    // 词书条目仍全部在列
+    expect(withoutNotebook.filter((card) => !notebookItemIds.has(card.item.id))).toHaveLength(
+      SAMPLE_WORDLIST_ROW_COUNT,
+    );
+  });
+
+  it("addToNotebook 幂等：重复加同一义项返回 already", async () => {
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await provider.importSampleWordlist();
+    const learnQueue = await provider.loadQueue("learn");
+    const card = learnQueue[0];
+    if (!card) {
+      throw new Error("学习队列应非空");
+    }
+
+    expect(await provider.addToNotebook(card.sense.id)).toBe("added");
+    expect(await provider.addToNotebook(card.sense.id)).toBe("already");
+    expect(await db!.notebookEntries.count()).toBe(1);
+  });
+});

@@ -8,7 +8,8 @@
  * 检索口径（拼写 + 释义、离线、排序）由 @lexilexi/core 的
  * searchLexilexiSenses / searchSenses 实现，apps/web 不做任何检索算法。
  */
-import type { Sense, SenseSearchHitKind } from "@lexilexi/core";
+import type { Sense, SenseId, SenseSearchHitKind } from "@lexilexi/core";
+import type { AddToNotebookResult } from "../notebook/types";
 
 /** 一条搜索结果：义项 + 命中类型（命中类型供未来高亮等展示用，当前仅透传） */
 export interface SearchResult {
@@ -19,8 +20,9 @@ export interface SearchResult {
 /**
  * 搜词数据源。
  *
- * 职责边界：只做「本地词库检索 / 词库是否为空」，全部经由 @lexilexi/core
- * 的公开 API（searchLexilexiSenses），不在 apps/web 内实现任何检索算法。
+ * 职责边界：只做「本地词库检索 / 词库是否为空 / 生词本加词（RAY-284）」，
+ * 全部经由 @lexilexi/core 的公开 API（searchLexilexiSenses /
+ * addToNotebook），不在 apps/web 内实现任何检索算法或生词本语义。
  */
 export interface SearchDataProvider {
   /**
@@ -30,4 +32,14 @@ export interface SearchDataProvider {
   search(query: string): Promise<SearchResult[]>;
   /** 词库是否有任何义项（决定空状态：词库空 vs 无命中） */
   hasAnySenses(): Promise<boolean>;
+  /**
+   * 当前生词本（active 条目）覆盖的义项 id 列表（RAY-284）：
+   * 结果行据此标记「已在生词本」，进入页面读一次。
+   */
+  getNotebookSenseIds(): Promise<readonly SenseId[]>;
+  /**
+   * 把义项加入生词本（RAY-284，搜词页加词入口）。
+   * 幂等：同义项已在生词本时返回 "already"。
+   */
+  addToNotebook(senseId: SenseId): Promise<AddToNotebookResult>;
 }

@@ -24,11 +24,15 @@
  * - 待学徽标数据经 StatsDataProvider（statsProvider 为 null 时不展示，
  *   如无 IndexedDB 的测试环境）；
  * - 仅承载展示与导航，队列数据一律由 ReviewScreen / QuizScreen 按模式加载；
+ * - RAY-284：三模式入口下方新增「学习列表包含生词本」开关（默认开）——
+ *   关闭后生词本词条从学习/复习/混合队列与到期统计中排除（词书条目不受
+ *   影响）；切换后刷新待学徽标，队列在下次进入复习页加载时生效；
  * - 全部颜色走 design tokens（浅色/深色两套自动生效）。
  */
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import type { StudyMode } from "@lexilexi/core";
 import { readDailyNewCardLimit } from "./lib/dailyNewCardLimit";
+import { readIncludeNotebook, writeIncludeNotebook } from "./lib/notebookPreference";
 import { useStats } from "./stats/useStats";
 import type { StatsDataProvider } from "./stats/types";
 
@@ -56,8 +60,20 @@ const FORMATS = [
 ];
 
 export function HomeScreen({ onStart, statsProvider }: HomeScreenProps) {
-  const { stats } = useStats(statsProvider);
+  const { stats, reload } = useStats(statsProvider);
   const [format, setFormat] = useState<StudyFormat>("card");
+  // 生词本开关（RAY-284）：懒初始化读一次；切换写回 localStorage 并刷新
+  // 待学徽标（统计口径随开关一致），队列在下次进入复习页时按新偏好加载
+  const [includeNotebook, setIncludeNotebook] = useState<boolean>(() => readIncludeNotebook());
+
+  const toggleIncludeNotebook = useCallback(() => {
+    setIncludeNotebook((previous) => {
+      const next = !previous;
+      writeIncludeNotebook(next);
+      return next;
+    });
+    reload();
+  }, [reload]);
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-16">
@@ -99,6 +115,33 @@ export function HomeScreen({ onStart, statsProvider }: HomeScreenProps) {
             </span>
           </button>
         ))}
+      </div>
+
+      {/* 生词本开关（RAY-284）：学习列表是否包含生词本（独立于词书） */}
+      <div className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-surface p-5">
+        <div className="flex flex-col gap-1">
+          <span className="text-sm font-semibold">学习列表包含生词本</span>
+          <span className="text-xs text-text-muted">
+            关闭后，生词本的词不再进入学习 / 复习 / 混合队列，词书不受影响。
+          </span>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={includeNotebook}
+          aria-label="学习列表是否包含生词本"
+          onClick={toggleIncludeNotebook}
+          className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
+            includeNotebook ? "border-primary bg-primary" : "border-border bg-surface-raised"
+          }`}
+        >
+          <span
+            aria-hidden="true"
+            className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-primary-contrast transition-all ${
+              includeNotebook ? "left-[calc(100%-1.25rem)]" : "left-1"
+            }`}
+          />
+        </button>
       </div>
 
       <DueBadge

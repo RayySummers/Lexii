@@ -98,4 +98,28 @@ describe("exportCsvWordlist", () => {
     expect(await exportCsvWordlist(db)).toBe("\uFEFFterm,definition,pos");
     await db.delete();
   });
+
+  it("同一义项被多个条目共享（生词本复用词库义项，RAY-284）时按 senseId 去重，一词一行", async () => {
+    const db = openDatabase({ indexedDB: new IDBFactory(), IDBKeyRange });
+    const apple = makeSense();
+    apple.term = "apple";
+    const book = makeSense();
+    book.term = "book";
+    await db.senses.bulkPut([apple, book]);
+    // 词书条目 + 生词本条目共享同一义项；book 一条正常
+    await db.items.bulkPut([
+      {
+        ...makeLearningItem(apple.id),
+        createdAt: "2026-08-01T00:00:00.000Z",
+        source: "导入:词书.csv",
+      },
+      { ...makeLearningItem(apple.id), createdAt: "2026-08-02T00:00:00.000Z", source: "生词本" },
+      { ...makeLearningItem(book.id), createdAt: "2026-08-03T00:00:00.000Z" },
+    ]);
+
+    const csv = await exportCsvWordlist(db);
+    const parsed = parseCsvWordlist(csv).entries;
+    expect(parsed.map((entry) => entry.term)).toEqual(["apple", "book"]);
+    await db.delete();
+  });
 });

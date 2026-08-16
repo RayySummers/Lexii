@@ -8,7 +8,8 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { toEventId } from "@lexilexi/core";
-import type { ReviewRating, StudyMode } from "@lexilexi/core";
+import type { ReviewRating, SenseId, StudyMode } from "@lexilexi/core";
+import type { AddToNotebookResult } from "../notebook/types";
 import { RATING_TIER_STORAGE_KEY } from "../lib/ratingTiers";
 import { ReviewScreen } from "./ReviewScreen";
 import { makeCard } from "./testFixtures";
@@ -23,6 +24,7 @@ interface ProviderHarness {
   undoGrade: ReturnType<typeof vi.fn>;
   hasAnyItems: ReturnType<typeof vi.fn>;
   importSampleWordlist: ReturnType<typeof vi.fn>;
+  addToNotebook: ReturnType<typeof vi.fn>;
 }
 
 afterEach(() => {
@@ -77,6 +79,9 @@ function makeHarness(
     .mockResolvedValue(undefined);
   const hasAnyItems = vi.fn<() => Promise<boolean>>().mockResolvedValue(hasItems);
   const importSampleWordlist = vi.fn<() => Promise<number>>().mockResolvedValue(14);
+  const addToNotebook = vi
+    .fn<(senseId: SenseId) => Promise<AddToNotebookResult>>()
+    .mockResolvedValue("added");
   const provider: ReviewDataProvider = {
     loadQueue,
     loadMultipleChoiceQueue,
@@ -85,6 +90,7 @@ function makeHarness(
     undoGrade,
     hasAnyItems,
     importSampleWordlist,
+    addToNotebook,
   };
   return {
     provider,
@@ -95,6 +101,7 @@ function makeHarness(
     undoGrade,
     hasAnyItems,
     importSampleWordlist,
+    addToNotebook,
   };
 }
 
@@ -588,6 +595,49 @@ describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
       ),
     ).toBeInTheDocument();
     // 复习流程不受影响
+    expect(screen.getByRole("button", { name: /评分：认识/ })).toBeInTheDocument();
+  });
+});
+
+describe("ReviewScreen 生词本加词入口（RAY-284）", () => {
+  it("点「加词」：以当前卡义项调用 addToNotebook，反馈已加入", async () => {
+    const harness = makeHarness();
+    const card = makeCard();
+    harness.loadQueue.mockResolvedValue([card]);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
+
+    await expectCardShown(card.sense.term);
+    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` }));
+
+    expect(await screen.findByText("已加入生词本")).toBeInTheDocument();
+    expect(harness.addToNotebook).toHaveBeenCalledWith(card.sense.id);
+  });
+
+  it("词已在生词本（provider 返回 already）：反馈已在生词本中", async () => {
+    const harness = makeHarness();
+    const card = makeCard();
+    harness.loadQueue.mockResolvedValue([card]);
+    harness.addToNotebook.mockResolvedValue("already");
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
+
+    await expectCardShown(card.sense.term);
+    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` }));
+
+    expect(await screen.findByText("已在生词本中")).toBeInTheDocument();
+  });
+
+  it("加词失败：反馈失败原因，不影响继续复习", async () => {
+    const harness = makeHarness();
+    const card = makeCard();
+    harness.loadQueue.mockResolvedValue([card]);
+    harness.addToNotebook.mockRejectedValue(new Error("义项不存在"));
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
+
+    await expectCardShown(card.sense.term);
+    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` }));
+
+    expect(await screen.findByText("加入失败：义项不存在")).toBeInTheDocument();
+    // 评分仍可用：失败反馈不阻塞继续复习
     expect(screen.getByRole("button", { name: /评分：认识/ })).toBeInTheDocument();
   });
 });
