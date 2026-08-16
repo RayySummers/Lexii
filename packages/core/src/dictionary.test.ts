@@ -27,6 +27,7 @@ import {
 } from "./dictionary";
 import type { DictionaryPackage } from "./dictionary";
 import type { PresetWordEntry } from "./presets/types";
+import { toSenseId } from "./id";
 import { searchAllSenses } from "./search";
 import { toSense } from "./importWords";
 import type { Sense } from "./domain";
@@ -62,7 +63,11 @@ function makeEntries(count: number): PresetWordEntry[] {
   return entries;
 }
 
-function makePackage(entries: PresetWordEntry[], id = "core-en-tier1", version = "1.0.0"): DictionaryPackage {
+function makePackage(
+  entries: PresetWordEntry[],
+  id = "core-en-tier1",
+  version = "1.0.0",
+): DictionaryPackage {
   return {
     id,
     version,
@@ -125,7 +130,7 @@ describe("installDictionaryPackage（分块安装扩展词包）", () => {
     const database = freshDatabase();
     // 先手动写入一个 apple 到 dictionarySenses
     await database.dictionarySenses.put({
-      id: "sense_existing" as any,
+      id: toSenseId("sense_existing"),
       lang: "en",
       term: "apple",
       definitions: ["已存在的苹果"],
@@ -167,9 +172,9 @@ describe("installDictionaryPackage（分块安装扩展词包）", () => {
       }
     };
 
-    await expect(
-      installDictionaryPackage(database, pkg, { yield: failingYield }),
-    ).rejects.toThrow("模拟中断");
+    await expect(installDictionaryPackage(database, pkg, { yield: failingYield })).rejects.toThrow(
+      "模拟中断",
+    );
 
     // 验证进度标记存在（2 块已提交 = 800）
     const progress = await database.meta.get(dictionaryProgressKey("core-en-tier1"));
@@ -217,7 +222,7 @@ describe("getDictionaryPackageState（安装状态查询）", () => {
 });
 
 describe("版本升级（增量替换）", () => {
-  it("版本失配触发增量替换：新增词条写入，已移除词条删除", async () => {
+  it("版本失配触发增量替换：新增词条写入，未变词条跳过，已移除词条删除", async () => {
     const database = freshDatabase();
 
     // 安装 v1
@@ -230,7 +235,7 @@ describe("版本升级（增量替换）", () => {
       yield: async () => {},
     });
 
-    // 安装 v2（删除 cherry，新增 date）
+    // 安装 v2（删除 cherry，新增 date，apple/banana 内容不变）
     const v2Entries: PresetWordEntry[] = [
       { term: "apple", definitions: ["苹果"], pos: "n.", tags: [] },
       { term: "banana", definitions: ["香蕉"], pos: "n.", tags: [] },
@@ -245,7 +250,9 @@ describe("版本升级（增量替换）", () => {
     expect(result.status).toBe("installed");
     if (result.status !== "installed") throw new Error("unreachable");
     expect(result.installedCount).toBe(1); // date 新增
-    expect(result.skippedCount).toBe(2); // apple, banana 已存在
+    expect(result.skippedCount).toBe(2); // apple, banana 内容未变
+    expect(result.updatedCount).toBe(0); // 无内容变更
+    expect(result.deletedCount).toBe(1); // cherry 已移除
 
     // 验证 cherry 已删除
     const allSenses = await database.dictionarySenses.toArray();
@@ -258,6 +265,92 @@ describe("版本升级（增量替换）", () => {
     // 验证版本已更新
     const done = await database.meta.get(dictionaryDoneKey("core-en-tier1"));
     expect(done?.value).toBe("2.0.0");
+  });
+
+  it("v2 变更释义 → 落库内容已更新（blocking #2 核心用例）", async () => {
+    const database = freshDatabase();
+
+    // 安装 v1
+    const v1Entries: PresetWordEntry[] = [
+      { term: "apple", definitions: ["苹果"], pos: "n.", tags: [] },
+      { term: "banana", definitions: ["香蕉"], pos: "n.", tags: [] },
+    ];
+    await installDictionaryPackage(database, makePackage(v1Entries, "core-en-tier1", "1.0.0"), {
+      yield: async () => {},
+    });
+
+    // 安装 v2：apple 释义变更，banana 不变
+    const v2Entries: PresetWordEntry[] = [
+      { term: "apple", definitions: ["苹果", "苹果公司"], pos: "n.", tags: [] },
+      { term: "banana", definitions: ["香蕉"], pos: "n.", tags: [] },
+    ];
+    const result = await installDictionaryPackage(
+      database,
+      makePackage(v2Entries, "core-en-tier1", "2.0.0"),
+      { yield: async () => {} },
+    );
+
+    expect(result.status).toBe("installed");
+    if (result.status !== "installed") throw new Error("unreachable");
+    expect(result.installedCount).toBe(0);
+    expect(result.skippedCount).toBe(1); // banana 未变
+    expect(result.updatedCount).toBe(1); // apple 释义变更
+    expect(result.deletedCount).toBe(0);
+
+    // 验证 apple 释义已更新
+    const appleSense = await database.dictionarySenses
+      .where("term")
+      .equalsIgnoreCase("apple")
+      .first();
+    expect(appleSense).toBeDefined();
+    expect(appleSense!.definitions).toEqual(["苹果", "苹果公司"]);
+  });
+
+  it("并发升级：只有一个成功，另一个抛 ConcurrentDictionaryInstallError", async () => {
+    const database = freshDatabase();
+
+    // 安装 v1
+    const v1Entries: PresetWordEntry[] = [
+      { term: "apple", definitions: ["苹果"], pos: "n.", tags: [] },
+    ];
+    await installDictionaryPackage(database, makePackage(v1Entries, "core-en-tier1", "1.0.0"), {
+      yield: async () => {},
+    });
+
+    // 并发升级到 v2 和 v3
+    const v2Entries: PresetWordEntry[] = [
+      { term: "apple", definitions: ["苹果", "苹果公司"], pos: "n.", tags: [] },
+    ];
+    const v3Entries: PresetWordEntry[] = [
+      { term: "apple", definitions: ["苹果（v3）"], pos: "n.", tags: [] },
+    ];
+
+    const results = await Promise.allSettled([
+      installDictionaryPackage(database, makePackage(v2Entries, "core-en-tier1", "2.0.0"), {
+        yield: async () => {},
+      }),
+      installDictionaryPackage(database, makePackage(v3Entries, "core-en-tier1", "3.0.0"), {
+        yield: async () => {},
+      }),
+    ]);
+
+    // 一个成功，一个失败
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter((r) => r.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+
+    // 失败的那个应该是 ConcurrentDictionaryInstallError
+    const rejectedResult = rejected[0] as PromiseRejectedResult;
+    expect(rejectedResult.reason).toBeInstanceOf(Error);
+    expect((rejectedResult.reason as Error).name).toBe("ConcurrentDictionaryInstallError");
+
+    // 数据库中 apple 只有一条（无重复记录）
+    const appleSenses = await database.dictionarySenses
+      .where("term")
+      .equalsIgnoreCase("apple")
+      .toArray();
+    expect(appleSenses).toHaveLength(1);
   });
 });
 
@@ -392,6 +485,38 @@ describe("searchAllSenses（跨层合并检索）", () => {
     const hits = await searchAllSenses(database, "kaleidoscope");
     expect(hits).toHaveLength(1);
     expect(hits[0]!.sense.term).toBe("kaleidoscope");
+  });
+
+  it("层内同 term 多义项不折叠（回归 blocking #1）", async () => {
+    const database = freshDatabase();
+
+    // 在 senses 表写入同 term 的两个学习义项（CSV 导入可产生，importWords 无 term 查重）
+    const sense1: Sense = toSense(
+      { term: "bank", definitions: ["银行"], pos: "n.", tags: [] },
+      "en",
+    );
+    const sense2: Sense = toSense(
+      { term: "bank", definitions: ["河岸"], pos: "n.", tags: [] },
+      "en",
+    );
+    await database.senses.put(sense1);
+    await database.senses.put(sense2);
+
+    // 在 dictionarySenses 表写入同 term 的词典义项（应被跨层过滤）
+    const dictEntries: PresetWordEntry[] = [
+      { term: "bank", definitions: ["银行（词典版）"], pos: "n.", tags: [] },
+    ];
+    await installDictionaryPackage(database, makePackage(dictEntries), { yield: async () => {} });
+    invalidateDictionaryCache();
+
+    const hits = await searchAllSenses(database, "bank");
+    // 同 term 两个学习义项都应命中（层内按 sense.id 去重，各显一条）
+    const bankHits = hits.filter((h) => h.sense.term.toLowerCase() === "bank");
+    expect(bankHits).toHaveLength(2);
+    // 词典义项应被跨层过滤（学习义项优先）
+    expect(bankHits.every((h) => h.sense.definitions[0] !== "银行（词典版）")).toBe(true);
+    // 两条都应是 term-prefix 命中
+    expect(bankHits.every((h) => h.kind === "term-prefix")).toBe(true);
   });
 
   it("全局排序：前缀 > 子串 > 释义 → 词长 → 字典序", async () => {

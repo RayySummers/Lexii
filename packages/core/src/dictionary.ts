@@ -10,7 +10,7 @@
  */
 import type { LanguageCode, Sense } from "./domain";
 import { createId, toSenseId } from "./id";
-import type { DictionarySense, LexilexiDatabase, MetaRecord } from "./persistence";
+import type { DictionarySense, LexilexiDatabase } from "./persistence";
 import type { PresetWordEntry } from "./presets/types";
 
 // ─── 常量 ────────────────────────────────────────────────────────────────────
@@ -26,6 +26,11 @@ export function dictionaryProgressKey(packageId: string): string {
 /** 完成标记的 meta 键前缀（值为已安装版本号或 "covered-by-tier2"） */
 export function dictionaryDoneKey(packageId: string): string {
   return `dict:${packageId}:done`;
+}
+
+/** 升级锁 meta 键（CAS 防并发升级） */
+function dictionaryUpgradeLockKey(packageId: string): string {
+  return `dict:${packageId}:upgrading`;
 }
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
@@ -59,7 +64,15 @@ export interface DictionaryPackageState {
 }
 
 export type DictionaryInstallResult =
-  | { status: "installed"; installedCount: number; skippedCount: number }
+  | {
+      status: "installed";
+      installedCount: number;
+      skippedCount: number;
+      /** 升级时：内容变更的词条数（首装时为 0） */
+      updatedCount: number;
+      /** 升级时：已移除的词条数（首装时为 0） */
+      deletedCount: number;
+    }
   | { status: "already-installed"; installedVersion: string };
 
 /** 安装选项 */
@@ -259,12 +272,36 @@ export async function installDictionaryPackage(
     status: "installed",
     installedCount: total - startCursor - skipped,
     skippedCount: skipped,
+    updatedCount: 0,
+    deletedCount: 0,
   };
+}
+
+/** 比较 PresetWordEntry 与 DictionarySense 的内容是否一致（轻量比较） */
+function isEntryContentEqual(entry: PresetWordEntry, sense: DictionarySense): boolean {
+  // definitions 逐条比较
+  const entryDefs = entry.definitions;
+  if (entryDefs.length !== sense.definitions.length) return false;
+  for (let i = 0; i < entryDefs.length; i++) {
+    if (entryDefs[i] !== sense.definitions[i]) return false;
+  }
+  // pos / ipa
+  if ((entry.pos ?? "") !== (sense.pos ?? "")) return false;
+  if ((entry.ipa ?? "") !== (sense.ipa ?? "")) return false;
+  // tags
+  const entryTags = entry.tags ?? [];
+  if (entryTags.length !== sense.tags.length) return false;
+  for (let i = 0; i < entryTags.length; i++) {
+    if (entryTags[i] !== sense.tags[i]) return false;
+  }
+  return true;
 }
 
 /**
  * 增量升级：版本失配时，diff 新旧词条，只写入新增/变更、删除已移除词条。
  * 不清库（红线）。已晋升到 senses 表的副本不受影响（独立记录）。
+ *
+ * 并发防线：CAS 升级锁（meta 键），防止两标签页并发升级产生重复记录。
  */
 async function upgradeDictionaryPackage(
   db: LexilexiDatabase,
@@ -273,71 +310,119 @@ async function upgradeDictionaryPackage(
   time: string,
   yieldFn: () => Promise<void>,
 ): Promise<DictionaryInstallResult> {
-  // 读取旧版该包的全部 term 集合
-  const oldEntries = await db.dictionarySenses.where("source").equals(pkg.id).toArray();
-  const oldTermSet = new Set(oldEntries.map((e) => e.term.toLowerCase()));
-  const newTermSet = new Set(pkg.entries.map((e) => e.term.toLowerCase()));
-
-  // 删除已移除词条
-  const removedTerms: string[] = [];
-  for (const term of oldTermSet) {
-    if (!newTermSet.has(term)) {
-      removedTerms.push(term);
-    }
-  }
-  // 分块删除（避免单事务过大）
-  for (let i = 0; i < removedTerms.length; i += DICTIONARY_CHUNK_SIZE) {
-    const chunk = removedTerms.slice(i, i + DICTIONARY_CHUNK_SIZE);
-    await db.transaction("rw", db.dictionarySenses, async () => {
-      for (const term of chunk) {
-        const toDelete = await db.dictionarySenses
-          .where("term")
-          .equalsIgnoreCase(term)
-          .filter((s) => s.source === pkg.id)
-          .toArray();
-        for (const s of toDelete) {
-          await db.dictionarySenses.delete(s.id);
-        }
-      }
-    });
-    await yieldFn();
-  }
-
-  // 写入新增/变更词条（term 不在旧版中的）
-  let installedCount = 0;
-  let skipped = 0;
-  for (let i = 0; i < pkg.entries.length; i += DICTIONARY_CHUNK_SIZE) {
-    const chunk = pkg.entries.slice(i, i + DICTIONARY_CHUNK_SIZE);
-    await db.transaction("rw", db.dictionarySenses, async () => {
-      for (const entry of chunk) {
-        if (oldTermSet.has(entry.term.toLowerCase())) {
-          // 已存在：检查内容是否变更（简化：跳过，未来可加 hash 比较）
-          skipped += 1;
-          continue;
-        }
-        const sense = toDictionarySense(entry, pkg.lang, pkg.id);
-        await db.dictionarySenses.put(sense);
-        installedCount += 1;
-      }
-    });
-    await yieldFn();
-  }
-
-  // 更新完成标记
+  // CAS 升级锁：并发升级时只有一个能成功
+  const lockKey = dictionaryUpgradeLockKey(pkg.id);
   await db.transaction("rw", db.meta, async () => {
-    await db.meta.put({ key: dictionaryDoneKey(pkg.id), value: pkg.version });
-    await db.meta.delete(dictionaryProgressKey(pkg.id));
+    const existing = await db.meta.get(lockKey);
+    if (existing) {
+      throw new ConcurrentDictionaryInstallError(pkg.id);
+    }
+    await db.meta.put({ key: lockKey, value: time });
   });
 
-  invalidateDictionaryCache(pkg.id);
+  try {
+    // 读取旧版该包的全部词条（含 id 用于更新）
+    const oldEntries = await db.dictionarySenses.where("source").equals(pkg.id).toArray();
+    const oldByTerm = new Map<string, DictionarySense>();
+    for (const e of oldEntries) {
+      oldByTerm.set(e.term.toLowerCase(), e);
+    }
+    const newTermSet = new Set(pkg.entries.map((e) => e.term.toLowerCase()));
 
-  return { status: "installed", installedCount, skippedCount: skipped };
+    // 删除已移除词条
+    let deletedCount = 0;
+    const removedTerms: string[] = [];
+    for (const [term] of oldByTerm) {
+      if (!newTermSet.has(term)) {
+        removedTerms.push(term);
+      }
+    }
+    for (let i = 0; i < removedTerms.length; i += DICTIONARY_CHUNK_SIZE) {
+      const chunk = removedTerms.slice(i, i + DICTIONARY_CHUNK_SIZE);
+      await db.transaction("rw", db.dictionarySenses, async () => {
+        for (const term of chunk) {
+          const toDelete = await db.dictionarySenses
+            .where("term")
+            .equalsIgnoreCase(term)
+            .filter((s) => s.source === pkg.id)
+            .toArray();
+          for (const s of toDelete) {
+            await db.dictionarySenses.delete(s.id);
+          }
+        }
+      });
+      deletedCount += chunk.length;
+      await yieldFn();
+    }
+
+    // 写入新增/变更词条，跳过内容未变的
+    let installedCount = 0;
+    let updatedCount = 0;
+    let skipped = 0;
+    for (let i = 0; i < pkg.entries.length; i += DICTIONARY_CHUNK_SIZE) {
+      const chunk = pkg.entries.slice(i, i + DICTIONARY_CHUNK_SIZE);
+      await db.transaction("rw", db.dictionarySenses, async () => {
+        for (const entry of chunk) {
+          const old = oldByTerm.get(entry.term.toLowerCase());
+          if (old) {
+            if (isEntryContentEqual(entry, old)) {
+              skipped += 1;
+            } else {
+              // 内容变更：保留原 id，更新字段
+              const updated: DictionarySense = {
+                ...old,
+                definitions: entry.definitions,
+                ...(entry.pos !== undefined ? { pos: entry.pos } : {}),
+                ...(entry.ipa !== undefined ? { ipa: entry.ipa } : {}),
+                tags: entry.tags ?? [],
+              };
+              await db.dictionarySenses.put(updated);
+              updatedCount += 1;
+            }
+          } else {
+            const sense = toDictionarySense(entry, pkg.lang, pkg.id);
+            await db.dictionarySenses.put(sense);
+            installedCount += 1;
+          }
+        }
+      });
+      await yieldFn();
+    }
+
+    // 更新完成标记，清除进度与升级锁
+    await db.transaction("rw", db.meta, async () => {
+      await db.meta.put({ key: dictionaryDoneKey(pkg.id), value: pkg.version });
+      await db.meta.delete(dictionaryProgressKey(pkg.id));
+      await db.meta.delete(lockKey);
+    });
+
+    invalidateDictionaryCache(pkg.id);
+
+    return {
+      status: "installed",
+      installedCount,
+      skippedCount: skipped,
+      updatedCount,
+      deletedCount,
+    };
+  } catch (err) {
+    // 清除升级锁（允许重试）
+    await db.meta.delete(lockKey);
+    throw err;
+  }
 }
 
 // ─── Tier 1 ⊆ Tier 2 覆盖标记 ────────────────────────────────────────────────
 
 /**
- * 标记 Tier 1 被 Tier 2 覆盖（Tier 2 安装完成后调用）。
+ * 标记 Tier 1 被 Tier 2 覆盖。
+ *
+ * **调用契约**：Tier 2 安装完成后（`installDictionaryPackage` 返回 `status: "installed"`）
+ * 由调用方显式调用。`installDictionaryPackage` 本身不自动调用此函数——
+ * 因为 Tier 1 ⊆ Tier 2 覆盖是安装关系语义，不是安装流程的一部分。
+ *
+ * Phase 3 UI 应在 Tier 2 安装成功回调中调用此函数，避免遗漏。
+ *
  * 写入 dictionaryDoneKey("core-en-tier1") = "covered-by-tier2"。
  */
 export async function markTier1CoveredByTier2(db: LexilexiDatabase): Promise<void> {
@@ -350,6 +435,9 @@ export async function markTier1CoveredByTier2(db: LexilexiDatabase): Promise<voi
  * 从 dictionarySenses 复制到 senses 表（新生成 SenseId）。
  * 供 addToNotebook 兜底路径调用（RAY-284 衔接）。
  * 返回晋升后的 Sense（senses 表中的新记录）。
+ *
+ * 幂等防重：put 前按 senses.term 查重（与 installPreset 同款口径），
+ * 同 term 已存在时直接返回已有 Sense，不重复晋升。
  */
 export async function promoteDictionarySense(
   db: LexilexiDatabase,
@@ -358,6 +446,11 @@ export async function promoteDictionarySense(
   const dictSense = await db.dictionarySenses.get(dictSenseId);
   if (!dictSense) {
     return null;
+  }
+  // 幂等防重：同 term 已在 senses 表中 → 直接返回已有记录
+  const existing = await db.senses.where("term").equalsIgnoreCase(dictSense.term).first();
+  if (existing) {
+    return existing;
   }
   // 新生成 SenseId，避免与字典条目 id 命名空间冲突
   const { source: _, ...senseFields } = dictSense;
@@ -383,19 +476,21 @@ export async function searchDictionarySenses(
   db: LexilexiDatabase,
   query: string,
   options: { limit?: number } = {},
-): Promise<Array<{ sense: DictionarySense; kind: "term-prefix" | "term-substring" | "definition" }>> {
+): Promise<
+  Array<{ sense: DictionarySense; kind: "term-prefix" | "term-substring" | "definition" }>
+> {
   const q = query.trim().toLowerCase().slice(0, 100);
   if (q.length === 0) return [];
   const limit = options.limit ?? 50;
 
   // 前缀命中：IDB 索引查询
-  const prefixHits = await db.dictionarySenses
-    .where("term")
-    .startsWithIgnoreCase(q)
-    .toArray();
+  const prefixHits = await db.dictionarySenses.where("term").startsWithIgnoreCase(q).toArray();
 
   const seen = new Set<string>();
-  const hits: Array<{ sense: DictionarySense; kind: "term-prefix" | "term-substring" | "definition" }> = [];
+  const hits: Array<{
+    sense: DictionarySense;
+    kind: "term-prefix" | "term-substring" | "definition";
+  }> = [];
 
   for (const sense of prefixHits) {
     if (!seen.has(sense.id)) {
@@ -424,7 +519,11 @@ export async function searchDictionarySenses(
   }
 
   // 排序：命中类型 → 词条长度 → 字典序
-  const KIND_RANK: Record<string, number> = { "term-prefix": 0, "term-substring": 1, definition: 2 };
+  const KIND_RANK: Record<string, number> = {
+    "term-prefix": 0,
+    "term-substring": 1,
+    definition: 2,
+  };
   hits.sort((a, b) => {
     const byKind = (KIND_RANK[a.kind] ?? 0) - (KIND_RANK[b.kind] ?? 0);
     if (byKind !== 0) return byKind;
@@ -439,11 +538,17 @@ export async function searchDictionarySenses(
 // ─── 模块级缓存 ────────────────────────────────────────────────────────────────
 
 /**
- * 模块级单例缓存：以 packageId 为键，缓存全量 DictionarySense[]。
+ * 模块级单例缓存：合并所有已装包的全量 DictionarySense[]。
  *
- * 缓存失效：安装/升级/卸载时调用 invalidateDictionaryCache。
- * 低内存降级：前缀命中不依赖缓存（IDB 索引查询），子串/释义命中在缓存
- * 未命中时回退到按需 toArray。
+ * 实现细节：
+ * - 使用单一键 "_all" 合并所有包（而非 packageId:version 独立键），
+ *   因为 searchDictionarySenses 需要全量数据做子串/释义扫描。
+ * - 缓存失效：安装/升级/卸载时调用 invalidateDictionaryCache() 全量清除。
+ * - 低内存降级：前缀命中不依赖缓存（IDB 索引查询），子串/释义命中在缓存
+ *   未命中时回退到按需 toArray。
+ *
+ * 跨标签页限制：模块级单例是 per-tab 的，另一标签页安装/升级后本页缓存
+ * 仍旧。刷新后生效。后续可按 focus/版本探测刷新。
  */
 const dictionaryCache = new Map<string, DictionarySense[]>();
 
@@ -464,15 +569,12 @@ async function getDictionarySensesCached(db: LexilexiDatabase): Promise<Dictiona
 
 /**
  * 使缓存失效（安装/升级/卸载时调用）。
- * packageId 未指定时清除全部缓存。
+ *
+ * 使用单一 "_all" 键合并所有包，因此始终全量清除。
+ * packageId 参数保留供调用方语义表达（当前未区分）。
  */
-export function invalidateDictionaryCache(packageId?: string): void {
-  if (packageId) {
-    // 清除所有缓存条目（因为 _all 合并了所有包）
-    dictionaryCache.clear();
-  } else {
-    dictionaryCache.clear();
-  }
+export function invalidateDictionaryCache(_packageId?: string): void {
+  dictionaryCache.clear();
 }
 
 // ─── manifest 与解压 ──────────────────────────────────────────────────────────
@@ -505,13 +607,31 @@ export interface DictionaryManifest {
 /**
  * 获取远程 manifest（含包列表、版本、SHA256）。
  * 用户进入扩展词包设置页时发起（启动时不发任何网络请求）。
+ *
+ * 返回时做最小字段校验（packages 数组 + id/version/variants），
+ * 防止托管端返回异常时 UI 深处才 TypeError。
  */
 export async function fetchManifest(manifestUrl: string): Promise<DictionaryManifest> {
   const response = await fetch(manifestUrl, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`manifest 获取失败：HTTP ${response.status}`);
   }
-  return response.json() as Promise<DictionaryManifest>;
+  const data: unknown = await response.json();
+  if (!data || typeof data !== "object" || !("packages" in data)) {
+    throw new Error("manifest 格式非法：缺少 packages 字段");
+  }
+  const manifest = data as DictionaryManifest;
+  if (!Array.isArray(manifest.packages)) {
+    throw new Error("manifest 格式非法：packages 不是数组");
+  }
+  for (const pkg of manifest.packages) {
+    if (!pkg.id || !pkg.version || !pkg.variants) {
+      throw new Error(
+        `manifest 包条目格式非法：缺少 id/version/variants（${JSON.stringify(pkg)}）`,
+      );
+    }
+  }
+  return manifest;
 }
 
 /**
@@ -540,10 +660,17 @@ export async function detectDecompression(): Promise<"brotli" | "gzip" | "raw"> 
  *
  * 流程：fetch 包文件（cache: "no-store"）→ 解压 → SHA-256 校验 → 解析 JSON。
  * 整包重试（非 Range 续传）。
+ *
+ * 前提：`crypto.subtle` 仅安全上下文可用（HTTPS 或 localhost）。
+ * 非安全上下文直接抛出可读错误（Phase 3 UI 需展示）。
  */
 export async function downloadAndVerifyPackage(
   variant: ManifestVariant,
 ): Promise<PresetWordEntry[]> {
+  if (typeof globalThis.crypto === "undefined" || !globalThis.crypto.subtle) {
+    throw new Error("当前环境不支持 crypto.subtle（需 HTTPS 或 localhost 安全上下文）");
+  }
+
   const response = await fetch(variant.url, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`包文件下载失败：HTTP ${response.status}`);
@@ -551,17 +678,13 @@ export async function downloadAndVerifyPackage(
   const compressed = await response.arrayBuffer();
 
   // 解压
-  const encoding = variant.url.endsWith(".br")
-    ? "br"
-    : variant.url.endsWith(".gz")
-      ? "gzip"
-      : null;
+  const encoding = variant.url.endsWith(".br") ? "br" : variant.url.endsWith(".gz") ? "gzip" : null;
   let decompressed: ArrayBuffer;
   if (encoding) {
     const ds = new DecompressionStream(encoding as CompressionFormat);
     const writer = ds.writable.getWriter();
-    writer.write(new Uint8Array(compressed));
-    writer.close();
+    await writer.write(new Uint8Array(compressed));
+    await writer.close();
     const reader = ds.readable.getReader();
     const chunks: Uint8Array[] = [];
     while (true) {

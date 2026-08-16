@@ -20,12 +20,12 @@
 
 ### 1.1 现状分析
 
-| 表 | 现有用途 | Tier 2 装入后影响 |
-|---|---|---|
-| `senses` | 学习义项（Tier 0 词书 + 用户导入） | 40 万+ 条，term 索引可承受，但与学习四表耦合 |
-| `items` | LearningItem（调度载体） | **不应**为词典条目创建 |
-| `memoryStates` | FSRS 记忆状态 | **不应**为词典条目创建 |
-| `events` | 学习事件 | **不应**为词典条目创建 |
+| 表             | 现有用途                           | Tier 2 装入后影响                            |
+| -------------- | ---------------------------------- | -------------------------------------------- |
+| `senses`       | 学习义项（Tier 0 词书 + 用户导入） | 40 万+ 条，term 索引可承受，但与学习四表耦合 |
+| `items`        | LearningItem（调度载体）           | **不应**为词典条目创建                       |
+| `memoryStates` | FSRS 记忆状态                      | **不应**为词典条目创建                       |
+| `events`       | 学习事件                           | **不应**为词典条目创建                       |
 
 Oscar 评审指出：按 `installPreset` 路径装 Tier 2 → 401,222 × 4 = **~160 万条 IDB 记录、~1,000 个分块事务**；复习队列按 `due` 索引取数 → 40 万张新卡涌入「今日待学」；统计页、导出备份同步爆炸。
 
@@ -46,6 +46,7 @@ db.version(6).stores({
 ```
 
 **数据模型**：`DictionarySense` 为独立类型（不复用 `Sense`——现有 `Sense` 类型无 `source` 字段，已核实 `domain.ts`），扩展为 `Sense & { source: string }`（或独立字段，Phase 1 PR 中按实际类型体系统一）：
+
 - `source`：所属包标识（如 `"core-en-tier1"` / `"core-en-tier2"`），写入 IDB 时附带，供增量替换按 source 范围删除；
 - 不产生 `LearningItem` / `MemoryState` / `Event`；
 - 仅用于检索，不参与复习队列、统计、导出（`exportLexilexiData` 不导出此表）。
@@ -75,6 +76,7 @@ db.version(6).stores({
 ### 2.1 现状分析
 
 `searchLexilexiSenses`（`packages/core/src/search.ts`）当前实现：
+
 ```typescript
 const senses = await db.senses.toArray(); // 全量读入内存
 return searchSenses(senses, query, options); // 内存过滤+排序
@@ -88,11 +90,11 @@ Tier 0（7,195 条）：可行。Tier 1/2 安装后 senses + dictionarySenses �
 
 **检索策略**（三种命中类型，与 RAY-266 口径完全一致）：
 
-| 命中类型 | 检索方式 | 数据源 |
-|---|---|---|
-| `term-prefix`（前缀） | `where("term").startsWithIgnoreCase(q)` → IDB 索引区间查询 | 各表 term 索引 |
-| `term-substring`（子串） | 全量 `toArray()` → 内存 `term.includes(q)` | 各表全量 |
-| `definition`（释义） | 全量 `toArray()` → 内存 `definitions.some(d => d.includes(q))` | 各表全量 |
+| 命中类型                 | 检索方式                                                       | 数据源         |
+| ------------------------ | -------------------------------------------------------------- | -------------- |
+| `term-prefix`（前缀）    | `where("term").startsWithIgnoreCase(q)` → IDB 索引区间查询     | 各表 term 索引 |
+| `term-substring`（子串） | 全量 `toArray()` → 内存 `term.includes(q)`                     | 各表全量       |
+| `definition`（释义）     | 全量 `toArray()` → 内存 `definitions.some(d => d.includes(q))` | 各表全量       |
 
 **前缀命中**：Dexie `startsWithIgnoreCase` 底层走 IDB `IDBKeyRange.bound(q.toLowerCase(), q.toLowerCase() + '\uffff')`，O(log N) 索引定位，40 万条毫秒级返回。此路径覆盖最常见用户输入（输入前几个字母）。
 
@@ -101,14 +103,16 @@ Tier 0（7,195 条）：可行。Tier 1/2 安装后 senses + dictionarySenses �
 ```typescript
 // 子串命中：全量取回 → 内存 includes（RAY-266 口径：词条任意位置子串）
 const allTerms = await db.dictionarySenses.toArray(); // ~40 万条
-const hits = allTerms.filter(sense => sense.term.toLowerCase().includes(q));
+const hits = allTerms.filter((sense) => sense.term.toLowerCase().includes(q));
 ```
 
 **性能预算**：dictionarySenses 表 40 万条，每条 ~200 字节，全量 `toArray()` ≈ 80 MB 内存、~200–500 ms（IDB 读取）；内存 `includes` 过滤 ~10–50 ms。总耗时 ~300–600 ms，可接受（实测目标 < 500 ms）。
 
-**优化**：采用**模块级单例**缓存（非 `WeakRef`——`WeakRef` 在 GC 不确定时可能导致缓存意外失效，且搜索屏生命周期内缓存应稳定存在）。缓存以已装包版本为键（`Map<string, DictionarySense[]>`，key = `packageId:version`），后续击键查询直接走内存过滤，不重复读 IDB。
+**优化**：采用**模块级单例**缓存（非 `WeakRef`——`WeakRef` 在 GC 不确定时可能导致缓存意外失效，且搜索屏生命周期内缓存应稳定存在）。缓存使用单一键 `_all` 合并所有已装包的全量 `DictionarySense[]`（因子串/释义扫描需全量数据），后续击键查询直接走内存过滤，不重复读 IDB。
 
-**缓存失效**：扩展包安装/卸载/升级时清除对应 packageId 的缓存条目（`cache.delete(key)`）；全量重装时清除全部缓存。
+**缓存失效**：扩展包安装/卸载/升级时全量清除缓存（`cache.clear()`）；`invalidateDictionaryCache()` 在安装/升级完成后由内部调用。
+
+**跨标签页限制**：模块级单例是 per-tab 的，另一标签页安装/升级后本页缓存仍旧。刷新后生效。后续可按 focus/版本探测刷新。
 
 **低内存设备降级**：前缀命中路径不依赖缓存（直接走 IDB 索引查询 `startsWithIgnoreCase`，O(log N)），在缓存未加载或被清除时仍可用；子串/释义命中路径在缓存未命中时回退到按需 `toArray()`（首次击键 200–500 ms，与无缓存时一致）。低内存设备可选择不预热缓存（`installDictionaryPackage` 完成后不主动加载），仅在用户输入 ≥ 2 字符时按需加载。
 
@@ -155,10 +159,12 @@ export async function searchAllSenses(
 ```
 
 **去重规则**：
+
 - **层内**（senses 表或 dictionarySenses 表各自内部）：按 `sense.id` 去重（与 RAY-266 现有口径一致——senses 表内可存在同 term 多个 Sense，如 CSV 导入不去重，已核实 `importWords.ts` 无 term 查重，RAY-266 按 `sense.id` 去重各显一条）；
 - **跨层**（dictionarySenses ↔ senses）：按 **term（大小写不敏感）** 去重、学习义项优先（senses 表晋升后副本的 id 与 dictionarySenses 不同，但 term 相同，保留学习版本）。
 
 **预算**（实测目标）：
+
 - 前缀命中（最常见）：< 50 ms（IDB 索引查询，两表各一次）；
 - 子串命中（2+ 字母）：< 500 ms（两表各一次全量 toArray + 内存过滤，含首次缓存加载）；后续击键 < 50 ms（内存缓存命中）；
 - 释义命中：< 500 ms（同子串命中路径）。
@@ -187,6 +193,7 @@ if (done) {
 ```
 
 **升级流程**：
+
 1. **不清库**：不调用 `db.delete()`，不删除 dictionarySenses 表——禁止清库重来是红线；
 2. **增量替换**：读取新包 entries → 按 term 与 dictionarySenses 表 diff → 只写入新增/变更词条（term 相同且内容未变的跳过）；
 3. **删除已移除词条**：新包中不再出现的旧词条，从 dictionarySenses 表删除（仅删该包 source 的条目，不影响其它包）；
@@ -205,14 +212,17 @@ if (done) {
 ### 4.1 现状分析
 
 `public/sw.js` 对同源 GET 一律 stale-while-revalidate + `cache.put`：
+
 ```javascript
 // sw.js 第 153-165 行
-const fetched = fetch(request).then((response) => {
-  if (response.ok) {
-    caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
-  }
-  return response;
-}).catch(() => cached);
+const fetched = fetch(request)
+  .then((response) => {
+    if (response.ok) {
+      caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
+    }
+    return response;
+  })
+  .catch(() => cached);
 ```
 
 问题：若包 URL 不带版本号，更新后的包会被旧缓存顶掉；25 MB 包进 Cache API 与解压后落库重复占配额。
@@ -220,10 +230,12 @@ const fetched = fetch(request).then((response) => {
 ### 4.2 方案
 
 **包 URL 版本化**：包文件 URL 包含版本号和内容哈希：
+
 ```
 https://<host>/presets/core-en-tier1-v1.0.0-a1b2c3d4.json.br
 https://<host>/presets/core-en-tier2-v1.0.0-e5f6g7h8.json.br
 ```
+
 - 版本号（`v1.0.0`）+ 内容哈希前 8 位（`a1b2c3d4`）= URL 唯一；
 - 版本化 URL 保证每版内容对应唯一地址，便于审计与回溯。
 
@@ -244,10 +256,10 @@ if (url.href.startsWith(presetsUrl)) {
 
 **存储位置与配额核算**：
 
-| 数据 | 存储位置 | 体积估算 |
-|---|---|---|
-| 包文件（下载的 JSON/Brotli） | **不持久化**：下载 → 校验 → 解压 → 落库 → 丢弃原始包 | Tier 1: 1.2 MB / Tier 2: 6.4 MB（Brotli） |
-| 落库数据（dictionarySenses 表） | IndexedDB `dictionarySenses` 表 | Tier 1: ~15 MB / Tier 2: ~80 MB（估算，每条 ~200 字节 × 条目数） |
+| 数据                            | 存储位置                                             | 体积估算                                                         |
+| ------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------- |
+| 包文件（下载的 JSON/Brotli）    | **不持久化**：下载 → 校验 → 解压 → 落库 → 丢弃原始包 | Tier 1: 1.2 MB / Tier 2: 6.4 MB（Brotli）                        |
+| 落库数据（dictionarySenses 表） | IndexedDB `dictionarySenses` 表                      | Tier 1: ~15 MB / Tier 2: ~80 MB（估算，每条 ~200 字节 × 条目数） |
 
 **总配额**：Tier 2 全量安装 ≈ 80 MB（落库），远低于浏览器 IDB 配额上限（Chrome: 磁盘 60%/可用空间、Firefox: 50% 可用空间、Safari: 1 GB 起步）。`navigator.storage.persist()` 尽力申请持久化（§6 详述）。
 
@@ -266,9 +278,21 @@ if (url.href.startsWith(presetsUrl)) {
       "id": "core-en-tier1",
       "version": "1.0.0",
       "variants": {
-        "brotli": { "url": "/presets/core-en-tier1-v1.0.0-a1b2c3d4.json.br", "size": 1258304, "sha256": "..." },
-        "gzip":   { "url": "/presets/core-en-tier1-v1.0.0-a1b2c3d4.json.gz", "size": 1740800, "sha256": "..." },
-        "raw":    { "url": "/presets/core-en-tier1-v1.0.0-a1b2c3d4.json",    "size": 4613120, "sha256": "..." }
+        "brotli": {
+          "url": "/presets/core-en-tier1-v1.0.0-a1b2c3d4.json.br",
+          "size": 1258304,
+          "sha256": "..."
+        },
+        "gzip": {
+          "url": "/presets/core-en-tier1-v1.0.0-a1b2c3d4.json.gz",
+          "size": 1740800,
+          "sha256": "..."
+        },
+        "raw": {
+          "url": "/presets/core-en-tier1-v1.0.0-a1b2c3d4.json",
+          "size": 4613120,
+          "sha256": "..."
+        }
       },
       "sourceCommit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b"
     },
@@ -276,9 +300,21 @@ if (url.href.startsWith(presetsUrl)) {
       "id": "core-en-tier2",
       "version": "1.0.0",
       "variants": {
-        "brotli": { "url": "/presets/core-en-tier2-v1.0.0-e5f6g7h8.json.br", "size": 6710886, "sha256": "..." },
-        "gzip":   { "url": "/presets/core-en-tier2-v1.0.0-e5f6g7h8.json.gz", "size": 8912896, "sha256": "..." },
-        "raw":    { "url": "/presets/core-en-tier2-v1.0.0-e5f6g7h8.json",    "size": 26419200, "sha256": "..." }
+        "brotli": {
+          "url": "/presets/core-en-tier2-v1.0.0-e5f6g7h8.json.br",
+          "size": 6710886,
+          "sha256": "..."
+        },
+        "gzip": {
+          "url": "/presets/core-en-tier2-v1.0.0-e5f6g7h8.json.gz",
+          "size": 8912896,
+          "sha256": "..."
+        },
+        "raw": {
+          "url": "/presets/core-en-tier2-v1.0.0-e5f6g7h8.json",
+          "size": 26419200,
+          "sha256": "..."
+        }
       },
       "sourceCommit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b"
     }
@@ -303,6 +339,7 @@ fetch manifest.json（cache: "no-store"）
 ### 5.3 Brotli 支持矩阵与降级
 
 **`DecompressionStream("br")`** 支持矩阵：
+
 - **Chrome 80+ / Edge 80+**：✅ 原生（`DecompressionStream` 自 Chrome 80 起可用，`"br"` 同期支持）
 - **Safari 16.4+**：✅ 原生
 - **Firefox 113+**：✅ 原生
@@ -311,15 +348,16 @@ fetch manifest.json（cache: "no-store"）
 
 **降级通道**：
 
-| 浏览器 | Brotli 支持 | 降级方案 |
-|---|---|---|
-| Chrome 80+ / Edge 80+ | ✅ | — |
-| Safari 16.4+ | ✅ | — |
-| Firefox 113+ | ✅ | — |
-| Chrome < 80 / Safari < 16.4 / Firefox < 113 | ❌ | gzip 降级包（Tier 1: 1.7 MB / Tier 2: 8.5 MB） |
-| 不支持 `DecompressionStream` | ❌ | raw JSON（Tier 1: 4.4 MB / Tier 2: 25.2 MB） |
+| 浏览器                                      | Brotli 支持 | 降级方案                                       |
+| ------------------------------------------- | ----------- | ---------------------------------------------- |
+| Chrome 80+ / Edge 80+                       | ✅          | —                                              |
+| Safari 16.4+                                | ✅          | —                                              |
+| Firefox 113+                                | ✅          | —                                              |
+| Chrome < 80 / Safari < 16.4 / Firefox < 113 | ❌          | gzip 降级包（Tier 1: 1.7 MB / Tier 2: 8.5 MB） |
+| 不支持 `DecompressionStream`                | ❌          | raw JSON（Tier 1: 4.4 MB / Tier 2: 25.2 MB）   |
 
 **运行时检测**：
+
 ```typescript
 async function detectDecompression(): Promise<"brotli" | "gzip" | "raw"> {
   try {
@@ -341,10 +379,12 @@ async function detectDecompression(): Promise<"brotli" | "gzip" | "raw"> {
 ### 5.4 校验对象与传输编码
 
 **校验对象**：校验**解压后**的原始 JSON 字节（而非传输字节）。原因：
+
 - 应用层解压（`DecompressionStream`）时，校验解压后内容更自然；
 - 三种编码（brotli/gzip/raw）解压后内容一致 → SHA256 一致 → manifest 只需一个 sha256 值。
 
 **传输编码选定**：采用**应用层解压**（非 `Content-Encoding`）：
+
 - 包文件以 `.br` / `.gz` 后缀存储在静态服务器上，`Content-Type: application/octet-stream`（不设 `Content-Encoding`）；
 - `fetch` 返回原始压缩字节 → 应用层 `DecompressionStream` 解压 → 校验解压后 SHA256；
 - manifest 中三种 variant 共用同一 sha256（解压后内容一致），仅 url/size 不同。
@@ -357,14 +397,15 @@ async function detectDecompression(): Promise<"brotli" | "gzip" | "raw"> {
 
 ### 6.1 存储预算
 
-| 场景 | 估算 |
-|---|---|
-| Tier 0（内置）+ 学习数据 | ~5 MB（现有用户） |
-| + Tier 1 词典层 | +15 MB ≈ 20 MB |
-| + Tier 2 词典层 | +80 MB ≈ 85 MB |
-| + Tier 1 富化包（可选，RAY-268） | +12 MB ≈ 97 MB |
+| 场景                             | 估算              |
+| -------------------------------- | ----------------- |
+| Tier 0（内置）+ 学习数据         | ~5 MB（现有用户） |
+| + Tier 1 词典层                  | +15 MB ≈ 20 MB    |
+| + Tier 2 词典层                  | +80 MB ≈ 85 MB    |
+| + Tier 1 富化包（可选，RAY-268） | +12 MB ≈ 97 MB    |
 
 **Safari 7 天逐出**：Safari 对非持久化 IDB 有 7 天无访问自动清除策略。应对：
+
 - 启动时调用 `navigator.storage.persist()` 尽力申请持久化（已有的 `domain-model.md §10` 逻辑）；
 - 持久化申请成功 → 数据安全；
 - 持久化申请失败 → 在设置页展示提示「扩展词包可能在 7 天未使用后被清除，建议定期打开应用」；
@@ -383,6 +424,7 @@ async function detectDecompression(): Promise<"brotli" | "gzip" | "raw"> {
 ### 6.3 双标签页互斥
 
 沿用 `installPreset` 的 check-and-set 方案：
+
 - 起始事务写 `progress=0` 占位（条件写入，不覆盖并发安装者已推进的进度）；
 - 每块事务校验进度未被并发安装者推进（`ConcurrentInstallError` 回滚 + 重读续装）；
 - `dictionarySenses` 表的 term 索引去重保证并发写入不产生重复记录。
@@ -404,6 +446,7 @@ async function detectDecompression(): Promise<"brotli" | "gzip" | "raw"> {
 Tier 2（401,222 条）包含 Tier 1（58,244 条）的全部词条（Tier 1 的筛选条件是 Tier 2 的子集）。
 
 **互斥策略**：
+
 - Tier 2 安装完成 → 自动标记 Tier 1 也为已覆盖（`dictionaryDoneKey("core-en-tier1")` 写入特殊值 `"covered-by-tier2"`）；
 - 设置页展示：Tier 2 已安装时，Tier 1 显示为「已包含在全量词表中」，不提供独立下载按钮；
 - Tier 1 已安装 → 安装 Tier 2 时，Tier 2 的 term 去重跳过 Tier 1 已有的词条（`installDictionaryPackage` 的 term 查重天然处理），Tier 2 安装完成后标记 Tier 1 为 covered。
@@ -424,6 +467,7 @@ Tier 2（401,222 条）包含 Tier 1（58,244 条）的全部词条（Tier 1 的
 ## 9. 许可展示
 
 下载确认界面展示许可声明：
+
 - **Tier 1/2 数据仅来自 ECDICT（MIT，© 2025 Linwei）**——Tier 1/2 包的打包脚本（`build.mjs --tier 1/2`）仅使用 ECDICT 数据，不包含 NGSL 词表；
 - NGSL 1.2（CC BY-SA 4.0）是 Tier 0 的选词基准，**不在 Tier 1/2 包内**——Tier 0 的打包口径（`build.mjs --tier 0`）才包含 NGSL join，Tier 1/2 的筛选条件（`hasExamTag` / `isTier1Core`）仅基于 ECDICT 字段；
 - 复用现有「数据来源与许可」页的 ECDICT MIT 声明，下载确认弹窗中以简短文案说明。
@@ -435,6 +479,7 @@ Tier 2（401,222 条）包含 Tier 1（58,244 条）的全部词条（Tier 1 的
 `docs/presets/experiment-enrichment.md` 记录 Tier 1 富化包（brotli 5.78 MB）「走按需加载子路径」。
 
 **方案**：Tier 1 富化包与 Tier 1 词条包**共用同一下载通道**：
+
 - manifest 中 Tier 1 条目包含 `enrichment` 子字段（指向富化包 URL/SHA256/体积）；
 - 用户下载 Tier 1 词条包时，可选「同时下载富化数据（例句/近反义/词根等）」或单独下载；
 - 富化包落库路径沿用 `backfillEnrichment`（不改 schema，按 term 合并到已有 Sense 的 content 字段）；
@@ -446,6 +491,7 @@ Tier 2（401,222 条）包含 Tier 1（58,244 条）的全部词条（Tier 1 的
 ## 11. DB Schema 升级路径
 
 **v5 → v6**（本方案引入）：
+
 ```typescript
 db.version(6).stores({
   items: "id",
@@ -464,14 +510,14 @@ db.version(6).stores({
 
 ## 12. API 清单（`@lexilexi/core` 新增导出）
 
-| 函数 | 说明 |
-|---|---|
-| `installDictionaryPackage(db, package, options)` | 安装/升级扩展词包到 dictionarySenses 表 |
-| `getDictionaryPackageState(db, packageId)` | 查询扩展包安装状态（not-installed / installing / installed + 版本） |
-| `searchAllSenses(db, query, options)` | 合并检索 senses + dictionarySenses，term 去重 + 学习优先 + 全局排序 + 截断 |
-| `promoteDictionarySense(db, dictSenseId)` | 从 dictionarySenses 复制到 senses 表（新生成 SenseId，晋升为学习数据） |
-| `fetchManifest(url)` | 获取远程 manifest（含包列表、版本、SHA256） |
-| `detectDecompression()` | 运行时检测浏览器解压能力（brotli / gzip / raw） |
+| 函数                                             | 说明                                                                       |
+| ------------------------------------------------ | -------------------------------------------------------------------------- |
+| `installDictionaryPackage(db, package, options)` | 安装/升级扩展词包到 dictionarySenses 表                                    |
+| `getDictionaryPackageState(db, packageId)`       | 查询扩展包安装状态（not-installed / installing / installed + 版本）        |
+| `searchAllSenses(db, query, options)`            | 合并检索 senses + dictionarySenses，term 去重 + 学习优先 + 全局排序 + 截断 |
+| `promoteDictionarySense(db, dictSenseId)`        | 从 dictionarySenses 复制到 senses 表（新生成 SenseId，晋升为学习数据）     |
+| `fetchManifest(url)`                             | 获取远程 manifest（含包列表、版本、SHA256）                                |
+| `detectDecompression()`                          | 运行时检测浏览器解压能力（brotli / gzip / raw）                            |
 
 ---
 

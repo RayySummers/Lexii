@@ -143,21 +143,19 @@ export async function searchAllSenses(
     searchDictionarySenses(db, q, { limit: 0 }),
   ]);
 
-  // 按 term（大小写不敏感）去重，学习义项优先
-  const seen = new Map<string, SenseSearchHit>(); // lowercased term → hit
-  for (const hit of learningHits) {
-    seen.set(hit.sense.term.toLowerCase(), hit);
-  }
+  // learningHits 已按 sense.id 去重（searchSenses 口径），同 term 多义项
+  // 保留各自（RAY-266：层内按 sense.id 去重，各显一条）。
+  // 仅用学习层的 term 集合过滤词典层命中（跨层按 term 去重，学习优先）。
+  const learningTerms = new Set(learningHits.map((h) => h.sense.term.toLowerCase()));
+  const result: SenseSearchHit[] = [...learningHits];
   for (const hit of dictHits) {
-    const key = hit.sense.term.toLowerCase();
-    if (!seen.has(key)) {
-      seen.set(key, { sense: hit.sense, kind: hit.kind });
+    if (!learningTerms.has(hit.sense.term.toLowerCase())) {
+      result.push({ sense: hit.sense, kind: hit.kind });
     }
-    // 学习义项已存在 → 跳过词典义项（学习义项优先）
+    // 学习层已有同 term → 跳过词典义项（学习义项优先）
   }
 
   // 全局排序 → 截断
-  const merged = [...seen.values()];
-  merged.sort(compareHits);
-  return limit > 0 ? merged.slice(0, limit) : merged;
+  result.sort(compareHits);
+  return limit > 0 ? result.slice(0, limit) : result;
 }

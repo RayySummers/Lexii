@@ -170,7 +170,12 @@ export {
   MIN_QUIZ_OPTION_COUNT,
 } from "./distractors";
 export type { DistractorOption, QuizDirection } from "./distractors";
-export { DEFAULT_SEARCH_LIMIT, searchAllSenses, searchLexilexiSenses, searchSenses } from "./search";
+export {
+  DEFAULT_SEARCH_LIMIT,
+  searchAllSenses,
+  searchLexilexiSenses,
+  searchSenses,
+} from "./search";
 export type { SenseSearchHit, SenseSearchHitKind, SenseSearchOptions } from "./search";
 export {
   DICTIONARY_CHUNK_SIZE,
