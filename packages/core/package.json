@@ -1,6 +1,6 @@
 {
   "name": "@lexilexi/core",
-  "version": "0.1.0-alpha.6",
+  "version": "0.1.0-alpha.7",
   "private": true,
   "type": "module",
   "description": "Lexilexi 核心领域模型与共享类型（local-first 骨架）",
