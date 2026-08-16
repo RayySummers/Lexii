@@ -20,8 +20,10 @@
  */
 import { useCallback, useState } from "react";
 import type { StudyMode } from "@lexilexi/core";
+import { FirstOpenDialog } from "./components/FirstOpenDialog";
 import { HomeScreen, type StudyFormat } from "./HomeScreen";
 import { useTheme } from "./hooks/useTheme";
+import { markFirstOpenDialogDismissed, shouldShowFirstOpenDialog } from "./lib/firstOpenDialog";
 import { QuizScreen } from "./review/QuizScreen";
 import { ReviewScreen } from "./review/ReviewScreen";
 import { createDefaultReviewDataProvider } from "./review/data";
@@ -64,6 +66,13 @@ export function App({
   const [view, setView] = useState<View>("home");
   const [reviewMode, setReviewMode] = useState<StudyMode>("review");
   const [studyFormat, setStudyFormat] = useState<StudyFormat>("card");
+  // RAY-282 首次打开弹窗：仅无已读标记的首次打开展示（懒初始化只读一次）
+  const [showFirstOpenDialog, setShowFirstOpenDialog] = useState(shouldShowFirstOpenDialog);
+
+  const dismissFirstOpenDialog = useCallback(() => {
+    markFirstOpenDialogDismissed();
+    setShowFirstOpenDialog(false);
+  }, []);
 
   const startStudy = useCallback(
     (mode: StudyMode, format: StudyFormat) => {
@@ -142,6 +151,8 @@ export function App({
       ) : (
         <HomeScreen onStart={startStudy} statsProvider={statsProvider} />
       )}
+
+      {showFirstOpenDialog && <FirstOpenDialog onDismiss={dismissFirstOpenDialog} />}
     </div>
   );
 }
