@@ -1,10 +1,15 @@
 /**
  * 选择题混淆项生成（纯函数，无 React / DB 依赖）。
  *
- * 混淆项三类来源（Jack 拍板口径，RAY-269）：
+ * 混淆项来源（Jack 拍板口径，RAY-269 立项 + RAY-293 后续修复）：
  * 1. 用户历史常错词——记忆状态中 lapses > 0 的条目定义
  * 2. 本地词库形近词——编辑距离最近的词条定义
- * 3. 近义词——Sense.synonyms 字段
+ * 3. 随机回退——词库中随机取定义兜底
+ *
+ * 剔除规则（RAY-293 后续修复，Jack 裁定「剔除」方案）：与目标词同义的
+ * 词条不进该题混淆池——同义选项「语义上也说得通」被判错属质量缺口。
+ * 同义词条从全部来源（常错词 / 形近词 / 随机）剔除，覆盖英译中 +
+ * 中译英两个方向；不采用「同义判对」（同义/近义边界模糊，会稀释记忆精度）。
  *
  * 隐私红线：全部基于本地数据，无跨用户统计。
  */
@@ -17,7 +22,7 @@ export interface DistractorOption {
   /** 是否为正确答案 */
   isCorrect: boolean;
   /** 来源标识（调试 / 可选展示） */
-  source: "correct" | "wrong-history" | "similar-spelling" | "synonym" | "random";
+  source: "correct" | "wrong-history" | "similar-spelling" | "random";
 }
 
 /**
@@ -67,6 +72,7 @@ function shuffle<T>(array: T[]): T[] {
  * 为一道选择题生成选项（1 正确 + N-1 混淆）。
  *
  * 英译中方向（RAY-269 既有行为）：正确项为主释义，混淆项为其他义项的主释义。
+ * 与目标词同义的词条不进混淆池（RAY-293 后续修复，见文件头说明）。
  *
  * @param targetSense  当前考查的义项
  * @param allSenses    词库中所有义项（用于形近词和随机回退）
@@ -92,8 +98,8 @@ export function generateOptions(
  * 为一道中译英选择题生成选项（1 正确 + N-1 混淆），RAY-293。
  *
  * 正确项为目标词条原文，混淆项为其他词条的原文。混淆项来源口径与
- * `generateOptions` 完全一致（历史常错词 / 形近词 / 近义词 / 随机回退），
- * 仅选项文本从「主释义」换成「词条原文」。
+ * `generateOptions` 完全一致（历史常错词 / 形近词 / 随机回退，同义词条
+ * 剔除），仅选项文本从「主释义」换成「词条原文」。
  *
  * @param targetSense  当前考查的义项
  * @param allSenses    词库中所有义项（用于形近词和随机回退）
@@ -109,7 +115,7 @@ export function generateTermOptions(
   return buildOptions(targetSense, allSenses, wrongTerms, optionCount, (sense) => sense.term);
 }
 
-/** 选项生成管线（两方向共用）：正确项 + 三类混淆池 + 随机回退，最后洗牌 */
+/** 选项生成管线（两方向共用）：正确项 + 常错词/形近词池 + 随机回退，最后洗牌 */
 function buildOptions(
   targetSense: Sense,
   allSenses: readonly Sense[],
@@ -128,6 +134,10 @@ function buildOptions(
     }));
   }
 
+  // 同义词条剔除（RAY-293 后续修复）：双向口径——目标词的 synonyms 字段
+  // 命中的词条、或自身 synonyms 含目标词的词条，都不进该题混淆池。
+  const excluded = synonymExcludedTerms(targetSense, allSenses);
+
   const used = new Set<string>([correctText]);
   const distractors: DistractorOption[] = [];
 
@@ -135,7 +145,7 @@ function buildOptions(
   addFromPool(
     distractors,
     used,
-    wrongDefs(allSenses, wrongTerms, extract),
+    wrongDefs(allSenses, wrongTerms, excluded, extract),
     "wrong-history",
     distractorCount,
   );
@@ -145,26 +155,21 @@ function buildOptions(
     addFromPool(
       distractors,
       used,
-      similarDefs(targetSense, allSenses, extract),
+      similarDefs(targetSense, allSenses, excluded, extract),
       "similar-spelling",
       distractorCount,
     );
   }
 
-  // 3. 近义词定义
+  // 3. 随机回退
   if (distractors.length < distractorCount) {
     addFromPool(
       distractors,
       used,
-      synonymDefs(targetSense, allSenses, extract),
-      "synonym",
+      randomDefs(allSenses, excluded, extract),
+      "random",
       distractorCount,
     );
-  }
-
-  // 4. 随机回退
-  if (distractors.length < distractorCount) {
-    addFromPool(distractors, used, randomDefs(allSenses, extract), "random", distractorCount);
   }
 
   const options: DistractorOption[] = [
@@ -172,6 +177,30 @@ function buildOptions(
     ...distractors,
   ];
   return shuffle(options);
+}
+
+/**
+ * 该题目标的同义词条集合（小写 term，双向口径）：
+ * - `target.synonyms` 中的每个词（同义词声明在目标侧）；
+ * - 词库中 `synonyms` 字段包含目标 term 的词条（同义词声明在另一侧）。
+ */
+function synonymExcludedTerms(target: Sense, allSenses: readonly Sense[]): ReadonlySet<string> {
+  const excluded = new Set<string>();
+  if (target.synonyms) {
+    for (const synonym of target.synonyms) {
+      excluded.add(synonym.toLowerCase());
+    }
+  }
+  const targetTerm = target.term.toLowerCase();
+  for (const sense of allSenses) {
+    if (sense.id === target.id || !sense.synonyms) {
+      continue;
+    }
+    if (sense.synonyms.some((synonym) => synonym.toLowerCase() === targetTerm)) {
+      excluded.add(sense.term.toLowerCase());
+    }
+  }
+  return excluded;
 }
 
 /** 从候选池中取未使用的定义，直到填满 */
@@ -194,16 +223,18 @@ function addFromPool(
   }
 }
 
-/** 历史常错词的主释义列表 */
+/** 历史常错词的主释义列表（同义词条剔除） */
 function wrongDefs(
   allSenses: readonly Sense[],
   wrongTerms: readonly string[],
+  excluded: ReadonlySet<string>,
   extract: TextExtractor,
 ): string[] {
-  const wrongSet = new Set(wrongTerms);
+  const wrongSet = new Set(wrongTerms.map((term) => term.toLowerCase()));
   const result: string[] = [];
   for (const sense of allSenses) {
-    if (wrongSet.has(sense.term)) {
+    const termKey = sense.term.toLowerCase();
+    if (wrongSet.has(termKey) && !excluded.has(termKey)) {
       const text = extract(sense);
       if (text) {
         result.push(text);
@@ -213,15 +244,24 @@ function wrongDefs(
   return result;
 }
 
-/** 形近词主释义（按编辑距离排序，取最近的前 10 个） */
-function similarDefs(target: Sense, allSenses: readonly Sense[], extract: TextExtractor): string[] {
+/** 形近词主释义（按编辑距离排序，取最近的前 10 个；同义词条剔除） */
+function similarDefs(
+  target: Sense,
+  allSenses: readonly Sense[],
+  excluded: ReadonlySet<string>,
+  extract: TextExtractor,
+): string[] {
   const term = target.term.toLowerCase();
   const scored: Array<{ dist: number; def: string }> = [];
   for (const sense of allSenses) {
     if (sense.id === target.id) {
       continue;
     }
-    const dist = editDistance(term, sense.term.toLowerCase());
+    const termKey = sense.term.toLowerCase();
+    if (excluded.has(termKey)) {
+      continue;
+    }
+    const dist = editDistance(term, termKey);
     if (dist > 0 && dist <= 3) {
       const text = extract(sense);
       if (text) {
@@ -233,32 +273,17 @@ function similarDefs(target: Sense, allSenses: readonly Sense[], extract: TextEx
   return scored.slice(0, 10).map((s) => s.def);
 }
 
-/** 近义词在词库中的主释义 */
-function synonymDefs(target: Sense, allSenses: readonly Sense[], extract: TextExtractor): string[] {
-  const synonyms = target.synonyms;
-  if (!synonyms || synonyms.length === 0) {
-    return [];
-  }
-  const synSet = new Set(synonyms.map((s) => s.toLowerCase()));
-  const result: string[] = [];
-  for (const sense of allSenses) {
-    if (sense.id === target.id) {
-      continue;
-    }
-    if (synSet.has(sense.term.toLowerCase())) {
-      const text = extract(sense);
-      if (text) {
-        result.push(text);
-      }
-    }
-  }
-  return result;
-}
-
-/** 词库中随机取主释义（兜底） */
-function randomDefs(allSenses: readonly Sense[], extract: TextExtractor): string[] {
+/** 词库中随机取主释义（兜底；同义词条剔除） */
+function randomDefs(
+  allSenses: readonly Sense[],
+  excluded: ReadonlySet<string>,
+  extract: TextExtractor,
+): string[] {
   const defs: string[] = [];
   for (const sense of allSenses) {
+    if (excluded.has(sense.term.toLowerCase())) {
+      continue;
+    }
     const text = extract(sense);
     if (text) {
       defs.push(text);
