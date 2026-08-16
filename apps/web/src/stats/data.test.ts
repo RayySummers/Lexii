@@ -17,7 +17,7 @@ import {
   toSenseId,
 } from "@lexilexi/core";
 import type { LexilexiDatabase } from "@lexilexi/core";
-import { localDayBounds } from "@lexilexi/stats";
+import { localDayBounds, MAX_EFFECTIVE_REVIEW_DURATION_MS } from "@lexilexi/stats";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DAILY_NEW_CARD_LIMIT_STORAGE_KEY } from "../lib/dailyNewCardLimit";
 import { createIndexedDbReviewDataProvider } from "../review/data";
@@ -91,9 +91,72 @@ describe("createIndexedDbStatsDataProvider", () => {
       expect(stats.dueTomorrowCount).toBe(0);
       // RAY-295：今日待学 = min(20 − 1, 剩余 13) = 13（不被已学重复扣减）
       expect(stats.newCardsRemainingToday).toBe(SAMPLE_WORDLIST_ROW_COUNT - 1);
+      // RAY-270：学习时长随 review 事件落库推导（1 秒）
+      expect(stats.todayStudyDurationMs).toBe(1_000);
+      expect(stats.totalStudyDurationMs).toBe(1_000);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  describe("学习时长（RAY-270）", () => {
+    it("多次评分累计：今日与累计时长均为各次有效时长之和", async () => {
+      const statsProvider = createIndexedDbStatsDataProvider(db!);
+      const reviewProvider = createIndexedDbReviewDataProvider(db!);
+      await importCsvWordlist(db!, SAMPLE_WORDLIST_CSV, { source: "test" });
+
+      const cards = await reviewProvider.loadQueue("learn");
+      await reviewProvider.grade(cards[0]!, "good", { reviewDurationMs: 1_000, revealed: true });
+      await reviewProvider.grade(cards[1]!, "good", { reviewDurationMs: 2_500, revealed: true });
+
+      const stats = await statsProvider.loadStats();
+      expect(stats.todayStudyDurationMs).toBe(3_500);
+      expect(stats.totalStudyDurationMs).toBe(3_500);
+    });
+
+    it("单卡挂机超上限：时长按上限截断，不虚高", async () => {
+      const statsProvider = createIndexedDbStatsDataProvider(db!);
+      const reviewProvider = createIndexedDbReviewDataProvider(db!);
+      await importCsvWordlist(db!, SAMPLE_WORDLIST_CSV, { source: "test" });
+
+      const card = (await reviewProvider.loadQueue("learn"))[0]!;
+      // 卡片挂了 30 分钟才评分：只有 5 分钟上限计入有效时长
+      await reviewProvider.grade(card, "good", {
+        reviewDurationMs: 30 * 60_000,
+        revealed: true,
+      });
+
+      const stats = await statsProvider.loadStats();
+      expect(stats.todayStudyDurationMs).toBe(MAX_EFFECTIVE_REVIEW_DURATION_MS);
+      expect(stats.totalStudyDurationMs).toBe(MAX_EFFECTIVE_REVIEW_DURATION_MS);
+    });
+
+    it("撤销评分后时长口径一致：事件删除，时长同步回滚（RAY-265 撤销红线）", async () => {
+      const statsProvider = createIndexedDbStatsDataProvider(db!);
+      const reviewProvider = createIndexedDbReviewDataProvider(db!);
+      await importCsvWordlist(db!, SAMPLE_WORDLIST_CSV, { source: "test" });
+
+      const card = (await reviewProvider.loadQueue("learn"))[0]!;
+      const result = await reviewProvider.grade(card, "good", {
+        reviewDurationMs: 4_000,
+        revealed: true,
+      });
+
+      let stats = await statsProvider.loadStats();
+      expect(stats.todayStudyDurationMs).toBe(4_000);
+      expect(stats.totalStudyDurationMs).toBe(4_000);
+
+      await reviewProvider.undoGrade(
+        card.item.id,
+        result.reviewEventId,
+        result.previousMemoryState,
+      );
+
+      stats = await statsProvider.loadStats();
+      expect(stats.todayStudyDurationMs).toBe(0);
+      expect(stats.totalStudyDurationMs).toBe(0);
+      expect(stats.reviewCount).toBe(0);
+    });
   });
 
   it("同一张卡今天第二次评分：今日已学习不变，今日已复习 +1", async () => {

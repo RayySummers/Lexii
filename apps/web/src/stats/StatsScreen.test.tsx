@@ -2,13 +2,14 @@
  * 统计页 UI 测试（mock 数据源）。
  *
  * RAY-252：8 项统计卡片全量渲染，数值互不冲突（用全不同的值便于断言）。
+ * RAY-270：新增今日/累计学习时长两张卡片，自适应文案断言。
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { StatsScreen } from "./StatsScreen";
 import type { StatsDataProvider, StatsSnapshot } from "./types";
 
-/** 8 个字段互不相同的快照（避免 getByText 撞值；今日待学取 newCardsRemainingToday=9） */
+/** 10 个字段互不相同的快照（避免 getByText 撞值；今日待学取 newCardsRemainingToday=9） */
 const FULL_SNAPSHOT: StatsSnapshot = {
   streakDays: 1,
   totalDays: 2,
@@ -19,6 +20,8 @@ const FULL_SNAPSHOT: StatsSnapshot = {
   newCardsRemainingToday: 9,
   reviewCount: 7,
   completedWordCount: 8,
+  todayStudyDurationMs: 90 * 60_000, // →「1 小时 30 分钟」
+  totalStudyDurationMs: 59 * 60_000, // →「59 分钟」（不足 1 小时不出现「小时」）
 };
 
 const EMPTY_SNAPSHOT: StatsSnapshot = {
@@ -31,6 +34,8 @@ const EMPTY_SNAPSHOT: StatsSnapshot = {
   newCardsRemainingToday: 0,
   reviewCount: 0,
   completedWordCount: 0,
+  todayStudyDurationMs: 0,
+  totalStudyDurationMs: 0,
 };
 
 function makeProvider(snapshot: StatsSnapshot): StatsDataProvider {
@@ -38,23 +43,46 @@ function makeProvider(snapshot: StatsSnapshot): StatsDataProvider {
 }
 
 describe("StatsScreen", () => {
-  it("渲染 8 张统计卡片与对应数值", async () => {
+  it("渲染 10 张统计卡片与对应数值", async () => {
     render(<StatsScreen provider={makeProvider(FULL_SNAPSHOT)} onExit={vi.fn()} />);
 
     expect(await screen.findByText("连续天数")).toBeInTheDocument();
     expect(screen.getByText("累计天数")).toBeInTheDocument();
     expect(screen.getByText("今日已学习（次数）")).toBeInTheDocument();
     expect(screen.getByText("今日已复习（次数）")).toBeInTheDocument();
+    expect(screen.getByText("今日学习时长")).toBeInTheDocument();
     expect(screen.getByText("今日待学（词条）")).toBeInTheDocument();
     expect(screen.getByText("明日到期（词条）")).toBeInTheDocument();
     expect(screen.getByText("累计已完成（次数）")).toBeInTheDocument();
     expect(screen.getByText("累计已完成（词条）")).toBeInTheDocument();
+    expect(screen.getByText("累计学习时长")).toBeInTheDocument();
 
     // 今日待学显示 newCardsRemainingToday（9），不再显示未截断的 dueCount（5）
     for (const value of ["1", "2", "3", "4", "6", "7", "8", "9"]) {
       expect(screen.getByText(value)).toBeInTheDocument();
     }
     expect(screen.queryByText("5")).not.toBeInTheDocument();
+    // RAY-270：学习时长自适应文案（1 小时及以上「X 小时 Y 分钟」/ 不足 1 小时「X 分钟」）
+    expect(screen.getByText("1 小时 30 分钟")).toBeInTheDocument();
+    expect(screen.getByText("59 分钟")).toBeInTheDocument();
+  });
+
+  it("学习时长不足 1 分钟与 0 的显示（RAY-270 自适应）", async () => {
+    render(
+      <StatsScreen
+        provider={makeProvider({
+          ...EMPTY_SNAPSHOT,
+          reviewCount: 1,
+          todayStudyDurationMs: 30_000,
+          totalStudyDurationMs: 0,
+        })}
+        onExit={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText("今日学习时长")).toBeInTheDocument();
+    expect(screen.getByText("不足 1 分钟")).toBeInTheDocument();
+    expect(screen.getByText("0 分钟")).toBeInTheDocument();
   });
 
   it("今日待学按每日新卡上限过滤：显示剩余新卡数，不显示全部未学新卡总数（RAY-295）", async () => {

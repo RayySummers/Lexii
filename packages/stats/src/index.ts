@@ -20,6 +20,10 @@
  * - 今日剩余新卡（词条，RAY-295）= min(每日新卡上限, 剩余新卡数) −
  *   今日已学习（次数），下限 0——统计页「今日待学」按每日新卡上限
  *   过滤，不显示未学新卡总数。
+ * - 有效学习时长（毫秒，RAY-270）= 单次复习有效时长之和。单次有效时长
+ *   为 reviewDurationMs 按上限截断（超上限视为闲置挂机，不计虚高部分），
+ *   负数/非法值按 0。今日学习时长 = 本地日历日落在今天的部分；累计学习
+ *   时长 = 全部（非法时间与未来脏事件不计）。
  * - 累计已完成（词条）= 至少复习过一次的词条数（不要求 time 合法，
  *   记录存在即算完成过一次）。
  * - 复习结果分类（对/错/遗忘）：rating=again 视为遗忘（用户自评忘记）；
@@ -160,6 +164,101 @@ export function computeReviewedTodayCount(
     count += 1;
   }
   return count;
+}
+
+/**
+ * 单次复习的有效学习时长上限（5 分钟，RAY-270 口径）。
+ *
+ * review 事件的 reviewDurationMs 是「卡片出现到评分」的时长：用户中途
+ * 离开、卡片挂着不动，闲置时间也会被一并计入，直接累加会使时长虚高。
+ * 因此每张卡的有效时长按本上限截断——超过上限的部分视为闲置挂机、
+ * 只按上限计。上限值刻意留有余量：例句/词根词缀等富化内容逐条细读
+ * 的单卡正常耗时也远低于 5 分钟；数值需调整时只改这里（有测试锁定）。
+ */
+export const MAX_EFFECTIVE_REVIEW_DURATION_MS = 5 * 60_000;
+
+/**
+ * 单次复习的有效时长（毫秒）：reviewDurationMs 截断到上限。
+ *
+ * 负数 / NaN / Infinity 视为脏数据按 0 计（与 core 的写入校验一致，
+ * 此处只防旧数据/异常记录，不做破坏性剔除）。
+ */
+export function effectiveReviewDurationMs(event: ReviewEvent): number {
+  if (!Number.isFinite(event.reviewDurationMs) || event.reviewDurationMs <= 0) {
+    return 0;
+  }
+  return Math.min(event.reviewDurationMs, MAX_EFFECTIVE_REVIEW_DURATION_MS);
+}
+
+/**
+ * 累计学习时长（毫秒，RAY-270）：全部有效复习时长之和。
+ *
+ * 与 computeTotalDays 同一时间口径：时间非法或晚于基准（未来脏事件）
+ * 的记录不计；其余事件的有效时长（见 effectiveReviewDurationMs）累加。
+ *
+ * @param events 复习事件（任意顺序）
+ * @param now 查询基准时刻（ISO；默认调用方当前时间）
+ */
+export function computeStudyDurationMs(
+  events: readonly ReviewEvent[],
+  now: IsoDate = new Date().toISOString(),
+): number {
+  const endOrdinal = dayOrdinal(now);
+  let total = 0;
+  for (const event of events) {
+    if (localDayOrdinalOrNull(event.time, endOrdinal) === null) {
+      continue;
+    }
+    total += effectiveReviewDurationMs(event);
+  }
+  return total;
+}
+
+/**
+ * 今日学习时长（毫秒，RAY-270）：本地日历日落在今天的有效复习时长之和。
+ *
+ * @param events 复习事件（任意顺序；非法时间与未来事件不计）
+ * @param now 查询基准时刻（ISO；默认调用方当前时间）
+ */
+export function computeTodayStudyDurationMs(
+  events: readonly ReviewEvent[],
+  now: IsoDate = new Date().toISOString(),
+): number {
+  const endOrdinal = dayOrdinal(now);
+  let total = 0;
+  for (const event of events) {
+    if (localDayOrdinalOrNull(event.time, endOrdinal) !== endOrdinal) {
+      continue;
+    }
+    total += effectiveReviewDurationMs(event);
+  }
+  return total;
+}
+
+/**
+ * 学习时长的自适应显示文案（RAY-270 口径，Jack 拍板）：
+ * - 0 → 「0 分钟」
+ * - 不足 1 分钟（> 0 且 < 60 秒）→ 「不足 1 分钟」（避免刚学几秒显示「0 分钟」）
+ * - 不足 1 小时 → 「X 分钟」（X 为向下取整的分钟数）
+ * - 1 小时及以上 → 「X 小时 Y 分钟」（X 取整小时，Y 取余分钟，始终两位齐全）
+ *
+ * 负数 / NaN / Infinity 按 0 处理（防御脏数据，与有效时长口径一致）。
+ */
+export function formatStudyDuration(durationMs: number): string {
+  const safe = Number.isFinite(durationMs) && durationMs > 0 ? Math.floor(durationMs) : 0;
+  if (safe === 0) {
+    return "0 分钟";
+  }
+  if (safe < 60_000) {
+    return "不足 1 分钟";
+  }
+  const minutes = Math.floor(safe / 60_000);
+  if (minutes < 60) {
+    return `${minutes} 分钟`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const restMinutes = minutes % 60;
+  return `${hours} 小时 ${restMinutes} 分钟`;
 }
 
 /**

@@ -75,6 +75,8 @@ const EMPTY_STATS_SNAPSHOT = {
   newCardsRemainingToday: 0,
   reviewCount: 0,
   completedWordCount: 0,
+  todayStudyDurationMs: 0,
+  totalStudyDurationMs: 0,
 };
 
 /** 测试接缝：注入 mock 统计数据源工厂（首页徽标 + 统计页） */
@@ -249,6 +251,7 @@ describe("App", () => {
   it("点击统计进入统计页，返回首页退出", async () => {
     // 8 个字段取互不相同的值，避免 getByText 撞值（今日待学取 newCardsRemainingToday=9）
     const statsFactory = makeStatsProviderFactory({
+      ...EMPTY_STATS_SNAPSHOT,
       streakDays: 1,
       totalDays: 2,
       todayLearnCount: 3,
