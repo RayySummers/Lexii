@@ -12,7 +12,8 @@
  * - dueTomorrowCount：getDueItemIdsInRange + localDayBounds（明天本地日历日
  *   的半开区间 [start, end)，与「今日待学」同为记忆状态口径）
  * - reviewCount / streakDays / totalDays / todayLearnCount / todayReviewCount /
- *   completedWordCount：@lexilexi/stats 纯函数（口径见 packages/stats）
+ *   completedWordCount / todayStudyDurationMs / totalStudyDurationMs：
+ *   @lexilexi/stats 纯函数（口径见 packages/stats，学习时长口径 RAY-270）
  *
  * 性能说明（Oscar 评审 C1）：review 事件查询走 events 表的 type 索引
  * （where("type").equals("review")），不整表 toArray；事件数上万后
@@ -38,6 +39,8 @@ import {
   computeNewCardsRemainingToday,
   computeReviewedTodayCount,
   computeStreak,
+  computeStudyDurationMs,
+  computeTodayStudyDurationMs,
   computeTotalDays,
   countReviews,
   localDayBounds,
@@ -74,6 +77,8 @@ export function createIndexedDbStatsDataProvider(db: LexilexiDatabase): StatsDat
         ),
         reviewCount: countReviews(reviews),
         completedWordCount: computeCompletedWordCount(reviews),
+        todayStudyDurationMs: computeTodayStudyDurationMs(reviews, now),
+        totalStudyDurationMs: computeStudyDurationMs(reviews, now),
       };
     },
   };
@@ -113,4 +118,6 @@ export const EMPTY_STATS: StatsSnapshot = {
   newCardsRemainingToday: 0,
   reviewCount: 0,
   completedWordCount: 0,
+  todayStudyDurationMs: 0,
+  totalStudyDurationMs: 0,
 };

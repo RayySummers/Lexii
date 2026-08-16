@@ -2,10 +2,11 @@
  * 统计页与首页到期徽标的数据契约（apps/web 内部）。
  *
  * UI 层只依赖本文件定义的接口，不直接触碰 IndexedDB：
- * - `StatsSnapshot`：8 项统计快照（RAY-252：统计面板扩充 + 时间维度）
+ * - `StatsSnapshot`：10 项统计快照（RAY-252：统计面板扩充 + 时间维度；
+ *   RAY-270：新增今日/累计学习时长）
  * - `StatsDataProvider`：统计数据源（测试注入 mock，浏览器注入 IndexedDB 实现）
  */
-/** 统计快照（统计页 8 项展示 + 首页到期徽标共用） */
+/** 统计快照（统计页 10 项展示 + 首页到期徽标共用） */
 export interface StatsSnapshot {
   /** 连续复习天数（0 = 无复习记录，口径见 @lexilexi/stats） */
   streakDays: number;
@@ -31,6 +32,10 @@ export interface StatsSnapshot {
   reviewCount: number;
   /** 累计已完成（词条）：至少复习过一次的词条数（itemId 去重） */
   completedWordCount: number;
+  /** 今日学习时长（毫秒，RAY-270）：今天产生的复习事件的有效时长之和（单卡超上限截断，闲置不计） */
+  todayStudyDurationMs: number;
+  /** 累计学习时长（毫秒，RAY-270）：全部有效复习时长之和（非法时间与未来脏事件不计） */
+  totalStudyDurationMs: number;
 }
 
 /**

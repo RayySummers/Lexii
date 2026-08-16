@@ -8,11 +8,16 @@ import {
   computeNewCardsRemainingToday,
   computeReviewedTodayCount,
   computeStreak,
+  computeStudyDurationMs,
+  computeTodayStudyDurationMs,
   computeTotalDays,
   countReviewOutcomes,
   countReviewOutcomesByItem,
   countReviews,
+  effectiveReviewDurationMs,
+  formatStudyDuration,
   localDayBounds,
+  MAX_EFFECTIVE_REVIEW_DURATION_MS,
 } from "./index";
 
 /** 构造一个指定时刻的复习事件（序号保证 id 唯一） */
@@ -396,5 +401,151 @@ describe("computeNewCardsRemainingToday（RAY-295 统计页「今日待学」口
 
   it("上限为 0：直接显示 0", () => {
     expect(computeNewCardsRemainingToday(0, 7_195, 0)).toBe(0);
+  });
+});
+
+/**
+ * 学习时长用例（RAY-270）：复用上方「11:00Z 事件 + 11:30Z 基准」的时区
+ * 安全约定——「今天」的事件与基准相隔 30 分钟，任何 UTC±14 时区下都不
+ * 会跨本地午夜。
+ */
+
+/** 指定词条 / 时刻 / 单卡时长（毫秒）的复习事件 */
+let durationEventSeq = 0;
+function reviewEventWithDuration(itemKey: string, time: string, durationMs: number): ReviewEvent {
+  durationEventSeq += 1;
+  return {
+    id: toEventId(`evt_duration_${durationEventSeq}`),
+    type: "review",
+    time,
+    itemId: toItemId(`item_${itemKey}`),
+    senseId: toSenseId(`sense_${itemKey}`),
+    exerciseType: "recall",
+    rating: "good",
+    reviewDurationMs: durationMs,
+    revealed: false,
+    answerWasCorrect: true,
+    elapsedDays: 0,
+  };
+}
+
+describe("effectiveReviewDurationMs（单次有效时长，闲置截断）", () => {
+  it("上限内的时长原样计入", () => {
+    expect(effectiveReviewDurationMs(reviewEventWithDuration("a", TODAY, 3_000))).toBe(3_000);
+    expect(
+      effectiveReviewDurationMs(
+        reviewEventWithDuration("a", TODAY, MAX_EFFECTIVE_REVIEW_DURATION_MS),
+      ),
+    ).toBe(MAX_EFFECTIVE_REVIEW_DURATION_MS);
+  });
+
+  it("超过上限的时长按上限截断（挂机闲置不计虚高部分）", () => {
+    const event = reviewEventWithDuration("a", TODAY, MAX_EFFECTIVE_REVIEW_DURATION_MS + 1);
+    expect(effectiveReviewDurationMs(event)).toBe(MAX_EFFECTIVE_REVIEW_DURATION_MS);
+    expect(effectiveReviewDurationMs(reviewEventWithDuration("b", TODAY, 3_600_000))).toBe(
+      MAX_EFFECTIVE_REVIEW_DURATION_MS,
+    );
+  });
+
+  it("负数与非法时长按 0 计（防脏数据）", () => {
+    expect(effectiveReviewDurationMs(reviewEventWithDuration("a", TODAY, -5))).toBe(0);
+    expect(effectiveReviewDurationMs(reviewEventWithDuration("a", TODAY, Number.NaN))).toBe(0);
+    expect(effectiveReviewDurationMs(reviewEventWithDuration("a", TODAY, 0))).toBe(0);
+  });
+});
+
+describe("computeStudyDurationMs（累计学习时长）", () => {
+  it("无复习记录时为 0", () => {
+    expect(computeStudyDurationMs([], NOW)).toBe(0);
+  });
+
+  it("全部有效时长累加（含超上限截断）", () => {
+    const events = [
+      reviewEventWithDuration("a", YESTERDAY, 1_000),
+      reviewEventWithDuration("b", TODAY, 2_500),
+      reviewEventWithDuration("c", TODAY, MAX_EFFECTIVE_REVIEW_DURATION_MS + 500),
+    ];
+    expect(computeStudyDurationMs(events, NOW)).toBe(
+      1_000 + 2_500 + MAX_EFFECTIVE_REVIEW_DURATION_MS,
+    );
+  });
+
+  it("未来脏事件不计入", () => {
+    const events = [
+      reviewEventWithDuration("a", TODAY, 1_000),
+      reviewEventWithDuration("b", "2026-08-15T11:00:00.000Z", 5_000),
+    ];
+    expect(computeStudyDurationMs(events, NOW)).toBe(1_000);
+  });
+
+  it("非法时间事件跳过", () => {
+    const events = [
+      reviewEventWithDuration("a", TODAY, 1_000),
+      reviewEventWithDuration("b", "not-a-date", 5_000),
+    ];
+    expect(computeStudyDurationMs(events, NOW)).toBe(1_000);
+  });
+
+  it("非法基准时刻抛错", () => {
+    expect(() => computeStudyDurationMs([], "not-a-date")).toThrow(RangeError);
+  });
+});
+
+describe("computeTodayStudyDurationMs（今日学习时长）", () => {
+  it("无复习记录时为 0", () => {
+    expect(computeTodayStudyDurationMs([], NOW)).toBe(0);
+  });
+
+  it("只累加今天的事件，昨天的按今天口径不计", () => {
+    const events = [
+      reviewEventWithDuration("a", YESTERDAY, 60_000),
+      reviewEventWithDuration("b", TODAY, 1_000),
+      reviewEventWithDuration("c", "2026-08-13T11:20:00.000Z", 2_000),
+    ];
+    expect(computeTodayStudyDurationMs(events, NOW)).toBe(3_000);
+  });
+
+  it("今天的事件超上限时按上限截断", () => {
+    const events = [reviewEventWithDuration("a", TODAY, MAX_EFFECTIVE_REVIEW_DURATION_MS * 2)];
+    expect(computeTodayStudyDurationMs(events, NOW)).toBe(MAX_EFFECTIVE_REVIEW_DURATION_MS);
+  });
+
+  it("非法时间与未来事件不计入", () => {
+    const events = [
+      reviewEventWithDuration("a", TODAY, 1_000),
+      reviewEventWithDuration("b", "not-a-date", 9_000),
+      reviewEventWithDuration("c", "2026-08-15T11:00:00.000Z", 9_000),
+    ];
+    expect(computeTodayStudyDurationMs(events, NOW)).toBe(1_000);
+  });
+
+  it("非法基准时刻抛错", () => {
+    expect(() => computeTodayStudyDurationMs([], "not-a-date")).toThrow(RangeError);
+  });
+});
+
+describe("formatStudyDuration（自适应显示文案）", () => {
+  it("0 与脏数据显示「0 分钟」", () => {
+    expect(formatStudyDuration(0)).toBe("0 分钟");
+    expect(formatStudyDuration(-1)).toBe("0 分钟");
+    expect(formatStudyDuration(Number.NaN)).toBe("0 分钟");
+  });
+
+  it("不足 1 分钟显示「不足 1 分钟」", () => {
+    expect(formatStudyDuration(1)).toBe("不足 1 分钟");
+    expect(formatStudyDuration(59_999)).toBe("不足 1 分钟");
+  });
+
+  it("不足 1 小时显示「X 分钟」（分钟向下取整）", () => {
+    expect(formatStudyDuration(60_000)).toBe("1 分钟");
+    expect(formatStudyDuration(90_000)).toBe("1 分钟");
+    expect(formatStudyDuration(59 * 60_000 + 59_999)).toBe("59 分钟");
+  });
+
+  it("1 小时及以上显示「X 小时 Y 分钟」", () => {
+    expect(formatStudyDuration(60 * 60_000)).toBe("1 小时 0 分钟");
+    expect(formatStudyDuration(90 * 60_000)).toBe("1 小时 30 分钟");
+    expect(formatStudyDuration(150 * 60_000)).toBe("2 小时 30 分钟");
+    expect(formatStudyDuration(25 * 60 * 60_000)).toBe("25 小时 0 分钟");
   });
 });
