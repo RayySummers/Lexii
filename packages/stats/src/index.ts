@@ -240,7 +240,7 @@ export function computeTodayStudyDurationMs(
  * - 0 → 「0 分钟」
  * - 不足 1 分钟（> 0 且 < 60 秒）→ 「不足 1 分钟」（避免刚学几秒显示「0 分钟」）
  * - 不足 1 小时 → 「X 分钟」（X 为向下取整的分钟数）
- * - 1 小时及以上 → 「X 小时 Y 分钟」（X 取整小时，Y 取余分钟，始终两位齐全）
+ * - 1 小时及以上 → 「X 小时 Y 分钟」；Y = 0 时省略，仅显示「X 小时」
  *
  * 负数 / NaN / Infinity 按 0 处理（防御脏数据，与有效时长口径一致）。
  */
@@ -258,7 +258,7 @@ export function formatStudyDuration(durationMs: number): string {
   }
   const hours = Math.floor(minutes / 60);
   const restMinutes = minutes % 60;
-  return `${hours} 小时 ${restMinutes} 分钟`;
+  return restMinutes === 0 ? `${hours} 小时` : `${hours} 小时 ${restMinutes} 分钟`;
 }
 
 /**

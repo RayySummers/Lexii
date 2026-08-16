@@ -542,10 +542,10 @@ describe("formatStudyDuration（自适应显示文案）", () => {
     expect(formatStudyDuration(59 * 60_000 + 59_999)).toBe("59 分钟");
   });
 
-  it("1 小时及以上显示「X 小时 Y 分钟」", () => {
-    expect(formatStudyDuration(60 * 60_000)).toBe("1 小时 0 分钟");
+  it("1 小时及以上显示「X 小时 Y 分钟」；余分钟为 0 时省略尾部", () => {
+    expect(formatStudyDuration(60 * 60_000)).toBe("1 小时");
     expect(formatStudyDuration(90 * 60_000)).toBe("1 小时 30 分钟");
     expect(formatStudyDuration(150 * 60_000)).toBe("2 小时 30 分钟");
-    expect(formatStudyDuration(25 * 60 * 60_000)).toBe("25 小时 0 分钟");
+    expect(formatStudyDuration(25 * 60 * 60_000)).toBe("25 小时");
   });
 });

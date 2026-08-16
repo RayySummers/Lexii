@@ -149,6 +149,8 @@ describe("StatsScreen", () => {
     const onExit = vi.fn();
     render(<StatsScreen provider={makeProvider(EMPTY_SNAPSHOT)} onExit={onExit} />);
 
+    // 等待组件完成异步加载后再点击，避免 act 警告
+    await screen.findByText("还没有学习数据。");
     fireEvent.click(screen.getByRole("button", { name: "返回首页" }));
     expect(onExit).toHaveBeenCalledTimes(1);
   });
