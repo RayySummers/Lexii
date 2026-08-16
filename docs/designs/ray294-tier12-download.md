@@ -1,7 +1,7 @@
 # RAY-294 Tier 1/2 扩展词包离线下载技术方案
 
-> 版本：draft-2（Harvey，2026-08-16）— 基于 Oscar 复审 `c45ae3c0` 回改
-> 状态：待 Oscar 复审（第二轮）
+> 版本：draft-3（Harvey，2026-08-16）— 基于 Oscar 复审 `edd1178c` suggestion + nit 落实
+> 状态：已通过 Oscar 复审（draft-2 放行），本版落实实施前清单 + nit
 > 前置依赖：RAY-257/258 分级口径（已定）、RAY-262 词书库（已定）、RAY-266 搜词排序口径（已定）、RAY-276 版本升级先例（已定）、RAY-284 生词本（已定）
 
 ---
@@ -41,14 +41,14 @@ db.version(6).stores({
   events: "id, time, type",
   meta: "key",
   notebookEntries: "id, senseId, status",
-  dictionarySenses: "id, term", // 新增：词典检索层（只读）
+  dictionarySenses: "id, term, source", // 新增：词典检索层（只读）；source 索引供增量替换删除检测
 });
 ```
 
-**数据模型**：`DictionarySense` 与 `Sense` 同构（复用 `Sense` 类型），区别仅在于：
+**数据模型**：`DictionarySense` 为独立类型（不复用 `Sense`——现有 `Sense` 类型无 `source` 字段，已核实 `domain.ts`），扩展为 `Sense & { source: string }`（或独立字段，Phase 1 PR 中按实际类型体系统一）：
+- `source`：所属包标识（如 `"core-en-tier1"` / `"core-en-tier2"`），写入 IDB 时附带，供增量替换按 source 范围删除；
 - 不产生 `LearningItem` / `MemoryState` / `Event`；
-- 仅用于检索，不参与复习队列、统计、导出（`exportLexilexiData` 不导出此表）；
-- 来源标记（`DictionarySense.source`）标明所属包（如 `"core-en-tier1"` / `"core-en-tier2"`）。
+- 仅用于检索，不参与复习队列、统计、导出（`exportLexilexiData` 不导出此表）。
 
 **安装函数**：`installDictionaryPackage`（新函数，不复用 `installPreset`），每词条仅写 1 条 `dictionarySense` 记录（vs `installPreset` 的 4 条），分块 400、可恢复、幂等、并发安全——沿用 `installPreset` 的 progress + done + check-and-set 三件套。
 
@@ -106,7 +106,11 @@ const hits = allTerms.filter(sense => sense.term.toLowerCase().includes(q));
 
 **性能预算**：dictionarySenses 表 40 万条，每条 ~200 字节，全量 `toArray()` ≈ 80 MB 内存、~200–500 ms（IDB 读取）；内存 `includes` 过滤 ~10–50 ms。总耗时 ~300–600 ms，可接受（实测目标 < 500 ms）。
 
-**优化**：搜索屏打开时将 dictionarySenses 全量加载到内存缓存（`WeakRef` 或模块级单例），后续击键查询直接走内存过滤，不重复读 IDB。缓存失效条件：扩展包安装/卸载/升级时清除。
+**优化**：采用**模块级单例**缓存（非 `WeakRef`——`WeakRef` 在 GC 不确定时可能导致缓存意外失效，且搜索屏生命周期内缓存应稳定存在）。缓存以已装包版本为键（`Map<string, DictionarySense[]>`，key = `packageId:version`），后续击键查询直接走内存过滤，不重复读 IDB。
+
+**缓存失效**：扩展包安装/卸载/升级时清除对应 packageId 的缓存条目（`cache.delete(key)`）；全量重装时清除全部缓存。
+
+**低内存设备降级**：前缀命中路径不依赖缓存（直接走 IDB 索引查询 `startsWithIgnoreCase`，O(log N)），在缓存未加载或被清除时仍可用；子串/释义命中路径在缓存未命中时回退到按需 `toArray()`（首次击键 200–500 ms，与无缓存时一致）。低内存设备可选择不预热缓存（`installDictionaryPackage` 完成后不主动加载），仅在用户输入 ≥ 2 字符时按需加载。
 
 **释义命中**：与子串命中同理，全量 `toArray()` → 内存过滤 `definitions.some(d => d.toLowerCase().includes(q))`。释义命中天然走全量扫描（无 IDB 索引可用于释义字段的子串查询），无需辅助索引。
 
@@ -150,7 +154,9 @@ export async function searchAllSenses(
 }
 ```
 
-**去重规则**：按 **term（大小写不敏感）** 去重（不是 `sense.id`——senses 表晋升后副本的 id 与 dictionarySenses 不同，但 term 相同）。学习义项优先（senses 表的版本有学习状态信息）。
+**去重规则**：
+- **层内**（senses 表或 dictionarySenses 表各自内部）：按 `sense.id` 去重（与 RAY-266 现有口径一致——senses 表内可存在同 term 多个 Sense，如 CSV 导入不去重，已核实 `importWords.ts` 无 term 查重，RAY-266 按 `sense.id` 去重各显一条）；
+- **跨层**（dictionarySenses ↔ senses）：按 **term（大小写不敏感）** 去重、学习义项优先（senses 表晋升后副本的 id 与 dictionarySenses 不同，但 term 相同，保留学习版本）。
 
 **预算**（实测目标）：
 - 前缀命中（最常见）：< 50 ms（IDB 索引查询，两表各一次）；
@@ -219,8 +225,7 @@ https://<host>/presets/core-en-tier1-v1.0.0-a1b2c3d4.json.br
 https://<host>/presets/core-en-tier2-v1.0.0-e5f6g7h8.json.br
 ```
 - 版本号（`v1.0.0`）+ 内容哈希前 8 位（`a1b2c3d4`）= URL 唯一；
-- 内容不变则 URL 不变，SW 缓存自然命中（无需额外失效逻辑）；
-- 内容更新则 URL 变化，SW 视为新资源，旧缓存由 activate 清理。
+- 版本化 URL 保证每版内容对应唯一地址，便于审计与回溯。
 
 **SW 排除**（双重保险）：在 `sw.js` 的 `fetch` 事件处理器中，**沿用 `resolveUrl` 相对口径**（Pages 部署在 `/Lexilexi/` 子路径），显式排除 presets 路径和 manifest URL：
 
@@ -298,18 +303,20 @@ fetch manifest.json（cache: "no-store"）
 ### 5.3 Brotli 支持矩阵与降级
 
 **`DecompressionStream("br")`** 支持矩阵：
-- **Chrome 113+ / Edge 113+**：✅ 原生
+- **Chrome 80+ / Edge 80+**：✅ 原生（`DecompressionStream` 自 Chrome 80 起可用，`"br"` 同期支持）
 - **Safari 16.4+**：✅ 原生
 - **Firefox 113+**：✅ 原生
+
+> 注：方案采用运行时探测（`detectDecompression()`），矩阵仅作参考；实际能力以探测结果为准。
 
 **降级通道**：
 
 | 浏览器 | Brotli 支持 | 降级方案 |
 |---|---|---|
-| Chrome 113+ / Edge 113+ | ✅ | — |
+| Chrome 80+ / Edge 80+ | ✅ | — |
 | Safari 16.4+ | ✅ | — |
 | Firefox 113+ | ✅ | — |
-| Chrome < 113 / Safari < 16.4 / Firefox < 113 | ❌ | gzip 降级包（Tier 1: 1.7 MB / Tier 2: 8.5 MB） |
+| Chrome < 80 / Safari < 16.4 / Firefox < 113 | ❌ | gzip 降级包（Tier 1: 1.7 MB / Tier 2: 8.5 MB） |
 | 不支持 `DecompressionStream` | ❌ | raw JSON（Tier 1: 4.4 MB / Tier 2: 25.2 MB） |
 
 **运行时检测**：
@@ -400,6 +407,7 @@ Tier 2（401,222 条）包含 Tier 1（58,244 条）的全部词条（Tier 1 的
 - Tier 2 安装完成 → 自动标记 Tier 1 也为已覆盖（`dictionaryDoneKey("core-en-tier1")` 写入特殊值 `"covered-by-tier2"`）；
 - 设置页展示：Tier 2 已安装时，Tier 1 显示为「已包含在全量词表中」，不提供独立下载按钮；
 - Tier 1 已安装 → 安装 Tier 2 时，Tier 2 的 term 去重跳过 Tier 1 已有的词条（`installDictionaryPackage` 的 term 查重天然处理），Tier 2 安装完成后标记 Tier 1 为 covered。
+- **卸载不在本期范围**：`covered-by-tier2` 标记的回退（Tier 2 卸载时恢复 Tier 1 独立状态）待后续「扩展包卸载」功能实现时一并处理。本期仅处理安装方向，文档明确此限制以免实现期歧义。
 
 ---
 
@@ -407,7 +415,7 @@ Tier 2（401,222 条）包含 Tier 1（58,244 条）的全部词条（Tier 1 的
 
 **CI 构建**：GitHub Actions workflow → `node scripts/presets/build.mjs --tier 1/2` → 产出 `tier1.json` / `tier2.json` → Brotli/gzip 压缩 → 生成 `manifest.json` → 上传到 GitHub Releases 资产或 GitHub Pages（`/presets/` 路径）。
 
-**manifest 分发**：应用启动时 fetch `resolveUrl("./presets/manifest.json")`（相对口径，与 SW 排除一致），检查本地已安装版本与远程最新版本的差异，提示用户更新。
+**manifest 分发**：**用户进入扩展词包设置页时**发起 fetch `resolveUrl("./presets/manifest.json")`（相对口径，与 SW 排除一致），检查本地已安装版本与远程最新版本的差异，提示用户更新。**启动时不发任何网络请求**——与 RAY-257/258「用户主动发起」口径一致（应用默认离线，联网仅由用户显式触发）。
 
 **体积审计**：Tier 2 Brotli 包 6.4 MB，远低于 GitHub Releases 单文件 2 GB 上限和 GitHub Pages 单文件 100 MB 上限。
 
@@ -430,6 +438,7 @@ Tier 2（401,222 条）包含 Tier 1（58,244 条）的全部词条（Tier 1 的
 - manifest 中 Tier 1 条目包含 `enrichment` 子字段（指向富化包 URL/SHA256/体积）；
 - 用户下载 Tier 1 词条包时，可选「同时下载富化数据（例句/近反义/词根等）」或单独下载；
 - 富化包落库路径沿用 `backfillEnrichment`（不改 schema，按 term 合并到已有 Sense 的 content 字段）；
+- **富化 join 对象为 senses 表（学习义项）**：dictionarySenses 词条在晋升前不带富化字段（富化数据仅作用于学习数据）；晋升时（`promoteDictionarySense`）若 senses 表中尚无该 term 的副本，晋升后再由 `backfillEnrichment` 按 term 回填富化字段——即「先晋升，后富化」；
 - 避免两套下载通道。
 
 ---
@@ -445,11 +454,11 @@ db.version(6).stores({
   events: "id, time, type",
   meta: "key",
   notebookEntries: "id, senseId, status",
-  dictionarySenses: "id, term", // 新增：词典检索层（只读）
+  dictionarySenses: "id, term, source", // 新增：词典检索层（只读）；source 索引供增量替换删除检测
 });
 ```
 
-纯新增表，无数据迁移，存量数据原样保留（与 v2→v5 的升级模式一致）。
+纯新增表，无数据迁移，存量数据原样保留（与 v2→v5 的升级模式一致）。`DictionarySense` 类型独立于 `Sense`（含 `source` 字段），见 §1.2。
 
 ---
 
