@@ -1,9 +1,10 @@
 /**
- * 词书库页测试（RAY-262）。
+ * 词书库页测试（RAY-262 + RAY-288）。
  *
  * 覆盖：目录分组展示（考试词汇/冲刺词书）、状态徽标（已装/未装/安装中）、
  * 安装触发与成功提示（新增/跳过计数）、安装失败错误提示、安装中进度与
- * 「继续安装」、轮询刷新、返回导航。mock 数据源，不依赖 IndexedDB。
+ * 「继续安装」、轮询刷新、返回导航；词书库概览（词书总数/词条总数/
+ * 已装词书/已装词条，词书规模口径，RAY-288）。mock 数据源，不依赖 IndexedDB。
  */
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -63,6 +64,55 @@ describe("WordbookLibraryScreen", () => {
       expect(screen.getByText(book.name)).toBeInTheDocument();
     }
     expect(screen.getAllByText("未安装")).toHaveLength(WORDBOOK_CATALOG.length);
+  });
+
+  it("词书库概览（RAY-288）：展示词书总数/词条总数与口径说明", async () => {
+    const { provider } = makeProvider();
+    render(<WordbookLibraryScreen provider={provider} onBack={() => {}} />);
+
+    await screen.findByText("考试词汇");
+    const expectedWordCount = WORDBOOK_CATALOG.reduce((sum, book) => sum + book.terms.length, 0);
+    expect(screen.getByText("词书总数")).toBeInTheDocument();
+    expect(screen.getByText(`${WORDBOOK_CATALOG.length} 本`)).toBeInTheDocument();
+    expect(screen.getByText("词条总数")).toBeInTheDocument();
+    // 千分位格式化（RAY-288 Oscar nit 2）
+    expect(screen.getByText(expectedWordCount.toLocaleString("zh-CN"))).toBeInTheDocument();
+    expect(screen.getByText(/词数按词书规模计，跨词书重叠词条分别计入。/)).toBeInTheDocument();
+  });
+
+  it("词书库概览（RAY-288）：已装词书/已装词条按已安装词书汇总（词书规模口径）", async () => {
+    const { provider } = makeProvider({
+      summaries: makeSummaries([
+        { id: "book-cet6", status: "installed", installedCount: 5406, totalCount: 5406 },
+        { id: "book-gre", status: "installed", installedCount: 4139, totalCount: 4139 },
+        { id: "book-toefl", status: "installing", installedCount: 100, totalCount: 4308 },
+      ]),
+    });
+    render(<WordbookLibraryScreen provider={provider} onBack={() => {}} />);
+
+    await screen.findByText("考试词汇");
+    expect(screen.getByText("已装词书")).toBeInTheDocument();
+    expect(screen.getByText("2 本")).toBeInTheDocument();
+    expect(screen.getByText("已装词条")).toBeInTheDocument();
+    // 5406 + 4139 = 9545，千分位格式化（RAY-288 Oscar nit 2）
+    expect(screen.getByText("9,545")).toBeInTheDocument();
+  });
+
+  it("词书库概览（RAY-288）：安装状态加载中已装统计显示占位", async () => {
+    const provider: SettingsDataProvider = {
+      exportBackup: vi.fn(),
+      exportWordlistCsv: vi.fn(),
+      importBackup: vi.fn(),
+      getPresetSummaries: vi.fn(),
+      getWordbookSummaries: vi.fn().mockImplementation(
+        () => new Promise<WordbookSummary[]>(() => {}), // 永不 resolve：模拟加载中
+      ),
+      installWordbook: vi.fn(),
+    } as unknown as SettingsDataProvider;
+    render(<WordbookLibraryScreen provider={provider} onBack={() => {}} />);
+
+    await screen.findByText("考试词汇");
+    expect(screen.getAllByText("…")).toHaveLength(2);
   });
 
   it("冲刺词书卡片展示口径文案（层次近似词书，非官方名单）", async () => {

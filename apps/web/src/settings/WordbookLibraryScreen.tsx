@@ -9,6 +9,13 @@
  * - 安装是长任务（数千词分块落库）：点击后 fire-and-forget 调
  *   provider.installWordbook，同时每 800ms 轮询安装状态刷新进度；安装
  *   完成或失败给出提示（新增/跳过词数来自安装结果）；
+ * - RAY-288：页首「词书库概览」展示词书总数 / 词条总数 / 已装词书 /
+ *   已装词条。口径：词数一律按「词书规模」计（每本词书声明的词条数，
+ *   与卡片 totalCount 同源，内置词书与已装词书口径一致），跨词书重叠
+ *   词条分别计入——新用户能看到词书规模，老用户可核对导入的词书数量/总数；
+ *   已装统计按当前目录 totalCount 汇总（RAY-288 Oscar suggestion 1 口径
+ *   备忘：若未来 books.data.json 重新生成——版本升级/词表增删——需明确
+ *   按 installedVersion 快照安装规模，或触发重装流程）；
  * - 全程离线（local-first）：不请求网络、不埋点；全部颜色走 design
  *   tokens（浅色/深色自动生效）。
  *
@@ -16,8 +23,9 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WordbookCategory } from "@lexilexi/core";
-import { WORDBOOK_CATALOG } from "@lexilexi/core/presets/books";
+import { WORDBOOK_CATALOG, WORDBOOK_COUNT } from "@lexilexi/core/presets/books";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { StatCard } from "../components/StatCard";
 import type { SettingsDataProvider, WordbookSummary } from "./types";
 
 export interface WordbookLibraryScreenProps {
@@ -34,6 +42,21 @@ const CATEGORY_TITLES: Record<WordbookCategory, string> = {
   exam: "考试词汇",
   sprint: "冲刺词书",
 };
+
+/**
+ * RAY-288：词书库总规模（词条总数，供页首概览）。
+ * 口径：词数一律按「词书规模」计——每本词书声明的词条数（terms.length），
+ * 与卡片展示的 summary.totalCount 同源；跨词书重叠词条分别计入。
+ * 词书总数复用 @lexilexi/core 的 WORDBOOK_COUNT（RAY-288 Oscar nit 1）。
+ */
+const CATALOG_WORD_COUNT = WORDBOOK_CATALOG.reduce((sum, book) => sum + book.terms.length, 0);
+
+/** 概览大数千分位格式化（RAY-288 Oscar nit 2：卡片与统计页的千分位统一留待后续） */
+const WORD_COUNT_FORMATTER = new Intl.NumberFormat("zh-CN");
+
+function formatWordCount(count: number): string {
+  return WORD_COUNT_FORMATTER.format(count);
+}
 
 /** 数据源错误 → 用户可见文案（不暴露内部实现细节） */
 function toErrorMessage(error: unknown): string {
@@ -96,6 +119,16 @@ export function WordbookLibraryScreen({ provider, onBack }: WordbookLibraryScree
 
   // 安装进行中轮询：任一词书 installing 或有未完成的安装 promise 时每 800ms 刷新
   const anyInstalling = summaries?.some((summary) => summary.status === "installing") ?? false;
+
+  // RAY-288：已装词书 / 已装词条（口径与卡片一致：按词书规模汇总，重叠分别计入；
+  // 只计 status === "installed"，安装中的词书完成并刷新后才会进入统计）。
+  const installedSummaries = summaries?.filter((summary) => summary.status === "installed");
+  const installedBookCount = installedSummaries?.length;
+  const installedWordCount = installedSummaries?.reduce(
+    (sum, summary) => sum + summary.totalCount,
+    0,
+  );
+
   useEffect(() => {
     if (!anyInstalling && pendingInstalls.size === 0) {
       return undefined;
@@ -148,6 +181,24 @@ export function WordbookLibraryScreen({ provider, onBack }: WordbookLibraryScree
       <p className="text-sm text-text-muted">
         浏览并安装考试分级词书（随应用内置，全程离线）。安装的词条进入学习队列，装什么学什么；与已学词条相同的词会自动跳过，不会重复学习。
       </p>
+
+      {/* RAY-288：词书库概览——词书总数/词条总数（新用户看词书规模）
+          + 已装词书/已装词条（老用户核对导入的词书数量/总数）。
+          sr-only h2 供文档大纲（RAY-288 Oscar suggestion 2）。 */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <h2 className="sr-only">词书库概览</h2>
+        <StatCard label="词书总数" value={`${WORDBOOK_COUNT} 本`} />
+        <StatCard label="词条总数" value={formatWordCount(CATALOG_WORD_COUNT)} />
+        <StatCard
+          label="已装词书"
+          value={installedBookCount === undefined ? "…" : `${installedBookCount} 本`}
+        />
+        <StatCard
+          label="已装词条"
+          value={installedWordCount === undefined ? "…" : formatWordCount(installedWordCount)}
+        />
+      </section>
+      <p className="text-xs text-text-muted">词数按词书规模计，跨词书重叠词条分别计入。</p>
 
       {(Object.keys(CATEGORY_TITLES) as WordbookCategory[]).map((category) => {
         const books = WORDBOOK_CATALOG.filter((book) => book.category === category);
