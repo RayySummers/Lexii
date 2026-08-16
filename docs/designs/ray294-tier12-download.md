@@ -195,11 +195,14 @@ if (done) {
 **升级流程**：
 
 1. **不清库**：不调用 `db.delete()`，不删除 dictionarySenses 表——禁止清库重来是红线；
-2. **增量替换**：读取新包 entries → 按 term 与 dictionarySenses 表 diff → 只写入新增/变更词条（term 相同且内容未变的跳过）；
-3. **删除已移除词条**：新包中不再出现的旧词条，从 dictionarySenses 表删除（仅删该包 source 的条目，不影响其它包）；
-4. **已晋升副本不受影响**：已从 dictionarySenses 晋升到 senses 表的 Sense（通过 `promoteDictionarySense` 生成新 SenseId 写入 senses 表）是独立记录，不因 dictionarySenses 表的删除而受影响——它们已属于学习数据，由用户管理；
-5. **更新 done 标记**：完成后 `db.meta.put({ key: dictionaryDoneKey(packageId), value: newVersion })`；
-6. **进度与中断恢复**：与新装一致（progress 标记 + 分块事务）。
+2. **升级锁（CAS）**：`dict:<id>:upgrading` meta 键（值为 ISO 时间戳），防止两标签页并发升级产生重复记录。锁存在时：
+   - 若锁已过期（> 10 分钟，`UPGRADE_LOCK_TTL_MS`）→ 视为标签页崩溃/被杀，覆盖接管；
+   - 若锁未过期 → 重读 done 标记：已等于目标版本则返回 `already-installed`（另一标签页已完成），否则抛 `ConcurrentDictionaryInstallError`（可读文案：「另一标签页正在升级」）；
+3. **增量替换**：读取新包 entries → 按 term 与 dictionarySenses 表 diff → 只写入新增/变更词条（term 相同且内容未变的跳过）；
+4. **删除已移除词条**：新包中不再出现的旧词条，从 dictionarySenses 表删除（仅删该包 source 的条目，不影响其它包）；
+5. **已晋升副本不受影响**：已从 dictionarySenses 晋升到 senses 表的 Sense（通过 `promoteDictionarySense` 生成新 SenseId 写入 senses 表）是独立记录，不因 dictionarySenses 表的删除而受影响——它们已属于学习数据，由用户管理；
+6. **更新 done 标记 + 清除锁**：完成后在同一事务内 `db.meta.put(done)` + `db.meta.delete(progress)` + `db.meta.delete(lockKey)`；
+7. **异常时清除锁**：catch 块中 `db.meta.delete(lockKey)` 允许重试；但锁过期接管场景下锁已覆盖，无需额外清除。
 
 **已移除词条检测策略**：安装前读取旧版 dictionarySenses 中该包 source 的全部 term 集合（`db.dictionarySenses.where("source").equals(packageId).toArray()`），与新包 entries 的 term 集合做差集 → 差集中的 term 即为「已移除词条」→ 从 dictionarySenses 表按 term + source 删除。
 
@@ -428,6 +431,8 @@ async function detectDecompression(): Promise<"brotli" | "gzip" | "raw"> {
 - 起始事务写 `progress=0` 占位（条件写入，不覆盖并发安装者已推进的进度）；
 - 每块事务校验进度未被并发安装者推进（`ConcurrentInstallError` 回滚 + 重读续装）；
 - `dictionarySenses` 表的 term 索引去重保证并发写入不产生重复记录。
+
+**升级锁存活机制**：`dict:<id>:upgrading` meta 键（值为 ISO 时间戳），TTL = 10 分钟（`UPGRADE_LOCK_TTL_MS`）。锁过期视为标签页崩溃/被杀，允许接管；锁未过期时重读 done 标记判断是否已由另一标签页完成。此机制保证：标签页崩溃后升级功能不会被永久锁死，同时正常并发场景下仍只有一个升级能成功。
 
 ### 6.4 取消与进度 UI
 

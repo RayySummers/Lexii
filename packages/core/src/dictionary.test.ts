@@ -18,6 +18,7 @@ import {
   DICTIONARY_CHUNK_SIZE,
   dictionaryDoneKey,
   dictionaryProgressKey,
+  dictionaryUpgradeLockKey,
   getDictionaryPackageState,
   invalidateDictionaryCache,
   installDictionaryPackage,
@@ -351,6 +352,85 @@ describe("版本升级（增量替换）", () => {
       .equalsIgnoreCase("apple")
       .toArray();
     expect(appleSenses).toHaveLength(1);
+  });
+
+  it("预置过期锁（>10 分钟）→ 安装可正常接管完成", async () => {
+    const database = freshDatabase();
+
+    // 安装 v1
+    const v1Entries: PresetWordEntry[] = [
+      { term: "apple", definitions: ["苹果"], pos: "n.", tags: [] },
+    ];
+    await installDictionaryPackage(database, makePackage(v1Entries, "core-en-tier1", "1.0.0"), {
+      yield: async () => {},
+    });
+
+    // 模拟崩溃：预置一个 15 分钟前的过期锁
+    const expiredTime = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    await database.meta.put({
+      key: dictionaryUpgradeLockKey("core-en-tier1"),
+      value: expiredTime,
+    });
+
+    // 升级到 v2 应能接管过期锁并完成
+    const v2Entries: PresetWordEntry[] = [
+      { term: "apple", definitions: ["苹果", "苹果公司"], pos: "n.", tags: [] },
+    ];
+    const result = await installDictionaryPackage(
+      database,
+      makePackage(v2Entries, "core-en-tier1", "2.0.0"),
+      { yield: async () => {} },
+    );
+
+    expect(result.status).toBe("installed");
+    if (result.status !== "installed") throw new Error("unreachable");
+    expect(result.updatedCount).toBe(1);
+
+    // 升级锁已清除
+    const lock = await database.meta.get(dictionaryUpgradeLockKey("core-en-tier1"));
+    expect(lock).toBeUndefined();
+
+    // 版本已更新
+    const done = await database.meta.get(dictionaryDoneKey("core-en-tier1"));
+    expect(done?.value).toBe("2.0.0");
+  });
+
+  it("预置未过期锁 + done 已达标 → 返回 already-installed", async () => {
+    const database = freshDatabase();
+
+    // 安装 v1
+    const v1Entries: PresetWordEntry[] = [
+      { term: "apple", definitions: ["苹果"], pos: "n.", tags: [] },
+    ];
+    await installDictionaryPackage(database, makePackage(v1Entries, "core-en-tier1", "1.0.0"), {
+      yield: async () => {},
+    });
+
+    // 模拟另一标签页正在升级且已完成：预置未过期锁 + done 已更新到 v2
+    const recentTime = new Date(Date.now() - 1 * 60 * 1000).toISOString();
+    await database.meta.put({
+      key: dictionaryUpgradeLockKey("core-en-tier1"),
+      value: recentTime,
+    });
+    await database.meta.put({
+      key: dictionaryDoneKey("core-en-tier1"),
+      value: "2.0.0",
+    });
+
+    // 尝试升级到 v2 → 应返回 already-installed（另一标签页已完成）
+    const v2Entries: PresetWordEntry[] = [
+      { term: "apple", definitions: ["苹果", "苹果公司"], pos: "n.", tags: [] },
+    ];
+    const result = await installDictionaryPackage(
+      database,
+      makePackage(v2Entries, "core-en-tier1", "2.0.0"),
+      { yield: async () => {} },
+    );
+
+    expect(result.status).toBe("already-installed");
+    if (result.status === "already-installed") {
+      expect(result.installedVersion).toBe("2.0.0");
+    }
   });
 });
 

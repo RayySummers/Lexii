@@ -29,9 +29,16 @@ export function dictionaryDoneKey(packageId: string): string {
 }
 
 /** 升级锁 meta 键（CAS 防并发升级） */
-function dictionaryUpgradeLockKey(packageId: string): string {
+export function dictionaryUpgradeLockKey(packageId: string): string {
   return `dict:${packageId}:upgrading`;
 }
+
+/**
+ * 升级锁存活时间（毫秒）。
+ * 锁值为 ISO 时间戳；超过此时限视为标签页崩溃/被杀，允许接管。
+ * Tier 2 升级需读 40 万行 + 分块写，分钟级，10 分钟留有余量。
+ */
+const UPGRADE_LOCK_TTL_MS = 10 * 60 * 1000;
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -315,10 +322,28 @@ async function upgradeDictionaryPackage(
   await db.transaction("rw", db.meta, async () => {
     const existing = await db.meta.get(lockKey);
     if (existing) {
-      throw new ConcurrentDictionaryInstallError(pkg.id);
+      // 锁存在：检查是否过期（标签页崩溃/被杀后锁残留）
+      const lockTime = new Date(existing.value).getTime();
+      const now = new Date(time).getTime();
+      const expired = Number.isFinite(lockTime) && now - lockTime > UPGRADE_LOCK_TTL_MS;
+      if (!expired) {
+        // 锁未过期：重读 done 标记，若已达标则返回 already-installed
+        const doneNow = await db.meta.get(dictionaryDoneKey(pkg.id));
+        if (doneNow && doneNow.value === pkg.version) {
+          return; // 另一标签页已完成，跳到外层 done 检查
+        }
+        throw new ConcurrentDictionaryInstallError(pkg.id);
+      }
+      // 锁已过期：接管（覆盖旧锁）
     }
     await db.meta.put({ key: lockKey, value: time });
   });
+  // 覆盖旧锁后重读 done：可能另一标签页在锁过期前已完成
+  const doneAfterLock = await db.meta.get(dictionaryDoneKey(pkg.id));
+  if (doneAfterLock && doneAfterLock.value === pkg.version) {
+    await db.meta.delete(lockKey);
+    return { status: "already-installed", installedVersion: doneAfterLock.value };
+  }
 
   try {
     // 读取旧版该包的全部词条（含 id 用于更新）
@@ -436,8 +461,9 @@ export async function markTier1CoveredByTier2(db: LexilexiDatabase): Promise<voi
  * 供 addToNotebook 兜底路径调用（RAY-284 衔接）。
  * 返回晋升后的 Sense（senses 表中的新记录）。
  *
- * 幂等防重：put 前按 senses.term 查重（与 installPreset 同款口径），
+ * 幂等防重：在单个 rw 事务内查重 + put（与 installPreset 块内查重同款），
  * 同 term 已存在时直接返回已有 Sense，不重复晋升。
+ * 连点/并发场景下事务串行化保证不会产生双记录。
  */
 export async function promoteDictionarySense(
   db: LexilexiDatabase,
@@ -447,19 +473,21 @@ export async function promoteDictionarySense(
   if (!dictSense) {
     return null;
   }
-  // 幂等防重：同 term 已在 senses 表中 → 直接返回已有记录
-  const existing = await db.senses.where("term").equalsIgnoreCase(dictSense.term).first();
-  if (existing) {
-    return existing;
-  }
-  // 新生成 SenseId，避免与字典条目 id 命名空间冲突
-  const { source: _, ...senseFields } = dictSense;
-  const promotedSense: Sense = {
-    ...senseFields,
-    id: toSenseId(createId("sense")),
-  };
-  await db.senses.put(promotedSense);
-  return promotedSense;
+  return db.transaction("rw", db.senses, async () => {
+    // 幂等防重：同 term 已在 senses 表中 → 直接返回已有记录
+    const existing = await db.senses.where("term").equalsIgnoreCase(dictSense.term).first();
+    if (existing) {
+      return existing;
+    }
+    // 新生成 SenseId，避免与字典条目 id 命名空间冲突
+    const { source: _, ...senseFields } = dictSense;
+    const promotedSense: Sense = {
+      ...senseFields,
+      id: toSenseId(createId("sense")),
+    };
+    await db.senses.put(promotedSense);
+    return promotedSense;
+  });
 }
 
 // ─── 检索 ─────────────────────────────────────────────────────────────────────
