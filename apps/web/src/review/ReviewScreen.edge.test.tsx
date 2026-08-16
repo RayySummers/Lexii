@@ -121,6 +121,42 @@ describe("ReviewScreen 键盘边界", () => {
     expect(harness.grade).not.toHaveBeenCalled();
   });
 
+  it("焦点在面内滚动区按空格：交给滚动容器原生滚动，不翻面（RAY-291 suggestion 1）", async () => {
+    const card = makeCard();
+    card.sense.term = "apple";
+    const harness = makeHarness({ queue: [card] });
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
+    await expectCardShown("apple");
+
+    // jsdom 不做布局：伪造「可滚动」尺寸与 computed overflow，
+    // 模拟 Chrome 127+ 中可键盘聚焦的滚动容器（无焦点子元素时）
+    const region = document.querySelector(".overflow-y-auto") as HTMLElement;
+    expect(region).not.toBeNull();
+    Object.defineProperty(region, "scrollHeight", { value: 400, configurable: true });
+    Object.defineProperty(region, "clientHeight", { value: 200, configurable: true });
+    // 只替换目标元素的 computed overflow，其余元素委托真实实现
+    // （testing-library 的角色查询依赖 getPropertyValue，不能整体 mock）
+    const realGetComputedStyle = window.getComputedStyle;
+    const styleSpy = vi.spyOn(window, "getComputedStyle").mockImplementation((element) => {
+      if (element === region) {
+        return { overflowY: "auto" } as CSSStyleDeclaration;
+      }
+      return realGetComputedStyle(element);
+    });
+
+    fireEvent.keyDown(region, { key: " " });
+    // 断言前立即还原：断言失败也不能让 spy 泄漏到后续用例
+    styleSpy.mockRestore();
+
+    // 不翻面、不评分：空格留给滚动容器的原生滚动
+    expect(
+      screen
+        .getByRole("button", { name: `显示 ${card.sense.term} 的释义` })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+    expect(harness.grade).not.toHaveBeenCalled();
+  });
+
   it("评分按钮获得焦点时按数字键：全局监听仍生效（按键不因焦点被吞）", async () => {
     const card = makeCard();
     card.sense.term = "apple";

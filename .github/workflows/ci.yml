@@ -41,6 +41,33 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+  # RAY-291（评审 nit 1）：移动端背词卡片 e2e（Playwright，iPhone 13 视口）
+  # 独立 job：浏览器安装耗时且只服务于界面层断言，不拖慢主链路。
+  e2e-mobile:
+    name: E2E 移动端背词卡片（Playwright）
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @lexilexi/web exec playwright install --with-deps chromium
+
+      - name: E2E
+        run: pnpm --filter @lexilexi/web test:e2e
+
   fsrs-verify:
     name: FSRS-7 对照官方参考实现验证
     runs-on: ubuntu-latest

@@ -75,6 +75,18 @@ function ratingHintFor(mode: RatingTierMode): string {
   return mode === "three" ? "按 1–3（或 A / H / G）评分" : "按 1–4（或 A / H / G / E）评分";
 }
 
+/**
+ * 可滚动容器判定（RAY-291 suggestion 1）：Chrome 127+ 中无焦点子元素的
+ * 滚动容器可以键盘聚焦。焦点落在卡片面内滚动区时，空格应交给该容器
+ * 原生滚动（等同 BUTTON/INPUT 的放行逻辑），而不是触发全局快捷键翻面；
+ * 方向键本就不在全局 handler 的监听范围内，不受影响。
+ */
+function isScrollableRegion(element: HTMLElement): boolean {
+  const { overflowY } = getComputedStyle(element);
+  const allowsScroll = overflowY === "auto" || overflowY === "scroll";
+  return allowsScroll && element.scrollHeight > element.clientHeight;
+}
+
 export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
   const session = useReviewSession(provider, mode);
   const dueLabels = session.current ? computeDueLabels(session.current) : null;
@@ -143,7 +155,10 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
         (target.tagName === "BUTTON" ||
           target.tagName === "INPUT" ||
           target.tagName === "TEXTAREA" ||
-          target.isContentEditable);
+          target.isContentEditable ||
+          // RAY-291 suggestion 1：面内滚动区（Chrome 127+ 可聚焦）同样放行，
+          // 空格交给滚动容器的原生滚动行为
+          isScrollableRegion(target));
       if (event.key === " " || event.key === "Enter") {
         if (onInteractive) {
           return; // 焦点在按钮上：交给按钮原生激活，避免重复触发

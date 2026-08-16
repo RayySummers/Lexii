@@ -25,3 +25,22 @@
   --color-success: var(--lex-success);
   --color-focus-ring: var(--lex-focus-ring);
 }
+
+/*
+ * 背词卡片固定高度的 vh 回退（RAY-291，RAY-291 评审 nit 3）：
+ * 卡片高度的 dvh 版本由组件内联 style 应用（常量唯一来源，见
+ * ReviewCard.tsx 的 cardHeightStyle）；旧浏览器（iOS Safari < 15.4 /
+ * Chrome < 108）不支持 dvh，会把整条内联声明判为非法并丢弃——本类
+ * 提供 vh 回退，内联声明被丢弃时回落此处，卡片不会退回改动前的自适应
+ * 高度。@supports 分支保证「内联样式缺失」等场景下新浏览器仍用 dvh。
+ * 公式口径（卡片外固定内容 ≈ 26rem）的推导见 ReviewCard.tsx 常量注释。
+ */
+.review-card-height {
+  height: clamp(14rem, 100vh - 26rem, 32rem);
+}
+
+@supports (height: 1dvh) {
+  .review-card-height {
+    height: clamp(14rem, 100dvh - 26rem, 32rem);
+  }
+}

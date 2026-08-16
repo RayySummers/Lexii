@@ -74,7 +74,15 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardPro
   }, [flipped]);
 
   return (
-    <div className="[perspective:1200px]" style={cardHeightStyle()}>
+    /*
+     * 固定高度双层声明（RAY-291，评审 nit 3）：
+     * - 内联 style（cardHeightStyle，常量唯一来源）为现代浏览器的 dvh 版本；
+     * - 类 .review-card-height（styles/index.css）为旧浏览器（iOS Safari < 15.4 /
+     *   Chrome < 108，不支持 dvh、整条内联声明被丢弃）的 vh 回退——内联声明
+     *   被丢弃时回落到类的 vh 规则，卡片不会退回改动前的自适应高度。
+     * 公式口径（卡片外固定内容 ≈ 26rem）的推导见上方常量注释。
+     */
+    <div className="review-card-height [perspective:1200px]" style={cardHeightStyle()}>
       <button
         type="button"
         onClick={onFlip}

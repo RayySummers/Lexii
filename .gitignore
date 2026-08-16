@@ -6,6 +6,10 @@ dist/
 coverage/
 .vite/
 
+# playwright (apps/web e2e)
+test-results/
+playwright-report/
+
 # logs
 *.log
 npm-debug.log*
