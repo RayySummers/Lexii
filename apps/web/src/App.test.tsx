@@ -72,6 +72,7 @@ const EMPTY_STATS_SNAPSHOT = {
   todayReviewCount: 0,
   dueCount: 0,
   dueTomorrowCount: 0,
+  newCardsRemainingToday: 0,
   reviewCount: 0,
   completedWordCount: 0,
 };
@@ -246,7 +247,7 @@ describe("App", () => {
   });
 
   it("点击统计进入统计页，返回首页退出", async () => {
-    // 8 个字段取互不相同的值，避免 getByText 撞值
+    // 8 个字段取互不相同的值，避免 getByText 撞值（今日待学取 newCardsRemainingToday=9）
     const statsFactory = makeStatsProviderFactory({
       streakDays: 1,
       totalDays: 2,
@@ -254,6 +255,7 @@ describe("App", () => {
       todayReviewCount: 4,
       dueCount: 5,
       dueTomorrowCount: 6,
+      newCardsRemainingToday: 9,
       reviewCount: 7,
       completedWordCount: 8,
     });
@@ -270,6 +272,7 @@ describe("App", () => {
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("7")).toBeInTheDocument();
     expect(screen.getByText("8")).toBeInTheDocument();
+    expect(screen.getByText("9")).toBeInTheDocument();
     // 统计页采用统一导航头：右对齐标题 + 左侧返回箭头
     expect(screen.getByRole("heading", { name: "统计" })).toBeInTheDocument();
 

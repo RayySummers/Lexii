@@ -5,6 +5,7 @@ import {
   classifyReviewOutcome,
   computeCompletedWordCount,
   computeLearnedTodayCount,
+  computeNewCardsRemainingToday,
   computeReviewedTodayCount,
   computeStreak,
   computeTotalDays,
@@ -355,5 +356,45 @@ describe("localDayBounds（本地日历日半开区间，时区无关性质断�
 
   it("非法基准时刻抛错", () => {
     expect(() => localDayBounds("not-a-date")).toThrow(RangeError);
+  });
+});
+
+describe("computeNewCardsRemainingToday（RAY-295 统计页「今日待学」口径）", () => {
+  it("剩余新卡 > 上限：取上限，未学时显示上限值", () => {
+    expect(computeNewCardsRemainingToday(20, 7_195, 0)).toBe(20);
+  });
+
+  it("剩余新卡 > 上限：减去今日已学数", () => {
+    expect(computeNewCardsRemainingToday(20, 7_190, 5)).toBe(15);
+  });
+
+  it("剩余新卡 < 上限：显示实际剩余新卡数（上限再大也不虚高）", () => {
+    expect(computeNewCardsRemainingToday(20, 12, 0)).toBe(12);
+  });
+
+  it("剩余新卡 < 上限且今日已学：剩余可学数不被已学重复扣减", () => {
+    // 今日新卡池 12（已学 3 后剩余 9）：显示 9，而非 min(20,9)−3=6
+    expect(computeNewCardsRemainingToday(20, 9, 3)).toBe(9);
+  });
+
+  it("剩余新卡 == 上限：显示「上限 − 今日已学」", () => {
+    expect(computeNewCardsRemainingToday(20, 20, 0)).toBe(20);
+    expect(computeNewCardsRemainingToday(20, 16, 4)).toBe(16);
+  });
+
+  it("已学满今日额度：显示 0", () => {
+    expect(computeNewCardsRemainingToday(20, 7_175, 20)).toBe(0);
+  });
+
+  it("今日已学超过上限（下限回落 0，不出现负数）", () => {
+    expect(computeNewCardsRemainingToday(20, 7_170, 25)).toBe(0);
+  });
+
+  it("剩余新卡为 0（无新卡可学）：显示 0", () => {
+    expect(computeNewCardsRemainingToday(20, 0, 0)).toBe(0);
+  });
+
+  it("上限为 0：直接显示 0", () => {
+    expect(computeNewCardsRemainingToday(0, 7_195, 0)).toBe(0);
   });
 });

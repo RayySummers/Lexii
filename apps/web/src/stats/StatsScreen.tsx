@@ -7,6 +7,11 @@
  * RAY-255：「今日到期（词条）」→「今日待学（词条）」——与首页徽标口径一致
  * （dueCount 含 reps===0 的新词）；统计口径（stats.dueCount 语义）不变。
  *
+ * RAY-295：统计页「今日待学（词条）」改用 stats.newCardsRemainingToday——
+ * min(每日新卡上限, 剩余新卡数) − 今日已学习（下限 0），按每日新卡上限
+ * 过滤、不再显示全部未学新卡总数；首页徽标仍用未截断的 dueCount（RAY-260
+ * 口径，另有额度提示说明二者关系）。
+ *
  * - 数据经 StatsDataProvider 加载（IndexedDB 聚合，口径见 stats/data.ts 与
  *   packages/stats README）；统计数据全本地计算，不联网不上传；
  * - 加载中 / 加载失败（可重试）/ 无学习数据 三种状态有明确展示；
@@ -29,7 +34,7 @@ const STAT_ROWS: ReadonlyArray<{ label: string; value: (stats: StatsSnapshot) =>
   { label: "累计天数", value: (stats) => stats.totalDays },
   { label: "今日已学习（次数）", value: (stats) => stats.todayLearnCount },
   { label: "今日已复习（次数）", value: (stats) => stats.todayReviewCount },
-  { label: "今日待学（词条）", value: (stats) => stats.dueCount },
+  { label: "今日待学（词条）", value: (stats) => stats.newCardsRemainingToday },
   { label: "明日到期（词条）", value: (stats) => stats.dueTomorrowCount },
   { label: "累计已完成（次数）", value: (stats) => stats.reviewCount },
   { label: "累计已完成（词条）", value: (stats) => stats.completedWordCount },
