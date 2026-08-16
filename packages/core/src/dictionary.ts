@@ -97,10 +97,10 @@ function yieldToMainThread(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-/** 并发安装检测错误（内部哨兵） */
+/** 并发安装检测错误（内部哨兵，用户可见文案见 §3.2） */
 class ConcurrentDictionaryInstallError extends Error {
   constructor(packageId: string) {
-    super(`词典包安装进度被并发安装者推进：${packageId}`);
+    super(`另一标签页正在升级：${packageId}`);
     this.name = "ConcurrentDictionaryInstallError";
   }
 }
