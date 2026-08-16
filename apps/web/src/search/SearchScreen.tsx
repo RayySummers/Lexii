@@ -7,9 +7,12 @@
  * - 状态机：词库为空 → 无查询提示（有历史时先展示搜索历史）→ 检索中 →
  *   无命中（明确提示「库内无此词，可导入自建词库」）→ 结果列表（含
  *   结果计数 live region）；错误态单独展示，不影响输入框继续使用；
+ *   词库为空但仍有历史时（RAY-292 评审 sug 1）：空库提示与搜索历史
+ *   同时展示，历史照常可点选/单条删除；
  * - RAY-292 搜词历史：只存本地（localStorage，见 lib/searchHistory），
- *   仅记录实际执行的检索（防抖后发出的查询）；点击历史词条回填输入并
- *   重新检索，每条带叉叉可单条删除；历史上传/埋点一律不涉及（隐私红线）；
+ *   仅记录有命中的检索（RAY-292 评审 sug 2：拼写错误 / 未收录等零命中
+ *   查询不进历史，不积攒噪音词）；点击历史词条回填输入并重新检索，
+ *   每条带叉叉可单条删除；历史上传/埋点一律不涉及（隐私红线）；
  * - 防抖期间的过期响应经请求序号丢弃（latest-request-wins），避免慢响应
  *   覆盖新结果；组件卸载后不再写状态；
  * - 全部颜色走 design tokens（浅色/深色自动生效），不硬编码颜色。
@@ -101,7 +104,8 @@ export function SearchScreen({ provider, onExit, historyStorage }: SearchScreenP
   }, []);
 
   // 防抖检索：查询变化后 200ms 执行；卸载/重查时清理定时器。
-  // 实际执行的检索同步记入本地历史（输入中途的字符不记录）。
+  // 只有命中的检索才记入本地历史（RAY-292 评审 sug 2）：零命中
+  // （拼写错误 / 未收录）查询不进历史，输入中途的字符更不记录。
   useEffect(() => {
     const trimmed = query.trim();
     if (trimmed.length === 0) {
@@ -110,13 +114,15 @@ export function SearchScreen({ provider, onExit, historyStorage }: SearchScreenP
     const seq = ++requestSeqRef.current;
     const timer = setTimeout(() => {
       setSearching(true);
-      setHistory(recordSearchHistory(resolveHistoryStorage(historyStorage), trimmed));
       void provider
         .search(trimmed)
         .then((hits) => {
           if (requestSeqRef.current === seq) {
             setResults(hits);
             setSearching(false);
+            if (hits.length > 0) {
+              setHistory(recordSearchHistory(resolveHistoryStorage(historyStorage), trimmed));
+            }
           }
         })
         .catch((err: unknown) => {
@@ -215,12 +221,23 @@ function SearchContent({
     );
   }
   if (emptyLibrary) {
+    // RAY-292 评审 sug 1：词库为空但仍有历史时，空库提示与历史同时展示，
+    // 历史照常可查看/点选/单条删除（仅输入为空时展示，保持既有交互节奏）
     return (
-      <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface p-8 text-center">
-        <h2 className="text-xl font-semibold">词库还是空的</h2>
-        <p className="max-w-sm text-sm text-text-muted">
-          还没有任何词可搜。先在设置页导入 CSV 词表，或到词书库安装一本词书。
-        </p>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface p-8 text-center">
+          <h2 className="text-xl font-semibold">词库还是空的</h2>
+          <p className="max-w-sm text-sm text-text-muted">
+            还没有任何词可搜。先在设置页导入 CSV 词表，或到词书库安装一本词书。
+          </p>
+        </div>
+        {query.length === 0 && history.length > 0 ? (
+          <SearchHistoryList
+            history={history}
+            onSelect={onSelectHistory}
+            onRemove={onRemoveHistory}
+          />
+        ) : null}
       </div>
     );
   }
@@ -298,6 +315,7 @@ function SearchHistoryList({ history, onSelect, onRemove }: SearchHistoryListPro
             <button
               type="button"
               onClick={() => onSelect(term)}
+              title={term}
               className="min-w-0 flex-1 truncate py-1 text-left text-base text-text transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
             >
               {term}
