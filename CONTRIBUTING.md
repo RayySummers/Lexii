@@ -145,10 +145,13 @@ PR 描述使用下方模板，并自行对照「13 条评审标准」在描述�
 2. **合入 main**：版本 bump 与功能变更一起走 PR（禁止绕过 PR 直推 `main`），CI 全绿后合并。
 3. **打 tag**：在包含该版本 bump 的 main 合并提交上打 tag，格式为 `v<版本号>`（与 package.json 完全一致，如 `v0.1.0-alpha.2`），并推送 tag。
 4. **部署验证**：main push 自动触发 GitHub Pages 工作流（`.github/workflows/deploy.yml`）；部署完成后，在 `rayysummers.github.io/Lexilexi/` 真机确认设置页底部版本号与 tag 一致。
+5. **同步对外版档案**：把内部完整版发版管线档案按「对外版」口径同步到 `docs/archive/release-pipeline-archive.md`——保留版本 / 波次分组、事项标题与父子依赖缩进；去掉状态标注（✅🔵🟡 等）、内部排期备注与 RAY 编号。
+6. **提炼 CHANGELOG**：由 Vega 从内部完整版档案提炼 CHANGELOG，以对外版档案为骨架、按实际合入版本归类，随 GitHub Release 公开。
 
 ## 文档与资料
 
 - 项目背景与规划：`docs/` 目录（领域模型等设计文档）与 [ROADMAP.md](./ROADMAP.md)。
+- 发版管线档案（对外公开版）：[docs/archive/release-pipeline-archive.md](./docs/archive/release-pipeline-archive.md)；完整版（含状态标注）由维护者内部维护，发版时按上方发版流程同步。
 - 历史讨论与决策记录：项目维护者备份中的 `INFO_260812.md`（不在本仓库）。
 - 算法口径：`packages/fsrs/README.md` 记录了「FSRS-7」版本口径（对照官方 ts-fsrs 参考实现验证）。
 
