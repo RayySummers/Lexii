@@ -1,0 +1,111 @@
+name: Deploy Release（稳定通道）
+
+# RAY-297 任务 A（双通道部署架构，上半部分）：Release 通道。
+# - 自动触发：仅发版 tag（v*）推送时，把该 tag 构建为稳定版并发布到
+#   Pages 根路径（rayysummers.github.io/Lexilexi/）。main push 不再触发根路径部署。
+# - 手动触发：workflow_dispatch 保留，可对任意 ref 发布稳定版
+#   （ref 留空时自动解析最新 v* tag）。
+# - 与 deploy-dev.yml 互补：每次部署都发布「自洽的完整站点」——根路径为本通道
+#   产物，dev/ 子目录为 main 当前快照的 dev 构建。两通道互相携带对方快照，
+#   任何一次部署都不会把另一个通道冲成 404。
+#
+# 构建信息注入（RAY-297 任务 B）：两次构建分别设置 LEXILEXI_CHANNEL 与
+# BUILD_BRANCH，vite.config.ts 在构建时收集 SHA/时间/分支/通道/历史 tag，
+# 运行时零网络请求。
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "要发布为稳定版的 ref（默认：最新 v* tag；留空自动解析）"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+# 并发控制（RAY-297 Oscar 评审 suggestion 1）：两通道共用同一部署串行队列。
+# group 统一为 pages、cancel-in-progress: false —— 部署按触发顺序排队落盘：
+# - 发版时 dev 部署（由 main 合入触发）与 release 部署（由 tag 推送触发）几乎
+#   必然重叠，若各自并行且后落盘的 dev 携带上一版 tag 的根路径快照，
+#   会把刚发布的稳定版覆盖回旧版；串行化后 release 部署总是最后落盘；
+# - 不能用 true：反向顺序（dev 部署后触发）会把 release 部署取消掉，
+#   且取消后无自动重触发，刚打的 tag 永远发不出去。
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    name: 构建并发布（稳定版 + dev/ 快照）
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # 全量历史：解析最新 tag、构建历史 Release 列表（__APP_BUILD__.releaseTags）
+          fetch-depth: 0
+
+      - name: 解析发布目标（tag 推送直接用 tag；手动触发可指定 ref，留空取最新 tag）
+        shell: bash
+        run: |
+          ref="${{ github.event.inputs.ref }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -z "$ref" ]; then
+            ref="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+          fi
+          if [ -n "$ref" ]; then
+            git checkout "$ref"
+          fi
+          echo "BUILD_BRANCH=${ref:-${{ github.ref_name }}}" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 构建稳定版（根路径）
+        run: pnpm --filter @lexilexi/web build
+        env:
+          LEXILEXI_CHANNEL: release
+          BUILD_BRANCH: ${{ env.BUILD_BRANCH }}
+
+      - name: 暂存稳定版产物
+        run: |
+          mkdir -p site
+          cp -a apps/web/dist/. site/
+
+      - name: 构建 dev 通道（main 快照 → dev/ 子目录）
+        shell: bash
+        run: |
+          git checkout -B main origin/main
+          pnpm install --frozen-lockfile
+          pnpm --filter @lexilexi/web build
+          mkdir -p site/dev
+          cp -a apps/web/dist/. site/dev/
+        env:
+          LEXILEXI_CHANNEL: dev
+          BUILD_BRANCH: main
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
