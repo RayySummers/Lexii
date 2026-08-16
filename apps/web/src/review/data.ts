@@ -45,6 +45,7 @@ import type {
   GradeContext,
   GradeResult,
   MultipleChoiceQueueResult,
+  QueueMeta,
   ReviewCard,
   ReviewDataProvider,
 } from "./types";
@@ -125,6 +126,26 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
         kept.map((pair) => pair.memory),
         now,
       );
+    },
+
+    /**
+     * 队列元信息（RAY-276 诊断线 3）：队列为空时区分「额度已用完」与
+     * 「没有内容」。额度口径与 loadQueue 一致（resolveNewCardLimit）；
+     * hasDueNewWords 为未截断口径（不传 newCardLimit 的新词队列非空），
+     * 且与队列装配（buildReviewQueue）同口径过滤条目状态——仅
+     * status === "active" 的未学新词计入，暂停/删除条目不会触发
+     * 「剩余顺延到明天」文案（Oscar 评审 PR #41 suggestion 2）。
+     */
+    async loadQueueMeta(mode: StudyMode): Promise<QueueMeta> {
+      const now = new Date().toISOString();
+      if (mode === "review") {
+        return { remainingNewCardQuota: null, hasDueNewWords: false };
+      }
+      const remaining = await resolveNewCardLimit(db, now);
+      const uncappedNewIds = await getStudyQueueItemIds(db, now, "learn");
+      const items = await db.items.bulkGet(uncappedNewIds);
+      const hasDueNewWords = items.some((item) => item !== undefined && item.status === "active");
+      return { remainingNewCardQuota: remaining, hasDueNewWords };
     },
 
     async loadMultipleChoiceQueue(mode: StudyMode): Promise<MultipleChoiceQueueResult> {

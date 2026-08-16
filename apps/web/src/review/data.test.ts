@@ -91,9 +91,12 @@ describe("createIndexedDbReviewDataProvider", () => {
     expect(memory?.fields.reps).toBe(1);
     expect(memory?.fields.lastRating).toBe("good");
     expect(memory?.fields.lastReviewAt).not.toBeNull();
-    // good 走学习第二步：due 应在未来（10 分钟内），复习队列仍为空
+    // good 走学习第二步：due 在未来 10 分钟内。日历日口径（RAY-276 诊断线 2）
+    // 下仍属「今日到期」，复习队列包含它（提前复习为 FSRS 合法输入）
     expect(memory!.fields.due > new Date().toISOString()).toBe(true);
-    expect(await provider.loadQueue("review")).toEqual([]);
+    const reviewQueue = await provider.loadQueue("review");
+    expect(reviewQueue).toHaveLength(1);
+    expect(reviewQueue[0]!.item.id).toBe(card.item.id);
   });
 
   it("已评分且到期的卡只进入复习队列，不进学习队列", async () => {
@@ -180,6 +183,78 @@ describe("createIndexedDbReviewDataProvider", () => {
     expect(learnQueue).toHaveLength(5);
     // 复习队列不含新词，额度不影响
     expect(await provider.loadQueue("review")).toEqual([]);
+  });
+
+  it("loadQueueMeta：learn/mixed 返回剩余额度与未学新词标记，review 返回 null（RAY-276 诊断线 3）", async () => {
+    window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
+    const provider = createIndexedDbReviewDataProvider(db!);
+
+    // 空库：没有未学新词，额度全额
+    expect(await provider.loadQueueMeta!("learn")).toEqual({
+      remainingNewCardQuota: 5,
+      hasDueNewWords: false,
+    });
+
+    await provider.importSampleWordlist();
+    expect(await provider.loadQueueMeta!("learn")).toEqual({
+      remainingNewCardQuota: 5,
+      hasDueNewWords: true,
+    });
+    expect(await provider.loadQueueMeta!("mixed")).toEqual({
+      remainingNewCardQuota: 5,
+      hasDueNewWords: true,
+    });
+
+    // 学满 5 张：额度耗尽、词库仍有未学新词（额度耗尽文案的触发条件）
+    const first = (await provider.loadQueue("learn")).slice(0, 5);
+    for (const card of first) {
+      await provider.grade(card, "good", { reviewDurationMs: 1_000, revealed: true });
+    }
+    expect(await provider.loadQueueMeta!("learn")).toEqual({
+      remainingNewCardQuota: 0,
+      hasDueNewWords: true,
+    });
+
+    // review 模式不含新词：额度语义为 null
+    expect(await provider.loadQueueMeta!("review")).toEqual({
+      remainingNewCardQuota: null,
+      hasDueNewWords: false,
+    });
+  });
+
+  it("loadQueueMeta：剩余未学新词全部为暂停/删除条目时不报「仍有新词」（Oscar suggestion 2）", async () => {
+    window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await provider.importSampleWordlist();
+
+    // 学满额度 → 剩余新词均不可进入队列（额度耗尽场景）
+    const first = (await provider.loadQueue("learn")).slice(0, 5);
+    for (const card of first) {
+      await provider.grade(card, "good", { reviewDurationMs: 1_000, revealed: true });
+    }
+
+    // 把全部剩余未学新词标记为暂停：与队列装配（只保留 active）同口径，
+    // 此时不应再提示「剩余新词顺延到明天」
+    const remainingNewStates = await db!.memoryStates
+      .filter((state) => state.fields.reps === 0)
+      .toArray();
+    await db!.transaction("rw", db!.items, async () => {
+      for (const state of remainingNewStates) {
+        const item = await db!.items.get(state.itemId);
+        if (item && item.status === "active") {
+          await db!.items.put({
+            ...item,
+            status: "suspended",
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+    });
+
+    expect(await provider.loadQueueMeta!("learn")).toEqual({
+      remainingNewCardQuota: 0,
+      hasDueNewWords: false,
+    });
   });
 
   it("每日新卡上限：今日已学词条数扣减额度（已学 2 张后剩余额度只补到上限）", async () => {

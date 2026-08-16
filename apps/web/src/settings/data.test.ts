@@ -14,8 +14,41 @@ import {
   parseCsvWordlist,
 } from "@lexilexi/core";
 import type { LexilexiDatabase } from "@lexilexi/core";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createIndexedDbSettingsDataProvider } from "./data";
+
+// 富化子路径 mock（RAY-276）：词书安装会内联加载富化数据包填充富化字段，
+// 测试用覆盖词书词条的小包替代 3.6MB 真实 enrichment.tier0.data.json，
+// 避免装载与解析拖慢用例（与 presets/bootstrap.test.ts 同口径）。
+vi.mock("@lexilexi/core/presets/enrichment", async () => {
+  const { parseEnrichmentPreset } = await import("@lexilexi/core");
+  return {
+    ENRICHMENT_TIER0_PRESET: parseEnrichmentPreset(
+      {
+        id: "web-test-enrichment",
+        version: "1.1.0",
+        name: "测试富化包",
+        generatedAt: "2026-08-16T00:00:00.000Z",
+        source: "测试来源（CC BY）",
+        entries: [
+          [
+            "ability",
+            "/uˈes-mock/",
+            "/uˈkeɪ-mock/",
+            "",
+            "",
+            "",
+            "",
+            "abilit<能力> · y<后缀>",
+            "",
+            [],
+          ],
+        ],
+      },
+      "web-test-enrichment.json",
+    ),
+  };
+});
 
 function makeOptions(): Parameters<typeof openDatabase>[0] {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
@@ -88,6 +121,11 @@ describe("createIndexedDbSettingsDataProvider", () => {
     expect(result.installedCount).toBe(1602);
     expect(result.skippedCount).toBe(0);
     expect(await db!.items.count()).toBe(1602);
+
+    // RAY-276 修复范围 2：词书安装内联填充富化字段（mock 富化包覆盖 ability）
+    const ability = await db!.senses.filter((sense) => sense.term === "ability").first();
+    expect(ability?.ipaUs).toBe("/uˈes-mock/");
+    expect(ability?.wordParts).toBe("abilit<能力> · y<后缀>");
 
     // 安装后：book-zk 已装，其余未装
     const after = await provider.getWordbookSummaries();

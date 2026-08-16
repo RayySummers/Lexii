@@ -107,19 +107,21 @@ describe("interleaveCards（混合穿插纯函数）", () => {
 });
 
 describe("getStudyQueueItemIds（学习 / 复习 / 混合三模式）", () => {
-  it("learn：仅从未评分的卡（reps === 0），按 due 升序，未来 due 排除", async () => {
+  it("learn：仅从未评分的卡（reps === 0），按 due 升序；日历日口径——今天稍后到期的卡进入今日队列，明天起的未来卡排除", async () => {
     const database = freshDatabase();
     const ids = await seed(database, [
       { id: "a", due: "2026-08-13T08:00:00.000Z", reps: 0 },
       { id: "b", due: "2026-08-13T09:00:00.000Z", reps: 2 },
       { id: "c", due: "2026-08-13T10:00:00.000Z", reps: 0 },
       { id: "d", due: "2026-08-13T11:00:00.000Z", reps: 5 },
-      { id: "e", due: "2026-08-14T12:00:00.000Z", reps: 0 },
+      { id: "e", due: "2026-08-14T12:00:00.000Z", reps: 0 }, // 今天 12:00 到期 → 今日可学
+      { id: "f", due: "2026-08-15T08:00:00.000Z", reps: 0 }, // 明天到期 → 排除
     ]);
 
     expect(await getStudyQueueItemIds(database, NOW, "learn")).toEqual([
       idOf(ids, "a"),
       idOf(ids, "c"),
+      idOf(ids, "e"),
     ]);
   });
 

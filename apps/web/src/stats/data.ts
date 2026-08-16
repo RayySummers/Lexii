@@ -2,7 +2,8 @@
  * 统计数据源（IndexedDB 实现）。
  *
  * 聚合口径（对应 docs/domain-model.md §7 事件流唯一事实来源）：
- * - dueCount：getDueItemIds（core 公开 API，due <= now 的记忆状态数，含积压）
+ * - dueCount：getDueItemIds（core 公开 API，due <= 今日结束的记忆状态数，
+ *   日历日口径含积压与今天稍后到期的卡，RAY-276）
  * - dueTomorrowCount：getDueItemIdsInRange + localDayBounds（明天本地日历日
  *   的半开区间 [start, end)，与「今日待学」同为记忆状态口径）
  * - reviewCount / streakDays / totalDays / todayLearnCount / todayReviewCount /

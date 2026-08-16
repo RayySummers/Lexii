@@ -23,6 +23,11 @@
  *
  * 回填与 installPreset 同一套安全机制：进度标记与块数据同事务提交、
  * 起始事务写 progress=0 占位、每块 check-and-set 防并发双标签页重复回填。
+ *
+ * 版本递增 = 存量设备重跑回填（RAY-276）：包 version 每次递增都会让
+ * `enrichment:<id>:done` 版本比对失配，存量设备在下一次启动时重新回填
+ * （合并幂等、重跑安全）。v1.0.0 → v1.1.0 即用于让升级前安装的旧词书
+ * 补齐富化字段（词书库安装路径自 v1.1.0 起同时内联填充，见 apps/web）。
  */
 import type { Sense } from "../domain";
 import type { LexilexiDatabase } from "../persistence";

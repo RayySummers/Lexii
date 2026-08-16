@@ -55,6 +55,11 @@ export interface ReviewSession {
   importing: boolean;
   /** 是否可撤销上一步（每次评分/标熟后为 true，撤销成功或新操作后清空） */
   canUndo: boolean;
+  /**
+   * 队列为空且「每日新卡额度已用完、词库仍有未学新词」（RAY-276 诊断线 3）：
+   * 界面据此展示额度耗尽文案，而不是「没有待学习的新词」。
+   */
+  newCardQuotaExhausted: boolean;
   /** 翻面（可在正面/背面间切换） */
   flip(): void;
   /** 评分并进入下一张卡；队列评完进入 done */
@@ -79,6 +84,8 @@ interface SessionState {
   importing: boolean;
   /** 撤销快照（null = 当前无撤销目标） */
   undoSnapshot: UndoSnapshot | null;
+  /** 每日新卡额度耗尽标记（RAY-276 诊断线 3；仅 no-due 阶段有意义） */
+  newCardQuotaExhausted: boolean;
 }
 
 const INITIAL_STATE: SessionState = {
@@ -90,6 +97,7 @@ const INITIAL_STATE: SessionState = {
   error: null,
   importing: false,
   undoSnapshot: null,
+  newCardQuotaExhausted: false,
 };
 
 /** 数据源错误 → 统一错误文案（不向用户暴露内部实现细节） */
@@ -137,6 +145,7 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
       index: 0,
       flipped: false,
       undoSnapshot: null,
+      newCardQuotaExhausted: false,
     });
     try {
       const [queue, hasItems] = await Promise.all([
@@ -150,6 +159,24 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
         startReviewing(queue);
       } else {
         apply({ phase: hasItems ? "no-due" : "empty", importing: false });
+        // 队列为空时区分「额度已用完」与「没有内容」（RAY-276 诊断线 3）。
+        // 元信息查询失败静默降级为不展示额度文案（不阻塞空状态展示）。
+        if (hasItems && provider.loadQueueMeta) {
+          try {
+            const meta = await provider.loadQueueMeta(mode);
+            if (
+              loadId !== loadIdRef.current ||
+              meta.remainingNewCardQuota === null ||
+              meta.remainingNewCardQuota > 0 ||
+              !meta.hasDueNewWords
+            ) {
+              return;
+            }
+            apply({ newCardQuotaExhausted: true });
+          } catch {
+            // 静默降级：元信息失败不影响 no-due 空状态
+          }
+        }
       }
     } catch (error) {
       if (loadId !== loadIdRef.current) {
@@ -310,6 +337,7 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
     error: state.error,
     importing: state.importing,
     canUndo: state.undoSnapshot !== null,
+    newCardQuotaExhausted: state.newCardQuotaExhausted,
     flip,
     grade,
     markMastered,

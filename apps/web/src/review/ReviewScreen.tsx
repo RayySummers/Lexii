@@ -19,10 +19,12 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
 import type { ReviewRating, StudyMode } from "@lexilexi/core";
 import { BackArrowIcon, SpeakerIcon, UndoIcon } from "../components/icons";
+import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { readPronunciationAccent, speakWord } from "../lib/pronunciation";
 import { readRatingTierMode } from "../lib/ratingTiers";
 import type { RatingTierMode } from "../lib/ratingTiers";
 import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
+import { quotaExhaustedCopy } from "./quotaCopy";
 import { ReviewCard } from "./ReviewCard";
 import { RatingButtons } from "./RatingButtons";
 import { formatDueLabel, previewGradeDueLabels, ratingFromKey } from "./grade";
@@ -281,7 +283,10 @@ function PhaseContent({
         </div>
       );
     case "no-due": {
-      const copy = NO_QUEUE_COPY[mode];
+      const copy =
+        (session.newCardQuotaExhausted
+          ? quotaExhaustedCopy(mode, readDailyNewCardLimit())
+          : null) ?? NO_QUEUE_COPY[mode];
       return (
         <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 text-center">
           <h2 className="text-xl font-semibold">{copy.title}</h2>

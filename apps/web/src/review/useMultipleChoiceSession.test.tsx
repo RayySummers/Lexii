@@ -175,6 +175,29 @@ describe("useMultipleChoiceSession", () => {
     await waitFor(() => expect(result.current.phase).toBe("no-due"));
   });
 
+  it("no-due 且每日新卡额度耗尽：newCardQuotaExhausted 置真（RAY-276 诊断线 3）", async () => {
+    const harness = makeHarness({ cards: [], hasItems: true });
+    harness.provider.loadQueueMeta = vi
+      .fn()
+      .mockResolvedValue({ remainingNewCardQuota: 0, hasDueNewWords: true });
+    const { result } = renderHook(() => useMultipleChoiceSession(harness.provider, "learn"));
+
+    await waitFor(() => expect(result.current.phase).toBe("no-due"));
+    await waitFor(() => expect(result.current.newCardQuotaExhausted).toBe(true));
+    expect(harness.provider.loadQueueMeta).toHaveBeenCalledWith("learn");
+  });
+
+  it("no-due 且额度仍有剩余：newCardQuotaExhausted 保持 false", async () => {
+    const harness = makeHarness({ cards: [], hasItems: true });
+    harness.provider.loadQueueMeta = vi
+      .fn()
+      .mockResolvedValue({ remainingNewCardQuota: 5, hasDueNewWords: true });
+    const { result } = renderHook(() => useMultipleChoiceSession(harness.provider, "learn"));
+
+    await waitFor(() => expect(result.current.phase).toBe("no-due"));
+    await waitFor(() => expect(result.current.newCardQuotaExhausted).toBe(false));
+  });
+
   it("加载失败：error 态，重试后恢复", async () => {
     const card = makeCard();
     const harness = makeHarness({ cards: [], loadError: new Error("数据库不可用") });

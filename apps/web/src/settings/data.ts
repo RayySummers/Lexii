@@ -54,6 +54,22 @@ function loadWordbookModule(): Promise<WordbookModule> {
   return wordbookModulePromise;
 }
 
+/**
+ * 富化数据包按需加载（RAY-276 修复范围 2）：
+ * 词书库安装的词条与 Tier 0 内置词表同口径内联填充富化字段
+ * （只补缺失字段，见 @lexilexi/core 的 mergeEnrichmentIntoContent）。
+ * 安装后立即受益，不依赖下一次富化包版本递增触发回填。
+ * 3.6MB 数据包仅在用户安装词书时装载（与词书数据 chunk 同策略）。
+ */
+type EnrichmentModule = typeof import("@lexilexi/core/presets/enrichment");
+
+let enrichmentModulePromise: Promise<EnrichmentModule> | null = null;
+
+function loadEnrichmentModule(): Promise<EnrichmentModule> {
+  enrichmentModulePromise ??= import("@lexilexi/core/presets/enrichment");
+  return enrichmentModulePromise;
+}
+
 /** 词书包惰性缓存：首次访问时 join 共享池（9k+ 词条目引用），避免轮询反复构造 */
 const wordbookPackageCache = new Map<string, PresetPackage>();
 
@@ -127,7 +143,13 @@ export function createIndexedDbSettingsDataProvider(db: LexilexiDatabase): Setti
       if (!book) {
         throw new Error(`未知词书：${bookId}`);
       }
-      const result = await installPreset(db, await getCachedWordbookPackage(book));
+      // 富化内联（RAY-276 修复范围 2）：安装时按 term 补富化字段——
+      // 与 Tier 0 新装路径同口径，安装即生效；覆盖不到的词条（如 GRE
+      // 剔除词）不受影响，只补缺失字段、不覆盖已有内容。
+      const { ENRICHMENT_TIER0_PRESET } = await loadEnrichmentModule();
+      const result = await installPreset(db, await getCachedWordbookPackage(book), {
+        enrichment: ENRICHMENT_TIER0_PRESET,
+      });
       if (result.status === "already-installed") {
         return { installedCount: 0, skippedCount: 0 };
       }

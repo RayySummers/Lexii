@@ -344,6 +344,40 @@ describe("ReviewScreen", () => {
     expect(harness.loadQueue).toHaveBeenCalledWith("learn");
   });
 
+  it("学习模式：每日新卡额度已用完且词库仍有新词时显示额度耗尽文案（RAY-276 诊断线 3）", async () => {
+    const harness = makeHarness({ queue: [], hasItems: true });
+    harness.provider.loadQueueMeta = vi
+      .fn()
+      .mockResolvedValue({ remainingNewCardQuota: 0, hasDueNewWords: true });
+    render(<ReviewScreen provider={harness.provider} mode="learn" onExit={() => {}} />);
+
+    expect(await screen.findByText("今日新词额度已用完")).toBeInTheDocument();
+    expect(screen.getByText(/剩余新词顺延到明天/)).toBeInTheDocument();
+    expect(harness.provider.loadQueueMeta).toHaveBeenCalledWith("learn");
+  });
+
+  it("学习模式：额度仍有剩余时不显示额度耗尽文案", async () => {
+    const harness = makeHarness({ queue: [], hasItems: true });
+    harness.provider.loadQueueMeta = vi
+      .fn()
+      .mockResolvedValue({ remainingNewCardQuota: 5, hasDueNewWords: true });
+    render(<ReviewScreen provider={harness.provider} mode="learn" onExit={() => {}} />);
+
+    expect(await screen.findByText("没有待学习的新词")).toBeInTheDocument();
+    expect(screen.queryByText("今日新词额度已用完")).not.toBeInTheDocument();
+  });
+
+  it("学习模式：词库没有未学新词时不显示额度耗尽文案", async () => {
+    const harness = makeHarness({ queue: [], hasItems: true });
+    harness.provider.loadQueueMeta = vi
+      .fn()
+      .mockResolvedValue({ remainingNewCardQuota: 0, hasDueNewWords: false });
+    render(<ReviewScreen provider={harness.provider} mode="learn" onExit={() => {}} />);
+
+    expect(await screen.findByText("没有待学习的新词")).toBeInTheDocument();
+    expect(screen.queryByText("今日新词额度已用完")).not.toBeInTheDocument();
+  });
+
   it("混合模式：队列为空但有词时显示「今天没有可复习的词」", async () => {
     const harness = makeHarness({ queue: [], hasItems: true });
     render(<ReviewScreen provider={harness.provider} mode="mixed" onExit={() => {}} />);

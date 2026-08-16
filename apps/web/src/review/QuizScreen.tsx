@@ -8,7 +8,9 @@
  */
 import type { StudyMode } from "@lexilexi/core";
 import { BackArrowIcon } from "../components/icons";
+import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { MultipleChoiceCard } from "./MultipleChoiceCard";
+import { quotaExhaustedCopy } from "./quotaCopy";
 import { useMultipleChoiceSession } from "./useMultipleChoiceSession";
 import type { ReviewDataProvider } from "./types";
 
@@ -96,7 +98,10 @@ function PhaseContent({ session, mode, onExit }: PhaseContentProps) {
         </div>
       );
     case "no-due": {
-      const copy = NO_QUEUE_COPY[mode];
+      const copy =
+        (session.newCardQuotaExhausted
+          ? quotaExhaustedCopy(mode, readDailyNewCardLimit())
+          : null) ?? NO_QUEUE_COPY[mode];
       return (
         <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 text-center">
           <h2 className="text-xl font-semibold">{copy.title}</h2>
