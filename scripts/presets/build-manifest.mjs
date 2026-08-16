@@ -21,8 +21,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const OUTPUT_DIR = path.join(ROOT, "scripts", "presets", "output");
 const PRESETS_DIR = path.join(OUTPUT_DIR, "presets");
 
-/** 获取当前源 commit（CI 环境从 GITHUB_SHA 读取，本地从 git 读取） */
-function getSourceCommit() {
+/**
+ * 获取当前构建 commit（仓库 HEAD，CI 环境从 GITHUB_SHA 读取）。
+ * 用于 manifest.buildCommit 字段（构建可追溯性）。
+ */
+function getBuildCommit() {
   if (process.env.GITHUB_SHA) {
     return process.env.GITHUB_SHA;
   }
@@ -33,11 +36,23 @@ function getSourceCommit() {
   }
 }
 
+/**
+ * ECDICT 固定数据 commit（与 fetch-ecdict.mjs 一致）。
+ * manifest.sourceCommit 语义 = 数据来源固定 commit（非仓库 commit）。
+ */
+const ECDICT_SOURCE_COMMIT = "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b";
+
 function sha256(buf) {
   return createHash("sha256").update(buf).digest("hex");
 }
 
-/** 压缩并写入文件，返回 { path, size, sha256 } */
+/**
+ * 压缩并写入文件，返回 { fileName, size, sha256 }。
+ *
+ * sha256 对**解压后原始 JSON** 计算（三编码同值），与运行时
+ * `downloadAndVerifyPackage` 及设计 §5.4 口径一致。
+ * size 保持传输体积（压缩后字节数）。
+ */
 function compressAndWrite(inputBuf, baseName, encoding, presetsDir) {
   let compressed;
   let ext;
@@ -60,16 +75,19 @@ function compressAndWrite(inputBuf, baseName, encoding, presetsDir) {
   return {
     fileName,
     size: compressed.length,
-    sha256: sha256(compressed),
+    // 解压后原始 JSON 的 SHA-256（三编码同值，与 §5.4 口径一致）
+    sha256: sha256(inputBuf),
   };
 }
 
 async function main() {
   const argv = process.argv.slice(2);
   const baseUrlIdx = argv.indexOf("--base-url");
-  const baseUrl = baseUrlIdx >= 0 ? argv[baseUrlIdx + 1] : "./presets/";
+  const rawBaseUrl = baseUrlIdx >= 0 ? argv[baseUrlIdx + 1] : "./presets/";
+  // 确保尾斜杠归一（避免 URL 拼接断裂）
+  const baseUrl = rawBaseUrl.endsWith("/") ? rawBaseUrl : `${rawBaseUrl}/`;
 
-  const sourceCommit = await getSourceCommit();
+  const buildCommit = getBuildCommit();
 
   // 读取 Tier 1 / Tier 2 原始 JSON
   const tier1Path = path.join(OUTPUT_DIR, "tier1.json");
@@ -168,7 +186,10 @@ async function main() {
           },
           raw: { url: baseUrl + tier1Raw.fileName, size: tier1Raw.size, sha256: tier1Raw.sha256 },
         },
-        sourceCommit,
+        // sourceCommit = ECDICT 固定数据 commit（§5.1 口径）
+        sourceCommit: ECDICT_SOURCE_COMMIT,
+        // buildCommit = 仓库构建 commit（可追溯性附加字段）
+        buildCommit,
         ...(enrichmentEntry ? { enrichment: enrichmentEntry } : {}),
       },
       {
@@ -187,7 +208,8 @@ async function main() {
           },
           raw: { url: baseUrl + tier2Raw.fileName, size: tier2Raw.size, sha256: tier2Raw.sha256 },
         },
-        sourceCommit,
+        sourceCommit: ECDICT_SOURCE_COMMIT,
+        buildCommit,
       },
     ],
     generatedAt: new Date().toISOString(),
@@ -207,7 +229,8 @@ async function main() {
   if (enrichmentEntry) {
     console.log(`  Tier 1 富化包：brotli ${enrichmentEntry.variants.brotli.size / 1024} KB`);
   }
-  console.log(`  源 commit：${sourceCommit}`);
+  console.log(`  数据 commit（sourceCommit）：${ECDICT_SOURCE_COMMIT}`);
+  console.log(`  构建 commit（buildCommit）：${buildCommit}`);
   console.log(`  manifest：${manifestPath}`);
 }
 

@@ -59,6 +59,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: 获取 ECDICT 数据（固定 commit + SHA256 校验）
+        run: node scripts/presets/fetch-ecdict.mjs
+
       - name: 构建 Tier 1 词包
         run: node scripts/presets/build.mjs --tier 1
 

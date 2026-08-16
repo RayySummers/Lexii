@@ -88,6 +88,8 @@ export interface DictionaryInstallOptions {
   time?: string;
   /** 块间让出事件循环（测试可注入 no-op；默认 setTimeout 0） */
   yield?: () => Promise<void>;
+  /** 取消信号（AbortController）。传入后块间检查 aborted → 抛 AbortError。 */
+  signal?: AbortSignal;
 }
 
 // ─── 内部辅助 ─────────────────────────────────────────────────────────────────
@@ -179,6 +181,7 @@ export async function installDictionaryPackage(
 ): Promise<DictionaryInstallResult> {
   const time = options.time ?? new Date().toISOString();
   const yieldFn = options.yield ?? yieldToMainThread;
+  const signal = options.signal;
 
   const done = await db.meta.get(dictionaryDoneKey(pkg.id));
   if (done) {
@@ -189,7 +192,7 @@ export async function installDictionaryPackage(
       return { status: "already-installed", installedVersion: done.value };
     }
     // 版本失配 → 增量升级（§3.2）
-    return upgradeDictionaryPackage(db, pkg, done.value, time, yieldFn);
+    return upgradeDictionaryPackage(db, pkg, done.value, time, yieldFn, signal);
   }
 
   // ─── 首次安装 ────────────────────────────────────────────────────────────────
@@ -212,6 +215,10 @@ export async function installDictionaryPackage(
   let skipped = 0;
 
   while (cursor < total) {
+    // 块间取消检查（§6.4 AbortController）
+    if (signal?.aborted) {
+      throw new DOMException("安装已取消", "AbortError");
+    }
     const chunk = pkg.entries.slice(cursor, cursor + DICTIONARY_CHUNK_SIZE);
     const nextCursor = cursor + chunk.length;
     const expectedCursor = cursor;
@@ -316,6 +323,7 @@ async function upgradeDictionaryPackage(
   oldVersion: string,
   time: string,
   yieldFn: () => Promise<void>,
+  signal?: AbortSignal,
 ): Promise<DictionaryInstallResult> {
   // CAS 升级锁：并发升级时只有一个能成功
   const lockKey = dictionaryUpgradeLockKey(pkg.id);
@@ -363,6 +371,9 @@ async function upgradeDictionaryPackage(
       }
     }
     for (let i = 0; i < removedTerms.length; i += DICTIONARY_CHUNK_SIZE) {
+      if (signal?.aborted) {
+        throw new DOMException("安装已取消", "AbortError");
+      }
       const chunk = removedTerms.slice(i, i + DICTIONARY_CHUNK_SIZE);
       await db.transaction("rw", db.dictionarySenses, async () => {
         for (const term of chunk) {
@@ -385,6 +396,9 @@ async function upgradeDictionaryPackage(
     let updatedCount = 0;
     let skipped = 0;
     for (let i = 0; i < pkg.entries.length; i += DICTIONARY_CHUNK_SIZE) {
+      if (signal?.aborted) {
+        throw new DOMException("安装已取消", "AbortError");
+      }
       const chunk = pkg.entries.slice(i, i + DICTIONARY_CHUNK_SIZE);
       await db.transaction("rw", db.dictionarySenses, async () => {
         for (const entry of chunk) {
@@ -691,15 +705,18 @@ export async function detectDecompression(): Promise<"brotli" | "gzip" | "raw"> 
  *
  * 前提：`crypto.subtle` 仅安全上下文可用（HTTPS 或 localhost）。
  * 非安全上下文直接抛出可读错误（Phase 3 UI 需展示）。
+ *
+ * signal 可选，用于取消下载（AbortController）。传入后 fetch 请求可被中止。
  */
 export async function downloadAndVerifyPackage(
   variant: ManifestVariant,
+  signal?: AbortSignal,
 ): Promise<PresetWordEntry[]> {
   if (typeof globalThis.crypto === "undefined" || !globalThis.crypto.subtle) {
     throw new Error("当前环境不支持 crypto.subtle（需 HTTPS 或 localhost 安全上下文）");
   }
 
-  const response = await fetch(variant.url, { cache: "no-store" });
+  const response = await fetch(variant.url, { cache: "no-store", signal });
   if (!response.ok) {
     throw new Error(`包文件下载失败：HTTP ${response.status}`);
   }

@@ -477,14 +477,25 @@ function DictionaryPackageCard({
       ) : null}
 
       {status === "not-installed" ? (
-        <button
-          type="button"
-          disabled={installing}
-          onClick={() => onDownload(summary)}
-          className="w-fit rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {installing ? "下载中…" : "下载"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={installing}
+            onClick={() => onDownload(summary)}
+            className="w-fit rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {installing ? "下载中…" : "下载"}
+          </button>
+          {installing ? (
+            <button
+              type="button"
+              onClick={() => onCancel(summary.id)}
+              className="rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium transition-colors hover:border-danger hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            >
+              取消
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       {isUpgradeAvailable ? (

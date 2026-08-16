@@ -280,22 +280,26 @@ export function createIndexedDbSettingsDataProvider(db: LexilexiDatabase): Setti
         throw new DOMException("下载已取消", "AbortError");
       }
 
-      // 下载 + 校验 + 解压（若 signal 已取消则 downloadAndVerifyPackage 内的 fetch 会立即 reject）
-      const entries = await downloadAndVerifyPackage(manifestInfo.bestVariant);
+      // 下载 + 校验 + 解压（signal 传递给 fetch，下载中途可中止）
+      const entries = await downloadAndVerifyPackage(manifestInfo.bestVariant, signal);
 
       // 安装前检查取消
       if (signal?.aborted) {
         throw new DOMException("安装已取消", "AbortError");
       }
 
-      // 安装到 dictionarySenses 表
-      const result = await coreInstallDictionaryPackage(db, {
-        id: packageId,
-        version: manifestInfo.version,
-        name: pkgDef.name,
-        lang: "en",
-        entries,
-      });
+      // 安装到 dictionarySenses 表（signal 传递给安装循环，块间可中止）
+      const result = await coreInstallDictionaryPackage(
+        db,
+        {
+          id: packageId,
+          version: manifestInfo.version,
+          name: pkgDef.name,
+          lang: "en",
+          entries,
+        },
+        { signal },
+      );
 
       if (result.status === "already-installed") {
         return { status: "already-installed", installedVersion: result.installedVersion };

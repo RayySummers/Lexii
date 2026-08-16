@@ -409,11 +409,109 @@ describe("DictionaryPackagesScreen", () => {
     expect(capturedSignal).toBeDefined();
     expect(capturedSignal!.aborted).toBe(false);
 
-    // 验证 signal 可以被 abort
-    capturedSignal!.addEventListener("abort", vi.fn());
-    // 注意：由于 handleConfirmDownload 内部的 AbortController 引用
-    // 我们无法直接调用 handleCancelInstall，但可以验证 signal 的传递
-    // 取消功能在集成测试中验证
+    // 点击取消按钮
+    await waitFor(() => {
+      expect(screen.getByText("取消")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("取消"));
+
+    // signal 应该被 abort
+    expect(capturedSignal!.aborted).toBe(true);
+  });
+
+  it("下载阶段也展示取消按钮（pendingInstalls 但 status 仍 not-installed）", async () => {
+    // 让 installDictionaryPackage 挂起（模拟下载阶段，status 仍 not-installed）
+    const installSpy = vi.fn().mockImplementation(() => {
+      return new Promise<DictionaryInstallResult>(() => {
+        // 不 resolve
+      });
+    });
+    const provider = makeProvider({
+      installDictionaryPackage: installSpy,
+      // getDictionaryPackageSummaries 返回 not-installed（模拟下载中状态未变）
+      getDictionaryPackageSummaries: vi.fn().mockResolvedValue([
+        {
+          id: "core-en-tier1",
+          name: "Tier 1 标准词包",
+          status: "not-installed",
+          installedCount: 0,
+          totalCount: 58_244,
+        },
+        {
+          id: "core-en-tier2",
+          name: "Tier 2 全量词包",
+          status: "not-installed",
+          installedCount: 0,
+          totalCount: 401_222,
+        },
+      ] satisfies DictionaryPackageSummary[]),
+    });
+    render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("下载")).toHaveLength(2);
+    });
+
+    // 点击 Tier 1 下载 → 确认
+    fireEvent.click(screen.getAllByText("下载")[0]!);
+    await waitFor(() => {
+      expect(screen.getByText("确认下载")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("确认下载"));
+
+    // 等待 install 被调用
+    await waitFor(() => {
+      expect(installSpy).toHaveBeenCalledOnce();
+    });
+
+    // 下载阶段应展示「下载中…」和「取消」按钮
+    await waitFor(() => {
+      expect(screen.getByText("下载中…")).toBeInTheDocument();
+    });
+    expect(screen.getByText("取消")).toBeInTheDocument();
+  });
+
+  it("AbortError 展示「下载已取消」提示（非错误态）", async () => {
+    const installSpy = vi.fn().mockImplementation((_id: string, signal?: AbortSignal) => {
+      return new Promise<DictionaryInstallResult>((_resolve, reject) => {
+        // 监听 abort → reject
+        signal?.addEventListener("abort", () => {
+          reject(new DOMException("安装已取消", "AbortError"));
+        });
+      });
+    });
+    const provider = makeProvider({
+      installDictionaryPackage: installSpy,
+    });
+    render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("下载")).toHaveLength(2);
+    });
+
+    // 点击下载 → 确认
+    fireEvent.click(screen.getAllByText("下载")[0]!);
+    await waitFor(() => {
+      expect(screen.getByText("确认下载")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("确认下载"));
+
+    await waitFor(() => {
+      expect(installSpy).toHaveBeenCalledOnce();
+    });
+
+    // 点击取消
+    await waitFor(() => {
+      expect(screen.getByText("取消")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("取消"));
+
+    // 应展示「下载已取消」提示（非错误态）
+    await waitFor(() => {
+      expect(screen.getByText("下载已取消。")).toBeInTheDocument();
+    });
+    // 不应展示错误
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("manifest 不可用时确认对话框不展示体积（降级）", async () => {
