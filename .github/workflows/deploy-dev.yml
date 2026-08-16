@@ -27,8 +27,6 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: pages-dev
 # 并发控制（RAY-297 Oscar 评审 suggestion 1）：两通道共用同一部署串行队列。
 # group 统一为 pages、cancel-in-progress: false —— 部署按触发顺序排队落盘：
 # - 发版时 dev 部署（由 main 合入触发）与 release 部署（由 tag 推送触发）几乎
