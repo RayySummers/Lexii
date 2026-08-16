@@ -2,8 +2,9 @@
  * 搜词页组件测试（mock 数据源，不触碰 IndexedDB）。
  *
  * 覆盖状态机：词库空 / 初始提示 / 检索中 → 结果列表（含计数 live region）/
- * 无命中（库内无此词提示，RAY-292 口径）/ 错误；交互细节：空白查询不发起
- * 检索、防抖只执行最后一次查询、卸载后不写状态（最新请求序号守卫）；
+ * 无命中（库内无此词提示，RAY-292 口径）/ 错误（友好文案 + 错误详情折叠）；
+ * 交互细节：空白查询不发起检索、防抖只执行最后一次查询、清空输入与
+ * 组件卸载使在途请求失效（请求序号守卫，Oscar 评审 suggestion 1 修复口径）；
  * 搜词历史（RAY-292）：未输入时展示、点击回填检索（焦点回输入框）、
  * 叉叉单条删除、有命中的检索记入本地历史（去重移前）、零命中查询不进
  * 历史（评审 sug 2）、词库为空时历史仍可查看/删除（评审 sug 1）。
@@ -103,7 +104,7 @@ describe("SearchScreen", () => {
     expect(screen.getByText(/导入自建词库/)).toBeInTheDocument();
   });
 
-  it("检索失败展示错误（输入框保持可用）", async () => {
+  it("检索失败展示友好文案，原始信息折叠在「错误详情」中（输入框保持可用）", async () => {
     const provider = makeProvider({
       search: vi.fn().mockRejectedValue(new Error("索引损坏")),
     });
@@ -111,8 +112,71 @@ describe("SearchScreen", () => {
 
     typeQuery("app");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("检索失败：索引损坏");
+    // 主提示为固定友好文案，不直接透出内部错误（Oscar 评审 nit 1 口径）
+    expect(await screen.findByRole("alert")).toHaveTextContent("本地检索暂时不可用，请稍后重试。");
+    expect(screen.queryByText("检索失败：索引损坏")).not.toBeInTheDocument();
+    // 原始错误信息只在「错误详情」折叠区
+    const details = screen.getByText("错误详情").closest("details");
+    expect(details).not.toBeNull();
+    expect(details).toHaveTextContent("索引损坏");
     expect(screen.getByLabelText("搜索词条")).toBeInTheDocument();
+  });
+
+  it("清空输入使在途请求失效：过期响应不回写结果（评审 suggestion 1）", async () => {
+    vi.useFakeTimers();
+    let resolveSearch!: (value: SearchResult[]) => void;
+    const provider = makeProvider({
+      search: vi.fn(
+        () =>
+          new Promise<SearchResult[]>((resolve) => {
+            resolveSearch = resolve;
+          }),
+      ),
+    });
+    render(<SearchScreen provider={provider} onExit={() => {}} />);
+
+    typeQuery("app");
+    await act(async () => {
+      vi.advanceTimersByTime(200); // 防抖到期：发起在途检索（promise 挂起未返回）
+    });
+    expect(provider.search).toHaveBeenCalledTimes(1);
+
+    typeQuery(""); // 清空输入：复位检索区状态并使在途请求失效
+
+    await act(async () => {
+      resolveSearch([makeResult("apple", ["苹果"])]); // 过期响应此刻才到达
+    });
+
+    // 过期结果被序号守卫丢弃：不显示词条/计数，保持初始检索提示
+    expect(screen.queryByText("apple")).not.toBeInTheDocument();
+    expect(screen.queryByText("找到 1 条结果")).not.toBeInTheDocument();
+    expect(screen.getByText(/输入英文单词或中文释义关键词/)).toBeInTheDocument();
+  });
+
+  it("卸载后到达的过期响应不回写状态（序号守卫随卸载清理生效）", async () => {
+    vi.useFakeTimers();
+    let resolveSearch!: (value: SearchResult[]) => void;
+    const provider = makeProvider({
+      search: vi.fn(
+        () =>
+          new Promise<SearchResult[]>((resolve) => {
+            resolveSearch = resolve;
+          }),
+      ),
+    });
+    const { unmount } = render(<SearchScreen provider={provider} onExit={() => {}} />);
+
+    typeQuery("app");
+    await act(async () => {
+      vi.advanceTimersByTime(200); // 发起在途检索
+    });
+    unmount();
+
+    await act(async () => {
+      resolveSearch([makeResult("apple", ["苹果"])]); // 卸载后才到达
+    });
+    // 无异常即通过：卸载清理递增序号，过期响应被丢弃、不再触发任何状态写入
+    expect(provider.search).toHaveBeenCalledTimes(1);
   });
 
   it("空白查询不发起检索", async () => {
