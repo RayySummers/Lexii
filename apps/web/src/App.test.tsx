@@ -5,6 +5,7 @@ import type { LexilexiExportData, StudyMode } from "@lexilexi/core";
 import { App } from "./App";
 import { makeCard } from "./review/testFixtures";
 import type { ReviewCard, ReviewDataProvider } from "./review/types";
+import type { SearchDataProvider } from "./search/types";
 import type { SettingsDataProvider } from "./settings/types";
 import type { StatsDataProvider } from "./stats/types";
 
@@ -47,6 +48,15 @@ function makeSettingsProviderFactory() {
     getPresetSummaries: vi.fn().mockResolvedValue([]),
     getWordbookSummaries: vi.fn().mockResolvedValue([]),
     installWordbook: vi.fn().mockResolvedValue({ installedCount: 0, skippedCount: 0 }),
+  };
+  return { provider, factory: vi.fn().mockReturnValue(provider) };
+}
+
+/** 测试接缝：注入 mock 搜词数据源工厂（避免渲染时触碰浏览器 IndexedDB） */
+function makeSearchProviderFactory() {
+  const provider: SearchDataProvider = {
+    search: vi.fn().mockResolvedValue([]),
+    hasAnySenses: vi.fn().mockResolvedValue(true),
   };
   return { provider, factory: vi.fn().mockReturnValue(provider) };
 }
@@ -98,11 +108,32 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "混合" })).toBeInTheDocument();
   });
 
-  it("RAY-261：header 不再常驻主题开关（仅统计 / 设置入口）", () => {
+  it("RAY-261：header 不再常驻主题开关；RAY-266：新增搜词入口", () => {
     render(<App reviewProviderFactory={makeReviewProviderFactory().factory} />);
     expect(screen.queryByRole("button", { name: /切换到/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "搜词" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "统计" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();
+  });
+
+  it("点击搜词进入搜词页（惰性创建数据源），返回首页退出", async () => {
+    const { factory } = makeSearchProviderFactory();
+    render(
+      <App
+        reviewProviderFactory={makeReviewProviderFactory().factory}
+        searchProviderFactory={factory}
+      />,
+    );
+
+    // 未进入搜词页前不创建数据源（避免 jsdom 下触碰 IndexedDB）
+    expect(factory).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "搜词" }));
+    expect(await screen.findByRole("heading", { name: "搜词" })).toBeInTheDocument();
+    expect(factory).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "返回首页" }));
+    expect(screen.getByRole("button", { name: "学习" })).toBeInTheDocument();
   });
 
   it("RAY-261：设置页下拉选单切换主题偏好并写入 data-theme", async () => {

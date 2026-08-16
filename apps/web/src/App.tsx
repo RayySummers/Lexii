@@ -10,10 +10,13 @@
  *   设置页下拉选单，经 `useTheme`（App 级单一数据源）下发到设置页。
  *
  * 数据源注入：`reviewProviderFactory` / `settingsProviderFactory` /
- * `statsProviderFactory` 是测试接缝——测试传入 mock 工厂，生产环境使用
- * 默认工厂（浏览器 IndexedDB）。复习/设置工厂在进入对应界面时才惰性创建；
- * 统计工厂在挂载时创建（首页默认视图的到期徽标需要），其默认实现自带
- * 无 IndexedDB 环境兜底，因此非浏览器环境（如仅渲染首页的测试）不会抛错。
+ * `statsProviderFactory` / `searchProviderFactory` 是测试接缝——测试传入
+ * mock 工厂，生产环境使用默认工厂（浏览器 IndexedDB）。复习/设置/搜词工厂
+ * 在进入对应界面时才惰性创建；统计工厂在挂载时创建（首页默认视图的到期
+ * 徽标需要），其默认实现自带无 IndexedDB 环境兜底，因此非浏览器环境
+ * （如仅渲染首页的测试）不会抛错。
+ *
+ * RAY-266：header 新增「搜词」入口（真机反馈找不到搜词入口，验收期优先项）。
  */
 import { useCallback, useState } from "react";
 import type { StudyMode } from "@lexilexi/core";
@@ -23,6 +26,9 @@ import { QuizScreen } from "./review/QuizScreen";
 import { ReviewScreen } from "./review/ReviewScreen";
 import { createDefaultReviewDataProvider } from "./review/data";
 import type { ReviewDataProvider } from "./review/types";
+import { SearchScreen } from "./search/SearchScreen";
+import { createDefaultSearchDataProvider } from "./search/data";
+import type { SearchDataProvider } from "./search/types";
 import { SettingsScreen } from "./settings/SettingsScreen";
 import { createDefaultSettingsDataProvider } from "./settings/data";
 import type { SettingsDataProvider } from "./settings/types";
@@ -31,7 +37,7 @@ import { createDefaultStatsDataProvider } from "./stats/data";
 import { useStatsProvider } from "./stats/useStatsProvider";
 import type { StatsDataProvider } from "./stats/types";
 
-type View = "home" | "review" | "settings" | "stats";
+type View = "home" | "review" | "search" | "settings" | "stats";
 
 export interface AppProps {
   /** 复习数据源工厂（测试注入 mock；默认浏览器 IndexedDB） */
@@ -40,16 +46,20 @@ export interface AppProps {
   settingsProviderFactory?: () => SettingsDataProvider;
   /** 统计页/首页徽标数据源工厂（测试注入 mock；默认浏览器 IndexedDB，无 IndexedDB 环境兜底） */
   statsProviderFactory?: () => StatsDataProvider;
+  /** 搜词页数据源工厂（测试注入 mock；默认浏览器 IndexedDB） */
+  searchProviderFactory?: () => SearchDataProvider;
 }
 
 export function App({
   reviewProviderFactory = createDefaultReviewDataProvider,
   settingsProviderFactory = createDefaultSettingsDataProvider,
   statsProviderFactory = createDefaultStatsDataProvider,
+  searchProviderFactory = createDefaultSearchDataProvider,
 }: AppProps) {
   const { preference, setPreference } = useTheme();
   const [reviewProvider, setReviewProvider] = useState<ReviewDataProvider | null>(null);
   const [settingsProvider, setSettingsProvider] = useState<SettingsDataProvider | null>(null);
+  const [searchProvider, setSearchProvider] = useState<SearchDataProvider | null>(null);
   const statsProvider = useStatsProvider(statsProviderFactory);
   const [view, setView] = useState<View>("home");
   const [reviewMode, setReviewMode] = useState<StudyMode>("review");
@@ -70,6 +80,11 @@ export function App({
     setView("settings");
   }, [settingsProviderFactory]);
 
+  const openSearch = useCallback(() => {
+    setSearchProvider((current) => current ?? searchProviderFactory());
+    setView("search");
+  }, [searchProviderFactory]);
+
   const openStats = useCallback(() => {
     setView("stats");
   }, []);
@@ -81,6 +96,14 @@ export function App({
   return (
     <div className="min-h-screen bg-bg text-text transition-colors">
       <header className="mx-auto flex w-full max-w-3xl items-center justify-end gap-2 px-6 py-6">
+        <button
+          type="button"
+          onClick={openSearch}
+          aria-pressed={view === "search"}
+          className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        >
+          搜词
+        </button>
         <button
           type="button"
           onClick={openStats}
@@ -105,6 +128,8 @@ export function App({
         ) : (
           <ReviewScreen provider={reviewProvider} mode={reviewMode} onExit={goHome} />
         )
+      ) : view === "search" && searchProvider ? (
+        <SearchScreen provider={searchProvider} onExit={goHome} />
       ) : view === "settings" && settingsProvider ? (
         <SettingsScreen
           provider={settingsProvider}

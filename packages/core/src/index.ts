@@ -150,3 +150,5 @@ export type {
 } from "./studyLoop";
 export { editDistance, generateOptions } from "./distractors";
 export type { DistractorOption } from "./distractors";
+export { DEFAULT_SEARCH_LIMIT, searchLexilexiSenses, searchSenses } from "./search";
+export type { SenseSearchHit, SenseSearchHitKind, SenseSearchOptions } from "./search";
