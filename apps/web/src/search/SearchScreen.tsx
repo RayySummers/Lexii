@@ -8,7 +8,8 @@
  *   无命中（明确提示「库内无此词，可导入自建词库」）→ 结果列表（含
  *   结果计数 live region）；错误态单独展示，不影响输入框继续使用；
  *   词库为空但仍有历史时（RAY-292 评审 sug 1）：空库提示与搜索历史
- *   同时展示，历史照常可点选/单条删除；
+ *   同时展示，历史照常可点选/单条删除；点选历史词条回填输入后，
+ *   空库提示内给出该查询暂无结果的反馈（delta 复核 nit）；
  * - RAY-292 搜词历史：只存本地（localStorage，见 lib/searchHistory），
  *   仅记录有命中的检索（RAY-292 评审 sug 2：拼写错误 / 未收录等零命中
  *   查询不进历史，不积攒噪音词）；点击历史词条回填输入并重新检索，
@@ -222,7 +223,9 @@ function SearchContent({
   }
   if (emptyLibrary) {
     // RAY-292 评审 sug 1：词库为空但仍有历史时，空库提示与历史同时展示，
-    // 历史照常可查看/点选/单条删除（仅输入为空时展示，保持既有交互节奏）
+    // 历史照常可查看/点选/单条删除（仅输入为空时展示，保持既有交互节奏）；
+    // 点选历史词条回填输入后（query 非空），空库提示内给出该查询暂无结果的
+    // 反馈（delta 复核 nit：空库下检索永远无命中，必须有可见反馈）
     return (
       <div className="flex flex-col gap-4">
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface p-8 text-center">
@@ -230,6 +233,11 @@ function SearchContent({
           <p className="max-w-sm text-sm text-text-muted">
             还没有任何词可搜。先在设置页导入 CSV 词表，或到词书库安装一本词书。
           </p>
+          {query.length > 0 ? (
+            <p role="status" className="max-w-sm text-sm text-text-muted">
+              「{query}」现在搜不到结果——先把词表导进来或安装词书，再回来搜。
+            </p>
+          ) : null}
         </div>
         {query.length === 0 && history.length > 0 ? (
           <SearchHistoryList

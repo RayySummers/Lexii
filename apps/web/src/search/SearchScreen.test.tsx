@@ -252,4 +252,22 @@ describe("SearchScreen", () => {
     expect(screen.getByRole("button", { name: "banana" })).toBeInTheDocument();
     expect(storedHistory()).toEqual(["banana"]);
   });
+
+  it("空词库点选历史词条：回填输入并给出该查询暂无结果的反馈（delta 复核 nit）", async () => {
+    localStorage.setItem(SEARCH_HISTORY_STORAGE_KEY, JSON.stringify(["apple"]));
+    const provider = makeProvider({ hasAnySenses: vi.fn().mockResolvedValue(false) });
+    render(<SearchScreen provider={provider} onExit={() => {}} />);
+
+    // 先等空库判定落地（hasAnySenses 异步），再点选：判定落地前点选会命中
+    // 即将被替换的旧按钮节点（组件测试特有竞态，真实点击不受影响）
+    expect(await screen.findByRole("heading", { name: "词库还是空的" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "apple" }));
+
+    // 输入回填，空库提示仍在，且带「该查询暂无结果」的可见反馈
+    expect(screen.getByLabelText("搜索词条")).toHaveValue("apple");
+    expect(screen.getByRole("heading", { name: "词库还是空的" })).toBeInTheDocument();
+    expect(await screen.findByText(/「apple」现在搜不到结果/)).toBeInTheDocument();
+    // 防抖后检索照常发起（输入回填触发的既有链路）
+    await waitFor(() => expect(provider.search).toHaveBeenCalledWith("apple"));
+  });
 });
