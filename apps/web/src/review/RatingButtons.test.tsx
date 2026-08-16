@@ -2,15 +2,16 @@
  * 评分按钮测试（RAY-265：默认三档，设置可切四档）。
  *
  * 覆盖：三档渲染认识 / 模糊 / 不认识且无 Easy；四档渲染
- * Again / Hard / Good / Easy；点击回调携带对应评分档位。
+ * Again / Hard / Good / Easy；点击回调携带对应评分档位；
+ * 分钟级副文案不渲染（RAY-279：移除「X 分钟后复习」提示）。
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ReviewRating } from "@lexilexi/core";
 import { RatingButtons } from "./RatingButtons";
 
-const DUE_LABELS: Record<ReviewRating, string> = {
-  again: "10分钟",
+const DUE_LABELS: Record<ReviewRating, string | null> = {
+  again: null, // 分钟级「X 分钟后复习」文案（RAY-279 起不展示）
   hard: "1小时",
   good: "1天",
   easy: "4天",
@@ -59,5 +60,33 @@ describe("RatingButtons", () => {
     fireEvent.click(easyButton);
 
     expect(onGrade).toHaveBeenCalledWith("easy");
+  });
+
+  it("分钟级副文案不渲染（RAY-279），小时/天级保留", () => {
+    const onGrade = vi.fn();
+    render(<RatingButtons dueLabels={DUE_LABELS} mode="three" onGrade={onGrade} />);
+
+    // again 档为 null（分钟级），不渲染「X 分钟后复习」类文案
+    expect(screen.queryByText(/分钟/)).not.toBeInTheDocument();
+    const againButton = screen.getByRole("button", { name: /评分：不认识/ });
+    expect(againButton).toHaveTextContent("不认识");
+    // 小时 / 天级（真实到期排期）保留
+    expect(screen.getByText("1小时")).toBeInTheDocument();
+    expect(screen.getByText("1天")).toBeInTheDocument();
+  });
+
+  it("全部档位为 null 时按钮无副文案且照常可用（RAY-279）", () => {
+    const onGrade = vi.fn();
+    const allNull: Record<ReviewRating, string | null> = {
+      again: null,
+      hard: null,
+      good: null,
+      easy: null,
+    };
+    render(<RatingButtons dueLabels={allNull} mode="four" onGrade={onGrade} />);
+
+    expect(screen.queryByText(/分钟|小时|天|月|年/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /评分：Again/ }));
+    expect(onGrade).toHaveBeenCalledWith("again");
   });
 });

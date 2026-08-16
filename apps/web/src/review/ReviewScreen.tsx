@@ -7,7 +7,8 @@
  *     空格 / 回车 → 翻面（焦点在按钮上时交给按钮原生行为，避免双触发）
  *     三档（默认）：1–3 或 A / H / G → 不认识 / 模糊 / 认识
  *     四档（Anki 传统）：1–4 或 A / H / G / E → Again / Hard / Good / Easy
- * - 评分按钮副文案为各档到期时间预览（@lexilexi/fsrs Scheduler.preview）。
+ * - 评分按钮副文案为各档到期时间预览（@lexilexi/fsrs Scheduler.preview）；
+ *   分钟级文案不展示（RAY-279：移除「X 分钟后复习」提示）。
  *
  * RAY-265：
  * - 评分档位默认三档（认识 / 模糊 / 不认识），设置内可切四档；
@@ -25,7 +26,7 @@ import type { RatingTierMode } from "../lib/ratingTiers";
 import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
 import { ReviewCard } from "./ReviewCard";
 import { RatingButtons } from "./RatingButtons";
-import { formatDueLabel, previewGradeDueLabels, ratingFromKey } from "./grade";
+import { dueLabelForDisplay, previewGradeDueLabels, ratingFromKey } from "./grade";
 import type { ReviewCard as ReviewCardData, ReviewDataProvider } from "./types";
 import { useReviewSession, type ReviewSession } from "./useReviewSession";
 
@@ -52,15 +53,16 @@ const NO_QUEUE_COPY: Record<StudyMode, { title: string; body: string }> = {
   },
 };
 
-/** 当前卡评分的到期文案（预览计算轻量，无需 memo） */
-function computeDueLabels(card: ReviewCardData): Record<ReviewRating, string> {
+/** 当前卡评分的到期文案（预览计算轻量，无需 memo）；
+ * 分钟级（「X 分钟后复习」类，RAY-279）为 null，不展示 */
+function computeDueLabels(card: ReviewCardData): Record<ReviewRating, string | null> {
   const now = new Date();
   const preview = previewGradeDueLabels(card.memory.fields, now);
   return {
-    again: formatDueLabel(preview.again, now),
-    hard: formatDueLabel(preview.hard, now),
-    good: formatDueLabel(preview.good, now),
-    easy: formatDueLabel(preview.easy, now),
+    again: dueLabelForDisplay(preview.again, now),
+    hard: dueLabelForDisplay(preview.hard, now),
+    good: dueLabelForDisplay(preview.good, now),
+    easy: dueLabelForDisplay(preview.easy, now),
   };
 }
 
@@ -233,7 +235,8 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
 
 interface PhaseContentProps {
   session: ReviewSession;
-  dueLabels: Record<ReviewRating, string> | null;
+  /** 各档评分的到期副文案；null = 该档不展示（分钟级文案，RAY-279） */
+  dueLabels: Record<ReviewRating, string | null> | null;
   mode: StudyMode;
   /** 评分档位模式（三档默认 / 四档 Anki 传统） */
   tierMode: RatingTierMode;
