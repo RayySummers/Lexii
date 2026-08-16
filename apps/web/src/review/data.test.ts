@@ -222,6 +222,41 @@ describe("createIndexedDbReviewDataProvider", () => {
     });
   });
 
+  it("loadQueueMeta：剩余未学新词全部为暂停/删除条目时不报「仍有新词」（Oscar suggestion 2）", async () => {
+    window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await provider.importSampleWordlist();
+
+    // 学满额度 → 剩余新词均不可进入队列（额度耗尽场景）
+    const first = (await provider.loadQueue("learn")).slice(0, 5);
+    for (const card of first) {
+      await provider.grade(card, "good", { reviewDurationMs: 1_000, revealed: true });
+    }
+
+    // 把全部剩余未学新词标记为暂停：与队列装配（只保留 active）同口径，
+    // 此时不应再提示「剩余新词顺延到明天」
+    const remainingNewStates = await db!.memoryStates
+      .filter((state) => state.fields.reps === 0)
+      .toArray();
+    await db!.transaction("rw", db!.items, async () => {
+      for (const state of remainingNewStates) {
+        const item = await db!.items.get(state.itemId);
+        if (item && item.status === "active") {
+          await db!.items.put({
+            ...item,
+            status: "suspended",
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+    });
+
+    expect(await provider.loadQueueMeta!("learn")).toEqual({
+      remainingNewCardQuota: 0,
+      hasDueNewWords: false,
+    });
+  });
+
   it("每日新卡上限：今日已学词条数扣减额度（已学 2 张后剩余额度只补到上限）", async () => {
     window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
     const provider = createIndexedDbReviewDataProvider(db!);

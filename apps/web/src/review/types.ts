@@ -80,7 +80,7 @@ export interface ReviewDataProvider {
   /**
    * 按学习模式加载队列（RAY-253 三模式首页）：
    * - learn：未评分新词（reps === 0）
-   * - review：已评分且到期的卡（reps > 0 && due <= now）
+   * - review：已评分且到期的卡（reps > 0 && due <= 今日结束，日历日口径）
    * - mixed：复习卡穿插新词卡（每 2 张复习 1 张新词）
    * 顺序由 @lexilexi/core 的 getStudyQueueItemIds 决定（含混合穿插）。
    */

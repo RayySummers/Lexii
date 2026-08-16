@@ -10,6 +10,7 @@ import type { StudyMode } from "@lexilexi/core";
 import { BackArrowIcon } from "../components/icons";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { MultipleChoiceCard } from "./MultipleChoiceCard";
+import { quotaExhaustedCopy } from "./quotaCopy";
 import { useMultipleChoiceSession } from "./useMultipleChoiceSession";
 import type { ReviewDataProvider } from "./types";
 
@@ -35,25 +36,6 @@ const NO_QUEUE_COPY: Record<StudyMode, { title: string; body: string }> = {
     body: "今天没有到期词，也没有待学习的新词。休息一下，或返回首页换一种模式。",
   },
 };
-
-/** 每日新卡额度耗尽时的空状态文案（RAY-276 诊断线 3，与 ReviewScreen 同口径） */
-function quotaExhaustedCopy(
-  mode: StudyMode,
-  limit: number,
-): { title: string; body: string } | null {
-  if (mode === "review") {
-    return null;
-  }
-  return mode === "learn"
-    ? {
-        title: "今日新词额度已用完",
-        body: `每日新词上限 ${limit} 张已经学完，剩余新词顺延到明天。想继续学习请返回首页试试「复习」或「混合」模式。`,
-      }
-    : {
-        title: "今日新词额度已用完",
-        body: `今天没有到期的复习卡，每日新词上限 ${limit} 张也已学完。休息一下，明天再来。`,
-      };
-}
 
 export function QuizScreen({ provider, mode, onExit }: QuizScreenProps) {
   const session = useMultipleChoiceSession(provider, mode);

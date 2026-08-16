@@ -15,7 +15,7 @@ export interface StatsSnapshot {
   todayLearnCount: number;
   /** 今日已复习（次数）：今天对已学词条的复习次数（不含今天首次学习） */
   todayReviewCount: number;
-  /** 今日待学（词条）：due <= now 的记忆状态数（含此前积压） */
+  /** 今日待学（词条）：due <= 今日结束的记忆状态数（日历日口径，含此前积压与今天稍后到期的卡） */
   dueCount: number;
   /** 明日到期（词条）：due 落在明天本地日历日内的记忆状态数 */
   dueTomorrowCount: number;
