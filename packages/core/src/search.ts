@@ -17,6 +17,7 @@
  */
 import type { Sense } from "./domain";
 import type { LexilexiDatabase } from "./persistence";
+import { searchDictionarySenses } from "./dictionary";
 
 /** 命中类型：词条前缀 > 词条包含 > 释义包含（优先级从高到低） */
 export type SenseSearchHitKind = "term-prefix" | "term-substring" | "definition";
@@ -113,4 +114,50 @@ function compareHits(a: SenseSearchHit, b: SenseSearchHit): number {
     return byLength;
   }
   return a.sense.term.localeCompare(b.sense.term);
+}
+
+/**
+ * 全局合并检索 senses + dictionarySenses（RAY-294）。
+ *
+ * 去重规则：
+ * - 层内（senses 或 dictionarySenses 各自内部）：按 sense.id 去重
+ *   （RAY-266 口径，searchSenses 已处理）；
+ * - 跨层（dictionarySenses ↔ senses）：按 term（大小写不敏感）去重、
+ *   学习义项优先（senses 表晋升后副本的 id 与 dictionarySenses 不同，
+ *   但 term 相同，保留学习版本）。
+ *
+ * 两层完整取回 → 同一比较器全局排序 → 截断 DEFAULT_SEARCH_LIMIT。
+ */
+export async function searchAllSenses(
+  db: LexilexiDatabase,
+  query: string,
+  options: SenseSearchOptions = {},
+): Promise<SenseSearchHit[]> {
+  const q = query.trim().toLowerCase().slice(0, MAX_QUERY_LENGTH);
+  if (q.length === 0) return [];
+  const limit = options.limit ?? DEFAULT_SEARCH_LIMIT;
+
+  // 两层并行取回（学习表通常很小，词典表可能很大）
+  const [learningHits, dictHits] = await Promise.all([
+    searchLexilexiSenses(db, q, { limit: 0 }), // 不截断，取全部命中
+    searchDictionarySenses(db, q, { limit: 0 }),
+  ]);
+
+  // 按 term（大小写不敏感）去重，学习义项优先
+  const seen = new Map<string, SenseSearchHit>(); // lowercased term → hit
+  for (const hit of learningHits) {
+    seen.set(hit.sense.term.toLowerCase(), hit);
+  }
+  for (const hit of dictHits) {
+    const key = hit.sense.term.toLowerCase();
+    if (!seen.has(key)) {
+      seen.set(key, { sense: hit.sense, kind: hit.kind });
+    }
+    // 学习义项已存在 → 跳过词典义项（学习义项优先）
+  }
+
+  // 全局排序 → 截断
+  const merged = [...seen.values()];
+  merged.sort(compareHits);
+  return limit > 0 ? merged.slice(0, limit) : merged;
 }

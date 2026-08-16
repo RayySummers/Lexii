@@ -19,6 +19,18 @@ import type { NotebookEntry } from "./notebook";
 import { DB_SCHEMA_VERSION } from "./constants";
 import { createId, toEventId } from "./id";
 
+/**
+ * 词典义项（RAY-294 Tier 1/2 扩展词包检索层）。
+ *
+ * 与 Sense 同构 + source 字段（所属包标识，如 "core-en-tier1"）。
+ * 仅用于检索，不参与复习队列、统计、导出。
+ * 不复用 Sense 类型——Sense 无 source 字段（已核实 domain.ts）。
+ */
+export interface DictionarySense extends Sense {
+  /** 所属包标识（如 "core-en-tier1" / "core-en-tier2"），供增量替换按 source 范围删除 */
+  source: string;
+}
+
 /** Dexie 构造函数（默认真实 Dexie，测试可注入自定义实现） */
 export type DexieConstructor = new (databaseName: string, options?: DexieOptions) => Dexie;
 
@@ -54,6 +66,8 @@ export function createLexilexiDatabase(
  * 存量数据原样保留。
  * v5（RAY-284）：新增 notebookEntries 表（生词本条目）。纯新增表，
  * 无数据迁移，存量数据原样保留；版本与 P0 数据任务错开（红线）。
+ * v6（RAY-294）：新增 dictionarySenses 表（词典检索层）。纯新增表，
+ *   无数据迁移，存量数据原样保留。
  */
 export function openLexilexiDatabase(db: Dexie): void {
   if (db.isOpen()) {
@@ -86,6 +100,14 @@ export function openLexilexiDatabase(db: Dexie): void {
     events: "id, time, type",
     meta: "key",
   });
+  db.version(5).stores({
+    items: "id",
+    senses: "id, term",
+    memoryStates: "id, fields.due",
+    events: "id, time, type",
+    meta: "key",
+    notebookEntries: "id, senseId, status",
+  });
   db.version(DB_SCHEMA_VERSION).stores({
     items: "id",
     senses: "id, term",
@@ -93,6 +115,7 @@ export function openLexilexiDatabase(db: Dexie): void {
     events: "id, time, type",
     meta: "key",
     notebookEntries: "id, senseId, status",
+    dictionarySenses: "id, term, source",
   });
 }
 
@@ -109,6 +132,7 @@ export interface LexilexiTables {
   events: Table<Event, string>;
   meta: Table<MetaRecord, string>;
   notebookEntries: Table<NotebookEntry, string>;
+  dictionarySenses: Table<DictionarySense, string>;
 }
 
 export interface LexilexiDatabase extends Dexie {
@@ -118,6 +142,7 @@ export interface LexilexiDatabase extends Dexie {
   events: Table<Event, string>;
   meta: Table<MetaRecord, string>;
   notebookEntries: Table<NotebookEntry, string>;
+  dictionarySenses: Table<DictionarySense, string>;
 }
 
 /**
