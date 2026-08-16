@@ -4,6 +4,8 @@
  * RAY-253：三个模式按钮（学习 / 复习 / 混合）+ 今日待学徽标（RAY-254 起，此前为到期徽标）；
  * 品牌名与介绍文案不再渲染（已归档 docs/archive/homepage-intro-v1.md）。
  * RAY-260（Oscar 复评 suggestion 2）：有待学词时展示「今日新卡额度剩余 N 张」。
+ * RAY-278（真机反馈）：三模式按钮全视口一排三个——容器必须是 base `grid-cols-3`
+ * 而非 `sm:grid-cols-3`（窄屏会退化为单列堆叠）。
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -46,6 +48,28 @@ describe("HomeScreen", () => {
     expect(screen.getByRole("button", { name: "学习" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "复习" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "混合" })).toBeInTheDocument();
+  });
+
+  it("三模式按钮共处一个 base 三列网格（RAY-278：窄屏一排三个，不依赖 sm 断点）", () => {
+    render(<HomeScreen onStart={vi.fn()} statsProvider={null} />);
+
+    const modes = [
+      screen.getByRole("button", { name: "学习" }),
+      screen.getByRole("button", { name: "复习" }),
+      screen.getByRole("button", { name: "混合" }),
+    ];
+
+    // 三个按钮挂在同一个网格容器上
+    const containers = new Set(modes.map((b) => b.parentElement));
+    expect(containers.size).toBe(1);
+
+    // 容器为 base grid-cols-3（全视口生效），而非 sm:grid-cols-3（<640px 退化为单列）
+    const grid = modes[0]!.parentElement!;
+    expect(grid.className).toContain("grid-cols-3");
+    expect(grid.className).not.toContain("sm:grid-cols-3");
+
+    // 学习形式切换（卡片/选择题）不属于该网格
+    expect(grid).not.toContainElement(screen.getByRole("radio", { name: /卡片/ }));
   });
 
   it("不渲染品牌名与介绍文案（反馈 1：首页保持简洁）", () => {

@@ -16,6 +16,10 @@
  * RAY-269：新增选择题学习模式。首页添加学习形式切换（卡片 / 选择题），
  * 用户可先选形式再选模式。默认卡片形式（向后兼容）。
  *
+ * RAY-278（真机反馈）：三模式按钮改为全视口一排三个——原 `sm:grid-cols-3`
+ * 在手机窄屏（<640px）退化为单列堆叠，真机看起来不对齐；改为 base 即
+ * `grid-cols-3`，窄屏收窄内边距与字号，避免 320px 视口溢出。
+ *
  * - 待学徽标数据经 StatsDataProvider（statsProvider 为 null 时不展示，
  *   如无 IndexedDB 的测试环境）；
  * - 仅承载展示与导航，队列数据一律由 ReviewScreen / QuizScreen 按模式加载；
@@ -79,17 +83,17 @@ export function HomeScreen({ onStart, statsProvider }: HomeScreenProps) {
         ))}
       </div>
 
-      {/* 三模式入口 */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      {/* 三模式入口（RAY-278：窄屏也一排三个，不随 sm 断点堆叠） */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {MODES.map(({ mode, title, subtitle }) => (
           <button
             key={mode}
             type="button"
             onClick={() => onStart(mode, format)}
-            className="flex flex-col gap-1 rounded-2xl border border-border bg-surface p-6 text-left transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="flex min-w-0 flex-col gap-1 rounded-2xl border border-border bg-surface p-4 text-left transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:p-6"
           >
-            <span className="text-xl font-semibold">{title}</span>
-            <span aria-hidden="true" className="text-sm text-text-muted">
+            <span className="text-lg font-semibold sm:text-xl">{title}</span>
+            <span aria-hidden="true" className="text-xs leading-snug text-text-muted sm:text-sm">
               {subtitle}
             </span>
           </button>
