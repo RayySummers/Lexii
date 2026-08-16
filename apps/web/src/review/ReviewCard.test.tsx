@@ -143,3 +143,82 @@ describe("ReviewCard 背面富化内容", () => {
     expect(button).toHaveAttribute("aria-expanded", "true");
   });
 });
+
+describe("ReviewCard 固定高度与卡片内部滚动（RAY-291）", () => {
+  /** 卡片按钮：翻面后可达名从「显示」变「隐藏」，正则取公共部分 */
+  function cardButton(): HTMLElement {
+    return screen.getByRole("button", { name: /abandon 的释义/ });
+  }
+
+  /** 两面都渲染同一词条文本（正反面各一），取当前可见面（aria-hidden=false）的那份 */
+  function visibleElementOf(text: string): HTMLElement {
+    const matches = screen.getAllByText(text);
+    const visible = matches.find(
+      (element) => element.closest("[aria-hidden]")?.getAttribute("aria-hidden") === "false",
+    );
+    if (!visible) {
+      throw new Error(`未找到可见面的文本：${text}`);
+    }
+    return visible;
+  }
+
+  it("卡片高度固定、与内容长度无关：外层容器带视口 clamp 高度（不随内容伸缩）", () => {
+    render(<Harness sense={makeRichSense()} />);
+    const wrapper = cardButton().parentElement as HTMLElement;
+    // 高度只由视口决定（clamp 区间），超长内容由面内滚动区承接
+    expect(wrapper).toHaveClass("h-[clamp(14rem,calc(100dvh_-_26rem),32rem)]");
+  });
+
+  it("正反面同口径：两面共用同一 CardFace 结构，h-full 填满固定高度卡片", () => {
+    render(<Harness sense={makeRichSense()} />);
+    const faces = Array.from(cardButton().querySelectorAll(":scope > div"));
+    expect(faces).toHaveLength(2);
+    for (const face of faces) {
+      expect(face).toHaveClass("h-full", "overflow-hidden", "rounded-2xl", "border");
+    }
+  });
+
+  it("背面超长内容落在面内滚动区；评分提示固定在滚动区外的底栏", () => {
+    render(<Harness sense={makeRichSense()} />);
+    flipCard();
+
+    const scrollRegion = screen.getByText("放弃；抛弃").closest(".overflow-y-auto") as HTMLElement;
+    expect(scrollRegion).toHaveClass("overflow-y-auto", "overscroll-contain");
+    // 富化内容全部收纳在同一滚动区内
+    for (const label of ["例句", "词根词缀", "中文词源", "近义词", "反义词"]) {
+      expect(scrollRegion).toContainElement(screen.getByText(label));
+    }
+    // 评分提示不在滚动区内：内容滚动时提示恒留在卡片底部
+    const ratingHint = screen.getByText("按 1–3（或 A / H / G）评分");
+    expect(scrollRegion).not.toContainElement(ratingHint);
+    expect(ratingHint.parentElement).toBe(cardButton().lastElementChild);
+  });
+
+  it("正面词条在面内滚动区内；翻面提示固定在正面底栏", () => {
+    render(<Harness sense={makeRichSense()} />);
+
+    const term = visibleElementOf("abandon");
+    const scrollRegion = term.closest(".overflow-y-auto") as HTMLElement;
+    expect(scrollRegion).toHaveClass("overflow-y-auto", "overscroll-contain");
+    expect(scrollRegion).toContainElement(term);
+
+    const flipHint = screen.getByText("点击卡片或按空格查看释义");
+    expect(scrollRegion).not.toContainElement(flipHint);
+    expect(flipHint.parentElement).toBe(cardButton().firstElementChild);
+  });
+
+  it("换卡时滚动区以 sense.id 重建：滚动位置不跨卡残留", () => {
+    const first = makeRichSense();
+    const second = makeSense({ term: "benevolent", definitions: ["仁慈的；善意的"] });
+    const { rerender } = render(<Harness sense={first} />);
+    flipCard();
+
+    const regionBefore = screen.getByText("放弃；抛弃").closest(".overflow-y-auto");
+    rerender(<Harness sense={second} />);
+    const regionAfter = screen.getByText("仁慈的；善意的").closest(".overflow-y-auto");
+
+    expect(regionAfter).not.toBeNull();
+    // 新卡重建滚动区（key 变化触发 remount），旧滚动位置随之归零
+    expect(regionAfter).not.toBe(regionBefore);
+  });
+});
