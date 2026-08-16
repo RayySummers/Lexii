@@ -80,4 +80,12 @@ Start planning Lexilexi（规划 epic）
 
 统计页「今日待学（词条）」按每日新卡上限过滤（不再显示全部未学新卡总数）
 
+### v0.1.0-alpha.7 — 双通道部署与隐藏开发者面板
+
+Pages 双通道部署架构：稳定版根路径（发版 tag 触发）+ 开发预览 dev 子路径（main push 触发）
+
+设置页隐藏开发者面板：通道切换 / 构建信息 / 版本回退 / 数据库调试 / FSRS 调试 / Feature flags
+
+    发版流程更新：CONTRIBUTING 发版清单同步双通道部署口径
+
 ```
