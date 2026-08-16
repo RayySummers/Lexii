@@ -38,7 +38,6 @@ function makeReviewProviderFactory(queue: ReviewCard[] = [makeCard()]) {
     undoGrade: vi.fn().mockResolvedValue(undefined),
     hasAnyItems: vi.fn().mockResolvedValue(queue.length > 0),
     importSampleWordlist: vi.fn().mockResolvedValue(14),
-    exportBackup: vi.fn().mockResolvedValue(EMPTY_EXPORT),
   };
   return { provider, factory: vi.fn().mockReturnValue(provider) };
 }

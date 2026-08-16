@@ -69,7 +69,6 @@ function makeHarness(
     undoGrade: vi.fn().mockResolvedValue(undefined),
     hasAnyItems,
     importSampleWordlist: vi.fn().mockResolvedValue(14),
-    exportBackup: vi.fn().mockResolvedValue(null as never),
   };
   return { provider, loadMultipleChoiceQueue, grade, hasAnyItems };
 }

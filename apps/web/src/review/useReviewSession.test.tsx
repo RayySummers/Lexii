@@ -65,7 +65,6 @@ function makeHarness(
     undoGrade,
     hasAnyItems,
     importSampleWordlist: vi.fn().mockResolvedValue(14),
-    exportBackup: vi.fn().mockResolvedValue(null as never),
   };
   return { provider, loadQueue, grade, markMastered, undoGrade, hasAnyItems };
 }
@@ -159,7 +158,6 @@ describe("useReviewSession 时序边界", () => {
       undoGrade: vi.fn().mockResolvedValue(undefined),
       hasAnyItems: vi.fn().mockResolvedValue(true),
       importSampleWordlist: vi.fn().mockResolvedValue(14),
-      exportBackup: vi.fn().mockResolvedValue(null as never),
     };
     const { result } = renderHook(() => useReviewSession(provider, "review"));
 
@@ -188,7 +186,6 @@ describe("useReviewSession 时序边界", () => {
       undoGrade: vi.fn().mockResolvedValue(undefined),
       hasAnyItems: vi.fn().mockResolvedValue(false),
       importSampleWordlist,
-      exportBackup: vi.fn().mockResolvedValue(null as never),
     };
     const { result } = renderHook(() => useReviewSession(provider, "review"));
     await waitFor(() => expect(result.current.phase).toBe("empty"));

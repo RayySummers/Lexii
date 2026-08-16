@@ -7,6 +7,9 @@
  *   "unsupported" 环境静默降级、不提示（验收点 6）。
  * - 导出：JSON 完整备份（可原样导回）+ CSV 词表（可经 importCsvWordlist 导回）。
  * - 导入：JSON 备份恢复（同 id 覆盖）；解析失败 / 版本不兼容有明确错误提示。
+ * - RAY-280（真机反馈）：导出备份入口从学习/复习页移到本页。原「数据安全」
+ *   与「导出数据」两个分组合并为顶部显眼的「数据安全与备份」分组（含持久化
+ *   提示与 JSON/CSV 导出），其后紧跟「导入数据」；导出功能本身不变。
  * - RAY-253 反馈 5/6：统一导航头（左侧返回箭头、标题右对齐，同统计页）；
  *   数据概览已删除（与统计页功能重复）。
  * - 关于（RAY-251）：GitHub 仓库链接 + 反馈问题入口（纯外链跳转，新窗口打开）；
@@ -300,6 +303,63 @@ function SettingsMainView({
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
       <ScreenHeader title="设置" onBack={onExit} />
 
+      <Section title="数据安全与备份">
+        <PersistenceBanner
+          status={persistence}
+          onExport={onExportJson}
+          exporting={exporting === "json"}
+        />
+        <p className="text-sm text-text-muted">
+          学习数据只存本机（IndexedDB），可能因清理网站数据或卸载而丢失，建议定期导出备份。
+        </p>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={onExportJson}
+            disabled={exporting !== null}
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {exporting === "json" ? "导出中…" : "导出 JSON 完整备份"}
+          </button>
+          <button
+            type="button"
+            onClick={onExportCsv}
+            disabled={exporting !== null}
+            className="rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {exporting === "csv" ? "导出中…" : "导出 CSV 词表"}
+          </button>
+        </div>
+        <p className="text-xs text-text-muted">
+          JSON 含词库、学习记录与进度，可原样导回；CSV 仅词表（词条 / 释义 / 词性），不含学习进度。
+        </p>
+      </Section>
+
+      <Section title="导入数据">
+        <p className="text-sm text-text-muted">
+          从之前导出的 JSON 备份恢复数据（同 ID 记录会被覆盖）。
+        </p>
+        <input
+          ref={fileInputRef}
+          id="import-backup-input"
+          type="file"
+          accept="application/json,.json"
+          className="sr-only"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              void onImportFile(file);
+            }
+          }}
+        />
+        <label
+          htmlFor="import-backup-input"
+          className="inline-flex w-fit cursor-pointer rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus-ring"
+        >
+          {importing ? "正在恢复…" : "选择备份文件…"}
+        </label>
+      </Section>
+
       <Section title="外观">
         <label
           htmlFor="theme-preference"
@@ -406,66 +466,6 @@ function SettingsMainView({
         >
           浏览并安装词书
         </button>
-      </Section>
-
-      <Section title="数据安全">
-        <PersistenceBanner
-          status={persistence}
-          onExport={onExportJson}
-          exporting={exporting === "json"}
-        />
-      </Section>
-
-      <Section title="导出数据">
-        <p className="text-sm text-text-muted">
-          学习数据只存本机（IndexedDB），可能因清理网站数据或卸载而丢失，建议定期导出备份。
-        </p>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <button
-            type="button"
-            onClick={onExportJson}
-            disabled={exporting !== null}
-            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {exporting === "json" ? "导出中…" : "导出 JSON 完整备份"}
-          </button>
-          <button
-            type="button"
-            onClick={onExportCsv}
-            disabled={exporting !== null}
-            className="rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {exporting === "csv" ? "导出中…" : "导出 CSV 词表"}
-          </button>
-        </div>
-        <p className="text-xs text-text-muted">
-          JSON 含词库、学习记录与进度，可原样导回；CSV 仅词表（词条 / 释义 / 词性），不含学习进度。
-        </p>
-      </Section>
-
-      <Section title="导入数据">
-        <p className="text-sm text-text-muted">
-          从之前导出的 JSON 备份恢复数据（同 ID 记录会被覆盖）。
-        </p>
-        <input
-          ref={fileInputRef}
-          id="import-backup-input"
-          type="file"
-          accept="application/json,.json"
-          className="sr-only"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) {
-              void onImportFile(file);
-            }
-          }}
-        />
-        <label
-          htmlFor="import-backup-input"
-          className="inline-flex w-fit cursor-pointer rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus-ring"
-        >
-          {importing ? "正在恢复…" : "选择备份文件…"}
-        </label>
       </Section>
 
       <Section title="数据来源与许可">
