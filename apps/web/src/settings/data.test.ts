@@ -4,11 +4,14 @@
  * 走真实 @lexilexi/core 路径：导入词表 → 导出/导入 round-trip。
  * 与 review/data.test.ts 使用同一 fake-indexeddb 注入方式。
  * RAY-253 反馈 6：loadOverview（数据概览）已随设置页概览区删除，无相关用例。
+ * RAY-294：扩展词包数据源测试（getDictionaryPackageSummaries /
+ * fetchDictionaryManifest / installDictionaryPackage / markTier1CoveredByTier2）。
  */
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import {
   SAMPLE_WORDLIST_CSV,
   SAMPLE_WORDLIST_ROW_COUNT,
+  dictionaryDoneKey,
   importCsvWordlist,
   openDatabase,
   parseCsvWordlist,
@@ -170,5 +173,64 @@ describe("createIndexedDbSettingsDataProvider", () => {
   it("词书库（RAY-262）：未知词书 id 抛错", async () => {
     const provider = createIndexedDbSettingsDataProvider(db!);
     await expect(provider.installWordbook("book-unknown")).rejects.toThrow("未知词书");
+  });
+});
+
+// ─── RAY-294 扩展词包数据源测试 ──────────────────────────────────────────────
+
+describe("扩展词包（RAY-294）", () => {
+  it("getDictionaryPackageSummaries：初始全部未安装", async () => {
+    const provider = createIndexedDbSettingsDataProvider(db!);
+    const summaries = await provider.getDictionaryPackageSummaries();
+    expect(summaries).toHaveLength(2);
+    expect(summaries[0]!.id).toBe("core-en-tier1");
+    expect(summaries[0]!.status).toBe("not-installed");
+    expect(summaries[0]!.totalCount).toBe(58_244);
+    expect(summaries[1]!.id).toBe("core-en-tier2");
+    expect(summaries[1]!.status).toBe("not-installed");
+    expect(summaries[1]!.totalCount).toBe(401_222);
+  });
+
+  it("getDictionaryPackageSummaries：手动写入 done 标记后状态变 installed", async () => {
+    // 手动写入 done 标记模拟已安装
+    await db!.meta.put({ key: dictionaryDoneKey("core-en-tier1"), value: "1.0.0" });
+    const provider = createIndexedDbSettingsDataProvider(db!);
+    const summaries = await provider.getDictionaryPackageSummaries();
+    const tier1 = summaries.find((s) => s.id === "core-en-tier1");
+    expect(tier1?.status).toBe("installed");
+    expect(tier1?.installedVersion).toBe("1.0.0");
+    const tier2 = summaries.find((s) => s.id === "core-en-tier2");
+    expect(tier2?.status).toBe("not-installed");
+  });
+
+  it("markTier1CoveredByTier2：Tier 1 状态变为 covered", async () => {
+    const provider = createIndexedDbSettingsDataProvider(db!);
+    await provider.markTier1CoveredByTier2();
+    const summaries = await provider.getDictionaryPackageSummaries();
+    const tier1 = summaries.find((s) => s.id === "core-en-tier1");
+    expect(tier1?.status).toBe("covered");
+    expect(tier1?.installedVersion).toBe("covered-by-tier2");
+  });
+
+  it("fetchDictionaryManifest：网络不可用时返回 null（不抛错）", async () => {
+    const provider = createIndexedDbSettingsDataProvider(db!);
+    const result = await provider.fetchDictionaryManifest();
+    // 在测试环境中 fetch 会失败（无本地 manifest 文件），应返回 null
+    expect(result).toBeNull();
+  });
+
+  it("installDictionaryPackage：未知包 id 抛错", async () => {
+    const provider = createIndexedDbSettingsDataProvider(db!);
+    await expect(provider.installDictionaryPackage("unknown-package")).rejects.toThrow(
+      "未知扩展词包",
+    );
+  });
+
+  it("installDictionaryPackage：manifest 不可用时抛出可读错误", async () => {
+    const provider = createIndexedDbSettingsDataProvider(db!);
+    // fetchDictionaryManifest 返回 null（网络不可用）→ installDictionaryPackage 应抛错
+    await expect(provider.installDictionaryPackage("core-en-tier1")).rejects.toThrow(
+      "无法获取词包 manifest",
+    );
   });
 });

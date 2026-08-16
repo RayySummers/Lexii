@@ -26,6 +26,8 @@ export type SenseSearchHitKind = "term-prefix" | "term-substring" | "definition"
 export interface SenseSearchHit {
   sense: Sense;
   kind: SenseSearchHitKind;
+  /** 数据来源（"learning" = senses 学习表，"dictionary" = dictionarySenses 词典表） */
+  source: "learning" | "dictionary";
 }
 
 /** 检索选项 */
@@ -81,7 +83,7 @@ export function searchSenses(
     }
     if (kind !== null) {
       seen.add(sense.id);
-      hits.push({ sense, kind });
+      hits.push({ sense, kind, source: "learning" });
     }
   }
   hits.sort(compareHits);
@@ -150,7 +152,7 @@ export async function searchAllSenses(
   const result: SenseSearchHit[] = [...learningHits];
   for (const hit of dictHits) {
     if (!learningTerms.has(hit.sense.term.toLowerCase())) {
-      result.push({ sense: hit.sense, kind: hit.kind });
+      result.push({ sense: hit.sense, kind: hit.kind, source: "dictionary" });
     }
     // 学习层已有同 term → 跳过词典义项（学习义项优先）
   }

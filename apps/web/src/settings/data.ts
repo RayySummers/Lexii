@@ -9,26 +9,37 @@
  * - getWordbookSummaries / installWordbook：词书库状态与选装（RAY-262；
  *   词书目录与共享池来自 @lexilexi/core 的 WORDBOOK_CATALOG / getWordbookPackage，
  *   安装落库复用 installPreset 的分块/可恢复/幂等/按 term 去重能力）
+ * - RAY-294 扩展词包：getDictionaryPackageSummaries / fetchDictionaryManifest /
+ *   installDictionaryPackage / markTier1CoveredByTier2
  *
  * RAY-253 反馈 6：loadOverview（数据概览）已随设置页概览区删除。
  */
 import {
+  downloadAndVerifyPackage,
   exportCsvWordlist,
   exportLexilexiData,
+  fetchManifest,
+  getDictionaryPackageState,
   getPresetInstallState,
   importLexilexiData,
+  installDictionaryPackage as coreInstallDictionaryPackage,
   installPreset,
+  markTier1CoveredByTier2 as coreMarkTier1CoveredByTier2,
   openDatabase,
   parseLexilexiExport,
   TIER0_PRESET,
 } from "@lexilexi/core";
 import type {
+  DictionaryManifest,
   LexilexiDatabase,
   LexilexiExportData,
   PresetPackage,
   WordbookDefinition,
 } from "@lexilexi/core";
 import type {
+  DictionaryInstallResult,
+  DictionaryManifestInfo,
+  DictionaryPackageSummary,
   ImportBackupResult,
   PresetSummary,
   SettingsDataProvider,
@@ -38,6 +49,24 @@ import type {
 
 /** 随包内置的预设词表（Tier 0；未来扩展包接入时在此登记） */
 const BUNDLED_PRESETS: readonly PresetPackage[] = [TIER0_PRESET];
+
+// ─── RAY-294 扩展词包定义 ────────────────────────────────────────────────────
+
+/** 扩展词包定义（稳定标识 + 面向用户名称 + 词条总数） */
+const DICTIONARY_PACKAGES: readonly {
+  id: string;
+  name: string;
+  totalCount: number;
+}[] = [
+  { id: "core-en-tier1", name: "Tier 1 标准词包", totalCount: 58_244 },
+  { id: "core-en-tier2", name: "Tier 2 全量词包", totalCount: 401_222 },
+];
+
+/** manifest 相对路径（与 SW 排除口径一致：resolveUrl("./presets/manifest.json")） */
+function getManifestUrl(): string {
+  // 相对于当前页面路径，兼容 GitHub Pages 子路径部署
+  return new URL("./presets/manifest.json", window.location.href).href;
+}
 
 /**
  * 词书模块按需加载（RAY-262 Oscar 评审 suggestion 3）：词书目录与共享池
@@ -154,6 +183,95 @@ export function createIndexedDbSettingsDataProvider(db: LexilexiDatabase): Setti
         return { installedCount: 0, skippedCount: 0 };
       }
       return { installedCount: result.installedCount, skippedCount: result.skippedCount };
+    },
+
+    // ─── RAY-294 扩展词包 ─────────────────────────────────────────────────
+
+    async getDictionaryPackageSummaries(): Promise<DictionaryPackageSummary[]> {
+      return Promise.all(
+        DICTIONARY_PACKAGES.map(async (pkg) => {
+          const state = await getDictionaryPackageState(db, pkg.id, pkg.totalCount);
+          return {
+            id: state.packageId,
+            name: pkg.name,
+            status: state.status,
+            installedCount: state.installedCount,
+            totalCount: state.totalCount,
+            ...(state.installedVersion ? { installedVersion: state.installedVersion } : {}),
+          };
+        }),
+      );
+    },
+
+    async fetchDictionaryManifest(): Promise<DictionaryManifestInfo[] | null> {
+      try {
+        const manifest: DictionaryManifest = await fetchManifest(getManifestUrl());
+        return manifest.packages.map((pkg) => {
+          // 优先 Brotli → gzip → raw
+          const bestVariant = pkg.variants.brotli ?? pkg.variants.gzip ?? pkg.variants.raw;
+          return {
+            id: pkg.id,
+            version: pkg.version,
+            sourceCommit: pkg.sourceCommit,
+            ...(bestVariant
+              ? {
+                  bestVariant: {
+                    url: bestVariant.url,
+                    size: bestVariant.size,
+                    sha256: bestVariant.sha256,
+                  },
+                }
+              : {}),
+          };
+        });
+      } catch {
+        return null;
+      }
+    },
+
+    async installDictionaryPackage(packageId: string): Promise<DictionaryInstallResult> {
+      // 查找包定义
+      const pkgDef = DICTIONARY_PACKAGES.find((p) => p.id === packageId);
+      if (!pkgDef) {
+        throw new Error(`未知扩展词包：${packageId}`);
+      }
+
+      // 获取 manifest 中的包信息
+      const manifestInfos = await this.fetchDictionaryManifest();
+      if (!manifestInfos) {
+        throw new Error("无法获取词包 manifest，请检查网络连接");
+      }
+      const manifestInfo = manifestInfos.find((info) => info.id === packageId);
+      if (!manifestInfo?.bestVariant) {
+        throw new Error(`manifest 中未找到词包 ${packageId} 的下载信息`);
+      }
+
+      // 下载 + 校验 + 解压
+      const entries = await downloadAndVerifyPackage(manifestInfo.bestVariant);
+
+      // 安装到 dictionarySenses 表
+      const result = await coreInstallDictionaryPackage(db, {
+        id: packageId,
+        version: manifestInfo.version,
+        name: pkgDef.name,
+        lang: "en",
+        entries,
+      });
+
+      if (result.status === "already-installed") {
+        return { status: "already-installed", installedVersion: result.installedVersion };
+      }
+      return {
+        status: "installed",
+        installedCount: result.installedCount,
+        skippedCount: result.skippedCount,
+        updatedCount: result.updatedCount,
+        deletedCount: result.deletedCount,
+      };
+    },
+
+    async markTier1CoveredByTier2(): Promise<void> {
+      return coreMarkTier1CoveredByTier2(db);
     },
   };
 }

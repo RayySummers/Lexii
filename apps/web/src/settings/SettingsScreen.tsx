@@ -77,6 +77,16 @@ const WordbookLibraryScreen = lazy(() =>
   import("./WordbookLibraryScreen").then((module) => ({ default: module.WordbookLibraryScreen })),
 );
 
+/**
+ * 扩展词包页按需加载（RAY-294）：扩展词包管理 UI 独立 chunk，
+ * 仅进入扩展词包设置页时加载。
+ */
+const DictionaryPackagesScreen = lazy(() =>
+  import("./DictionaryPackagesScreen").then((module) => ({
+    default: module.DictionaryPackagesScreen,
+  })),
+);
+
 /** 项目 GitHub 仓库与反馈入口（RAY-251）：纯外链跳转，不请求任何外部数据 */
 const GITHUB_REPO_URL = "https://github.com/RayySummers/Lexilexi";
 const GITHUB_ISSUES_URL = "https://github.com/RayySummers/Lexilexi/issues";
@@ -114,7 +124,7 @@ export function SettingsScreen({
   developerDataProviderFactory = createDefaultDeveloperDataProvider,
 }: SettingsScreenProps) {
   // 二级视图分发（hooks 规则：主视图的全部 hooks 在 SettingsMainView 内，此处仅一个 state）
-  const [view, setView] = useState<"main" | "licenses" | "wordbooks">("main");
+  const [view, setView] = useState<"main" | "licenses" | "wordbooks" | "dictionary">("main");
 
   // 导出/导入/提示状态提升到本层（RAY-260 评审 nit 2）：二级页切换时
   // SettingsMainView 卸载，进行中的导出与结果提示不再随卸载丢失。
@@ -267,11 +277,26 @@ export function SettingsScreen({
       </Suspense>
     );
   }
+  if (view === "dictionary") {
+    return (
+      <Suspense
+        fallback={
+          <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
+            <ScreenHeader title="扩展词包" onBack={() => setView("main")} backLabel="返回设置" />
+            <p className="text-sm text-text-muted">正在加载扩展词包…</p>
+          </main>
+        }
+      >
+        <DictionaryPackagesScreen provider={provider} onBack={() => setView("main")} />
+      </Suspense>
+    );
+  }
   return (
     <SettingsMainView
       onExit={onExit}
       onOpenLicenses={() => setView("licenses")}
       onOpenWordbooks={() => setView("wordbooks")}
+      onOpenDictionary={() => setView("dictionary")}
       exporting={exporting}
       importing={importing}
       notice={notice}
@@ -304,6 +329,8 @@ interface SettingsMainViewProps {
   onOpenLicenses(): void;
   /** 进入「词书库」二级页（RAY-262） */
   onOpenWordbooks(): void;
+  /** 进入「扩展词包」二级页（RAY-294） */
+  onOpenDictionary(): void;
   /** 导出/导入进行态与结果提示（状态由 SettingsScreen 持有，二级页切换不丢失） */
   exporting: "json" | "csv" | null;
   importing: boolean;
@@ -339,6 +366,7 @@ function SettingsMainView({
   onExit,
   onOpenLicenses,
   onOpenWordbooks,
+  onOpenDictionary,
   exporting,
   importing,
   notice,
@@ -551,6 +579,21 @@ function SettingsMainView({
           className="w-fit rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
         >
           浏览并安装词书
+        </button>
+      </Section>
+
+      <Section title="扩展词包">
+        <p className="text-sm text-text-muted">
+          下载 Tier 1/2 扩展词包，将词典检索范围从内置 7,195 词扩展到 ECDICT 全量覆盖（如
+          kaleidoscope、menstrual 等 Tier 0 未收录词均可搜到）。
+          词包仅扩充检索层，加入词书/生词本后才进入学习队列。
+        </p>
+        <button
+          type="button"
+          onClick={onOpenDictionary}
+          className="w-fit rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        >
+          管理扩展词包
         </button>
       </Section>
 
