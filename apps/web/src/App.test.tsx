@@ -7,6 +7,10 @@ import { makeCard } from "./review/testFixtures";
 import type { ReviewCard, ReviewDataProvider } from "./review/types";
 import type { SettingsDataProvider } from "./settings/types";
 import type { StatsDataProvider } from "./stats/types";
+import {
+  FIRST_OPEN_DIALOG_DISMISSED_VALUE,
+  FIRST_OPEN_DIALOG_STORAGE_KEY,
+} from "./lib/firstOpenDialog";
 
 const EMPTY_EXPORT: LexilexiExportData = {
   format: "lexilexi",
@@ -76,6 +80,8 @@ describe("App", () => {
 
   beforeEach(() => {
     window.localStorage.clear();
+    // 默认视为「已看过首次弹窗」，避免干扰既有用例；RAY-282 专项用例自行清标记
+    window.localStorage.setItem(FIRST_OPEN_DIALOG_STORAGE_KEY, FIRST_OPEN_DIALOG_DISMISSED_VALUE);
     // useTheme 会注册 prefers-color-scheme change 监听（RAY-261），mock 需提供对应 API
     window.matchMedia = vi.fn().mockReturnValue({
       matches: false,
@@ -239,5 +245,39 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "返回首页" }));
     expect(screen.getByRole("button", { name: "学习" })).toBeInTheDocument();
+  });
+
+  describe("RAY-282 首次打开弹窗", () => {
+    it("无已读标记的首次打开展示弹窗；点击「开始使用」关闭并写入标记", () => {
+      window.localStorage.removeItem(FIRST_OPEN_DIALOG_STORAGE_KEY);
+      render(<App reviewProviderFactory={makeReviewProviderFactory().factory} />);
+
+      expect(screen.getByRole("dialog", { name: "学习数据只存本机" })).toBeInTheDocument();
+      expect(screen.getByText(/乐希是本地优先（local-first）应用/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "开始使用" })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "开始使用" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(window.localStorage.getItem(FIRST_OPEN_DIALOG_STORAGE_KEY)).toBe(
+        FIRST_OPEN_DIALOG_DISMISSED_VALUE,
+      );
+    });
+
+    it("已读标记存在时不再展示（再次打开不重复）", () => {
+      window.localStorage.setItem(FIRST_OPEN_DIALOG_STORAGE_KEY, FIRST_OPEN_DIALOG_DISMISSED_VALUE);
+      render(<App reviewProviderFactory={makeReviewProviderFactory().factory} />);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("Escape 关闭弹窗并写入标记（与按钮行为一致）", () => {
+      window.localStorage.removeItem(FIRST_OPEN_DIALOG_STORAGE_KEY);
+      render(<App reviewProviderFactory={makeReviewProviderFactory().factory} />);
+
+      fireEvent.keyDown(window, { key: "Escape" });
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(window.localStorage.getItem(FIRST_OPEN_DIALOG_STORAGE_KEY)).toBe(
+        FIRST_OPEN_DIALOG_DISMISSED_VALUE,
+      );
+    });
   });
 });
