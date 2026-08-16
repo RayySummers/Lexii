@@ -96,6 +96,10 @@ export interface ReviewDataProvider {
    * 返回与 loadQueue 相同的卡片队列，每张卡额外附带选择题题目
    * （1 正确 + 3 混淆项，来源：历史常错词 / 形近词 / 近义词）。
    * cards[i] 与 questions[i] 一一对应。
+   *
+   * 出题方向（RAY-293）由设置「选择题出题方向」决定（英译中 / 中译英 /
+   * 混合逐题随机），记录在每道题的 `direction` 字段；方向只改变题面与
+   * 选项文本，评分与 FSRS 调度不变（见 docs/quiz-fsrs-mapping.md）。
    */
   loadMultipleChoiceQueue(mode: StudyMode): Promise<MultipleChoiceQueueResult>;
   /**

@@ -493,3 +493,34 @@ describe("RAY-265 学习设置：评分档位与发音口音", () => {
     expect(screen.getByLabelText(/发音口音/)).toHaveValue("uk");
   });
 });
+
+describe("RAY-293 学习设置：选择题出题方向", () => {
+  it("选择题出题方向默认英译中；切换中译英即时持久化到 localStorage", async () => {
+    renderSettings();
+    await screen.findByText("学习");
+
+    const select = screen.getByLabelText(/选择题出题方向/);
+    expect(select).toHaveValue("en-zh");
+    expect(window.localStorage.getItem("lexilexi:quiz-direction")).toBeNull(); // 未显式设置
+
+    fireEvent.change(select, { target: { value: "zh-en" } });
+    expect(select).toHaveValue("zh-en");
+    expect(window.localStorage.getItem("lexilexi:quiz-direction")).toBe("zh-en");
+  });
+
+  it("选择题出题方向三档可选（英译中 / 中译英 / 混合）", async () => {
+    renderSettings();
+    await screen.findByText("学习");
+
+    const select = screen.getByLabelText(/选择题出题方向/);
+    const options = Array.from(select.querySelectorAll("option")).map((option) => option.value);
+    expect(options).toEqual(["en-zh", "zh-en", "mixed"]);
+  });
+
+  it("选择题出题方向读取已存储的混合档", async () => {
+    window.localStorage.setItem("lexilexi:quiz-direction", "mixed");
+    renderSettings();
+    await screen.findByText("学习");
+    expect(screen.getByLabelText(/选择题出题方向/)).toHaveValue("mixed");
+  });
+});

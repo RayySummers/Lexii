@@ -26,7 +26,7 @@ function makeQuestion(sense: ReviewCard["sense"]): MultipleChoiceQuestion {
     { text: "错答B", isCorrect: false, source: "random" },
     { text: "错答C", isCorrect: false, source: "random" },
   ];
-  return { sense, options };
+  return { sense, direction: "en-zh", options };
 }
 
 function makeHarness(

@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import type { Sense } from "./domain";
 import { toSenseId } from "./id";
-import { editDistance, generateOptions } from "./distractors";
+import { editDistance, generateOptions, generateTermOptions } from "./distractors";
 
 function makeSense(overrides: Partial<Sense> = {}): Sense {
   return {
@@ -147,5 +147,109 @@ describe("generateOptions", () => {
     ];
     const options = generateOptions(target, all, [], 3);
     expect(options).toHaveLength(3);
+  });
+});
+
+describe("generateTermOptions（RAY-293 中译英）", () => {
+  it("正确选项为目标词条原文", () => {
+    const target = makeSense({ term: "abandon", definitions: ["放弃"] });
+    const all = [
+      target,
+      makeSense({ term: "band", definitions: ["乐队"] }),
+      makeSense({ term: "ban", definitions: ["禁令"] }),
+      makeSense({ term: "bandit", definitions: ["强盗"] }),
+      makeSense({ term: "bank", definitions: ["银行"] }),
+    ];
+    const options = generateTermOptions(target, all, []);
+    expect(options).toHaveLength(4);
+    const correct = options.filter((o) => o.isCorrect);
+    expect(correct).toHaveLength(1);
+    expect(correct[0]!.text).toBe("abandon");
+  });
+
+  it("所有选项文本互不相同（按词条去重）", () => {
+    const target = makeSense({ term: "abandon", definitions: ["放弃"] });
+    const all = [
+      target,
+      makeSense({ term: "band", definitions: ["乐队"] }),
+      makeSense({ term: "ban", definitions: ["禁令"] }),
+      makeSense({ term: "bandit", definitions: ["强盗"] }),
+      makeSense({ term: "bank", definitions: ["银行"] }),
+    ];
+    const options = generateTermOptions(target, all, []);
+    const texts = options.map((o) => o.text);
+    expect(new Set(texts).size).toBe(options.length);
+  });
+
+  it("常错词混淆项取词条原文", () => {
+    const target = makeSense({ term: "abandon", definitions: ["放弃"] });
+    const wrongSense = makeSense({ term: "common", definitions: ["普通的"] });
+    const all = [
+      target,
+      wrongSense,
+      makeSense({ term: "band", definitions: ["乐队"] }),
+      makeSense({ term: "ban", definitions: ["禁令"] }),
+      makeSense({ term: "bandit", definitions: ["强盗"] }),
+      makeSense({ term: "bank", definitions: ["银行"] }),
+    ];
+    const options = generateTermOptions(target, all, ["common"]);
+    const wrongOptions = options.filter((o) => o.source === "wrong-history");
+    expect(wrongOptions.length).toBeGreaterThanOrEqual(1);
+    expect(wrongOptions[0]!.text).toBe("common");
+  });
+
+  it("近义词混淆项取词条原文", () => {
+    const target = makeSense({
+      term: "abandon",
+      definitions: ["放弃"],
+      synonyms: ["forsake"],
+    });
+    const synSense = makeSense({ term: "forsake", definitions: ["遗弃"] });
+    const all = [
+      target,
+      synSense,
+      makeSense({ term: "band", definitions: ["乐队"] }),
+      makeSense({ term: "ban", definitions: ["禁令"] }),
+      makeSense({ term: "bandit", definitions: ["强盗"] }),
+      makeSense({ term: "bank", definitions: ["银行"] }),
+    ];
+    const options = generateTermOptions(target, all, []);
+    const synOptions = options.filter((o) => o.source === "synonym");
+    expect(synOptions.length).toBeGreaterThanOrEqual(1);
+    expect(synOptions[0]!.text).toBe("forsake");
+  });
+
+  it("形近词混淆项取词条原文", () => {
+    const target = makeSense({ term: "abandon", definitions: ["放弃"] });
+    const similarSense = makeSense({ term: "abandoned", definitions: ["被抛弃的"] });
+    const all = [
+      target,
+      similarSense,
+      makeSense({ term: "ban", definitions: ["禁令"] }),
+      makeSense({ term: "bandit", definitions: ["强盗"] }),
+      makeSense({ term: "bank", definitions: ["银行"] }),
+    ];
+    const options = generateTermOptions(target, all, []);
+    const similarOptions = options.filter((o) => o.source === "similar-spelling");
+    expect(similarOptions.length).toBeGreaterThanOrEqual(1);
+    // 选项整体洗牌，不断言顺序；最近形近词（编辑距离 2）必在池中
+    expect(similarOptions.map((o) => o.text)).toContain("abandoned");
+  });
+
+  it("词条模式不把主释义当选项：英译中回归对照", () => {
+    const target = makeSense({ term: "abandon", definitions: ["放弃"] });
+    const all = [
+      target,
+      makeSense({ term: "band", definitions: ["乐队"] }),
+      makeSense({ term: "ban", definitions: ["禁令"] }),
+      makeSense({ term: "bandit", definitions: ["强盗"] }),
+      makeSense({ term: "bank", definitions: ["银行"] }),
+    ];
+    const termOptions = generateTermOptions(target, all, []);
+    const defOptions = generateOptions(target, all, []);
+    // 词条模式选项全部是英文词条；释义模式选项全部是中文释义（无一英文词条）
+    expect(termOptions.every((o) => /^[a-z]+$/.test(o.text))).toBe(true);
+    expect(defOptions.some((o) => o.text === "放弃")).toBe(true);
+    expect(defOptions.every((o) => !/^[a-z]+$/.test(o.text))).toBe(true);
   });
 });
