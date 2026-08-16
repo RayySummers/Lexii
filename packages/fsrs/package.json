@@ -1,6 +1,6 @@
 {
   "name": "@lexilexi/fsrs",
-  "version": "0.1.0-alpha.5",
+  "version": "0.1.0-alpha.6",
   "private": true,
   "type": "module",
   "description": "Lexilexi FSRS-7 调度算法包（对照官方参考实现 ts-fsrs 差分验证）",
