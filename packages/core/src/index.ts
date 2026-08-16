@@ -149,7 +149,12 @@ export type {
   StudyQueueOptions,
   UndoReviewInput,
 } from "./studyLoop";
-export { editDistance, generateOptions, generateTermOptions } from "./distractors";
+export {
+  editDistance,
+  generateOptions,
+  generateTermOptions,
+  MIN_QUIZ_OPTION_COUNT,
+} from "./distractors";
 export type { DistractorOption, QuizDirection } from "./distractors";
 export { DEFAULT_SEARCH_LIMIT, searchLexilexiSenses, searchSenses } from "./search";
 export type { SenseSearchHit, SenseSearchHitKind, SenseSearchOptions } from "./search";

@@ -4,7 +4,12 @@
 import { describe, expect, it } from "vitest";
 import type { Sense } from "./domain";
 import { toSenseId } from "./id";
-import { editDistance, generateOptions, generateTermOptions } from "./distractors";
+import {
+  editDistance,
+  generateOptions,
+  generateTermOptions,
+  MIN_QUIZ_OPTION_COUNT,
+} from "./distractors";
 
 function makeSense(overrides: Partial<Sense> = {}): Sense {
   return {
@@ -316,7 +321,33 @@ describe("同义词条剔除（RAY-293 后续修复，两方向通用）", () =>
     expect(termOptions.some((o) => o.text === "forsake")).toBe(false);
   });
 
-  it("随机回退池同样剔除同义词条（其他候选为空时选项不足也不补同义词）", () => {
+  it("三级回退不足时保底填充到最低阈值（同义词条允许进入填充层）", () => {
+    // 词库 = [abandon, forsake(同义), band, ban]：三级回退剔除 forsake 后
+    // 只剩 band(形近) + ban(随机) 两个干扰项（3 选项 < 4），保底填充从
+    // 剩余词条（仅排除目标词）补入 forsake，确保该词照常出题。
+    const target = makeSense({
+      term: "abandon",
+      definitions: ["放弃"],
+      synonyms: ["forsake"],
+    });
+    const synSense = makeSense({ term: "forsake", definitions: ["遗弃"] });
+    const all = [
+      target,
+      synSense,
+      makeSense({ term: "band", definitions: ["乐队"] }),
+      makeSense({ term: "ban", definitions: ["禁令"] }),
+    ];
+    const defOptions = generateOptions(target, all, []);
+    const termOptions = generateTermOptions(target, all, []);
+    expect(defOptions).toHaveLength(4);
+    expect(termOptions).toHaveLength(4);
+    expect(termOptions.filter((o) => o.isCorrect)).toHaveLength(1);
+    // 保底填充层允许同义词条：三级回退凑不够时补入，宁可题目简单也不跳过
+    expect(defOptions.some((o) => o.text === "遗弃")).toBe(true);
+    expect(termOptions.some((o) => o.text === "forsake")).toBe(true);
+  });
+
+  it("保底填充仅排除目标词本身（词库只剩同义词条时照填不跳过）", () => {
     const target = makeSense({
       term: "abandon",
       definitions: ["放弃"],
@@ -325,9 +356,24 @@ describe("同义词条剔除（RAY-293 后续修复，两方向通用）", () =>
     const synSense = makeSense({ term: "forsake", definitions: ["遗弃"] });
     const all = [target, synSense];
     const options = generateTermOptions(target, all, []);
-    // 混淆池唯一的候选就是同义词条，剔除后只剩正确项
-    expect(options).toHaveLength(1);
-    expect(options[0]!.isCorrect).toBe(true);
+    // 词库总共 2 词：正确项 + 保底填充的同义词条（2 < 4，属极端小词库）
+    expect(options).toHaveLength(2);
+    expect(options.filter((o) => o.isCorrect)).toHaveLength(1);
+    expect(options.some((o) => o.text === "forsake")).toBe(true);
+  });
+
+  it("词库小到保底填充也凑不够时返回低于 MIN_QUIZ_OPTION_COUNT（上层据此跳题）", () => {
+    const target = makeSense({ term: "abandon", definitions: ["放弃"] });
+    const all = [
+      target,
+      makeSense({ term: "band", definitions: ["乐队"] }),
+      makeSense({ term: "ban", definitions: ["禁令"] }),
+    ];
+    // 3 词词库：保底填充池 = 除目标外的 2 词，均已入池 → 最多 3 选项 < 4
+    const defOptions = generateOptions(target, all, []);
+    const termOptions = generateTermOptions(target, all, []);
+    expect(defOptions.length).toBeLessThan(MIN_QUIZ_OPTION_COUNT);
+    expect(termOptions.length).toBeLessThan(MIN_QUIZ_OPTION_COUNT);
   });
 
   it("大小写不敏感：同义词条大写变体同样剔除", () => {

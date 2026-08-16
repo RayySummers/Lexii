@@ -24,6 +24,7 @@ import {
   gradeReview,
   importCsvWordlist,
   isReviewEvent,
+  MIN_QUIZ_OPTION_COUNT,
   openDatabase,
   undoReview,
 } from "@lexilexi/core";
@@ -40,6 +41,7 @@ import type {
 import { computeLearnedTodayCount, localDayBounds } from "@lexilexi/stats";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { readQuizDirectionPreference, resolveQuizDirection } from "../lib/quizDirection";
+import type { MultipleChoiceQuestion } from "./MultipleChoiceCard";
 import { buildReviewQueue } from "./queue";
 import type {
   GradeContext,
@@ -186,15 +188,33 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
       // 出题方向（RAY-293）：设置三档「英译中 / 中译英 / 混合」。
       // 混合 = 逐题随机方向；方向只决定题面与选项文本，评分与调度不变。
       const preference = readQuizDirectionPreference();
-      const questions = cards.map((card) => {
+      const prepared: Array<{
+        card: ReviewCard;
+        question: MultipleChoiceQuestion;
+      }> = [];
+      for (const card of cards) {
         const direction = resolveQuizDirection(preference);
         const options =
           direction === "zh-en"
             ? generateTermOptions(card.sense, allSenses, wrongTerms)
             : generateOptions(card.sense, allSenses, wrongTerms);
-        return { sense: card.sense, direction, options };
-      });
-      return { questions, cards };
+        // 极端兜底（RAY-293 修正决策「级联回退 + 保底填充」）：core 侧已做
+        // 三级回退 + 保底填充（仅排除目标词本身），常规词库必达最低阈值。
+        // 仅当词库小到连保底填充都凑不够（或没有任何正确项——无释义义项）
+        // 时该题才跳过，不进入出题队列；跳过的题不产生任何 review 事件，
+        // 两方向同一口径。
+        if (options.length < MIN_QUIZ_OPTION_COUNT || !options.some((option) => option.isCorrect)) {
+          continue;
+        }
+        prepared.push({
+          card,
+          question: { sense: card.sense, direction, options },
+        });
+      }
+      return {
+        questions: prepared.map((entry) => entry.question),
+        cards: prepared.map((entry) => entry.card),
+      };
     },
 
     async grade(
