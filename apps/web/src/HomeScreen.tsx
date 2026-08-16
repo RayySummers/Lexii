@@ -16,6 +16,11 @@
  * RAY-269：新增选择题学习模式。首页添加学习形式切换（卡片 / 选择题），
  * 用户可先选形式再选模式。默认卡片形式（向后兼容）。
  *
+ * RAY-278（返工裁定，2026-08-16 Rayy 澄清）：手机端三模式按钮竖排
+ * （一排一个）本就是期望形态——`sm:grid-cols-3` 的 <640px 单列堆叠保持
+ * 不动，桌面端（≥640px）一排三个。真实问题在背单词页评分按钮，见
+ * review/RatingButtons.tsx。
+ *
  * - 待学徽标数据经 StatsDataProvider（statsProvider 为 null 时不展示，
  *   如无 IndexedDB 的测试环境）；
  * - 仅承载展示与导航，队列数据一律由 ReviewScreen / QuizScreen 按模式加载；
@@ -79,7 +84,7 @@ export function HomeScreen({ onStart, statsProvider }: HomeScreenProps) {
         ))}
       </div>
 
-      {/* 三模式入口 */}
+      {/* 三模式入口（RAY-278 返工：移动端竖排为期望形态，桌面一排三个） */}
       <div className="grid gap-4 sm:grid-cols-3">
         {MODES.map(({ mode, title, subtitle }) => (
           <button

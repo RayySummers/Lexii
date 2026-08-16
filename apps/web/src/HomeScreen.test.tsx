@@ -4,6 +4,9 @@
  * RAY-253：三个模式按钮（学习 / 复习 / 混合）+ 今日待学徽标（RAY-254 起，此前为到期徽标）；
  * 品牌名与介绍文案不再渲染（已归档 docs/archive/homepage-intro-v1.md）。
  * RAY-260（Oscar 复评 suggestion 2）：有待学词时展示「今日新卡额度剩余 N 张」。
+ * RAY-278（返工裁定）：三模式按钮移动端竖排为期望形态——容器必须是
+ * `sm:grid-cols-3`（<640px 单列竖排），不带 base `grid-cols-3`（那会把
+ * 移动端挤成一排三个）。
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -46,6 +49,29 @@ describe("HomeScreen", () => {
     expect(screen.getByRole("button", { name: "学习" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "复习" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "混合" })).toBeInTheDocument();
+  });
+
+  it("三模式按钮移动端竖排、桌面端三列（RAY-278 返工：容器不带 base grid-cols-3）", () => {
+    render(<HomeScreen onStart={vi.fn()} statsProvider={null} />);
+
+    const modes = [
+      screen.getByRole("button", { name: "学习" }),
+      screen.getByRole("button", { name: "复习" }),
+      screen.getByRole("button", { name: "混合" }),
+    ];
+
+    // 三个按钮挂在同一个网格容器上
+    const containers = new Set(modes.map((b) => b.parentElement));
+    expect(containers.size).toBe(1);
+
+    // 移动端竖排（一排一个）：base 不带三列类；桌面端 ≥sm 才一排三个
+    const grid = modes[0]!.parentElement!;
+    const tokens = grid.className.split(/\s+/);
+    expect(tokens).toContain("sm:grid-cols-3");
+    expect(tokens).not.toContain("grid-cols-3");
+
+    // 学习形式切换（卡片/选择题）不属于该网格
+    expect(grid).not.toContainElement(screen.getByRole("radio", { name: /卡片/ }));
   });
 
   it("不渲染品牌名与介绍文案（反馈 1：首页保持简洁）", () => {

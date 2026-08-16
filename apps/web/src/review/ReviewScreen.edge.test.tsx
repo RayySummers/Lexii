@@ -9,7 +9,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toEventId } from "@lexilexi/core";
-import type { LexilexiExportData, ReviewRating, StudyMode } from "@lexilexi/core";
+import type { ReviewRating, StudyMode } from "@lexilexi/core";
 import { RATING_TIER_STORAGE_KEY } from "../lib/ratingTiers";
 import { ReviewScreen } from "./ReviewScreen";
 import { makeCard } from "./testFixtures";
@@ -22,19 +22,7 @@ interface ProviderHarness {
   grade: ReturnType<typeof vi.fn>;
   hasAnyItems: ReturnType<typeof vi.fn>;
   importSampleWordlist: ReturnType<typeof vi.fn>;
-  exportBackup: ReturnType<typeof vi.fn>;
 }
-
-const EMPTY_EXPORT: LexilexiExportData = {
-  format: "lexilexi",
-  exportFormatVersion: 1,
-  dbSchemaVersion: 1,
-  exportedAt: "2026-08-14T00:00:00.000Z",
-  items: [],
-  senses: [],
-  memoryStates: [],
-  events: [],
-};
 
 beforeEach(() => {
   window.localStorage.setItem(RATING_TIER_STORAGE_KEY, "four");
@@ -52,7 +40,6 @@ function makeHarness(options: { queue?: ReviewCard[] } = {}): ProviderHarness {
     }));
   const hasAnyItems = vi.fn<() => Promise<boolean>>().mockResolvedValue(queue.length > 0);
   const importSampleWordlist = vi.fn<() => Promise<number>>().mockResolvedValue(14);
-  const exportBackup = vi.fn<() => Promise<LexilexiExportData>>().mockResolvedValue(EMPTY_EXPORT);
   const provider: ReviewDataProvider = {
     loadQueue,
     loadMultipleChoiceQueue,
@@ -64,7 +51,6 @@ function makeHarness(options: { queue?: ReviewCard[] } = {}): ProviderHarness {
     undoGrade: vi.fn().mockResolvedValue(undefined),
     hasAnyItems,
     importSampleWordlist,
-    exportBackup,
   };
   return {
     provider,
@@ -73,7 +59,6 @@ function makeHarness(options: { queue?: ReviewCard[] } = {}): ProviderHarness {
     grade,
     hasAnyItems,
     importSampleWordlist,
-    exportBackup,
   };
 }
 

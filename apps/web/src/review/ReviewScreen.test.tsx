@@ -5,10 +5,10 @@
  * 键盘快捷键与按钮等价、标熟、单步撤销、发音、队列推进与完成态、
  * 空状态与错误恢复。
  */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { toEventId } from "@lexilexi/core";
-import type { LexilexiExportData, ReviewRating, StudyMode } from "@lexilexi/core";
+import type { ReviewRating, StudyMode } from "@lexilexi/core";
 import { RATING_TIER_STORAGE_KEY } from "../lib/ratingTiers";
 import { ReviewScreen } from "./ReviewScreen";
 import { makeCard } from "./testFixtures";
@@ -23,19 +23,7 @@ interface ProviderHarness {
   undoGrade: ReturnType<typeof vi.fn>;
   hasAnyItems: ReturnType<typeof vi.fn>;
   importSampleWordlist: ReturnType<typeof vi.fn>;
-  exportBackup: ReturnType<typeof vi.fn>;
 }
-
-const EMPTY_EXPORT: LexilexiExportData = {
-  format: "lexilexi",
-  exportFormatVersion: 1,
-  dbSchemaVersion: 1,
-  exportedAt: "2026-08-14T00:00:00.000Z",
-  items: [],
-  senses: [],
-  memoryStates: [],
-  events: [],
-};
 
 afterEach(() => {
   // 档位设置在 localStorage：每个用例后清理，保证「默认三档」用例不受污染
@@ -89,7 +77,6 @@ function makeHarness(
     .mockResolvedValue(undefined);
   const hasAnyItems = vi.fn<() => Promise<boolean>>().mockResolvedValue(hasItems);
   const importSampleWordlist = vi.fn<() => Promise<number>>().mockResolvedValue(14);
-  const exportBackup = vi.fn<() => Promise<LexilexiExportData>>().mockResolvedValue(EMPTY_EXPORT);
   const provider: ReviewDataProvider = {
     loadQueue,
     loadMultipleChoiceQueue,
@@ -98,7 +85,6 @@ function makeHarness(
     undoGrade,
     hasAnyItems,
     importSampleWordlist,
-    exportBackup,
   };
   return {
     provider,
@@ -109,7 +95,6 @@ function makeHarness(
     undoGrade,
     hasAnyItems,
     importSampleWordlist,
-    exportBackup,
   };
 }
 
@@ -124,6 +109,20 @@ function expectCardShown(term: string) {
 }
 
 describe("ReviewScreen", () => {
+  it("不渲染导出备份按钮（RAY-280：导出入口已移到设置页）", async () => {
+    const card = makeCard();
+    render(
+      <ReviewScreen
+        provider={makeHarness({ queue: [card] }).provider}
+        mode="review"
+        onExit={() => {}}
+      />,
+    );
+
+    await expectCardShown(card.sense.term);
+    expect(screen.queryByRole("button", { name: "导出备份" })).not.toBeInTheDocument();
+  });
+
   it("加载后渲染第一张卡的词条与进度（四档 Anki 传统）", async () => {
     useFourTiers();
     const card = makeCard();
@@ -158,6 +157,8 @@ describe("ReviewScreen", () => {
     expect(screen.getByRole("button", { name: /模糊/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /不认识/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Easy/ })).not.toBeInTheDocument();
+    // RAY-279：背词页不再显示「X 分钟后复习」提示（新卡各档均为分钟级）
+    expect(screen.queryByText(/分钟/)).not.toBeInTheDocument();
   });
 
   it("默认三档：数字键 4 与字母 E 不评分（Easy 未提供）", async () => {
@@ -413,47 +414,6 @@ describe("ReviewScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
     await expectCardShown(card.sense.term);
   });
-
-  it("点击导出备份：调用数据源导出并触发下载", async () => {
-    const card = makeCard();
-    const harness = makeHarness({ queue: [card] });
-    // jsdom 未实现 URL.createObjectURL，桩掉以验证下载被触发
-    const createObjectURL = vi.fn().mockReturnValue("blob:test");
-    const revokeObjectURL = vi.fn();
-    const originalCreate = URL.createObjectURL;
-    const originalRevoke = URL.revokeObjectURL;
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-    URL.createObjectURL = createObjectURL;
-    URL.revokeObjectURL = revokeObjectURL;
-    try {
-      render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
-      await expectCardShown(card.sense.term);
-
-      fireEvent.click(screen.getByRole("button", { name: "导出备份" }));
-
-      await waitFor(() => expect(harness.exportBackup).toHaveBeenCalledTimes(1));
-      expect(createObjectURL).toHaveBeenCalledTimes(1);
-      // 导出成功有 aria-live 反馈（评审建议 C4）
-      expect(await screen.findByText("已导出备份。")).toBeInTheDocument();
-      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    } finally {
-      URL.createObjectURL = originalCreate;
-      URL.revokeObjectURL = originalRevoke;
-      clickSpy.mockRestore();
-    }
-  });
-
-  it("导出失败：显示错误提示", async () => {
-    const card = makeCard();
-    const harness = makeHarness({ queue: [card] });
-    harness.exportBackup.mockRejectedValue(new Error("IndexedDB 不可用"));
-    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
-    await expectCardShown(card.sense.term);
-
-    fireEvent.click(screen.getByRole("button", { name: "导出备份" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("导出失败");
-  });
 });
 
 describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
@@ -519,14 +479,30 @@ describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
   it("发音：以设置口音朗读当前词条（浏览器语音合成，离线）", async () => {
     const speak = vi.fn();
     const cancel = vi.fn();
+    const resume = vi.fn();
     class FakeUtterance {
       text: string;
       lang = "";
+      volume = 1;
+      rate = 1;
+      voice: SpeechSynthesisVoice | null = null;
+      onstart: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      onerror: ((event: SpeechSynthesisErrorEvent) => void) | null = null;
       constructor(text: string) {
         this.text = text;
       }
     }
-    vi.stubGlobal("speechSynthesis", { speak, cancel });
+    vi.stubGlobal("speechSynthesis", {
+      speak,
+      cancel,
+      resume,
+      getVoices: () => [],
+      addEventListener: () => {},
+      speaking: false,
+      pending: false,
+      paused: false,
+    });
     vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
 
     const card = makeCard();
@@ -546,7 +522,10 @@ describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
     const utterance = speak.mock.calls[0]![0] as FakeUtterance;
     expect(utterance.text).toBe("apple");
     expect(utterance.lang).toBe("en-US"); // 默认美式
-    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(utterance.volume).toBe(1); // RAY-277：显式音量（部分 iOS 默认异常）
+    // RAY-277：队列空闲时不 cancel（iOS cancel→speak 同 tick 竞态吞朗读）
+    expect(cancel).not.toHaveBeenCalled();
+    expect(resume).not.toHaveBeenCalled();
   });
 
   it("发音：环境不支持语音合成时给出提示，不阻塞复习", async () => {
@@ -561,6 +540,53 @@ describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
     fireEvent.click(screen.getByRole("button", { name: /朗读/ }));
 
     expect(await screen.findByText("当前浏览器不支持语音合成，无法发音。")).toBeInTheDocument();
+    // 复习流程不受影响
+    expect(screen.getByRole("button", { name: /评分：认识/ })).toBeInTheDocument();
+  });
+
+  it("发音：设备语音不可用（异步合成失败）时给出降级提示，不阻塞复习（RAY-277）", async () => {
+    const speak = vi.fn();
+    class FakeUtterance {
+      text: string;
+      lang = "";
+      volume = 1;
+      rate = 1;
+      voice: SpeechSynthesisVoice | null = null;
+      onstart: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      onerror: ((event: SpeechSynthesisErrorEvent) => void) | null = null;
+      constructor(text: string) {
+        this.text = text;
+      }
+    }
+    vi.stubGlobal("speechSynthesis", {
+      speak,
+      cancel: () => {},
+      resume: () => {},
+      getVoices: () => [],
+      addEventListener: () => {},
+      speaking: false,
+      pending: false,
+      paused: false,
+    });
+    vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
+
+    const card = makeCard();
+    const harness = makeHarness({ queue: [card] });
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
+    await expectCardShown(card.sense.term);
+
+    fireEvent.click(screen.getByRole("button", { name: /朗读/ }));
+    const utterance = speak.mock.calls[0]![0] as FakeUtterance;
+    act(() => {
+      utterance.onerror?.({ error: "synthesis-unavailable" } as SpeechSynthesisErrorEvent);
+    });
+
+    expect(
+      await screen.findByText(
+        "当前设备无法发声：语音服务不可用，请检查系统语音（TTS）设置后重试。",
+      ),
+    ).toBeInTheDocument();
     // 复习流程不受影响
     expect(screen.getByRole("button", { name: /评分：认识/ })).toBeInTheDocument();
   });

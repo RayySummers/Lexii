@@ -7,27 +7,30 @@
  *     空格 / 回车 → 翻面（焦点在按钮上时交给按钮原生行为，避免双触发）
  *     三档（默认）：1–3 或 A / H / G → 不认识 / 模糊 / 认识
  *     四档（Anki 传统）：1–4 或 A / H / G / E → Again / Hard / Good / Easy
- * - 评分按钮副文案为各档到期时间预览（@lexilexi/fsrs Scheduler.preview）。
+ * - 评分按钮副文案为各档到期时间预览（@lexilexi/fsrs Scheduler.preview）；
+ *   分钟级文案不展示（RAY-279：移除「X 分钟后复习」提示）。
  *
  * RAY-265：
  * - 评分档位默认三档（认识 / 模糊 / 不认识），设置内可切四档；
  * - 工具栏提供「发音」（浏览器语音合成，美/英口音随设置）与「标熟」
  *   （词保留词书、按已熟长间隔调度）；
  * - 每次评分 / 标熟后可单步撤销（连续只能撤销一次，不可连退）。
+ *
+ * RAY-280：导出备份入口已从本页移到设置页（真机反馈），本页不再提供
+ * 导出按钮，导出功能本身不变（设置页仍导出完整可恢复 JSON）。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
 import type { ReviewRating, StudyMode } from "@lexilexi/core";
 import { BackArrowIcon, SpeakerIcon, UndoIcon } from "../components/icons";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
-import { readPronunciationAccent, speakWord } from "../lib/pronunciation";
+import { primeSpeechEngine, readPronunciationAccent, speakWord } from "../lib/pronunciation";
 import { readRatingTierMode } from "../lib/ratingTiers";
 import type { RatingTierMode } from "../lib/ratingTiers";
-import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
 import { quotaExhaustedCopy } from "./quotaCopy";
 import { ReviewCard } from "./ReviewCard";
 import { RatingButtons } from "./RatingButtons";
-import { formatDueLabel, previewGradeDueLabels, ratingFromKey } from "./grade";
+import { dueLabelForDisplay, previewGradeDueLabels, ratingFromKey } from "./grade";
 import type { ReviewCard as ReviewCardData, ReviewDataProvider } from "./types";
 import { useReviewSession, type ReviewSession } from "./useReviewSession";
 
@@ -54,15 +57,16 @@ const NO_QUEUE_COPY: Record<StudyMode, { title: string; body: string }> = {
   },
 };
 
-/** 当前卡评分的到期文案（预览计算轻量，无需 memo） */
-function computeDueLabels(card: ReviewCardData): Record<ReviewRating, string> {
+/** 当前卡评分的到期文案（预览计算轻量，无需 memo）；
+ * 分钟级（「X 分钟后复习」类，RAY-279）为 null，不展示 */
+function computeDueLabels(card: ReviewCardData): Record<ReviewRating, string | null> {
   const now = new Date();
   const preview = previewGradeDueLabels(card.memory.fields, now);
   return {
-    again: formatDueLabel(preview.again, now),
-    hard: formatDueLabel(preview.hard, now),
-    good: formatDueLabel(preview.good, now),
-    easy: formatDueLabel(preview.easy, now),
+    again: dueLabelForDisplay(preview.again, now),
+    hard: dueLabelForDisplay(preview.hard, now),
+    good: dueLabelForDisplay(preview.good, now),
+    easy: dueLabelForDisplay(preview.easy, now),
   };
 }
 
@@ -76,43 +80,28 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
   const dueLabels = session.current ? computeDueLabels(session.current) : null;
   // 评分档位（RAY-265）：会话内固定读取一次；改设置后下次进入复习生效
   const [tierMode] = useState<RatingTierMode>(() => readRatingTierMode());
-  const [exporting, setExporting] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [speakNotice, setSpeakNotice] = useState<string | null>(null);
   // 朗读目标经 ref 读取（session 每次渲染换身份，useCallback 依赖其字段会
   // 让回调每次重建；ref 与提交同步即可保证点击时读到当前卡）
   const currentCardRef = useRef(session.current);
 
-  /** 朗读当前词条（浏览器语音合成，口音随设置；不支持时给出一次性提示） */
+  /** 朗读当前词条（浏览器语音合成，口音随设置；不可用时给出一次性提示） */
   const handleSpeak = useCallback(() => {
     const card = currentCardRef.current;
     if (!card) {
       return;
     }
-    if (!speakWord(card.sense.term, readPronunciationAccent())) {
-      setSpeakNotice("当前浏览器不支持语音合成，无法发音。");
-    }
+    setSpeakNotice(null);
+    speakWord(card.sense.term, readPronunciationAccent(), {
+      onUnavailable: (reason) => {
+        setSpeakNotice(
+          reason === "unsupported"
+            ? "当前浏览器不支持语音合成，无法发音。"
+            : "当前设备无法发声：语音服务不可用，请检查系统语音（TTS）设置后重试。",
+        );
+      },
+    });
   }, []);
-
-  const handleExport = useCallback(async () => {
-    setExporting(true);
-    setExportError(null);
-    setExportNotice(null);
-    try {
-      const data = await provider.exportBackup();
-      downloadTextFile(
-        datedFilename("lexilexi-backup", "json"),
-        serializeBackup(data),
-        "application/json",
-      );
-      setExportNotice("已导出备份。");
-    } catch (err) {
-      setExportError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setExporting(false);
-    }
-  }, [provider]);
 
   // 键盘监听：监听器生命周期与组件绑定（空依赖），阶段与回调经 ref 读取。
   // 之前依赖 [phase] 会在阶段切换时移除/重挂监听——重挂窗口内（或闭包
@@ -136,6 +125,12 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
     tierModeRef.current = tierMode;
     currentCardRef.current = session.current;
   });
+
+  // 预热语音引擎（RAY-277）：提前触发手机浏览器语音包的异步装载，
+  // 避免用户第一次点击「发音」时 getVoices 仍为空导致无声
+  useEffect(() => {
+    primeSpeechEngine();
+  }, []);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -191,34 +186,8 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
               {session.totalCount - session.index - 1}
             </span>
           ) : null}
-          <button
-            type="button"
-            onClick={() => void handleExport()}
-            disabled={exporting}
-            className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {exporting ? "导出中…" : "导出备份"}
-          </button>
         </div>
       </div>
-
-      {exportNotice ? (
-        <p
-          role="status"
-          className="rounded-xl border border-border bg-surface p-4 text-sm text-success"
-        >
-          {exportNotice}
-        </p>
-      ) : null}
-
-      {exportError ? (
-        <p
-          role="alert"
-          className="rounded-xl border border-danger/40 bg-surface p-4 text-sm text-text"
-        >
-          导出失败：{exportError}
-        </p>
-      ) : null}
 
       <PhaseContent
         session={session}
@@ -235,7 +204,8 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
 
 interface PhaseContentProps {
   session: ReviewSession;
-  dueLabels: Record<ReviewRating, string> | null;
+  /** 各档评分的到期副文案；null = 该档不展示（分钟级文案，RAY-279） */
+  dueLabels: Record<ReviewRating, string | null> | null;
   mode: StudyMode;
   /** 评分档位模式（三档默认 / 四档 Anki 传统） */
   tierMode: RatingTierMode;

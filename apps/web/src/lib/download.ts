@@ -29,7 +29,8 @@ export function downloadTextFile(filename: string, text: string, mimeType: strin
 /**
  * 把导出快照序列化为带缩进的 JSON 文本（可读备份）。
  *
- * 复习页与设置页的导出共用此函数（评审建议 C5：序列化不再各写一遍）。
+ * 设置页导出使用（评审建议 C5：序列化不再各写一遍；RAY-280 后复习页
+ * 不再提供导出，仅设置页调用）。
  */
 export function serializeBackup(data: LexilexiExportData): string {
   return JSON.stringify(data, null, 2);

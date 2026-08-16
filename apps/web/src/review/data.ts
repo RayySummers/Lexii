@@ -18,7 +18,6 @@
  */
 import {
   SAMPLE_WORDLIST_CSV,
-  exportLexilexiData,
   generateOptions,
   getStudyQueueItemIds,
   gradeReview,
@@ -32,7 +31,6 @@ import type {
   ItemId,
   LearningItem,
   LexilexiDatabase,
-  LexilexiExportData,
   MemoryState,
   ReviewEvent,
   ReviewRating,
@@ -244,10 +242,6 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
     async importSampleWordlist(): Promise<number> {
       const result = await importCsvWordlist(db, SAMPLE_WORDLIST_CSV, { source: SAMPLE_SOURCE });
       return result.importedCount;
-    },
-
-    async exportBackup(): Promise<LexilexiExportData> {
-      return exportLexilexiData(db, new Date().toISOString());
     },
   };
 }
