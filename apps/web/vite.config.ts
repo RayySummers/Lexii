@@ -30,5 +30,17 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     globals: true,
+    // Playwright e2e（RAY-291 评审 nit 1）由 `pnpm test:e2e` 单独运行，
+    // 不进入 vitest（浏览器断言依赖真实布局与 IndexedDB，jsdom 无法承载）。
+    // 注意：自定义 exclude 会整体替换 vitest 默认排除，此处保留常用默认项。
+    exclude: [
+      "e2e/**",
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/coverage/**",
+      "**/.vite/**",
+      "playwright-report/**",
+      "test-results/**",
+    ],
   },
 });
