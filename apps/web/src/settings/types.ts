@@ -128,8 +128,12 @@ export interface SettingsDataProvider {
   /**
    * 下载并安装扩展词包（fetch → 校验 → 解压 → 落库）。
    * 失败抛错（网络/校验/安装错误）。
+   * signal 可选，用于取消下载（AbortController）。
    */
-  installDictionaryPackage(packageId: string): Promise<DictionaryInstallResult>;
+  installDictionaryPackage(
+    packageId: string,
+    signal?: AbortSignal,
+  ): Promise<DictionaryInstallResult>;
   /** Tier 2 安装完成后标记 Tier 1 为 covered */
   markTier1CoveredByTier2(): Promise<void>;
 }

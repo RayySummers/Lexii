@@ -161,6 +161,8 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
   const [notice, setNotice] = useState<string | null>(null);
   // 正在安装的包 id（按钮态 + 轮询续命）
   const [pendingInstalls, setPendingInstalls] = useState<ReadonlySet<string>>(new Set());
+  // 每个 pending install 的 AbortController（用于取消）
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   // 下载确认对话框（null = 不显示）
   const [confirmTarget, setConfirmTarget] = useState<DictionaryPackageSummary | null>(null);
   // manifest 加载中
@@ -168,8 +170,13 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
   // 卸载保护
   const mountedRef = useRef(true);
   useEffect(() => {
+    const controllers = abortControllersRef.current;
     return () => {
       mountedRef.current = false;
+      // 组件卸载时取消所有进行中的下载
+      for (const controller of controllers.values()) {
+        controller.abort();
+      }
     };
   }, []);
 
@@ -234,8 +241,13 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
       setError(null);
       setNotice(null);
       setPendingInstalls((current) => new Set(current).add(packageId));
+
+      // 创建 AbortController 用于取消
+      const controller = new AbortController();
+      abortControllersRef.current.set(packageId, controller);
+
       try {
-        const result = await provider.installDictionaryPackage(packageId);
+        const result = await provider.installDictionaryPackage(packageId, controller.signal);
         if (!mountedRef.current) return;
 
         if (result.status === "installed") {
@@ -263,8 +275,14 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
         }
       } catch (err) {
         if (!mountedRef.current) return;
-        setError(`安装失败：${toErrorMessage(err)}`);
+        // AbortError 静默处理（用户主动取消，不展示错误）
+        if (err instanceof DOMException && err.name === "AbortError") {
+          setNotice("下载已取消。");
+        } else {
+          setError(`安装失败：${toErrorMessage(err)}`);
+        }
       } finally {
+        abortControllersRef.current.delete(packageId);
         if (mountedRef.current) {
           setPendingInstalls((current) => {
             const next = new Set(current);
@@ -277,6 +295,14 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
     },
     [provider, refresh],
   );
+
+  // 取消安装
+  const handleCancelInstall = useCallback((packageId: string) => {
+    const controller = abortControllersRef.current.get(packageId);
+    if (controller) {
+      controller.abort();
+    }
+  }, []);
 
   // 获取 manifest 中的体积信息
   const getManifestSize = useCallback(
@@ -319,6 +345,7 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
             manifestVersion={getManifestVersion(summary.id)}
             installing={pendingInstalls.has(summary.id)}
             onDownload={handleDownloadClick}
+            onCancel={handleCancelInstall}
           />
         ))}
       </div>
@@ -375,6 +402,7 @@ function DictionaryPackageCard({
   manifestVersion,
   installing,
   onDownload,
+  onCancel,
 }: {
   summary: DictionaryPackageSummary;
   sizeBytes?: number;
@@ -382,6 +410,7 @@ function DictionaryPackageCard({
   manifestVersion?: string;
   installing: boolean;
   onDownload(summary: DictionaryPackageSummary): void;
+  onCancel(packageId: string): void;
 }) {
   const { status, installedCount, totalCount, installedVersion } = summary;
   const progressPercent =
@@ -419,20 +448,31 @@ function DictionaryPackageCard({
       </span>
 
       {status === "installing" ? (
-        <div className="flex items-center gap-3">
-          <div
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={totalCount}
-            aria-valuenow={installedCount}
-            className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-raised"
-          >
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-3">
             <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${progressPercent}%` }}
-            />
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={totalCount}
+              aria-valuenow={installedCount}
+              className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-raised"
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <span className="shrink-0 text-xs text-text-muted">{progressPercent}%</span>
           </div>
-          <span className="shrink-0 text-xs text-text-muted">{progressPercent}%</span>
+          {installing ? (
+            <button
+              type="button"
+              onClick={() => onCancel(summary.id)}
+              className="w-fit rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium transition-colors hover:border-danger hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            >
+              取消
+            </button>
+          ) : null}
         </div>
       ) : null}
 

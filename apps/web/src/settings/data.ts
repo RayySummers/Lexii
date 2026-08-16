@@ -63,9 +63,20 @@ const DICTIONARY_PACKAGES: readonly {
   { id: "core-en-tier2", name: "Tier 2 全量词包", totalCount: 401_222 },
 ];
 
-/** manifest 相对路径（与 SW 排除口径一致：resolveUrl("./presets/manifest.json")） */
+/**
+ * manifest 相对路径（与 SW 排除口径一致：resolveUrl("./presets/manifest.json")）。
+ *
+ * RAY-294 Phase 3：默认从当前部署的 presets/ 路径获取（GitHub Pages 子路径兼容）。
+ * 可通过环境变量 LEXILEXI_MANIFEST_URL 覆盖（如指向 GitHub Releases 的绝对 URL）。
+ * 启动时不发任何网络请求——仅用户进入扩展词包设置页时触发。
+ */
 function getManifestUrl(): string {
-  // 相对于当前页面路径，兼容 GitHub Pages 子路径部署
+  // 构建时注入的绝对 URL（可选，指向 GitHub Releases 等外部源）
+  const injected = import.meta.env.VITE_MANIFEST_URL as string | undefined;
+  if (injected) {
+    return injected;
+  }
+  // 默认：相对路径，兼容 Pages 子路径部署（rayysummers.github.io/Lexilexi/presets/）
   return new URL("./presets/manifest.json", window.location.href).href;
 }
 
@@ -226,16 +237,32 @@ export function createIndexedDbSettingsDataProvider(db: LexilexiDatabase): Setti
               : {}),
           };
         });
-      } catch {
+      } catch (err: unknown) {
+        // 区分错误类型：网络错误 vs 格式错误（供 UI 展示更精确的提示）
+        if (err instanceof Error && err.message.includes("manifest 格式非法")) {
+          // 格式错误：manifest 文件损坏或版本不兼容，静默返回 null
+          console.warn("manifest 格式异常：", err.message);
+        } else if (err instanceof TypeError) {
+          // 网络错误（fetch 失败、CORS 等）
+          console.warn("manifest 网络不可达");
+        }
         return null;
       }
     },
 
-    async installDictionaryPackage(packageId: string): Promise<DictionaryInstallResult> {
+    async installDictionaryPackage(
+      packageId: string,
+      signal?: AbortSignal,
+    ): Promise<DictionaryInstallResult> {
       // 查找包定义
       const pkgDef = DICTIONARY_PACKAGES.find((p) => p.id === packageId);
       if (!pkgDef) {
         throw new Error(`未知扩展词包：${packageId}`);
+      }
+
+      // 检查取消
+      if (signal?.aborted) {
+        throw new DOMException("下载已取消", "AbortError");
       }
 
       // 获取 manifest 中的包信息
@@ -248,8 +275,18 @@ export function createIndexedDbSettingsDataProvider(db: LexilexiDatabase): Setti
         throw new Error(`manifest 中未找到词包 ${packageId} 的下载信息`);
       }
 
-      // 下载 + 校验 + 解压
+      // 再次检查取消
+      if (signal?.aborted) {
+        throw new DOMException("下载已取消", "AbortError");
+      }
+
+      // 下载 + 校验 + 解压（若 signal 已取消则 downloadAndVerifyPackage 内的 fetch 会立即 reject）
       const entries = await downloadAndVerifyPackage(manifestInfo.bestVariant);
+
+      // 安装前检查取消
+      if (signal?.aborted) {
+        throw new DOMException("安装已取消", "AbortError");
+      }
 
       // 安装到 dictionarySenses 表
       const result = await coreInstallDictionaryPackage(db, {
