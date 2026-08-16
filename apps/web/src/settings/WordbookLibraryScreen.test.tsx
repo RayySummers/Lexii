@@ -75,7 +75,8 @@ describe("WordbookLibraryScreen", () => {
     expect(screen.getByText("词书总数")).toBeInTheDocument();
     expect(screen.getByText(`${WORDBOOK_CATALOG.length} 本`)).toBeInTheDocument();
     expect(screen.getByText("词条总数")).toBeInTheDocument();
-    expect(screen.getByText(String(expectedWordCount))).toBeInTheDocument();
+    // 千分位格式化（RAY-288 Oscar nit 2）
+    expect(screen.getByText(expectedWordCount.toLocaleString("zh-CN"))).toBeInTheDocument();
     expect(screen.getByText(/词数按词书规模计，跨词书重叠词条分别计入。/)).toBeInTheDocument();
   });
 
@@ -93,7 +94,8 @@ describe("WordbookLibraryScreen", () => {
     expect(screen.getByText("已装词书")).toBeInTheDocument();
     expect(screen.getByText("2 本")).toBeInTheDocument();
     expect(screen.getByText("已装词条")).toBeInTheDocument();
-    expect(screen.getByText("9545")).toBeInTheDocument();
+    // 5406 + 4139 = 9545，千分位格式化（RAY-288 Oscar nit 2）
+    expect(screen.getByText("9,545")).toBeInTheDocument();
   });
 
   it("词书库概览（RAY-288）：安装状态加载中已装统计显示占位", async () => {

@@ -13,6 +13,9 @@
  *   已装词条。口径：词数一律按「词书规模」计（每本词书声明的词条数，
  *   与卡片 totalCount 同源，内置词书与已装词书口径一致），跨词书重叠
  *   词条分别计入——新用户能看到词书规模，老用户可核对导入的词书数量/总数；
+ *   已装统计按当前目录 totalCount 汇总（RAY-288 Oscar suggestion 1 口径
+ *   备忘：若未来 books.data.json 重新生成——版本升级/词表增删——需明确
+ *   按 installedVersion 快照安装规模，或触发重装流程）；
  * - 全程离线（local-first）：不请求网络、不埋点；全部颜色走 design
  *   tokens（浅色/深色自动生效）。
  *
@@ -20,7 +23,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WordbookCategory } from "@lexilexi/core";
-import { WORDBOOK_CATALOG } from "@lexilexi/core/presets/books";
+import { WORDBOOK_CATALOG, WORDBOOK_COUNT } from "@lexilexi/core/presets/books";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { StatCard } from "../components/StatCard";
 import type { SettingsDataProvider, WordbookSummary } from "./types";
@@ -41,12 +44,19 @@ const CATEGORY_TITLES: Record<WordbookCategory, string> = {
 };
 
 /**
- * RAY-288：词书库总规模（词书总数 / 词条总数，供页首概览）。
+ * RAY-288：词书库总规模（词条总数，供页首概览）。
  * 口径：词数一律按「词书规模」计——每本词书声明的词条数（terms.length），
  * 与卡片展示的 summary.totalCount 同源；跨词书重叠词条分别计入。
+ * 词书总数复用 @lexilexi/core 的 WORDBOOK_COUNT（RAY-288 Oscar nit 1）。
  */
-const CATALOG_BOOK_COUNT = WORDBOOK_CATALOG.length;
 const CATALOG_WORD_COUNT = WORDBOOK_CATALOG.reduce((sum, book) => sum + book.terms.length, 0);
+
+/** 概览大数千分位格式化（RAY-288 Oscar nit 2：卡片与统计页的千分位统一留待后续） */
+const WORD_COUNT_FORMATTER = new Intl.NumberFormat("zh-CN");
+
+function formatWordCount(count: number): string {
+  return WORD_COUNT_FORMATTER.format(count);
+}
 
 /** 数据源错误 → 用户可见文案（不暴露内部实现细节） */
 function toErrorMessage(error: unknown): string {
@@ -173,17 +183,19 @@ export function WordbookLibraryScreen({ provider, onBack }: WordbookLibraryScree
       </p>
 
       {/* RAY-288：词书库概览——词书总数/词条总数（新用户看词书规模）
-          + 已装词书/已装词条（老用户核对导入的词书数量/总数） */}
-      <section aria-label="词书库概览" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="词书总数" value={`${CATALOG_BOOK_COUNT} 本`} />
-        <StatCard label="词条总数" value={String(CATALOG_WORD_COUNT)} />
+          + 已装词书/已装词条（老用户核对导入的词书数量/总数）。
+          sr-only h2 供文档大纲（RAY-288 Oscar suggestion 2）。 */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <h2 className="sr-only">词书库概览</h2>
+        <StatCard label="词书总数" value={`${WORDBOOK_COUNT} 本`} />
+        <StatCard label="词条总数" value={formatWordCount(CATALOG_WORD_COUNT)} />
         <StatCard
           label="已装词书"
           value={installedBookCount === undefined ? "…" : `${installedBookCount} 本`}
         />
         <StatCard
           label="已装词条"
-          value={installedWordCount === undefined ? "…" : String(installedWordCount)}
+          value={installedWordCount === undefined ? "…" : formatWordCount(installedWordCount)}
         />
       </section>
       <p className="text-xs text-text-muted">词数按词书规模计，跨词书重叠词条分别计入。</p>
