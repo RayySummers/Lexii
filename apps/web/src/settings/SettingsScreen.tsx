@@ -19,6 +19,9 @@
  * - 主题（RAY-261）：外观分组下拉选单三档（浅色 / 深色 / 跟随系统）。
  *   状态与持久化由 App 级 `useTheme` 单一数据源持有，本页仅渲染选单并
  *   经 `onThemePreferenceChange` 回调；header 不再常驻主题开关。
+ * - 选择题出题方向（RAY-293）：学习分组三档选单（英译中 / 中译英 / 混合），
+ *   与评分档位、发音口音同一 localStorage 持久化模式；方向只影响题目
+ *   呈现，不影响评分与 FSRS 调度（见 docs/quiz-fsrs-mapping.md）。
  *
  * 导出/导入/提示状态提升到本组件（SettingsScreen）而非 SettingsMainView：
  * 进入「数据来源与许可」二级页时 SettingsMainView 卸载，进行中的导出状态与
@@ -46,6 +49,12 @@ import {
 import type { PronunciationAccent } from "../lib/pronunciation";
 import { isRatingTierMode, readRatingTierMode, writeRatingTierMode } from "../lib/ratingTiers";
 import type { RatingTierMode } from "../lib/ratingTiers";
+import {
+  isQuizDirectionPreference,
+  readQuizDirectionPreference,
+  writeQuizDirectionPreference,
+} from "../lib/quizDirection";
+import type { QuizDirectionPreference } from "../lib/quizDirection";
 import { isThemePreference, type ThemePreference } from "../theme/resolve";
 import { DataSourcesScreen } from "./DataSourcesScreen";
 import { usePersistenceStatus } from "./persistenceStatus";
@@ -110,6 +119,10 @@ export function SettingsScreen({
   const [ratingTier, setRatingTier] = useState<RatingTierMode>(() => readRatingTierMode());
   const [pronunciationAccent, setPronunciationAccent] = useState<PronunciationAccent>(() =>
     readPronunciationAccent(),
+  );
+  // 选择题出题方向（RAY-293：英译中 / 中译英 / 混合），同一 localStorage 持久化模式
+  const [quizDirection, setQuizDirection] = useState<QuizDirectionPreference>(() =>
+    readQuizDirectionPreference(),
   );
 
   const handleExportJson = useCallback(async () => {
@@ -202,6 +215,14 @@ export function SettingsScreen({
     }
   }, []);
 
+  /** 选择题出题方向切换（RAY-293）：选单只产出合法值，直接持久化 */
+  const handleQuizDirectionChange = useCallback((value: string) => {
+    if (isQuizDirectionPreference(value)) {
+      setQuizDirection(value);
+      writeQuizDirectionPreference(value);
+    }
+  }, []);
+
   if (view === "licenses") {
     return <DataSourcesScreen provider={provider} onBack={() => setView("main")} />;
   }
@@ -239,6 +260,8 @@ export function SettingsScreen({
       onRatingTierChange={handleRatingTierChange}
       pronunciationAccent={pronunciationAccent}
       onPronunciationAccentChange={handlePronunciationAccentChange}
+      quizDirection={quizDirection}
+      onQuizDirectionChange={handleQuizDirectionChange}
       themePreference={themePreference}
       onThemePreferenceChange={onThemePreferenceChange}
     />
@@ -270,6 +293,9 @@ interface SettingsMainViewProps {
   /** 发音口音（RAY-265：美式 / 英式，浏览器语音合成） */
   pronunciationAccent: PronunciationAccent;
   onPronunciationAccentChange(value: string): void;
+  /** 选择题出题方向（RAY-293：英译中 / 中译英 / 混合） */
+  quizDirection: QuizDirectionPreference;
+  onQuizDirectionChange(value: string): void;
   /** 主题偏好三档（RAY-261）：App 级 useTheme 单一数据源下发 */
   themePreference: ThemePreference;
   onThemePreferenceChange(preference: ThemePreference): void;
@@ -294,6 +320,8 @@ function SettingsMainView({
   onRatingTierChange,
   pronunciationAccent,
   onPronunciationAccentChange,
+  quizDirection,
+  onQuizDirectionChange,
   themePreference,
   onThemePreferenceChange,
 }: SettingsMainViewProps) {
@@ -450,6 +478,27 @@ function SettingsMainView({
           >
             <option value="us">美式</option>
             <option value="uk">英式</option>
+          </select>
+        </label>
+        <label
+          htmlFor="quiz-direction"
+          className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+          <span>
+            选择题出题方向
+            <span className="mt-1 block text-xs text-text-muted">
+              英译中：看单词选释义；中译英：看释义选单词；混合：每道题随机方向。
+            </span>
+          </span>
+          <select
+            id="quiz-direction"
+            value={quizDirection}
+            onChange={(event) => onQuizDirectionChange(event.target.value)}
+            className="w-40 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            <option value="en-zh">英译中</option>
+            <option value="zh-en">中译英</option>
+            <option value="mixed">混合</option>
           </select>
         </label>
       </Section>

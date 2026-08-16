@@ -19,6 +19,7 @@
 import {
   SAMPLE_WORDLIST_CSV,
   generateOptions,
+  generateTermOptions,
   getStudyQueueItemIds,
   gradeReview,
   importCsvWordlist,
@@ -38,6 +39,7 @@ import type {
 } from "@lexilexi/core";
 import { computeLearnedTodayCount, localDayBounds } from "@lexilexi/stats";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
+import { readQuizDirectionPreference, resolveQuizDirection } from "../lib/quizDirection";
 import { buildReviewQueue } from "./queue";
 import type {
   GradeContext,
@@ -181,10 +183,17 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
         .filter((sense): sense is NonNullable<typeof sense> => sense !== undefined)
         .map((sense) => sense.term);
 
-      const questions = cards.map((card) => ({
-        sense: card.sense,
-        options: generateOptions(card.sense, allSenses, wrongTerms),
-      }));
+      // 出题方向（RAY-293）：设置三档「英译中 / 中译英 / 混合」。
+      // 混合 = 逐题随机方向；方向只决定题面与选项文本，评分与调度不变。
+      const preference = readQuizDirectionPreference();
+      const questions = cards.map((card) => {
+        const direction = resolveQuizDirection(preference);
+        const options =
+          direction === "zh-en"
+            ? generateTermOptions(card.sense, allSenses, wrongTerms)
+            : generateOptions(card.sense, allSenses, wrongTerms);
+        return { sense: card.sense, direction, options };
+      });
       return { questions, cards };
     },
 

@@ -12,13 +12,25 @@ import type { Sense } from "./domain";
 
 /** 选择题的一个选项 */
 export interface DistractorOption {
-  /** 选项文本（一条释义） */
+  /** 选项文本（一条释义或一个词条原文，取决于出题方向） */
   text: string;
   /** 是否为正确答案 */
   isCorrect: boolean;
   /** 来源标识（调试 / 可选展示） */
   source: "correct" | "wrong-history" | "similar-spelling" | "synonym" | "random";
 }
+
+/**
+ * 选择题出题方向（RAY-293）：
+ * - `en-zh`（英译中）：题面词条原文 → 选项释义（原有行为）
+ * - `zh-en`（中译英）：题面主释义 → 选项词条原文
+ *
+ * 方向只改变题目呈现，不改变评分与 FSRS 调度（见 docs/quiz-fsrs-mapping.md）。
+ */
+export type QuizDirection = "en-zh" | "zh-en";
+
+/** 选项文本提取器：英译中取主释义，中译英取词条原文 */
+type TextExtractor = (sense: Sense) => string;
 
 /**
  * Levenshtein 编辑距离（动态规划，O(mn)）。
@@ -54,6 +66,8 @@ function shuffle<T>(array: T[]): T[] {
 /**
  * 为一道选择题生成选项（1 正确 + N-1 混淆）。
  *
+ * 英译中方向（RAY-269 既有行为）：正确项为主释义，混淆项为其他义项的主释义。
+ *
  * @param targetSense  当前考查的义项
  * @param allSenses    词库中所有义项（用于形近词和随机回退）
  * @param wrongTerms   用户历史常错词的 term 列表（lapses > 0 的条目）
@@ -65,10 +79,48 @@ export function generateOptions(
   wrongTerms: readonly string[],
   optionCount = 4,
 ): DistractorOption[] {
+  return buildOptions(
+    targetSense,
+    allSenses,
+    wrongTerms,
+    optionCount,
+    (sense) => sense.definitions[0] ?? "",
+  );
+}
+
+/**
+ * 为一道中译英选择题生成选项（1 正确 + N-1 混淆），RAY-293。
+ *
+ * 正确项为目标词条原文，混淆项为其他词条的原文。混淆项来源口径与
+ * `generateOptions` 完全一致（历史常错词 / 形近词 / 近义词 / 随机回退），
+ * 仅选项文本从「主释义」换成「词条原文」。
+ *
+ * @param targetSense  当前考查的义项
+ * @param allSenses    词库中所有义项（用于形近词和随机回退）
+ * @param wrongTerms   用户历史常错词的 term 列表（lapses > 0 的条目）
+ * @param optionCount  选项总数（默认 4）
+ */
+export function generateTermOptions(
+  targetSense: Sense,
+  allSenses: readonly Sense[],
+  wrongTerms: readonly string[],
+  optionCount = 4,
+): DistractorOption[] {
+  return buildOptions(targetSense, allSenses, wrongTerms, optionCount, (sense) => sense.term);
+}
+
+/** 选项生成管线（两方向共用）：正确项 + 三类混淆池 + 随机回退，最后洗牌 */
+function buildOptions(
+  targetSense: Sense,
+  allSenses: readonly Sense[],
+  wrongTerms: readonly string[],
+  optionCount: number,
+  extract: TextExtractor,
+): DistractorOption[] {
   const distractorCount = optionCount - 1;
-  const correctText = targetSense.definitions[0];
+  const correctText = extract(targetSense);
   if (!correctText) {
-    // 防御：无释义的义项无法出题，全部用占位
+    // 防御：无文本可出的义项无法出题，全部用占位
     return Array.from({ length: optionCount }, () => ({
       text: "（无释义）",
       isCorrect: false,
@@ -83,7 +135,7 @@ export function generateOptions(
   addFromPool(
     distractors,
     used,
-    wrongDefs(allSenses, wrongTerms),
+    wrongDefs(allSenses, wrongTerms, extract),
     "wrong-history",
     distractorCount,
   );
@@ -93,7 +145,7 @@ export function generateOptions(
     addFromPool(
       distractors,
       used,
-      similarDefs(targetSense, allSenses),
+      similarDefs(targetSense, allSenses, extract),
       "similar-spelling",
       distractorCount,
     );
@@ -101,12 +153,18 @@ export function generateOptions(
 
   // 3. 近义词定义
   if (distractors.length < distractorCount) {
-    addFromPool(distractors, used, synonymDefs(targetSense, allSenses), "synonym", distractorCount);
+    addFromPool(
+      distractors,
+      used,
+      synonymDefs(targetSense, allSenses, extract),
+      "synonym",
+      distractorCount,
+    );
   }
 
   // 4. 随机回退
   if (distractors.length < distractorCount) {
-    addFromPool(distractors, used, randomDefs(allSenses), "random", distractorCount);
+    addFromPool(distractors, used, randomDefs(allSenses, extract), "random", distractorCount);
   }
 
   const options: DistractorOption[] = [
@@ -137,19 +195,26 @@ function addFromPool(
 }
 
 /** 历史常错词的主释义列表 */
-function wrongDefs(allSenses: readonly Sense[], wrongTerms: readonly string[]): string[] {
+function wrongDefs(
+  allSenses: readonly Sense[],
+  wrongTerms: readonly string[],
+  extract: TextExtractor,
+): string[] {
   const wrongSet = new Set(wrongTerms);
   const result: string[] = [];
   for (const sense of allSenses) {
-    if (wrongSet.has(sense.term) && sense.definitions[0]) {
-      result.push(sense.definitions[0]);
+    if (wrongSet.has(sense.term)) {
+      const text = extract(sense);
+      if (text) {
+        result.push(text);
+      }
     }
   }
   return result;
 }
 
 /** 形近词主释义（按编辑距离排序，取最近的前 10 个） */
-function similarDefs(target: Sense, allSenses: readonly Sense[]): string[] {
+function similarDefs(target: Sense, allSenses: readonly Sense[], extract: TextExtractor): string[] {
   const term = target.term.toLowerCase();
   const scored: Array<{ dist: number; def: string }> = [];
   for (const sense of allSenses) {
@@ -157,8 +222,11 @@ function similarDefs(target: Sense, allSenses: readonly Sense[]): string[] {
       continue;
     }
     const dist = editDistance(term, sense.term.toLowerCase());
-    if (dist > 0 && dist <= 3 && sense.definitions[0]) {
-      scored.push({ dist, def: sense.definitions[0] });
+    if (dist > 0 && dist <= 3) {
+      const text = extract(sense);
+      if (text) {
+        scored.push({ dist, def: text });
+      }
     }
   }
   scored.sort((a, b) => a.dist - b.dist);
@@ -166,7 +234,7 @@ function similarDefs(target: Sense, allSenses: readonly Sense[]): string[] {
 }
 
 /** 近义词在词库中的主释义 */
-function synonymDefs(target: Sense, allSenses: readonly Sense[]): string[] {
+function synonymDefs(target: Sense, allSenses: readonly Sense[], extract: TextExtractor): string[] {
   const synonyms = target.synonyms;
   if (!synonyms || synonyms.length === 0) {
     return [];
@@ -177,19 +245,23 @@ function synonymDefs(target: Sense, allSenses: readonly Sense[]): string[] {
     if (sense.id === target.id) {
       continue;
     }
-    if (synSet.has(sense.term.toLowerCase()) && sense.definitions[0]) {
-      result.push(sense.definitions[0]);
+    if (synSet.has(sense.term.toLowerCase())) {
+      const text = extract(sense);
+      if (text) {
+        result.push(text);
+      }
     }
   }
   return result;
 }
 
 /** 词库中随机取主释义（兜底） */
-function randomDefs(allSenses: readonly Sense[]): string[] {
+function randomDefs(allSenses: readonly Sense[], extract: TextExtractor): string[] {
   const defs: string[] = [];
   for (const sense of allSenses) {
-    if (sense.definitions[0]) {
-      defs.push(sense.definitions[0]);
+    const text = extract(sense);
+    if (text) {
+      defs.push(text);
     }
   }
   // 简单随机排序（不修改原数组）

@@ -1,8 +1,11 @@
 /**
- * 选择题卡片：显示词条 + 4 个释义选项。
+ * 选择题卡片：显示题面 + 4 个选项。
+ *
+ * 出题方向（RAY-293）：英译中（题面 = 词条，选释义）或 中译英
+ * （题面 = 主释义，选词条）。方向由 settings 的「选择题出题方向」决定。
  *
  * 交互流程：
- * 1. 显示词条（正面），等待选择
+ * 1. 显示题面（正面），等待选择
  * 2. 选择后立即反馈（正确/错误高亮），1 秒后自动进入下一题
  * 3. 键盘快捷键 1–4 选择
  *
@@ -12,11 +15,13 @@
  */
 import { useEffect, useRef } from "react";
 import type { Sense } from "@lexilexi/core";
-import type { DistractorOption } from "@lexilexi/core";
+import type { DistractorOption, QuizDirection } from "@lexilexi/core";
 
 export interface MultipleChoiceQuestion {
   /** 当前考查的义项 */
   sense: Sense;
+  /** 出题方向（RAY-293）：英译中（词条→释义）或 中译英（释义→词条） */
+  direction: QuizDirection;
   /** 选项（已洗牌，含 1 正 + N-1 错） */
   options: readonly DistractorOption[];
 }
@@ -29,8 +34,13 @@ export interface MultipleChoiceCardProps {
 }
 
 export function MultipleChoiceCard({ question, selectedIndex, onSelect }: MultipleChoiceCardProps) {
-  const { sense, options } = question;
+  const { sense, direction, options } = question;
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // 题面与副文案（RAY-293）：英译中看词条选释义；中译英看释义选词条。
+  const isZhEn = direction === "zh-en";
+  const promptText = isZhEn ? (sense.definitions[0] ?? "（无释义）") : sense.term;
+  const promptHint = isZhEn ? "选择正确的单词" : "选择正确的释义";
 
   // 键盘快捷键 1–4
   useEffect(() => {
@@ -57,22 +67,28 @@ export function MultipleChoiceCard({ question, selectedIndex, onSelect }: Multip
 
   return (
     <div ref={containerRef} className="flex flex-col gap-4">
-      {/* 词条标题 */}
+      {/* 题面：英译中 = 词条（大字号）+ 词性；中译英 = 主释义（中等字号，可能较长） */}
       <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface p-6 text-center">
-        <span className="text-4xl font-bold tracking-tight sm:text-5xl">{sense.term}</span>
-        {sense.pos ? (
+        <span
+          className={`font-bold tracking-tight ${
+            isZhEn ? "text-2xl sm:text-3xl" : "text-4xl sm:text-5xl"
+          }`}
+        >
+          {promptText}
+        </span>
+        {!isZhEn && sense.pos ? (
           <span className="rounded-full border border-border bg-surface-raised px-2 py-0.5 text-sm text-text-muted">
             {sense.pos}
           </span>
         ) : null}
-        <span className="text-sm text-text-muted">选择正确的释义</span>
+        <span className="text-sm text-text-muted">{promptHint}</span>
       </div>
 
       {/* 选项列表 */}
       <div
         className="flex flex-col gap-2"
         role="radiogroup"
-        aria-label={`${sense.term} 的释义选择`}
+        aria-label={isZhEn ? `${promptText} 的单词选择` : `${sense.term} 的释义选择`}
       >
         {options.map((option, index) => (
           <OptionButton

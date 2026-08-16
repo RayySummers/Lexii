@@ -19,7 +19,7 @@ function makeQuestion(overrides: Partial<MultipleChoiceQuestion> = {}): Multiple
     { text: "禁令", isCorrect: false, source: "similar-spelling" },
     { text: "银行", isCorrect: false, source: "random" },
   ];
-  return { sense, options, ...overrides };
+  return { sense, direction: "en-zh", options, ...overrides };
 }
 
 describe("MultipleChoiceCard", () => {
@@ -132,5 +132,48 @@ describe("MultipleChoiceCard", () => {
     render(<MultipleChoiceCard question={question} selectedIndex={null} onSelect={() => {}} />);
 
     expect(screen.getByText("v.")).toBeInTheDocument();
+  });
+});
+
+describe("MultipleChoiceCard 中译英方向（RAY-293）", () => {
+  function makeZhEnQuestion(): MultipleChoiceQuestion {
+    const sense = makeSense({ term: "abandon", definitions: ["放弃", "抛弃"], pos: "v." });
+    const options: DistractorOption[] = [
+      { text: "abandon", isCorrect: true, source: "correct" },
+      { text: "band", isCorrect: false, source: "random" },
+      { text: "ban", isCorrect: false, source: "similar-spelling" },
+      { text: "bank", isCorrect: false, source: "random" },
+    ];
+    return { sense, direction: "zh-en", options };
+  }
+
+  it("题面显示主释义、选项显示英文词条", () => {
+    const question = makeZhEnQuestion();
+    render(<MultipleChoiceCard question={question} selectedIndex={null} onSelect={() => {}} />);
+
+    // 题面是中文主释义（词条原文只出现在选项里）
+    expect(screen.getByRole("radiogroup")).toHaveAccessibleName("放弃 的单词选择");
+    expect(screen.getByText("选择正确的单词")).toBeInTheDocument();
+    expect(screen.queryByText("选择正确的释义")).not.toBeInTheDocument();
+    // 选项全部是英文词条，正确项为 abandon
+    expect(screen.getByText("abandon")).toBeInTheDocument();
+    expect(screen.getByText("band")).toBeInTheDocument();
+    expect(screen.getByText("ban")).toBeInTheDocument();
+    expect(screen.getByText("bank")).toBeInTheDocument();
+  });
+
+  it("中译英不显示词性标签", () => {
+    const question = makeZhEnQuestion();
+    render(<MultipleChoiceCard question={question} selectedIndex={null} onSelect={() => {}} />);
+
+    expect(screen.queryByText("v.")).not.toBeInTheDocument();
+  });
+
+  it("中译英选择后仍显示正确/错误标记", () => {
+    const question = makeZhEnQuestion();
+    render(<MultipleChoiceCard question={question} selectedIndex={1} onSelect={() => {}} />);
+
+    expect(screen.getByLabelText("正确")).toBeInTheDocument();
+    expect(screen.getByLabelText("错误")).toBeInTheDocument();
   });
 });

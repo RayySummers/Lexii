@@ -347,3 +347,64 @@ describe("标熟与单步撤销（RAY-265，数据源集成）", () => {
     expect(learnQueue.some((entry) => entry.item.id === card.item.id)).toBe(true);
   });
 });
+
+describe("选择题出题方向（RAY-293，数据源集成）", () => {
+  it("默认英译中：每道题 direction=en-zh，正确选项为主释义", async () => {
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await provider.importSampleWordlist();
+
+    const { questions, cards } = await provider.loadMultipleChoiceQueue("learn");
+    expect(questions.length).toBeGreaterThan(0);
+    expect(questions).toHaveLength(cards.length);
+    for (const question of questions) {
+      expect(question.direction).toBe("en-zh");
+      const correct = question.options.find((option) => option.isCorrect);
+      expect(correct?.text).toBe(question.sense.definitions[0]);
+    }
+  });
+
+  it("设置中译英后：每道题 direction=zh-en，正确选项为词条原文、混淆项均为英文词条", async () => {
+    window.localStorage.setItem("lexilexi:quiz-direction", "zh-en");
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await provider.importSampleWordlist();
+
+    const { questions, cards } = await provider.loadMultipleChoiceQueue("learn");
+    expect(questions.length).toBeGreaterThan(0);
+    expect(questions).toHaveLength(cards.length);
+    for (const question of questions) {
+      expect(question.direction).toBe("zh-en");
+      const correct = question.options.find((option) => option.isCorrect);
+      expect(correct?.text).toBe(question.sense.term);
+      // 中译英的选项全部是词条原文（示例词表为纯小写英文词）
+      expect(question.options.every((option) => /^[a-z]+$/.test(option.text))).toBe(true);
+    }
+  });
+
+  it("混合模式：每道题方向在 {en-zh, zh-en} 内且与选项文本口径一致", async () => {
+    window.localStorage.setItem("lexilexi:quiz-direction", "mixed");
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await provider.importSampleWordlist();
+
+    const { questions } = await provider.loadMultipleChoiceQueue("learn");
+    expect(questions.length).toBeGreaterThan(0);
+    for (const question of questions) {
+      expect(["en-zh", "zh-en"]).toContain(question.direction);
+      const correct = question.options.find((option) => option.isCorrect);
+      if (question.direction === "zh-en") {
+        expect(correct?.text).toBe(question.sense.term);
+      } else {
+        expect(correct?.text).toBe(question.sense.definitions[0]);
+      }
+    }
+  });
+
+  it("损坏的方向设置值回落默认英译中（不出错、不出 zh-en 题）", async () => {
+    window.localStorage.setItem("lexilexi:quiz-direction", "garbage");
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await provider.importSampleWordlist();
+
+    const { questions } = await provider.loadMultipleChoiceQueue("learn");
+    expect(questions.length).toBeGreaterThan(0);
+    expect(questions.every((question) => question.direction === "en-zh")).toBe(true);
+  });
+});
