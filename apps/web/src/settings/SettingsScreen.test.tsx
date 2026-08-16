@@ -14,6 +14,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LexilexiExportData } from "@lexilexi/core";
 import { APP_VERSION } from "../lib/appVersion";
 import type { ThemePreference } from "../theme/resolve";
+import { readDevPanelUnlocked, writeDevPanelUnlocked } from "./devPanel/unlock";
+import type { DeveloperDataProvider } from "./devPanel/types";
 import { usePersistenceStatus } from "./persistenceStatus";
 import { SettingsScreen } from "./SettingsScreen";
 import type { ImportBackupResult, PresetSummary, SettingsDataProvider } from "./types";
@@ -98,12 +100,39 @@ function stubObjectUrl() {
   };
 }
 
+/** 开发者面板 mock 数据源（RAY-297）：设置页测试注入，不触碰真实 IndexedDB */
+function makeDevProvider(): DeveloperDataProvider {
+  return {
+    loadDatabaseDebug: vi.fn().mockResolvedValue({
+      dbName: "lexilexi",
+      schemaVersion: 4,
+      tables: [],
+    }),
+    loadFsrsDebug: vi.fn().mockResolvedValue({
+      parameters: {
+        request_retention: 0.9,
+        maximum_interval: 36_500,
+        w: [1],
+        enable_fuzz: false,
+        enable_short_term: true,
+        learning_steps: ["1m"],
+        relearning_steps: ["10m"],
+      },
+      counts: { new: 0, learning: 0, review: 0, relearning: 0 },
+      dueSample: [],
+    }),
+    clearDatabase: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 interface RenderSettingsOptions {
   provider?: SettingsDataProvider;
   onExit?: () => void;
   /** 主题偏好（RAY-261 必传 props；默认跟随系统） */
   themePreference?: ThemePreference;
   onThemePreferenceChange?: (preference: ThemePreference) => void;
+  /** 开发者面板数据源工厂（RAY-297：默认 mock，避免误触真实 IndexedDB） */
+  developerDataProviderFactory?: () => DeveloperDataProvider;
 }
 
 /** 统一渲染设置页：主题 props 提供默认值，与主题无关的用例无需重复传参 */
@@ -114,6 +143,7 @@ function renderSettings(options: RenderSettingsOptions = {}) {
       onExit={options.onExit ?? (() => {})}
       themePreference={options.themePreference ?? "system"}
       onThemePreferenceChange={options.onThemePreferenceChange ?? vi.fn()}
+      developerDataProviderFactory={options.developerDataProviderFactory ?? makeDevProvider}
     />,
   );
 }
@@ -522,5 +552,44 @@ describe("RAY-293 学习设置：选择题出题方向", () => {
     renderSettings();
     await screen.findByText("学习");
     expect(screen.getByLabelText(/选择题出题方向/)).toHaveValue("mixed");
+  });
+});
+
+describe("RAY-297 隐藏开发者面板", () => {
+  beforeEach(() => {
+    vi.mocked(usePersistenceStatus).mockReturnValue(null);
+    window.localStorage.clear();
+  });
+
+  it("版本号连点 5 次解锁，再连点 5 次折叠，状态存 localStorage", async () => {
+    renderSettings();
+
+    const versionButton = screen.getByRole("button", { name: `乐希 Lexilexi v${APP_VERSION}` });
+    expect(screen.queryByRole("heading", { name: "开发者" })).not.toBeInTheDocument();
+
+    for (let tap = 0; tap < 5; tap += 1) {
+      fireEvent.click(versionButton);
+    }
+    expect(await screen.findByRole("heading", { name: "开发者" })).toBeInTheDocument();
+    expect(readDevPanelUnlocked()).toBe(true);
+
+    for (let tap = 0; tap < 5; tap += 1) {
+      fireEvent.click(versionButton);
+    }
+    expect(screen.queryByRole("heading", { name: "开发者" })).not.toBeInTheDocument();
+    expect(readDevPanelUnlocked()).toBe(false);
+  });
+
+  it("解锁状态刷新后保留（初始值读 localStorage）", async () => {
+    expect(writeDevPanelUnlocked(true)).toBe(true);
+    renderSettings();
+    expect(await screen.findByRole("heading", { name: "开发者" })).toBeInTheDocument();
+  });
+
+  it("未解锁时数据源工厂不被调用（零开销）", async () => {
+    const factory = vi.fn(makeDevProvider);
+    renderSettings({ developerDataProviderFactory: factory });
+    await screen.findByText("关于");
+    expect(factory).not.toHaveBeenCalled();
   });
 });

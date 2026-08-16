@@ -22,6 +22,10 @@
  * - 选择题出题方向（RAY-293）：学习分组三档选单（英译中 / 中译英 / 混合），
  *   与评分档位、发音口音同一 localStorage 持久化模式；方向只影响题目
  *   呈现，不影响评分与 FSRS 调度（见 docs/quiz-fsrs-mapping.md）。
+ * - 隐藏开发者面板（RAY-297）：页面底部版本号连点 5 次解锁「开发者」分组
+ *   （再次连点 5 次折叠，解锁状态存 localStorage）；分组内为通道切换器 /
+ *   构建信息 / 版本回退 / 数据库调试 / FSRS 调试 / Feature flags，
+ *   信息全部构建时注入或本机读取，无联网、无埋点（详见 devPanel/）。
  *
  * 导出/导入/提示状态提升到本组件（SettingsScreen）而非 SettingsMainView：
  * 进入「数据来源与许可」二级页时 SettingsMainView 卸载，进行中的导出状态与
@@ -57,6 +61,10 @@ import {
 import type { QuizDirectionPreference } from "../lib/quizDirection";
 import { isThemePreference, type ThemePreference } from "../theme/resolve";
 import { DataSourcesScreen } from "./DataSourcesScreen";
+import { DeveloperPanel } from "./devPanel/DeveloperPanel";
+import { createDefaultDeveloperDataProvider } from "./devPanel/data";
+import type { DeveloperDataProvider } from "./devPanel/types";
+import { nextTapState, readDevPanelUnlocked, writeDevPanelUnlocked } from "./devPanel/unlock";
 import { usePersistenceStatus } from "./persistenceStatus";
 import type { SettingsDataProvider } from "./types";
 
@@ -79,6 +87,8 @@ export interface SettingsScreenProps {
   /** 主题偏好（RAY-261：App 级 useTheme 单一数据源，本页仅选择与回调，不自行持久化） */
   themePreference: ThemePreference;
   onThemePreferenceChange(preference: ThemePreference): void;
+  /** 开发者面板数据源工厂（RAY-297：默认浏览器 IndexedDB；测试注入 mock，解锁时才创建） */
+  developerDataProviderFactory?: () => DeveloperDataProvider;
 }
 
 /** 数据源错误 → 用户可见文案（不暴露内部实现细节） */
@@ -101,6 +111,7 @@ export function SettingsScreen({
   onExit,
   themePreference,
   onThemePreferenceChange,
+  developerDataProviderFactory = createDefaultDeveloperDataProvider,
 }: SettingsScreenProps) {
   // 二级视图分发（hooks 规则：主视图的全部 hooks 在 SettingsMainView 内，此处仅一个 state）
   const [view, setView] = useState<"main" | "licenses" | "wordbooks">("main");
@@ -124,6 +135,11 @@ export function SettingsScreen({
   const [quizDirection, setQuizDirection] = useState<QuizDirectionPreference>(() =>
     readQuizDirectionPreference(),
   );
+  // 开发者面板连点状态（RAY-297：版本号连点 N 次解锁/折叠；初始解锁态读 localStorage）
+  const [devPanelTapState, setDevPanelTapState] = useState(() => ({
+    unlocked: readDevPanelUnlocked(),
+    taps: 0,
+  }));
 
   const handleExportJson = useCallback(async () => {
     setExporting("json");
@@ -223,6 +239,17 @@ export function SettingsScreen({
     }
   }, []);
 
+  /** 版本号连点（RAY-297）：累计 N 次翻转解锁状态并持久化；未到阈值只计数 */
+  const handleVersionTap = useCallback(() => {
+    setDevPanelTapState((current) => {
+      const next = nextTapState(current);
+      if (next.unlocked !== current.unlocked) {
+        writeDevPanelUnlocked(next.unlocked);
+      }
+      return next;
+    });
+  }, []);
+
   if (view === "licenses") {
     return <DataSourcesScreen provider={provider} onBack={() => setView("main")} />;
   }
@@ -264,6 +291,9 @@ export function SettingsScreen({
       onQuizDirectionChange={handleQuizDirectionChange}
       themePreference={themePreference}
       onThemePreferenceChange={onThemePreferenceChange}
+      devPanelUnlocked={devPanelTapState.unlocked}
+      onVersionTap={handleVersionTap}
+      developerDataProviderFactory={developerDataProviderFactory}
     />
   );
 }
@@ -299,6 +329,10 @@ interface SettingsMainViewProps {
   /** 主题偏好三档（RAY-261）：App 级 useTheme 单一数据源下发 */
   themePreference: ThemePreference;
   onThemePreferenceChange(preference: ThemePreference): void;
+  /** 开发者面板（RAY-297）：是否已解锁 + 版本号连点回调 + 面板数据源工厂 */
+  devPanelUnlocked: boolean;
+  onVersionTap(): void;
+  developerDataProviderFactory: () => DeveloperDataProvider;
 }
 
 function SettingsMainView({
@@ -324,6 +358,9 @@ function SettingsMainView({
   onQuizDirectionChange,
   themePreference,
   onThemePreferenceChange,
+  devPanelUnlocked,
+  onVersionTap,
+  developerDataProviderFactory,
 }: SettingsMainViewProps) {
   const persistence = usePersistenceStatus();
 
@@ -558,6 +595,8 @@ function SettingsMainView({
         </div>
       </Section>
 
+      {devPanelUnlocked ? <DeveloperPanel providerFactory={developerDataProviderFactory} /> : null}
+
       <div aria-live="polite">
         {notice ? (
           <p
@@ -577,8 +616,17 @@ function SettingsMainView({
         ) : null}
       </div>
 
-      <footer className="border-t border-border pt-4 text-center text-xs text-text-muted">
-        乐希 Lexilexi v{APP_VERSION}
+      {/* RAY-297：版本号为隐藏彩蛋入口——连点 5 次解锁「开发者」分组，
+          再次连点 5 次折叠；解锁状态存 localStorage。样式上仍是普通脚注文本，
+          但语义上可点（按钮），键盘可聚焦、可用（无障碍不破坏）。 */}
+      <footer className="border-t border-border pt-4 text-center">
+        <button
+          type="button"
+          onClick={onVersionTap}
+          className="rounded-full px-3 py-1 text-xs text-text-muted transition-colors hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        >
+          乐希 Lexilexi v{APP_VERSION}
+        </button>
       </footer>
     </main>
   );
