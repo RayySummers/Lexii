@@ -54,6 +54,10 @@ function makeSettingsProviderFactory() {
     getPresetSummaries: vi.fn().mockResolvedValue([]),
     getWordbookSummaries: vi.fn().mockResolvedValue([]),
     installWordbook: vi.fn().mockResolvedValue({ installedCount: 0, skippedCount: 0 }),
+    getDictionaryPackageSummaries: vi.fn().mockResolvedValue([]),
+    fetchDictionaryManifest: vi.fn().mockResolvedValue(null),
+    installDictionaryPackage: vi.fn().mockResolvedValue({ status: "installed", installedCount: 0 }),
+    markTier1CoveredByTier2: vi.fn().mockResolvedValue(undefined),
   };
   return { provider, factory: vi.fn().mockReturnValue(provider) };
 }

@@ -1,9 +1,11 @@
 /**
  * 搜词数据源集成测试（fake-indexeddb）。
  *
- * 走真实 @lexilexi/core 路径：写入义项 → searchLexilexiSenses 检索 →
+ * 走真实 @lexilexi/core 路径：写入义项 → searchAllSenses 检索 →
  * 命中顺序（前缀 > 包含 > 释义）与词库空判定。与 review/data.test.ts
  * 使用同一 fake-indexeddb 注入方式，不依赖浏览器环境。
+ *
+ * RAY-294：词典来源的 addToNotebook 测试（promote 后再加词）。
  */
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { openDatabase, toSenseId } from "@lexilexi/core";
@@ -97,5 +99,37 @@ describe("搜词页生词本加词入口（RAY-284，数据源集成）", () => 
     expect(await provider.getNotebookSenseIds()).toEqual([sense.id]);
     // 幂等：重复加词返回 already
     expect(await provider.addToNotebook(sense.id)).toBe("already");
+  });
+
+  it("词典来源的 senseId 自动 promote 后加入生词本（RAY-294 晋升路径）", async () => {
+    // 写入一个 dictionarySense（模拟词典来源）
+    const dictSenseId = toSenseId("sense_dict_kaleidoscope");
+    await db!.dictionarySenses.put({
+      id: dictSenseId,
+      lang: "en",
+      term: "kaleidoscope",
+      definitions: ["万花筒"],
+      tags: [],
+      examples: [],
+      source: "core-en-tier2",
+    });
+    const provider = createIndexedDbSearchDataProvider(db!);
+
+    // addToNotebook 应自动 promote 到 senses 表再加词
+    const result = await provider.addToNotebook(dictSenseId);
+    expect(result).toBe("added");
+
+    // senses 表应有 promoted 副本（新 id，非原始 dictSenseId）
+    const senses = await db!.senses.toArray();
+    expect(senses).toHaveLength(1);
+    expect(senses[0]!.term).toBe("kaleidoscope");
+    expect(senses[0]!.id).not.toBe(dictSenseId); // promote 生成新 SenseId
+
+    // 生词本应包含 promoted 的 senseId
+    expect(await provider.getNotebookSenseIds()).toEqual([senses[0]!.id]);
+
+    // 幂等：再次加词（此时 senses 表已有该 term）返回 already
+    const result2 = await provider.addToNotebook(dictSenseId);
+    expect(result2).toBe("already");
   });
 });

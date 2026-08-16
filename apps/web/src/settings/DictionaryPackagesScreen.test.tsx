@@ -241,4 +241,130 @@ describe("DictionaryPackagesScreen", () => {
       expect(screen.getByText(/无法获取词包信息/)).toBeInTheDocument();
     });
   });
+
+  it("已安装包版本低于 manifest 时展示「可升级」徽标和升级按钮", async () => {
+    const provider = makeProvider({
+      getDictionaryPackageSummaries: vi.fn().mockResolvedValue([
+        {
+          id: "core-en-tier1",
+          name: "Tier 1 标准词包",
+          status: "installed",
+          installedCount: 58_244,
+          totalCount: 58_244,
+          installedVersion: "1.0.0",
+        },
+        {
+          id: "core-en-tier2",
+          name: "Tier 2 全量词包",
+          status: "not-installed",
+          installedCount: 0,
+          totalCount: 401_222,
+        },
+      ] satisfies DictionaryPackageSummary[]),
+      fetchDictionaryManifest: vi.fn().mockResolvedValue([
+        {
+          id: "core-en-tier1",
+          version: "2.0.0",
+          sourceCommit: "abc123",
+          bestVariant: { url: "http://example.com/t1.json.br", size: 1_258_304, sha256: "aaa" },
+        },
+        {
+          id: "core-en-tier2",
+          version: "1.0.0",
+          sourceCommit: "abc123",
+          bestVariant: { url: "http://example.com/t2.json.br", size: 6_710_886, sha256: "bbb" },
+        },
+      ] satisfies DictionaryManifestInfo[]),
+    });
+    render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("可升级 v2.0.0")).toBeInTheDocument();
+    });
+    expect(screen.getByText("升级到 v2.0.0")).toBeInTheDocument();
+    // Tier 2 仍然显示「下载」按钮（未安装）
+    expect(screen.getByText("下载")).toBeInTheDocument();
+  });
+
+  it("已安装包版本与 manifest 一致时不展示升级按钮", async () => {
+    const provider = makeProvider({
+      getDictionaryPackageSummaries: vi.fn().mockResolvedValue([
+        {
+          id: "core-en-tier1",
+          name: "Tier 1 标准词包",
+          status: "installed",
+          installedCount: 58_244,
+          totalCount: 58_244,
+          installedVersion: "1.0.0",
+        },
+        {
+          id: "core-en-tier2",
+          name: "Tier 2 全量词包",
+          status: "not-installed",
+          installedCount: 0,
+          totalCount: 401_222,
+        },
+      ] satisfies DictionaryPackageSummary[]),
+    });
+    render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("已安装 v1.0.0")).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/可升级/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/升级到/)).not.toBeInTheDocument();
+  });
+
+  it("点击升级按钮触发安装流程（复用 installDictionaryPackage）", async () => {
+    const provider = makeProvider({
+      getDictionaryPackageSummaries: vi.fn().mockResolvedValue([
+        {
+          id: "core-en-tier1",
+          name: "Tier 1 标准词包",
+          status: "installed",
+          installedCount: 58_244,
+          totalCount: 58_244,
+          installedVersion: "1.0.0",
+        },
+        {
+          id: "core-en-tier2",
+          name: "Tier 2 全量词包",
+          status: "not-installed",
+          installedCount: 0,
+          totalCount: 401_222,
+        },
+      ] satisfies DictionaryPackageSummary[]),
+      fetchDictionaryManifest: vi.fn().mockResolvedValue([
+        {
+          id: "core-en-tier1",
+          version: "2.0.0",
+          sourceCommit: "abc123",
+          bestVariant: { url: "http://example.com/t1.json.br", size: 1_258_304, sha256: "aaa" },
+        },
+        {
+          id: "core-en-tier2",
+          version: "1.0.0",
+          sourceCommit: "abc123",
+          bestVariant: { url: "http://example.com/t2.json.br", size: 6_710_886, sha256: "bbb" },
+        },
+      ] satisfies DictionaryManifestInfo[]),
+    });
+    render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("升级到 v2.0.0")).toBeInTheDocument();
+    });
+
+    // 点击升级按钮 → 弹出确认对话框
+    fireEvent.click(screen.getByText("升级到 v2.0.0"));
+    await waitFor(() => {
+      expect(screen.getByText("确认下载")).toBeInTheDocument();
+    });
+
+    // 确认后调用 installDictionaryPackage
+    fireEvent.click(screen.getByText("确认下载"));
+    await waitFor(() => {
+      expect(provider.installDictionaryPackage).toHaveBeenCalledWith("core-en-tier1");
+    });
+  });
 });

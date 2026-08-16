@@ -15,6 +15,7 @@
  * RAY-253 反馈 6：loadOverview（数据概览）已随设置页概览区删除。
  */
 import {
+  detectDecompression,
   downloadAndVerifyPackage,
   exportCsvWordlist,
   exportLexilexiData,
@@ -206,19 +207,20 @@ export function createIndexedDbSettingsDataProvider(db: LexilexiDatabase): Setti
     async fetchDictionaryManifest(): Promise<DictionaryManifestInfo[] | null> {
       try {
         const manifest: DictionaryManifest = await fetchManifest(getManifestUrl());
+        // 按浏览器实际解压能力选择 variant（§5.2/§5.3 降级矩阵）
+        const encoding = await detectDecompression();
         return manifest.packages.map((pkg) => {
-          // 优先 Brotli → gzip → raw
-          const bestVariant = pkg.variants.brotli ?? pkg.variants.gzip ?? pkg.variants.raw;
+          const variant = pkg.variants[encoding] ?? pkg.variants.gzip ?? pkg.variants.raw;
           return {
             id: pkg.id,
             version: pkg.version,
             sourceCommit: pkg.sourceCommit,
-            ...(bestVariant
+            ...(variant
               ? {
                   bestVariant: {
-                    url: bestVariant.url,
-                    size: bestVariant.size,
-                    sha256: bestVariant.sha256,
+                    url: variant.url,
+                    size: variant.size,
+                    sha256: variant.sha256,
                   },
                 }
               : {}),

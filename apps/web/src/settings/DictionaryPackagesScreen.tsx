@@ -22,6 +22,22 @@ import type {
 /** 安装状态轮询间隔（安装进行中时刷新进度） */
 const POLL_INTERVAL_MS = 800;
 
+/**
+ * 简单 semver 比较：返回 -1（a < b）、0（a === b）、1（a > b）。
+ * 仅处理 major.minor.patch，不含 pre-release/build。
+ */
+function compareSemver(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    const da = pa[i] ?? 0;
+    const db = pb[i] ?? 0;
+    if (da < db) return -1;
+    if (da > db) return 1;
+  }
+  return 0;
+}
+
 /** 包体积格式化（字节 → MB） */
 function formatSize(bytes: number | undefined): string {
   if (bytes === undefined) return "";
@@ -31,10 +47,22 @@ function formatSize(bytes: number | undefined): string {
 }
 
 /** 安装状态 → 中文徽标文案 */
-function statusLabel(status: DictionaryInstallStatus, installedVersion?: string): string {
+function statusLabel(
+  status: DictionaryInstallStatus,
+  installedVersion?: string,
+  manifestVersion?: string,
+): string {
   switch (status) {
-    case "installed":
+    case "installed": {
+      if (
+        installedVersion &&
+        manifestVersion &&
+        compareSemver(installedVersion, manifestVersion) < 0
+      ) {
+        return `可升级 v${manifestVersion}`;
+      }
       return installedVersion ? `已安装 v${installedVersion}` : "已安装";
+    }
     case "installing":
       return "安装中";
     case "not-installed":
@@ -259,6 +287,14 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
     [manifestInfos],
   );
 
+  // 获取 manifest 中的版本信息
+  const getManifestVersion = useCallback(
+    (packageId: string): string | undefined => {
+      return manifestInfos?.find((i) => i.id === packageId)?.version;
+    },
+    [manifestInfos],
+  );
+
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
       <ScreenHeader title="扩展词包" onBack={onBack} backLabel="返回设置" />
@@ -280,6 +316,7 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
             key={summary.id}
             summary={summary}
             sizeBytes={getManifestSize(summary.id)}
+            manifestVersion={getManifestVersion(summary.id)}
             installing={pendingInstalls.has(summary.id)}
             onDownload={handleDownloadClick}
           />
@@ -335,17 +372,26 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
 function DictionaryPackageCard({
   summary,
   sizeBytes,
+  manifestVersion,
   installing,
   onDownload,
 }: {
   summary: DictionaryPackageSummary;
   sizeBytes?: number;
+  /** manifest 中的最新版本（用于判断升级可用） */
+  manifestVersion?: string;
   installing: boolean;
   onDownload(summary: DictionaryPackageSummary): void;
 }) {
-  const { status, installedCount, totalCount } = summary;
+  const { status, installedCount, totalCount, installedVersion } = summary;
   const progressPercent =
     status === "installing" && totalCount > 0 ? Math.round((installedCount / totalCount) * 100) : 0;
+
+  const isUpgradeAvailable =
+    status === "installed" &&
+    installedVersion &&
+    manifestVersion &&
+    compareSemver(installedVersion, manifestVersion) < 0;
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-border p-4">
@@ -354,7 +400,9 @@ function DictionaryPackageCard({
         <span
           className={`rounded-full border px-2.5 py-0.5 text-xs ${
             status === "installed"
-              ? "border-success/40 text-success"
+              ? isUpgradeAvailable
+                ? "border-accent/40 text-accent"
+                : "border-success/40 text-success"
               : status === "covered"
                 ? "border-success/40 text-success"
                 : status === "installing"
@@ -362,7 +410,7 @@ function DictionaryPackageCard({
                   : "border-border text-text-muted"
           }`}
         >
-          {statusLabel(status, summary.installedVersion)}
+          {statusLabel(status, installedVersion, manifestVersion)}
         </span>
       </span>
       <span className="text-xs text-text-muted">
@@ -396,6 +444,17 @@ function DictionaryPackageCard({
           className="w-fit rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
         >
           {installing ? "下载中…" : "下载"}
+        </button>
+      ) : null}
+
+      {isUpgradeAvailable ? (
+        <button
+          type="button"
+          disabled={installing}
+          onClick={() => onDownload(summary)}
+          className="w-fit rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {installing ? "升级中…" : `升级到 v${manifestVersion}`}
         </button>
       ) : null}
     </div>

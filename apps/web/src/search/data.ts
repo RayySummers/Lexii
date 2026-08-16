@@ -7,12 +7,18 @@
  * - hasAnySenses：senses + dictionarySenses 双表计数（空状态判定）；
  * - getNotebookSenseIds / addToNotebook：生词本加词入口（RAY-284）——
  *   加词幂等判定与落库走 core 的 addToNotebook（notebook/data.ts 的
- *   addWordToNotebook helper）。
+ *   addWordToNotebook helper）。词典来源的 senseId 需先 promote 到
+ *   senses 表再走加词流程（RAY-294 晋升路径）。
  *
  * 检索数据量口径与复习选择题混淆项加载一致（词库规模数千条，单次全量
  * 可接受），见 packages/core/src/search.ts 的说明。
  */
-import { getActiveNotebookItemIds, openDatabase, searchAllSenses } from "@lexilexi/core";
+import {
+  getActiveNotebookItemIds,
+  openDatabase,
+  promoteDictionarySense,
+  searchAllSenses,
+} from "@lexilexi/core";
 import type { LexilexiDatabase, SenseId } from "@lexilexi/core";
 import { addWordToNotebook } from "../notebook/data";
 import type { AddToNotebookResult } from "../notebook/types";
@@ -48,7 +54,17 @@ export function createIndexedDbSearchDataProvider(db: LexilexiDatabase): SearchD
     },
 
     async addToNotebook(senseId: SenseId): Promise<AddToNotebookResult> {
-      // 搜词页加词入口（RAY-284）：幂等加词，生词进入现有 FSRS 调度
+      // 搜词页加词入口（RAY-284 + RAY-294）：
+      // 词典来源的 senseId 属于 dictionarySenses 表，需先 promote 到 senses 表
+      // 才能走 addToNotebook（后者要求 senseId 已存在于 senses 表）。
+      const inLearningTable = await db.senses.get(senseId);
+      if (!inLearningTable) {
+        // 不在学习表 → 可能是词典来源，尝试 promote
+        const promoted = await promoteDictionarySense(db, senseId);
+        if (promoted) {
+          return addWordToNotebook(db, promoted.id);
+        }
+      }
       return addWordToNotebook(db, senseId);
     },
   };
