@@ -178,6 +178,9 @@ describe("ReviewCard 固定高度与卡片内部滚动（RAY-291）", () => {
     expect(height).toContain("100dvh");
     expect(height).toContain(`${CARD_HEIGHT_OFFSET_REM}rem`);
     expect(height).toContain(`${CARD_HEIGHT_MAX_REM}rem`);
+    // nit 3：容器同时带 vh 回退类——旧浏览器丢弃非法 dvh 内联声明时回落
+    // 到 styles/index.css 的 .review-card-height（vh 版本）
+    expect(wrapper).toHaveClass("review-card-height");
   });
 
   it("翻面后焦点移到背面滚动区：桌面键盘可用方向键滚动长释义（suggestion 1）", async () => {
