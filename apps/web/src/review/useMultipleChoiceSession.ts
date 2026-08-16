@@ -35,6 +35,11 @@ export interface QuizSession {
   isCorrect: boolean | null;
   /** 错误信息 */
   error: string | null;
+  /**
+   * 队列为空且「每日新卡额度已用完、词库仍有未学新词」（RAY-276 诊断线 3）。
+   * 与卡片模式的 useReviewSession 同口径。
+   */
+  newCardQuotaExhausted: boolean;
   /** 选择一个选项 */
   select(index: number): void;
   /** 重试加载 */
@@ -50,6 +55,8 @@ interface QuizState {
   isCorrect: boolean | null;
   answeredCount: number;
   error: string | null;
+  /** 每日新卡额度耗尽标记（RAY-276 诊断线 3；仅 no-due 阶段有意义） */
+  newCardQuotaExhausted: boolean;
 }
 
 const INITIAL_STATE: QuizState = {
@@ -61,6 +68,7 @@ const INITIAL_STATE: QuizState = {
   isCorrect: null,
   answeredCount: 0,
   error: null,
+  newCardQuotaExhausted: false,
 };
 
 /** 自动推进延迟（毫秒）：让用户看到正误反馈后进入下一题 */
@@ -111,6 +119,7 @@ export function useMultipleChoiceSession(
       selectedIndex: null,
       isCorrect: null,
       answeredCount: 0,
+      newCardQuotaExhausted: false,
     });
     try {
       const { questions, cards } = await provider.loadMultipleChoiceQueue(mode);
@@ -134,6 +143,23 @@ export function useMultipleChoiceSession(
           return;
         }
         apply({ phase: hasItems ? "no-due" : "empty" });
+        // 队列为空时区分「额度已用完」与「没有内容」（RAY-276 诊断线 3）
+        if (hasItems && provider.loadQueueMeta) {
+          try {
+            const meta = await provider.loadQueueMeta(mode);
+            if (
+              loadId !== loadIdRef.current ||
+              meta.remainingNewCardQuota === null ||
+              meta.remainingNewCardQuota > 0 ||
+              !meta.hasDueNewWords
+            ) {
+              return;
+            }
+            apply({ newCardQuotaExhausted: true });
+          } catch {
+            // 静默降级：元信息失败不影响 no-due 空状态
+          }
+        }
       }
     } catch (error) {
       if (loadId !== loadIdRef.current) {
@@ -227,6 +253,7 @@ export function useMultipleChoiceSession(
     selectedIndex: state.selectedIndex,
     isCorrect: state.isCorrect,
     error: state.error,
+    newCardQuotaExhausted: state.newCardQuotaExhausted,
     select,
     retry,
   };

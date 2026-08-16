@@ -4,7 +4,7 @@
 
 ## 当前状态：全部 private，仅从源码消费
 
-- 五个 packages（`ai` / `core` / `eval` / `fsrs` / `stats`）均为 `private: true`、版本 `0.1.0-alpha.2`（随 `apps/web` 发版同步，仅内部引用），**不发布 npm**。
+- 五个 packages（`ai` / `core` / `eval` / `fsrs` / `stats`）均为 `private: true`、版本 `0.1.0-alpha.3`（随 `apps/web` 发版同步，仅内部引用），**不发布 npm**。
 - `exports` / `main` / `types` 统一指向 `./src/index.ts`：pnpm workspace 与 vite/tsc 直接解析源码，开发与构建都无需预先 build 各包。
 - 因此**不声明 `files` 字段**——该字段只对 npm 发布生效，对 private 包是死字段，且与 `exports` 指向 `src` 矛盾（RAY-248 已删除）。
 - 新增 package 请遵循同一约定：`private: true` + `exports` 指向 `src` + 不写 `files`。

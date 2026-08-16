@@ -133,6 +133,7 @@ export { TIER0_PRESET, TIER0_PRESET_ROW_COUNT } from "./presets/tier0";
 // 走 "@lexilexi/core/presets/books" 子路径导出：books.data.json 约 2 MB，
 // 静态 re-export 会把词书数据打进所有消费者主 bundle；子路径 + 动态 import
 // 使 Vite 将其拆为按需加载的 async chunk（RAY-262 Oscar 评审 suggestion 3）。
+export { endOfLocalDay } from "./dayBoundary";
 export {
   getDueItemIds,
   getDueItemIdsInRange,

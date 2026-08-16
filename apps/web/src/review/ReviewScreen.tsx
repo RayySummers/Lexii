@@ -19,6 +19,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
 import type { ReviewRating, StudyMode } from "@lexilexi/core";
 import { BackArrowIcon, SpeakerIcon, UndoIcon } from "../components/icons";
+import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { readPronunciationAccent, speakWord } from "../lib/pronunciation";
 import { readRatingTierMode } from "../lib/ratingTiers";
 import type { RatingTierMode } from "../lib/ratingTiers";
@@ -51,6 +52,29 @@ const NO_QUEUE_COPY: Record<StudyMode, { title: string; body: string }> = {
     body: "今天没有到期词，也没有待学习的新词。休息一下，或返回首页换一种模式。",
   },
 };
+
+/**
+ * 每日新卡额度耗尽时的空状态文案（RAY-276 诊断线 3）：
+ * 队列为空 + 剩余额度 0 + 词库仍有未学新词时，明确告诉用户「顺延」，
+ * 而不是暗示词库没有新词可学。review 模式不触发（不含新词）。
+ */
+function quotaExhaustedCopy(
+  mode: StudyMode,
+  limit: number,
+): { title: string; body: string } | null {
+  if (mode === "review") {
+    return null;
+  }
+  return mode === "learn"
+    ? {
+        title: "今日新词额度已用完",
+        body: `每日新词上限 ${limit} 张已经学完，剩余新词顺延到明天。想继续学习请返回首页试试「复习」或「混合」模式。`,
+      }
+    : {
+        title: "今日新词额度已用完",
+        body: `今天没有到期的复习卡，每日新词上限 ${limit} 张也已学完。休息一下，明天再来。`,
+      };
+}
 
 /** 当前卡评分的到期文案（预览计算轻量，无需 memo） */
 function computeDueLabels(card: ReviewCardData): Record<ReviewRating, string> {
@@ -281,7 +305,10 @@ function PhaseContent({
         </div>
       );
     case "no-due": {
-      const copy = NO_QUEUE_COPY[mode];
+      const copy =
+        (session.newCardQuotaExhausted
+          ? quotaExhaustedCopy(mode, readDailyNewCardLimit())
+          : null) ?? NO_QUEUE_COPY[mode];
       return (
         <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 text-center">
           <h2 className="text-xl font-semibold">{copy.title}</h2>

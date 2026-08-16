@@ -9,6 +9,7 @@
  */
 import { Scheduler, dateDiffInDays } from "@lexilexi/fsrs";
 import type { CardInput, RecordLogItem } from "@lexilexi/fsrs";
+import { endOfLocalDay } from "./dayBoundary";
 import type { IsoDate } from "./domain";
 import type { ExerciseType, ReviewEvent, ReviewRating } from "./events";
 import { createId, toEventId } from "./id";
@@ -240,14 +241,18 @@ function validateGradeReviewInput(input: GradeReviewInput): void {
 }
 
 /**
- * 查询到期条目 id（due <= now 的全部记忆状态；MVP 新卡 due 为导入时刻，
+ * 查询到期条目 id（due <= 今日结束的全部记忆状态；MVP 新卡 due 为导入时刻，
  * 导入即到期。学习步骤中的卡片到期时间由 FSRS 排期决定）。
+ *
+ * 「今日」口径为本地日历日（due <= endOfLocalDay(now)，见 dayBoundary.ts）：
+ * 昨晚学过的词今天上午即可复习（提前复习为 FSRS 合法输入），不再等到
+ * due 的精确时刻（RAY-276 诊断线 2）。
  *
  * 查询走 fields.due 索引（DB schema v3，RAY-260 评审 suggestion 2）：
  * belowOrEqual 区间查询，不再是 filter 全表扫描。
  */
 export async function getDueItemIds(db: LexilexiDatabase, now: IsoDate): Promise<ItemId[]> {
-  const due = await db.memoryStates.where("fields.due").belowOrEqual(now).toArray();
+  const due = await db.memoryStates.where("fields.due").belowOrEqual(endOfLocalDay(now)).toArray();
   return due.map((state) => state.itemId);
 }
 
@@ -262,7 +267,8 @@ export const INTERLEAVE_REVIEW_STEP = 2;
  *
  * 「新词」口径：从未评分的卡，即 `fields.reps === 0`——与 MemoryState
  * 不变量一致（首次评分前 reps 恒为 0，评分后恒 > 0；`lastReviewAt === null`
- * 是等价口径）。到期口径沿用 getDueItemIds：`due <= now`。
+ * 是等价口径）。到期口径沿用 getDueItemIds：`due <= endOfLocalDay(now)`
+ * （本地日历日，见 dayBoundary.ts——RAY-276 诊断线 2）。
  *
  * - learn：仅新词，按 due 升序（新卡 due = 导入时刻，即导入顺序）；
  * - review：仅已评分且到期的卡，按 due 升序；
@@ -290,7 +296,10 @@ export async function getStudyQueueItemIds(
   mode: StudyMode,
   options: StudyQueueOptions = {},
 ): Promise<ItemId[]> {
-  const dueStates = await db.memoryStates.where("fields.due").belowOrEqual(now).toArray();
+  const dueStates = await db.memoryStates
+    .where("fields.due")
+    .belowOrEqual(endOfLocalDay(now))
+    .toArray();
   const newStates: MemoryState[] = [];
   const reviewStates: MemoryState[] = [];
   for (const state of dueStates) {

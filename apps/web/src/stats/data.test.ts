@@ -56,7 +56,7 @@ describe("createIndexedDbStatsDataProvider", () => {
     expect(stats).toEqual({ ...EMPTY_STATS, dueCount: SAMPLE_WORDLIST_ROW_COUNT });
   });
 
-  it("评分一张卡后：到期数减一，累计次数/词条/天数/今日学习各 +1，今日复习为 0", async () => {
+  it("评分一张卡后：累计次数/词条/天数/今日学习各 +1，今日复习为 0；该卡 10 分钟后到期仍属今日待学（日历日口径）", async () => {
     // 冻结系统时间到远离本地午夜的时刻（只假 Date、不假计时器，Dexie 事务不受影响）：
     // 「good」的到期时间在 10 分钟内，若在 23:50 之后运行会跨过本地午夜，
     // 使 dueTomorrowCount 变成 1，产生与实现无关的时间点抖动。
@@ -71,7 +71,9 @@ describe("createIndexedDbStatsDataProvider", () => {
       await reviewProvider.grade(card, "good", { reviewDurationMs: 1_000, revealed: true });
 
       const stats = await statsProvider.loadStats();
-      expect(stats.dueCount).toBe(SAMPLE_WORDLIST_ROW_COUNT - 1);
+      // 日历日口径（RAY-276 诊断线 2）：good 后 due 在未来 10 分钟，仍属
+      // 「今日待学」，到期数不减；明日到期仍为 0
+      expect(stats.dueCount).toBe(SAMPLE_WORDLIST_ROW_COUNT);
       expect(stats.reviewCount).toBe(1);
       expect(stats.completedWordCount).toBe(1);
       expect(stats.streakDays).toBe(1);

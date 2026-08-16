@@ -45,6 +45,7 @@ import type {
   GradeContext,
   GradeResult,
   MultipleChoiceQueueResult,
+  QueueMeta,
   ReviewCard,
   ReviewDataProvider,
 } from "./types";
@@ -125,6 +126,21 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
         kept.map((pair) => pair.memory),
         now,
       );
+    },
+
+    /**
+     * 队列元信息（RAY-276 诊断线 3）：队列为空时区分「额度已用完」与
+     * 「没有内容」。额度口径与 loadQueue 一致（resolveNewCardLimit）；
+     * hasDueNewWords 为未截断口径（不传 newCardLimit 的新词队列非空）。
+     */
+    async loadQueueMeta(mode: StudyMode): Promise<QueueMeta> {
+      const now = new Date().toISOString();
+      if (mode === "review") {
+        return { remainingNewCardQuota: null, hasDueNewWords: false };
+      }
+      const remaining = await resolveNewCardLimit(db, now);
+      const uncappedNewIds = await getStudyQueueItemIds(db, now, "learn");
+      return { remainingNewCardQuota: remaining, hasDueNewWords: uncappedNewIds.length > 0 };
     },
 
     async loadMultipleChoiceQueue(mode: StudyMode): Promise<MultipleChoiceQueueResult> {

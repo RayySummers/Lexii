@@ -188,19 +188,28 @@ interface ReviewEvent extends BaseEvent {
 
 ## 9. 数据层与版本迁移
 
-- Dexie 数据库 **`lexilexi`**，`SCHEMA_VERSION = 3`，表：`items`(`id`)、`senses`(`id`)、`memoryStates`(`id`, `fields.due`)、`events`(`id`, `time`, `type`)、`meta`(`key`)。
+- Dexie 数据库 **`lexilexi`**，`SCHEMA_VERSION = 4`，表：`items`(`id`)、`senses`(`id`, `term`)、`memoryStates`(`id`, `fields.due`)、`events`(`id`, `time`, `type`)、`meta`(`key`)。
 - **schema 升级必须走 `db.version(n).stores(...).upgrade(...)` 迁移**，严禁 `db.delete()` / `db.close()` 后重建（清库重来是红线）。每版迁移函数带独立单元测试。
 - 版本链：v1 = 初始四表；v2（RAY-258）= 新增 `meta` 表（`{ key, value }` 字符串键值，
   承载预设词表安装进度/完成标记 `preset:<id>:progress` / `preset:<id>:done`
   与未来的扩展包元信息）。纯新增表，无数据迁移，存量数据原样保留。
   v3（RAY-260）= `memoryStates` 新增 `fields.due` 索引：到期/明日到期查询由
   filter 全表扫描改为索引区间查询（`belowOrEqual` / `between`），仅新增索引，
-  无数据迁移，存量数据原样保留。
+  无数据迁移，存量数据原样保留。v4（RAY-262）= `senses` 新增 `term` 索引
+  （预设词书安装按 term 查重去重），仅新增索引，存量数据原样保留。
+- 升级不丢数据回归防线（RAY-276）：`upgradePath.test.ts` 以 alpha.2 的 v1
+  schema 直接建库、按旧版本落库形态写入已学词/新词/学习记录，再由当前
+  `openDatabase` 执行 v1→v4 迁移链，断言四表数量与到期队列完整。
 - 数据库操作一律走 `db.transaction("rw", ...)`；同一「评分 → 写状态 + 写事件」必须单事务原子落库。
 - 预设词表安装（`installPreset`）分块事务落库：每 400 词条一个事务（词条 → Sense / Item / Memory State / import 事件 4 记录），进度标记与块同事务提交，中断后从断点续装、不重复导入；完成标记 `preset:<id>:done` 命中即幂等跳过。并发首装（RAY-260）：起始事务先写 `progress=0` 占位 + 每块事务 check-and-set（进度必须仍是本调用读到的 cursor），双标签页同时首启不产生重复导入。
 - 每日新卡上限（RAY-260）：`getStudyQueueItemIds` 的 `newCardLimit` 按 due 升序截取新词
   （learn / mixed）；「今日已学新词数」由 review 事件投影（`@lexilexi/stats` 的
   `computeLearnedTodayCount`）折算，产品默认值 20/日 与设置存储（localStorage 偏好）在 apps/web。
+- 「今日到期」日历日口径（RAY-276）：`getDueItemIds` / `getStudyQueueItemIds` /
+  复习队列装配以 `due <= endOfLocalDay(now)`（本地日历日 23:59:59.999 含）为
+  今日边界，而不是 `due <= now`。昨晚学过的词今天上午即可复习（提前复习为
+  FSRS 合法输入，调度器按实际经过天数排期），不再等到 due 的精确时刻；
+  `@lexilexi/fsrs` 的排期算法与差分验证口径不变（`dayBoundary.ts` 只作用于查询层）。
 
 ## 10. 持久化防线（storage.persist）
 

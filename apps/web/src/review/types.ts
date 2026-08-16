@@ -55,6 +55,20 @@ export interface GradeResult {
 }
 
 /**
+ * 队列元信息（RAY-276 诊断线 3）：队列为空时区分「词库无新词」与
+ * 「每日新卡额度已用完」，避免把额度截断误报成没有可学内容。
+ */
+export interface QueueMeta {
+  /**
+   * 今日剩余新卡额度（每日上限 − 今日已学新词，下限 0）。
+   * review 模式不含新词，为 null。
+   */
+  remainingNewCardQuota: number | null;
+  /** 词库中仍有未学新词（reps === 0 且今天到期，未按额度截断前的数量 > 0） */
+  hasDueNewWords: boolean;
+}
+
+/**
  * 复习数据源。
  *
  * 职责边界：只做「按模式加载队列 / 评分落库 / 标熟 / 单步撤销 / 词库状态
@@ -71,6 +85,12 @@ export interface ReviewDataProvider {
    * 顺序由 @lexilexi/core 的 getStudyQueueItemIds 决定（含混合穿插）。
    */
   loadQueue(mode: StudyMode): Promise<ReviewCard[]>;
+  /**
+   * 队列元信息（RAY-276 诊断线 3，可选方法）：
+   * 队列为空时由会话层查询，用于区分「每日新卡额度已用完」与
+   * 「真的没有可学/可复习内容」。未实现的数据源不触发查询。
+   */
+  loadQueueMeta?(mode: StudyMode): Promise<QueueMeta>;
   /**
    * 按学习模式加载选择题队列（RAY-269）。
    *
