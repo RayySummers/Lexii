@@ -13,7 +13,6 @@ import type {
   ExerciseType,
   ItemId,
   LearningItem,
-  LexilexiExportData,
   MemoryState,
   ReviewRating,
   Sense,
@@ -100,6 +99,4 @@ export interface ReviewDataProvider {
   hasAnyItems(): Promise<boolean>;
   /** 导入内置示例词表（空状态一键体验），返回导入条数 */
   importSampleWordlist(): Promise<number>;
-  /** 导出完整备份（items/senses/memoryStates/events 快照，可经 importLexilexiData 原样导回） */
-  exportBackup(): Promise<LexilexiExportData>;
 }

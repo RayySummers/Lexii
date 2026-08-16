@@ -14,6 +14,9 @@
  * - 工具栏提供「发音」（浏览器语音合成，美/英口音随设置）与「标熟」
  *   （词保留词书、按已熟长间隔调度）；
  * - 每次评分 / 标熟后可单步撤销（连续只能撤销一次，不可连退）。
+ *
+ * RAY-280：导出备份入口已从本页移到设置页（真机反馈），本页不再提供
+ * 导出按钮，导出功能本身不变（设置页仍导出完整可恢复 JSON）。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
@@ -22,7 +25,6 @@ import { BackArrowIcon, SpeakerIcon, UndoIcon } from "../components/icons";
 import { readPronunciationAccent, speakWord } from "../lib/pronunciation";
 import { readRatingTierMode } from "../lib/ratingTiers";
 import type { RatingTierMode } from "../lib/ratingTiers";
-import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
 import { ReviewCard } from "./ReviewCard";
 import { RatingButtons } from "./RatingButtons";
 import { formatDueLabel, previewGradeDueLabels, ratingFromKey } from "./grade";
@@ -74,9 +76,6 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
   const dueLabels = session.current ? computeDueLabels(session.current) : null;
   // 评分档位（RAY-265）：会话内固定读取一次；改设置后下次进入复习生效
   const [tierMode] = useState<RatingTierMode>(() => readRatingTierMode());
-  const [exporting, setExporting] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [speakNotice, setSpeakNotice] = useState<string | null>(null);
   // 朗读目标经 ref 读取（session 每次渲染换身份，useCallback 依赖其字段会
   // 让回调每次重建；ref 与提交同步即可保证点击时读到当前卡）
@@ -92,25 +91,6 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
       setSpeakNotice("当前浏览器不支持语音合成，无法发音。");
     }
   }, []);
-
-  const handleExport = useCallback(async () => {
-    setExporting(true);
-    setExportError(null);
-    setExportNotice(null);
-    try {
-      const data = await provider.exportBackup();
-      downloadTextFile(
-        datedFilename("lexilexi-backup", "json"),
-        serializeBackup(data),
-        "application/json",
-      );
-      setExportNotice("已导出备份。");
-    } catch (err) {
-      setExportError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setExporting(false);
-    }
-  }, [provider]);
 
   // 键盘监听：监听器生命周期与组件绑定（空依赖），阶段与回调经 ref 读取。
   // 之前依赖 [phase] 会在阶段切换时移除/重挂监听——重挂窗口内（或闭包
@@ -189,34 +169,8 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
               {session.totalCount - session.index - 1}
             </span>
           ) : null}
-          <button
-            type="button"
-            onClick={() => void handleExport()}
-            disabled={exporting}
-            className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {exporting ? "导出中…" : "导出备份"}
-          </button>
         </div>
       </div>
-
-      {exportNotice ? (
-        <p
-          role="status"
-          className="rounded-xl border border-border bg-surface p-4 text-sm text-success"
-        >
-          {exportNotice}
-        </p>
-      ) : null}
-
-      {exportError ? (
-        <p
-          role="alert"
-          className="rounded-xl border border-danger/40 bg-surface p-4 text-sm text-text"
-        >
-          导出失败：{exportError}
-        </p>
-      ) : null}
 
       <PhaseContent
         session={session}

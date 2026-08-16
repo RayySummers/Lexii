@@ -136,6 +136,19 @@ describe("SettingsScreen", () => {
     expect(onExit).toHaveBeenCalledTimes(1);
   });
 
+  it("RAY-280 导出入口显眼：数据安全与备份分组位于页面顶部（先于外观）", async () => {
+    renderSettings();
+
+    const backupHeading = await screen.findByRole("heading", { name: "数据安全与备份" });
+    const appearanceHeading = screen.getByRole("heading", { name: "外观" });
+    // 备份分组渲染在外观分组之前（DOM 顺序），保证入口进设置页即可见
+    expect(
+      backupHeading.compareDocumentPosition(appearanceHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // 主导出按钮保持主样式（primary）——显眼入口
+    expect(screen.getByRole("button", { name: "导出 JSON 完整备份" })).toBeInTheDocument();
+  });
+
   it("RAY-261 外观：下拉选单三档选项齐全且随 preference 受控", async () => {
     renderSettings({ themePreference: "light" });
     await screen.findByText("外观");
@@ -169,7 +182,7 @@ describe("SettingsScreen", () => {
   it("不渲染数据概览（RAY-253 反馈 6：与统计页重复，已删除）", async () => {
     renderSettings();
 
-    await screen.findByText("数据安全");
+    await screen.findByText("数据安全与备份");
     expect(screen.queryByText("数据概览")).not.toBeInTheDocument();
     expect(screen.queryByText("词条")).not.toBeInTheDocument();
     expect(screen.queryByText("已复习")).not.toBeInTheDocument();
@@ -208,7 +221,7 @@ describe("SettingsScreen", () => {
     const harness = makeHarness();
     renderSettings({ provider: harness.provider });
 
-    await screen.findByText("数据安全");
+    await screen.findByText("数据安全与备份");
     expect(screen.queryByText("当前数据可能被浏览器清理，建议导出备份。")).not.toBeInTheDocument();
     expect(screen.queryByText("本地数据已受浏览器持久化保护。")).not.toBeInTheDocument();
   });
@@ -218,7 +231,7 @@ describe("SettingsScreen", () => {
     const restore = stubObjectUrl();
     try {
       renderSettings({ provider: harness.provider });
-      await screen.findByText("导出数据");
+      await screen.findByText("数据安全与备份");
 
       fireEvent.click(screen.getByRole("button", { name: "导出 JSON 完整备份" }));
       expect(await screen.findByText("已导出 JSON 完整备份。")).toBeInTheDocument();
@@ -233,7 +246,7 @@ describe("SettingsScreen", () => {
     const restore = stubObjectUrl();
     try {
       renderSettings({ provider: harness.provider });
-      await screen.findByText("导出数据");
+      await screen.findByText("数据安全与备份");
 
       fireEvent.click(screen.getByRole("button", { name: "导出 CSV 词表" }));
       expect(await screen.findByText("已导出 CSV 词表。")).toBeInTheDocument();
@@ -416,7 +429,7 @@ describe("SettingsScreen", () => {
     );
     try {
       renderSettings({ provider: harness.provider });
-      await screen.findByText("导出数据");
+      await screen.findByText("数据安全与备份");
 
       // 发起导出（挂起中），随即切到「数据来源与许可」再返回
       fireEvent.click(screen.getByRole("button", { name: "导出 JSON 完整备份" }));
