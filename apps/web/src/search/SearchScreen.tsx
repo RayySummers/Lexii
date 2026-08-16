@@ -13,8 +13,12 @@
  *   仅记录有命中的检索（RAY-292 评审 sug 2：拼写错误 / 未收录等零命中
  *   查询不进历史，不积攒噪音词）；点击历史词条回填输入并重新检索，
  *   每条带叉叉可单条删除；历史上传/埋点一律不涉及（隐私红线）；
- * - 防抖期间的过期响应经请求序号丢弃（latest-request-wins），避免慢响应
- *   覆盖新结果；组件卸载后不再写状态；
+ * - 过期响应经请求序号丢弃（latest-request-wins）：查询变更（含清空）
+ *   与组件卸载都在 effect 清理阶段递增序号，使在途响应到达后因序号
+ *   不匹配被丢弃、不回写过期结果；清空输入同步复位检索区状态，二者
+ *   配合保证清空后不残留上一轮结果（Oscar 评审 suggestion 1 修复口径）；
+ * - 错误态：主提示为固定友好文案，原始错误信息折叠在「错误详情」中
+ *   （与统计页同一模式），不直接透出内部实现细节；
  * - 全部颜色走 design tokens（浅色/深色自动生效），不硬编码颜色。
  *
  * 说明文案为过渡版（Vega 的正式文案交付后替换）。
@@ -44,7 +48,7 @@ export interface SearchScreenProps {
   historyStorage?: SearchHistoryStorage;
 }
 
-/** 数据源错误 → 用户可见文案（不暴露内部实现细节） */
+/** 数据源错误 → 原始错误信息（仅供「错误详情」折叠区展示；主提示为固定友好文案，不直接透出内部实现细节） */
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -132,7 +136,13 @@ export function SearchScreen({ provider, onExit, historyStorage }: SearchScreenP
           }
         });
     }, DEBOUNCE_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      // 清理阶段递增序号，使在途响应失效（Oscar 评审 suggestion 1）：
+      // 查询变更（含清空输入）与组件卸载都会走这里——在途响应返回后
+      // 因序号不匹配被丢弃，不回写过期结果/错误。
+      requestSeqRef.current += 1;
+    };
   }, [query, provider, historyStorage]);
 
   // 点击历史词条：回填输入（防抖检索随之执行，该词条也会移到历史最前），
@@ -211,13 +221,18 @@ function SearchContent({
   onRemoveHistory,
 }: SearchContentProps) {
   if (error) {
+    // 友好文案 + 原始信息折叠（与统计页同一模式，Oscar 评审 nit 1）：
+    // 主提示固定、不暴露内部实现细节；原始错误信息收进「错误详情」折叠区
     return (
-      <p
-        role="alert"
-        className="rounded-xl border border-danger/40 bg-surface p-4 text-sm text-text"
-      >
-        检索失败：{error}
-      </p>
+      <div className="flex flex-col items-start gap-3 rounded-2xl border border-danger/40 bg-surface p-6">
+        <p role="alert" className="text-sm">
+          本地检索暂时不可用，请稍后重试。
+        </p>
+        <details className="text-xs text-text-muted">
+          <summary>错误详情</summary>
+          <p className="mt-1 whitespace-pre-wrap">{error}</p>
+        </details>
+      </div>
     );
   }
   if (emptyLibrary) {
