@@ -198,11 +198,11 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
           direction === "zh-en"
             ? generateTermOptions(card.sense, allSenses, wrongTerms)
             : generateOptions(card.sense, allSenses, wrongTerms);
-        // 候选不足跳题（RAY-293 nit 决策「候选不足跳题」）：有效选项数低于
-        // 最低阈值、或没有任何正确项时，该题跳过不进入出题队列——避免
-        // 「必对」（极端小词库剔除同义词条后仅剩正确项）或「必错」（无释义
-        // 义项）的评分污染 FSRS 记忆精度。实际词库规模下不会触发，
-        // 属防御性质量兜底；两方向同一口径。
+        // 极端兜底（RAY-293 修正决策「级联回退 + 保底填充」）：core 侧已做
+        // 三级回退 + 保底填充（仅排除目标词本身），常规词库必达最低阈值。
+        // 仅当词库小到连保底填充都凑不够（或没有任何正确项——无释义义项）
+        // 时该题才跳过，不进入出题队列；跳过的题不产生任何 review 事件，
+        // 两方向同一口径。
         if (options.length < MIN_QUIZ_OPTION_COUNT || !options.some((option) => option.isCorrect)) {
           continue;
         }

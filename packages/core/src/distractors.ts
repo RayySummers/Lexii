@@ -7,14 +7,15 @@
  * 3. 随机回退——词库中随机取定义兜底
  *
  * 剔除规则（RAY-293 后续修复，Jack 裁定「剔除」方案）：与目标词同义的
- * 词条不进该题混淆池——同义选项「语义上也说得通」被判错属质量缺口。
- * 同义词条从全部来源（常错词 / 形近词 / 随机）剔除，覆盖英译中 +
+ * 词条不进三级回退池——同义选项「语义上也说得通」被判错属质量缺口。
+ * 同义词条从常错词 / 形近词 / 随机三级来源剔除，覆盖英译中 +
  * 中译英两个方向；不采用「同义判对」（同义/近义边界模糊，会稀释记忆精度）。
  *
- * 候选不足（RAY-293 nit 决策「候选不足跳题」）：极端小词库下有效候选数
- * 可能低于 `MIN_QUIZ_OPTION_COUNT`，本模块如实返回不足的选项列表（可能
- * 只有正确项）；上层装配（apps/web 复习数据源）据此把该题跳出不入队，
- * 避免「必对」评分污染 FSRS 记忆精度。两方向共用同一管线、口径一致。
+ * 级联回退 + 保底填充（RAY-293 修正决策，撤回「候选不足跳题」）：三级
+ * 回退凑不够 `MIN_QUIZ_OPTION_COUNT` 时，从词库剩余词条随机补充——仅排除
+ * 目标词本身、不再剔除同义词条，确保每个词都能被出题（「宁可题目简单，
+ * 不可永远不学」，用户至少见到这个词、走一遍 FSRS 调度）。仅当词库小到
+ * 连保底填充都凑不够时，生成结果才低于阈值，由上层装配跳过该题。
  *
  * 隐私红线：全部基于本地数据，无跨用户统计。
  */
@@ -31,9 +32,10 @@ export interface DistractorOption {
 }
 
 /**
- * 一道选择题的最低有效选项数（RAY-293 nit 决策）：生成结果低于该值
- * （或没有任何正确项）时，上层装配必须跳过该题、不进入出题队列。
- * 与 `generateOptions` / `generateTermOptions` 的默认 `optionCount` 一致。
+ * 一道选择题的最低有效选项数（RAY-293 修正决策）：保底填充的目标下限。
+ * 词库小到连保底填充都凑不够该值（或没有任何正确项）时，上层装配跳过
+ * 该题、不进入出题队列。与 `generateOptions` / `generateTermOptions` 的
+ * 默认 `optionCount` 一致。
  */
 export const MIN_QUIZ_OPTION_COUNT = 4;
 
@@ -127,7 +129,7 @@ export function generateTermOptions(
   return buildOptions(targetSense, allSenses, wrongTerms, optionCount, (sense) => sense.term);
 }
 
-/** 选项生成管线（两方向共用）：正确项 + 常错词/形近词池 + 随机回退，最后洗牌 */
+/** 选项生成管线（两方向共用）：正确项 + 常错词/形近词/随机三级回退 + 保底填充，最后洗牌 */
 function buildOptions(
   targetSense: Sense,
   allSenses: readonly Sense[],
@@ -147,7 +149,7 @@ function buildOptions(
   }
 
   // 同义词条剔除（RAY-293 后续修复）：双向口径——目标词的 synonyms 字段
-  // 命中的词条、或自身 synonyms 含目标词的词条，都不进该题混淆池。
+  // 命中的词条、或自身 synonyms 含目标词的词条，都不进三级回退池。
   const excluded = synonymExcludedTerms(targetSense, allSenses);
 
   const used = new Set<string>([correctText]);
@@ -179,6 +181,19 @@ function buildOptions(
       distractors,
       used,
       randomDefs(allSenses, excluded, extract),
+      "random",
+      distractorCount,
+    );
+  }
+
+  // 4. 保底填充（RAY-293 修正决策「级联回退 + 保底填充」）：三级回退仍不足
+  //    时，从词库剩余词条随机补充——仅排除目标词本身，不再剔除同义词条，
+  //    确保每个词都能被出题（宁可选简单，不可永远不学）。
+  if (distractors.length < distractorCount) {
+    addFromPool(
+      distractors,
+      used,
+      fallbackDefs(targetSense, allSenses, extract),
       "random",
       distractorCount,
     );
@@ -301,8 +316,35 @@ function randomDefs(
       defs.push(text);
     }
   }
-  // 简单随机排序（不修改原数组）
-  const shuffled = [...defs];
+  return shuffledCopy(defs);
+}
+
+/**
+ * 保底填充池（RAY-293 修正决策）：词库中除目标词条外的所有词条。
+ * 不再剔除同义词条——三级回退凑不够时宁可选语义相近的干扰项，也不让
+ * 该词「永远不被出题」。
+ */
+function fallbackDefs(
+  target: Sense,
+  allSenses: readonly Sense[],
+  extract: TextExtractor,
+): string[] {
+  const defs: string[] = [];
+  for (const sense of allSenses) {
+    if (sense.id === target.id) {
+      continue;
+    }
+    const text = extract(sense);
+    if (text) {
+      defs.push(text);
+    }
+  }
+  return shuffledCopy(defs);
+}
+
+/** 简单随机排序（返回新数组，不修改入参） */
+function shuffledCopy(texts: string[]): string[] {
+  const shuffled = [...texts];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];

@@ -102,9 +102,11 @@ export interface ReviewDataProvider {
    * 混合逐题随机），记录在每道题的 `direction` 字段；方向只改变题面与
    * 选项文本，评分与 FSRS 调度不变（见 docs/quiz-fsrs-mapping.md）。
    *
-   * 候选不足跳题（RAY-293 nit 决策）：有效选项数低于 `MIN_QUIZ_OPTION_COUNT`
-   * 或没有正确项的题目跳过不出——`questions` 与 `cards` 始终一一对应
-   * （两数组同步剔除，长度一致）。
+   * 候选不足兜底（RAY-293 修正决策「级联回退 + 保底填充」）：core 侧三级
+   * 回退凑不够时做保底填充（仅排除目标词本身），常规词库每词都会出题；
+   * 仅当词库小到连保底填充都凑不够 `MIN_QUIZ_OPTION_COUNT`（或没有正确项）
+   * 时该题才跳过不出——`questions` 与 `cards` 始终一一对应（两数组同步
+   * 剔除，长度一致）。
    */
   loadMultipleChoiceQueue(mode: StudyMode): Promise<MultipleChoiceQueueResult>;
   /**

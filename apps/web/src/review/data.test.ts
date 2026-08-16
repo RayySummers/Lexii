@@ -414,9 +414,10 @@ describe("选择题出题方向（RAY-293，数据源集成）", () => {
   });
 });
 
-describe("候选不足跳题（RAY-293 nit 决策，数据源集成）", () => {
-  // 3 词小词库：任意两个词编辑距离 > 3，常错词为空 → 每题仅 1 正确 + 2 随机
-  // 干扰 = 3 选项 < MIN_QUIZ_OPTION_COUNT，整轮跳题。
+describe("保底填充 + 极端兜底跳题（RAY-293 修正决策，数据源集成）", () => {
+  // 3 词小词库：任意两个词编辑距离 > 3，常错词为空 → 每题 1 正确 + 2 随机
+  // 干扰 = 3 选项，保底填充池也只剩已入池的词 → 凑不够 MIN_QUIZ_OPTION_COUNT，
+  // 属「连保底填充都凑不够」的极端情形，整轮跳题。
   const CSV_3_WORDS = "term,definition,pos\napple,苹果,n.\nbanana,香蕉,n.\ncherry,樱桃,n.";
   // 4 词词库：每词有 3 个随机干扰候选 → 恰好 4 选项，全部照常出题。
   const CSV_4_WORDS = `${CSV_3_WORDS}\ndonut,甜甜圈,n.`;
@@ -433,7 +434,7 @@ describe("候选不足跳题（RAY-293 nit 决策，数据源集成）", () => {
     }
   });
 
-  it("跳题时学习队列本身不受影响（卡片队列仍含全部 3 词）", async () => {
+  it("极端跳题不影响学习队列本身（卡片队列仍含全部 3 词）", async () => {
     const provider = createIndexedDbReviewDataProvider(db!);
     await importCsvWordlist(db!, CSV_3_WORDS, { source: "测试" });
 
@@ -456,6 +457,35 @@ describe("候选不足跳题（RAY-293 nit 决策，数据源集成）", () => {
       expect(question.options).toHaveLength(4);
       expect(question.options.filter((option) => option.isCorrect)).toHaveLength(1);
     }
+  });
+
+  it("保底填充：三级回退不足时从剩余词条补齐（含同义词条），该题照常出题", async () => {
+    // 4 词词库（含同义词条 forsake）：三级回退剔除同义词条后 abandon 只有
+    // band(形近) + ban(随机) 两个干扰项，保底填充补入 forsake 凑满 4 选项。
+    const target = makeSense({ term: "abandon", definitions: ["放弃"], synonyms: ["forsake"] });
+    const synSense = makeSense({ term: "forsake", definitions: ["遗弃"] });
+    const bandSense = makeSense({ term: "band", definitions: ["乐队"] });
+    const banSense = makeSense({ term: "ban", definitions: ["禁令"] });
+    for (const sense of [target, synSense, bandSense, banSense]) {
+      const item = makeItem(sense.id);
+      await db!.senses.put(sense);
+      await db!.items.put(item);
+      await db!.memoryStates.put(makeMemory(item.id));
+    }
+    window.localStorage.setItem("lexilexi:quiz-direction", "zh-en");
+
+    const provider = createIndexedDbReviewDataProvider(db!);
+    const { questions, cards } = await provider.loadMultipleChoiceQueue("learn");
+    // 每个词都会被出题——不会被「永远跳过」
+    expect(questions).toHaveLength(4);
+    expect(cards).toHaveLength(4);
+    const abandonQuestion = questions.find((question) =>
+      question.options.some((option) => option.isCorrect && option.text === "abandon"),
+    );
+    expect(abandonQuestion).toBeDefined();
+    expect(abandonQuestion!.options).toHaveLength(4);
+    // 同义词条经保底填充层进入选项（仅排除目标词本身，不再剔除同义词条）
+    expect(abandonQuestion!.options.some((option) => option.text === "forsake")).toBe(true);
   });
 
   it("示例词表（14 词）不触发跳题：questions 与 cards 一一对应", async () => {
