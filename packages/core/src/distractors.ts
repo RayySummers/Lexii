@@ -11,6 +11,11 @@
  * 同义词条从全部来源（常错词 / 形近词 / 随机）剔除，覆盖英译中 +
  * 中译英两个方向；不采用「同义判对」（同义/近义边界模糊，会稀释记忆精度）。
  *
+ * 候选不足（RAY-293 nit 决策「候选不足跳题」）：极端小词库下有效候选数
+ * 可能低于 `MIN_QUIZ_OPTION_COUNT`，本模块如实返回不足的选项列表（可能
+ * 只有正确项）；上层装配（apps/web 复习数据源）据此把该题跳出不入队，
+ * 避免「必对」评分污染 FSRS 记忆精度。两方向共用同一管线、口径一致。
+ *
  * 隐私红线：全部基于本地数据，无跨用户统计。
  */
 import type { Sense } from "./domain";
@@ -24,6 +29,13 @@ export interface DistractorOption {
   /** 来源标识（调试 / 可选展示） */
   source: "correct" | "wrong-history" | "similar-spelling" | "random";
 }
+
+/**
+ * 一道选择题的最低有效选项数（RAY-293 nit 决策）：生成结果低于该值
+ * （或没有任何正确项）时，上层装配必须跳过该题、不进入出题队列。
+ * 与 `generateOptions` / `generateTermOptions` 的默认 `optionCount` 一致。
+ */
+export const MIN_QUIZ_OPTION_COUNT = 4;
 
 /**
  * 选择题出题方向（RAY-293）：

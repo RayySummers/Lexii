@@ -24,6 +24,7 @@ import {
   gradeReview,
   importCsvWordlist,
   isReviewEvent,
+  MIN_QUIZ_OPTION_COUNT,
   openDatabase,
   undoReview,
 } from "@lexilexi/core";
@@ -40,6 +41,7 @@ import type {
 import { computeLearnedTodayCount, localDayBounds } from "@lexilexi/stats";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { readQuizDirectionPreference, resolveQuizDirection } from "../lib/quizDirection";
+import type { MultipleChoiceQuestion } from "./MultipleChoiceCard";
 import { buildReviewQueue } from "./queue";
 import type {
   GradeContext,
@@ -186,15 +188,33 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
       // 出题方向（RAY-293）：设置三档「英译中 / 中译英 / 混合」。
       // 混合 = 逐题随机方向；方向只决定题面与选项文本，评分与调度不变。
       const preference = readQuizDirectionPreference();
-      const questions = cards.map((card) => {
+      const prepared: Array<{
+        card: ReviewCard;
+        question: MultipleChoiceQuestion;
+      }> = [];
+      for (const card of cards) {
         const direction = resolveQuizDirection(preference);
         const options =
           direction === "zh-en"
             ? generateTermOptions(card.sense, allSenses, wrongTerms)
             : generateOptions(card.sense, allSenses, wrongTerms);
-        return { sense: card.sense, direction, options };
-      });
-      return { questions, cards };
+        // 候选不足跳题（RAY-293 nit 决策「候选不足跳题」）：有效选项数低于
+        // 最低阈值、或没有任何正确项时，该题跳过不进入出题队列——避免
+        // 「必对」（极端小词库剔除同义词条后仅剩正确项）或「必错」（无释义
+        // 义项）的评分污染 FSRS 记忆精度。实际词库规模下不会触发，
+        // 属防御性质量兜底；两方向同一口径。
+        if (options.length < MIN_QUIZ_OPTION_COUNT || !options.some((option) => option.isCorrect)) {
+          continue;
+        }
+        prepared.push({
+          card,
+          question: { sense: card.sense, direction, options },
+        });
+      }
+      return {
+        questions: prepared.map((entry) => entry.question),
+        cards: prepared.map((entry) => entry.card),
+      };
     },
 
     async grade(

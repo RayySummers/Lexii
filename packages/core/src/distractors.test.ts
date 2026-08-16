@@ -4,7 +4,12 @@
 import { describe, expect, it } from "vitest";
 import type { Sense } from "./domain";
 import { toSenseId } from "./id";
-import { editDistance, generateOptions, generateTermOptions } from "./distractors";
+import {
+  editDistance,
+  generateOptions,
+  generateTermOptions,
+  MIN_QUIZ_OPTION_COUNT,
+} from "./distractors";
 
 function makeSense(overrides: Partial<Sense> = {}): Sense {
   return {
@@ -328,6 +333,20 @@ describe("同义词条剔除（RAY-293 后续修复，两方向通用）", () =>
     // 混淆池唯一的候选就是同义词条，剔除后只剩正确项
     expect(options).toHaveLength(1);
     expect(options[0]!.isCorrect).toBe(true);
+  });
+
+  it("候选不足时返回低于 MIN_QUIZ_OPTION_COUNT 的选项（上层据此跳题）", () => {
+    const target = makeSense({ term: "abandon", definitions: ["放弃"] });
+    const all = [
+      target,
+      makeSense({ term: "band", definitions: ["乐队"] }),
+      makeSense({ term: "ban", definitions: ["禁令"] }),
+    ];
+    // 3 词词库：每词仅 1 正确 + 2 干扰 = 3 < 4——生成器如实返回不足结果
+    const defOptions = generateOptions(target, all, []);
+    const termOptions = generateTermOptions(target, all, []);
+    expect(defOptions.length).toBeLessThan(MIN_QUIZ_OPTION_COUNT);
+    expect(termOptions.length).toBeLessThan(MIN_QUIZ_OPTION_COUNT);
   });
 
   it("大小写不敏感：同义词条大写变体同样剔除", () => {

@@ -6,12 +6,17 @@
  * 同一 fake-indexeddb 注入方式（IDBFactory + IDBKeyRange），不依赖浏览器环境。
  */
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
-import { isReviewEvent, openDatabase, SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
+import {
+  importCsvWordlist,
+  isReviewEvent,
+  openDatabase,
+  SAMPLE_WORDLIST_ROW_COUNT,
+} from "@lexilexi/core";
 import type { LexilexiDatabase } from "@lexilexi/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIndexedDbReviewDataProvider } from "./data";
 import type { ReviewCard } from "./types";
-import { pastIso } from "./testFixtures";
+import { makeItem, makeMemory, makeSense, pastIso } from "./testFixtures";
 
 /** 与 openDatabase 的参数类型对齐，避免直接依赖 dexie 的类型声明 */
 function makeOptions(): Parameters<typeof openDatabase>[0] {
@@ -406,5 +411,79 @@ describe("选择题出题方向（RAY-293，数据源集成）", () => {
     const { questions } = await provider.loadMultipleChoiceQueue("learn");
     expect(questions.length).toBeGreaterThan(0);
     expect(questions.every((question) => question.direction === "en-zh")).toBe(true);
+  });
+});
+
+describe("候选不足跳题（RAY-293 nit 决策，数据源集成）", () => {
+  // 3 词小词库：任意两个词编辑距离 > 3，常错词为空 → 每题仅 1 正确 + 2 随机
+  // 干扰 = 3 选项 < MIN_QUIZ_OPTION_COUNT，整轮跳题。
+  const CSV_3_WORDS = "term,definition,pos\napple,苹果,n.\nbanana,香蕉,n.\ncherry,樱桃,n.";
+  // 4 词词库：每词有 3 个随机干扰候选 → 恰好 4 选项，全部照常出题。
+  const CSV_4_WORDS = `${CSV_3_WORDS}\ndonut,甜甜圈,n.`;
+
+  it("3 词词库在英译中 / 中译英 / 混合三档设置下均整轮跳题（questions/cards 皆空）", async () => {
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await importCsvWordlist(db!, CSV_3_WORDS, { source: "测试" });
+
+    for (const preference of ["en-zh", "zh-en", "mixed"]) {
+      window.localStorage.setItem("lexilexi:quiz-direction", preference);
+      const { questions, cards } = await provider.loadMultipleChoiceQueue("learn");
+      expect(questions).toHaveLength(0);
+      expect(cards).toHaveLength(0);
+    }
+  });
+
+  it("跳题时学习队列本身不受影响（卡片队列仍含全部 3 词）", async () => {
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await importCsvWordlist(db!, CSV_3_WORDS, { source: "测试" });
+
+    const { questions, cards } = await provider.loadMultipleChoiceQueue("learn");
+    expect(questions).toHaveLength(0);
+    expect(cards).toHaveLength(0);
+    // 跳题只是不出选择题；卡片模式学习队列照常可用
+    const learnQueue = await provider.loadQueue("learn");
+    expect(learnQueue).toHaveLength(3);
+  });
+
+  it("4 词词库候选充足：4 题全出且每题恰好 4 选项（随机回退补齐）", async () => {
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await importCsvWordlist(db!, CSV_4_WORDS, { source: "测试" });
+
+    const { questions, cards } = await provider.loadMultipleChoiceQueue("learn");
+    expect(questions).toHaveLength(4);
+    expect(cards).toHaveLength(4);
+    for (const question of questions) {
+      expect(question.options).toHaveLength(4);
+      expect(question.options.filter((option) => option.isCorrect)).toHaveLength(1);
+    }
+  });
+
+  it("示例词表（14 词）不触发跳题：questions 与 cards 一一对应", async () => {
+    const provider = createIndexedDbReviewDataProvider(db!);
+    await provider.importSampleWordlist();
+
+    const { questions, cards } = await provider.loadMultipleChoiceQueue("learn");
+    expect(questions.length).toBeGreaterThan(0);
+    expect(questions).toHaveLength(cards.length);
+    expect(questions.every((question) => question.options.length >= 4)).toBe(true);
+  });
+
+  it("无释义义项（没有任何正确项）同样跳题", async () => {
+    // 直接落一条 definitions 为空的义项：卡片模式队列会带上它（完整性校验
+    // 不查释义），但选择题没有正确项可出，必须跳题。
+    const sense = makeSense({ term: "nodef", definitions: [] });
+    const item = makeItem(sense.id);
+    const memory = makeMemory(item.id);
+    await db!.senses.put(sense);
+    await db!.items.put(item);
+    await db!.memoryStates.put(memory);
+
+    const provider = createIndexedDbReviewDataProvider(db!);
+    const learnQueue = await provider.loadQueue("learn");
+    expect(learnQueue.some((card) => card.item.id === item.id)).toBe(true);
+
+    const { questions, cards } = await provider.loadMultipleChoiceQueue("learn");
+    expect(questions).toHaveLength(0);
+    expect(cards).toHaveLength(0);
   });
 });

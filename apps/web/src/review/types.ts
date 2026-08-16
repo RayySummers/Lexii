@@ -94,12 +94,17 @@ export interface ReviewDataProvider {
    * 按学习模式加载选择题队列（RAY-269）。
    *
    * 返回与 loadQueue 相同的卡片队列，每张卡额外附带选择题题目
-   * （1 正确 + 3 混淆项，来源：历史常错词 / 形近词 / 近义词）。
+   * （1 正确 + 3 混淆项，来源：历史常错词 / 形近词 / 随机回退，
+   * 同义词条剔除——RAY-293 后续修复）。
    * cards[i] 与 questions[i] 一一对应。
    *
    * 出题方向（RAY-293）由设置「选择题出题方向」决定（英译中 / 中译英 /
    * 混合逐题随机），记录在每道题的 `direction` 字段；方向只改变题面与
    * 选项文本，评分与 FSRS 调度不变（见 docs/quiz-fsrs-mapping.md）。
+   *
+   * 候选不足跳题（RAY-293 nit 决策）：有效选项数低于 `MIN_QUIZ_OPTION_COUNT`
+   * 或没有正确项的题目跳过不出——`questions` 与 `cards` 始终一一对应
+   * （两数组同步剔除，长度一致）。
    */
   loadMultipleChoiceQueue(mode: StudyMode): Promise<MultipleChoiceQueueResult>;
   /**
