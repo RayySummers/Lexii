@@ -22,6 +22,9 @@
  * - 选择题出题方向（RAY-293）：学习分组三档选单（英译中 / 中译英 / 混合），
  *   与评分档位、发音口音同一 localStorage 持久化模式；方向只影响题目
  *   呈现，不影响评分与 FSRS 调度（见 docs/quiz-fsrs-mapping.md）。
+ * - RAY-324 发音源选择：学习分组新增下拉选单二档（系统自带 / 线上发音），
+ *   持久化到 localStorage（与发音口音同一模式）；线上源走有道 dictvoice
+ *   公开接口，失败时自动回落系统朗读（见 lib/pronunciation.ts）。
  * - 隐藏开发者面板（RAY-297）：页面底部版本号连点 5 次解锁「开发者」分组
  *   （再次连点 5 次折叠，解锁状态存 localStorage）；分组内为通道切换器 /
  *   构建信息 / 版本回退 / 数据库调试 / FSRS 调试 / Feature flags，
@@ -51,10 +54,13 @@ import { datedFilename, downloadTextFile, serializeBackup } from "../lib/downloa
 import { readIncludeNotebook, writeIncludeNotebook } from "../lib/notebookPreference";
 import {
   isPronunciationAccent,
+  isPronunciationSource,
   readPronunciationAccent,
+  readPronunciationSource,
   writePronunciationAccent,
+  writePronunciationSource,
 } from "../lib/pronunciation";
-import type { PronunciationAccent } from "../lib/pronunciation";
+import type { PronunciationAccent, PronunciationSource } from "../lib/pronunciation";
 import { isRatingTierMode, readRatingTierMode, writeRatingTierMode } from "../lib/ratingTiers";
 import type { RatingTierMode } from "../lib/ratingTiers";
 import {
@@ -139,11 +145,15 @@ export function SettingsScreen({
   const fileInputRef = useRef<HTMLInputElement>(null);
   // 每日新卡上限输入（初始值读 localStorage；文本态随输入走，合法值即时持久化）
   const [newCardLimitText, setNewCardLimitText] = useState(() => String(readDailyNewCardLimit()));
-  // 评分档位（RAY-265：三档默认，可切四档）与发音口音（美/英），
-  // 与每日新卡上限同一 localStorage 持久化模式；选单只产出合法值。
+  // 评分档位（RAY-265：三档默认，可切四档）、发音口音（美/英）与
+  // 发音源（RAY-324：系统 / 线上），与每日新卡上限同一 localStorage
+  // 持久化模式；选单只产出合法值。
   const [ratingTier, setRatingTier] = useState<RatingTierMode>(() => readRatingTierMode());
   const [pronunciationAccent, setPronunciationAccent] = useState<PronunciationAccent>(() =>
     readPronunciationAccent(),
+  );
+  const [pronunciationSource, setPronunciationSource] = useState<PronunciationSource>(() =>
+    readPronunciationSource(),
   );
   // 选择题出题方向（RAY-293：英译中 / 中译英 / 混合），同一 localStorage 持久化模式
   const [quizDirection, setQuizDirection] = useState<QuizDirectionPreference>(() =>
@@ -250,6 +260,14 @@ export function SettingsScreen({
     }
   }, []);
 
+  /** 发音源切换（RAY-324）：选单只产出合法值，直接持久化 */
+  const handlePronunciationSourceChange = useCallback((value: string) => {
+    if (isPronunciationSource(value)) {
+      setPronunciationSource(value);
+      writePronunciationSource(value);
+    }
+  }, []);
+
   /** 选择题出题方向切换（RAY-293）：选单只产出合法值，直接持久化 */
   const handleQuizDirectionChange = useCallback((value: string) => {
     if (isQuizDirectionPreference(value)) {
@@ -329,6 +347,8 @@ export function SettingsScreen({
       onRatingTierChange={handleRatingTierChange}
       pronunciationAccent={pronunciationAccent}
       onPronunciationAccentChange={handlePronunciationAccentChange}
+      pronunciationSource={pronunciationSource}
+      onPronunciationSourceChange={handlePronunciationSourceChange}
       quizDirection={quizDirection}
       onQuizDirectionChange={handleQuizDirectionChange}
       includeNotebook={includeNotebook}
@@ -369,6 +389,9 @@ interface SettingsMainViewProps {
   /** 发音口音（RAY-265：美式 / 英式，浏览器语音合成） */
   pronunciationAccent: PronunciationAccent;
   onPronunciationAccentChange(value: string): void;
+  /** 发音源（RAY-324：系统自带 / 线上发音） */
+  pronunciationSource: PronunciationSource;
+  onPronunciationSourceChange(value: string): void;
   /** 选择题出题方向（RAY-293：英译中 / 中译英 / 混合） */
   quizDirection: QuizDirectionPreference;
   onQuizDirectionChange(value: string): void;
@@ -404,6 +427,8 @@ function SettingsMainView({
   onRatingTierChange,
   pronunciationAccent,
   onPronunciationAccentChange,
+  pronunciationSource,
+  onPronunciationSourceChange,
   quizDirection,
   onQuizDirectionChange,
   includeNotebook,
@@ -556,7 +581,7 @@ function SettingsMainView({
           <span>
             发音口音
             <span className="mt-1 block text-xs text-text-muted">
-              美式 / 英式；使用浏览器语音合成，离线可用，无需联网。
+              美式 / 英式；同时影响系统与线上两种发音源。
             </span>
           </span>
           <select
@@ -567,6 +592,28 @@ function SettingsMainView({
           >
             <option value="us">美式</option>
             <option value="uk">英式</option>
+          </select>
+        </label>
+        {/* 发音源选择（RAY-324）：系统自带 vs 线上发音；线上失败自动回落系统 */}
+        <label
+          htmlFor="pronunciation-source"
+          className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+          <span>
+            发音源
+            <span className="mt-1 block text-xs text-text-muted">
+              系统自带：使用浏览器语音合成，离线可用；线上发音：有道词典公开音源（需联网，
+              质量更稳定，但偶发漏字或发音错误；失败时自动回落系统语音）。
+            </span>
+          </span>
+          <select
+            id="pronunciation-source"
+            value={pronunciationSource}
+            onChange={(event) => onPronunciationSourceChange(event.target.value)}
+            className="w-40 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            <option value="system">系统自带</option>
+            <option value="online">线上发音</option>
           </select>
         </label>
         <label

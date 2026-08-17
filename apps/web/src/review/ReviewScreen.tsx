@@ -16,6 +16,9 @@
  *   （词保留词书、按已熟长间隔调度）；
  * - 每次评分 / 标熟后可单步撤销（连续只能撤销一次，不可连退）。
  *
+ * RAY-324：发音源选择（系统 / 线上）—— 朗读时按设置分发；线上源失败
+ * 自动回落系统朗读，UI 给一次「已自动切换到系统语音」提示。
+ *
  * RAY-280：导出备份入口已从本页移到设置页（真机反馈），本页不再提供
  * 导出按钮，导出功能本身不变（设置页仍导出完整可恢复 JSON）。
  *
@@ -28,7 +31,7 @@ import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexii/core";
 import type { ReviewRating, StudyMode } from "@lexii/core";
 import { BackArrowIcon, CheckIcon, PlusIcon, SpeakerIcon, UndoIcon } from "../components/icons";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
-import { primeSpeechEngine, readPronunciationAccent, speakWord } from "../lib/pronunciation";
+import { primeSpeechEngine, readPronunciationAccent, readPronunciationSource, speakWord } from "../lib/pronunciation";
 import { readRatingTierMode } from "../lib/ratingTiers";
 import type { RatingTierMode } from "../lib/ratingTiers";
 import { quotaExhaustedCopy } from "./quotaCopy";
@@ -103,7 +106,7 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
   // 让回调每次重建；ref 与提交同步即可保证点击时读到当前卡）
   const currentCardRef = useRef(session.current);
 
-  /** 朗读当前词条（浏览器语音合成，口音随设置；不可用时给出一次性提示） */
+  /** 朗读当前词条（口音与发音源随设置；不可用时给出一次性提示） */
   const handleSpeak = useCallback(() => {
     const card = currentCardRef.current;
     if (!card) {
@@ -111,12 +114,17 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
     }
     setSpeakNotice(null);
     speakWord(card.sense.term, readPronunciationAccent(), {
+      // RAY-324：按用户设置的发音源分发；线上失败自动回落系统朗读
+      source: readPronunciationSource(),
       onUnavailable: (reason) => {
         setSpeakNotice(
           reason === "unsupported"
             ? "当前浏览器不支持语音合成，无法发音。"
             : "当前设备无法发声：语音服务不可用，请检查系统语音（TTS）设置后重试。",
         );
+      },
+      onOnlineFallbackToSystem: () => {
+        setSpeakNotice("线上发音暂不可用，已自动切换到系统语音。");
       },
     });
   }, []);
