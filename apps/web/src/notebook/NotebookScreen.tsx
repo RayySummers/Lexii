@@ -122,7 +122,7 @@ export function NotebookScreen({ provider, onExit }: NotebookScreenProps) {
           <h2 className="text-xl font-semibold">生词本还是空的</h2>
           <p className="max-w-sm text-sm text-text-muted">
             在搜词页的结果上点「加词」，或在复习卡页点「加词」，就能把想重点掌握的词收进这里。
-            加入后可在首页开关「学习列表包含生词本」，决定它们是否进入学习队列。
+            加入后可在设置页开关「学习列表包含生词本」，决定它们是否进入学习队列。
           </p>
         </div>
       ) : (

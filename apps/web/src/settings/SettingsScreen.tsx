@@ -26,6 +26,9 @@
  *   （再次连点 5 次折叠，解锁状态存 localStorage）；分组内为通道切换器 /
  *   构建信息 / 版本回退 / 数据库调试 / FSRS 调试 / Feature flags，
  *   信息全部构建时注入或本机读取，无联网、无埋点（详见 devPanel/）。
+ * - RAY-303：「学习列表包含生词本」开关从首页移至本页（学习分组）。
+ *   关闭后生词本词条从学习/复习/混合队列与到期统计中排除（词书条目不受
+ *   影响）；切换后队列在下次进入复习页加载时生效。
  *
  * 导出/导入/提示状态提升到本组件（SettingsScreen）而非 SettingsMainView：
  * 进入「数据来源与许可」二级页时 SettingsMainView 卸载，进行中的导出状态与
@@ -45,6 +48,7 @@ import {
   writeDailyNewCardLimit,
 } from "../lib/dailyNewCardLimit";
 import { datedFilename, downloadTextFile, serializeBackup } from "../lib/download";
+import { readIncludeNotebook, writeIncludeNotebook } from "../lib/notebookPreference";
 import {
   isPronunciationAccent,
   readPronunciationAccent,
@@ -145,6 +149,10 @@ export function SettingsScreen({
   const [quizDirection, setQuizDirection] = useState<QuizDirectionPreference>(() =>
     readQuizDirectionPreference(),
   );
+  // 生词本开关（RAY-284 / RAY-303）：学习列表是否包含生词本（默认开），
+  // 从首页移至设置页（学习分组）；切换写回 localStorage，队列在下次进入
+  // 复习页加载时生效。
+  const [includeNotebook, setIncludeNotebook] = useState<boolean>(() => readIncludeNotebook());
   // 开发者面板连点状态（RAY-297：版本号连点 N 次解锁/折叠；初始解锁态读 localStorage）
   const [devPanelTapState, setDevPanelTapState] = useState(() => ({
     unlocked: readDevPanelUnlocked(),
@@ -250,6 +258,15 @@ export function SettingsScreen({
     }
   }, []);
 
+  /** 生词本开关切换（RAY-284 / RAY-303）：写回 localStorage，队列在下次进入复习页时生效 */
+  const handleIncludeNotebookToggle = useCallback(() => {
+    setIncludeNotebook((previous) => {
+      const next = !previous;
+      writeIncludeNotebook(next);
+      return next;
+    });
+  }, []);
+
   /** 版本号连点（RAY-297）：累计 N 次翻转解锁状态并持久化；未到阈值只计数。
    *  Oscar 评审 nit 1：localStorage 写入放在 updater 外（updater 保持纯函数）。 */
   const handleVersionTap = useCallback(() => {
@@ -314,6 +331,8 @@ export function SettingsScreen({
       onPronunciationAccentChange={handlePronunciationAccentChange}
       quizDirection={quizDirection}
       onQuizDirectionChange={handleQuizDirectionChange}
+      includeNotebook={includeNotebook}
+      onIncludeNotebookToggle={handleIncludeNotebookToggle}
       themePreference={themePreference}
       onThemePreferenceChange={onThemePreferenceChange}
       devPanelUnlocked={devPanelTapState.unlocked}
@@ -353,6 +372,9 @@ interface SettingsMainViewProps {
   /** 选择题出题方向（RAY-293：英译中 / 中译英 / 混合） */
   quizDirection: QuizDirectionPreference;
   onQuizDirectionChange(value: string): void;
+  /** 生词本开关（RAY-284 / RAY-303）：学习列表是否包含生词本 */
+  includeNotebook: boolean;
+  onIncludeNotebookToggle(): void;
   /** 主题偏好三档（RAY-261）：App 级 useTheme 单一数据源下发 */
   themePreference: ThemePreference;
   onThemePreferenceChange(preference: ThemePreference): void;
@@ -384,6 +406,8 @@ function SettingsMainView({
   onPronunciationAccentChange,
   quizDirection,
   onQuizDirectionChange,
+  includeNotebook,
+  onIncludeNotebookToggle,
   themePreference,
   onThemePreferenceChange,
   devPanelUnlocked,
@@ -565,6 +589,32 @@ function SettingsMainView({
             <option value="zh-en">中译英</option>
             <option value="mixed">混合</option>
           </select>
+        </label>
+        {/* 生词本开关（RAY-284 / RAY-303）：从首页移至设置页学习分组；N1 用 label 包裹保持一致 */}
+        <label className="flex items-start justify-between gap-4">
+          <span>
+            <span className="text-sm font-semibold">学习列表包含生词本</span>
+            <span className="mt-1 block text-xs text-text-muted">
+              关闭后，生词本的词不再进入学习 / 复习 / 混合队列，词书不受影响。
+            </span>
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={includeNotebook}
+            aria-label="学习列表是否包含生词本"
+            onClick={onIncludeNotebookToggle}
+            className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
+              includeNotebook ? "border-primary bg-primary" : "border-border bg-surface-raised"
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-primary-contrast transition-all ${
+                includeNotebook ? "left-[calc(100%-1.25rem)]" : "left-1"
+              }`}
+            />
+          </button>
         </label>
       </Section>
 
