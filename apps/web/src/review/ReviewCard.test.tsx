@@ -42,7 +42,7 @@ function makeRichSense(): Sense {
     synonyms: ["abdicate", "abjure"],
     antonyms: ["keep", "retain"],
     wordParts: "a<加强> · bandon<控制>",
-    etymologyZh: "由强调前缀 a- 与 bandon（管辖权）结合。",
+    etymologyZh: "由强调前缀 a- 与 _bandon_（管辖权）结合。",
     examples: [
       { text: "We have to abandon the plan.", translation: "我们必须放弃这个计划。" },
       { text: "More text.", translation: "" },
@@ -104,11 +104,17 @@ describe("ReviewCard 背面富化内容", () => {
     expect(within(wordPartsSection).getByText("控制")).toBeInTheDocument();
   });
 
-  it("中文词源展示完整说明文字", () => {
+  it("中文词源展示完整说明文字，斜体标记渲染为 <em>", () => {
     render(<Harness sense={makeRichSense()} />);
     flipCard();
 
-    expect(screen.getByText("由强调前缀 a- 与 bandon（管辖权）结合。")).toBeInTheDocument();
+    const etymologySection = screen.getByText("中文词源").parentElement as HTMLElement;
+    // 完整文本仍可读取（textContent 拼合所有子节点）
+    expect(etymologySection.textContent).toContain("由强调前缀 a- 与 bandon（管辖权）结合。");
+    // 斜体 _bandon_ 渲染为 <em> 元素
+    const em = etymologySection.querySelector("em");
+    expect(em).not.toBeNull();
+    expect(em!.textContent).toBe("bandon");
   });
 
   it("近反义词以 chips 展示", () => {
