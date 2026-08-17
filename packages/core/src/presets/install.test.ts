@@ -18,6 +18,7 @@ import {
   presetDoneKey,
   presetProgressKey,
   PRESET_CHUNK_SIZE,
+  removePreset,
 } from "./install";
 import type { PresetPackage, PresetWordEntry } from "./types";
 
@@ -52,7 +53,10 @@ function makeEntries(count: number): PresetWordEntry[] {
   return entries;
 }
 
-function makePreset(entries: PresetWordEntry[]): PresetPackage {
+function makePreset(
+  entries: PresetWordEntry[],
+  overrides: Partial<PresetPackage> = {},
+): PresetPackage {
   return {
     id: "test-tier0",
     version: "1.0.0",
@@ -60,6 +64,7 @@ function makePreset(entries: PresetWordEntry[]): PresetPackage {
     source: "测试来源（MIT）",
     lang: "en",
     entries,
+    ...overrides,
   };
 }
 
@@ -361,5 +366,69 @@ describe("installPreset（分块安装预设词表）", () => {
     const sense1 = await database.senses.filter((s) => s.term === "testword1").first();
     expect(sense1?.ipaUs).toBeUndefined();
     expect(sense1?.examples).toEqual([]);
+  });
+});
+
+describe("removePreset（RAY-320：移除已安装词书）", () => {
+  it("已安装词书经 removePreset 后状态回退到 not-installed", async () => {
+    const database = freshDatabase();
+    const preset = makePreset(makeEntries(10));
+    await installPreset(database, preset, { yield: async () => {} });
+    expect((await getPresetInstallState(database, preset)).status).toBe("installed");
+
+    await removePreset(database, preset.id);
+
+    const state = await getPresetInstallState(database, preset);
+    expect(state.status).toBe("not-installed");
+    expect(state.installedCount).toBe(0);
+  });
+
+  it("安装中的词书经 removePreset 后进度清除", async () => {
+    const database = freshDatabase();
+    const preset = makePreset(makeEntries(800));
+    // 安装前 400 条（中断模拟）
+    await installPreset(database, preset, {
+      yield: async () => {
+        throw new Error("中断");
+      },
+    }).catch(() => {
+      /* 预期中断 */
+    });
+    expect((await getPresetInstallState(database, preset)).status).toBe("installing");
+
+    await removePreset(database, preset.id);
+
+    const state = await getPresetInstallState(database, preset);
+    expect(state.status).toBe("not-installed");
+    expect(state.installedCount).toBe(0);
+  });
+
+  it("removePreset 不删除已导入的词条数据", async () => {
+    const database = freshDatabase();
+    const preset = makePreset(makeEntries(5));
+    await installPreset(database, preset, { yield: async () => {} });
+
+    const sensesBefore = await database.senses.count();
+    const itemsBefore = await database.items.count();
+    expect(sensesBefore).toBe(5);
+    expect(itemsBefore).toBe(5);
+
+    await removePreset(database, preset.id);
+
+    // 词条数据保留不动
+    const sensesAfter = await database.senses.count();
+    const itemsAfter = await database.items.count();
+    expect(sensesAfter).toBe(5);
+    expect(itemsAfter).toBe(5);
+  });
+
+  it("removePreset 对未安装词书无操作（幂等）", async () => {
+    const database = freshDatabase();
+    // 无 done/progress 标记，直接调用 removePreset 不抛错
+    await removePreset(database, "nonexistent-book");
+    // 用 makePreset + override 复用 fixture factory，避免手写 literal 漏字段
+    const preset = makePreset([], { id: "nonexistent-book", name: "不存在", source: "" });
+    const state = await getPresetInstallState(database, preset);
+    expect(state.status).toBe("not-installed");
   });
 });

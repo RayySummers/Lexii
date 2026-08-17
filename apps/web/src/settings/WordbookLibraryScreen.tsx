@@ -16,16 +16,20 @@
  *   已装统计按当前目录 totalCount 汇总（RAY-288 Oscar suggestion 1 口径
  *   备忘：若未来 books.data.json 重新生成——版本升级/词表增删——需明确
  *   按 installedVersion 快照安装规模，或触发重装流程）；
+ * - RAY-320：已安装词书支持删除（清除安装标记，状态回退到 not-installed）。
+ *   二次确认对话框醒目提示：已学习的词记录不会被删除，新词将不会继续
+ *   安排学习；
  * - 全程离线（local-first）：不请求网络、不埋点；全部颜色走 design
  *   tokens（浅色/深色自动生效）。
  *
- * 说明文案为过渡版（Vega 的正式文案交付后替换）。
+ * 文案：Vega 产出（RAY-326）；删除对话框核心口径与 RAY-320 一致。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WordbookCategory } from "@lexii/core";
 import { WORDBOOK_CATALOG, WORDBOOK_COUNT } from "@lexii/core/presets/books";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { StatCard } from "../components/StatCard";
+import { TrashIcon } from "../components/icons";
 import type { SettingsDataProvider, WordbookSummary } from "./types";
 
 export interface WordbookLibraryScreenProps {
@@ -174,12 +178,42 @@ export function WordbookLibraryScreen({ provider, onBack }: WordbookLibraryScree
     [provider, refresh],
   );
 
+  // RAY-320：删除词书——二次确认后移除安装标记
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const confirmDeleteName = confirmDelete
+    ? WORDBOOK_CATALOG.find((book) => book.id === confirmDelete)?.name
+    : undefined;
+
+  const handleRemove = useCallback(
+    async (bookId: string) => {
+      setError(null);
+      setNotice(null);
+      try {
+        await provider.removeWordbook(bookId);
+        if (!mountedRef.current) {
+          return;
+        }
+        setNotice("词书已移除。已学习的词记录保留在学习库中。");
+        void refresh().catch(() => {
+          // 刷新失败静默忽略
+        });
+      } catch (err) {
+        if (!mountedRef.current) {
+          return;
+        }
+        setError(`移除失败：${toErrorMessage(err)}`);
+      }
+    },
+    [provider, refresh],
+  );
+
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
       <ScreenHeader title="词书库" onBack={onBack} backLabel="返回设置" />
 
       <p className="text-sm text-text-muted">
-        浏览并安装考试分级词书（随应用内置，全程离线）。安装的词条进入学习队列，装什么学什么；与已学词条相同的词会自动跳过，不会重复学习。
+        浏览并按需安装内置词书（考试词汇 /
+        冲刺词书）。所有词书随应用打包，无需联网。安装的词条自动进入学习队列；与已学词条重复的会跳过，不会重复学习。
       </p>
 
       {/* RAY-288：词书库概览——词书总数/词条总数（新用户看词书规模）
@@ -220,6 +254,7 @@ export function WordbookLibraryScreen({ provider, onBack }: WordbookLibraryScree
                     summary={summary}
                     installing={pendingInstalls.has(book.id)}
                     onInstall={handleInstall}
+                    onDelete={setConfirmDelete}
                   />
                 );
               })}
@@ -243,6 +278,19 @@ export function WordbookLibraryScreen({ provider, onBack }: WordbookLibraryScree
           </p>
         ) : null}
       </div>
+
+      {/* RAY-320：删除确认对话框 */}
+      {confirmDelete !== null ? (
+        <ConfirmDeleteDialog
+          wordbookName={confirmDeleteName ?? confirmDelete}
+          onConfirm={() => {
+            const bookId = confirmDelete;
+            setConfirmDelete(null);
+            void handleRemove(bookId);
+          }}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      ) : null}
     </main>
   );
 }
@@ -255,6 +303,8 @@ interface WordbookCardProps {
   /** 该词书有进行中的安装 promise（按钮显示「安装中…」） */
   installing: boolean;
   onInstall(bookId: string): void;
+  /** 点击删除按钮（RAY-320）：触发二次确认流程 */
+  onDelete(bookId: string): void;
 }
 
 function WordbookCard({
@@ -264,6 +314,7 @@ function WordbookCard({
   summary,
   installing,
   onInstall,
+  onDelete,
 }: WordbookCardProps) {
   const status = summary?.status ?? "not-installed";
   const progressPercent =
@@ -309,16 +360,95 @@ function WordbookCard({
             {installing ? "安装中…" : "继续安装"}
           </button>
         </div>
+      ) : status === "installed" ? (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled
+            className="w-24 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-contrast opacity-60 cursor-not-allowed"
+          >
+            已安装
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(bookId)}
+            aria-label={`删除词书：${name}`}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-text-muted transition-colors hover:border-danger hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        </div>
       ) : (
         <button
           type="button"
-          disabled={status === "installed" || installing}
+          disabled={installing}
           onClick={() => void onInstall(bookId)}
           className="w-24 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {status === "installed" ? "已安装" : "安装"}
+          安装
         </button>
       )}
+    </div>
+  );
+}
+
+// ─── RAY-320：删除确认对话框 ──────────────────────────────────────────────
+
+interface ConfirmDeleteDialogProps {
+  wordbookName: string;
+  onConfirm(): void;
+  onCancel(): void;
+}
+
+/** 删除确认对话框：醒目提示学习记录保留，二次确认后移除词书安装标记 */
+function ConfirmDeleteDialog({ wordbookName, onConfirm, onCancel }: ConfirmDeleteDialogProps) {
+  // ESC 键关闭
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onCancel();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="确认删除词书"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    >
+      {/* 背景遮罩 */}
+      <div className="absolute inset-0 bg-black/40" onClick={onCancel} aria-hidden="true" />
+      {/* 对话框主体 */}
+      <div className="relative flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-surface p-6 shadow-lg">
+        <h3 className="text-base font-semibold">确认删除词书</h3>
+        <p className="text-sm text-text-muted">确定要移除「{wordbookName}」吗？</p>
+        {/* 醒目提示框 */}
+        <div className="rounded-xl border border-warning/40 bg-warning/10 p-3">
+          <p className="text-sm font-medium text-warning">
+            已学习的词记录不会被删除，但新词将不会继续安排学习。
+          </p>
+        </div>
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-full border border-border px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="rounded-full bg-danger px-4 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            确认删除
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

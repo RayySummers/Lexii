@@ -115,6 +115,11 @@ export interface SettingsDataProvider {
   getWordbookSummaries(): Promise<WordbookSummary[]>;
   /** 安装一本词书（分块落库、可恢复、幂等、按 term 去重）；失败抛错 */
   installWordbook(bookId: string): Promise<WordbookInstallResult>;
+  /**
+   * 移除已安装词书（RAY-320）：清除安装标记，状态回退到 not-installed。
+   * 已导入的词条数据保留不动（学习记录不受影响）。
+   */
+  removeWordbook(bookId: string): Promise<void>;
 
   // ─── 扩展词包（RAY-294）─────────────────────────────────────────────────
 

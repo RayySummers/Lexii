@@ -1,10 +1,12 @@
 /**
- * 词书库页测试（RAY-262 + RAY-288）。
+ * 词书库页测试（RAY-262 + RAY-288 + RAY-320）。
  *
  * 覆盖：目录分组展示（考试词汇/冲刺词书）、状态徽标（已装/未装/安装中）、
  * 安装触发与成功提示（新增/跳过计数）、安装失败错误提示、安装中进度与
  * 「继续安装」、轮询刷新、返回导航；词书库概览（词书总数/词条总数/
- * 已装词书/已装词条，词书规模口径，RAY-288）。mock 数据源，不依赖 IndexedDB。
+ * 已装词书/已装词条，词书规模口径，RAY-288）；
+ * RAY-320：已安装词书删除按钮、二次确认对话框、删除成功/失败提示。
+ * mock 数据源，不依赖 IndexedDB。
  */
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -27,10 +29,12 @@ function makeProvider(overrides?: {
   summaries?: WordbookSummary[];
   installError?: Error;
   installResult?: { installedCount: number; skippedCount: number };
+  removeError?: Error;
 }): {
   provider: SettingsDataProvider;
   getWordbookSummaries: ReturnType<typeof vi.fn>;
   installWordbook: ReturnType<typeof vi.fn>;
+  removeWordbook: ReturnType<typeof vi.fn>;
 } {
   const getWordbookSummaries = vi.fn<() => Promise<WordbookSummary[]>>();
   getWordbookSummaries.mockResolvedValue(overrides?.summaries ?? []);
@@ -42,6 +46,12 @@ function makeProvider(overrides?: {
       overrides?.installResult ?? { installedCount: 100, skippedCount: 0 },
     );
   }
+  const removeWordbook = vi.fn<() => Promise<void>>();
+  if (overrides?.removeError) {
+    removeWordbook.mockRejectedValue(overrides.removeError);
+  } else {
+    removeWordbook.mockResolvedValue(undefined);
+  }
   const provider: SettingsDataProvider = {
     exportBackup: vi.fn(),
     exportWordlistCsv: vi.fn(),
@@ -49,8 +59,9 @@ function makeProvider(overrides?: {
     getPresetSummaries: vi.fn(),
     getWordbookSummaries,
     installWordbook,
+    removeWordbook,
   } as unknown as SettingsDataProvider;
-  return { provider, getWordbookSummaries, installWordbook };
+  return { provider, getWordbookSummaries, installWordbook, removeWordbook };
 }
 
 describe("WordbookLibraryScreen", () => {
@@ -108,6 +119,7 @@ describe("WordbookLibraryScreen", () => {
         () => new Promise<WordbookSummary[]>(() => {}), // 永不 resolve：模拟加载中
       ),
       installWordbook: vi.fn(),
+      removeWordbook: vi.fn(),
     } as unknown as SettingsDataProvider;
     render(<WordbookLibraryScreen provider={provider} onBack={() => {}} />);
 
@@ -124,7 +136,7 @@ describe("WordbookLibraryScreen", () => {
     expect(screen.getByText(/层次近似词书，非官方专八名单/)).toBeInTheDocument();
   });
 
-  it("已安装词书显示「已安装」徽标与禁用按钮", async () => {
+  it("已安装词书显示「已安装」徽标、禁用按钮与删除按钮", async () => {
     const { provider } = makeProvider({
       summaries: makeSummaries([
         {
@@ -143,6 +155,8 @@ describe("WordbookLibraryScreen", () => {
     expect(await screen.findAllByText("已安装")).toHaveLength(2);
     expect(screen.getByText("5406 词条 · v1.0.0")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "已安装" })).toBeDisabled();
+    // RAY-320：已安装词书有删除按钮
+    expect(screen.getByRole("button", { name: /删除词书/ })).toBeInTheDocument();
     // 未安装的词书仍有「安装」按钮
     expect(screen.getAllByRole("button", { name: "安装" }).length).toBeGreaterThanOrEqual(1);
   });
@@ -252,6 +266,7 @@ describe("WordbookLibraryScreen", () => {
       getPresetSummaries: vi.fn(),
       getWordbookSummaries,
       installWordbook: vi.fn(),
+      removeWordbook: vi.fn(),
     } as unknown as SettingsDataProvider;
     render(<WordbookLibraryScreen provider={provider} onBack={() => {}} />);
 
@@ -266,5 +281,132 @@ describe("WordbookLibraryScreen", () => {
     await screen.findByText("考试词汇");
     fireEvent.click(screen.getByRole("button", { name: "返回设置" }));
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  // ─── RAY-320：删除词书测试 ──────────────────────────────────────────
+
+  it("点击删除按钮弹出确认对话框", async () => {
+    const { provider } = makeProvider({
+      summaries: makeSummaries([
+        { id: "book-cet6", status: "installed", installedCount: 5406, totalCount: 5406 },
+      ]),
+    });
+    render(<WordbookLibraryScreen provider={provider} onBack={() => {}} />);
+
+    await screen.findByText("大学英语六级");
+    fireEvent.click(screen.getByRole("button", { name: /删除词书/ }));
+
+    // 对话框出现
+    expect(screen.getByRole("dialog", { name: "确认删除词书" })).toBeInTheDocument();
+    expect(screen.getByText(/确定要移除「大学英语六级」/)).toBeInTheDocument();
+    // 醒目提示
+    expect(screen.getByText(/已学习的词记录不会被删除/)).toBeInTheDocument();
+    expect(screen.getByText(/新词将不会继续安排学习/)).toBeInTheDocument();
+    // 按钮
+    expect(screen.getByRole("button", { name: "取消" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认删除" })).toBeInTheDocument();
+  });
+
+  it("确认删除：调用 removeWordbook 并展示成功提示", async () => {
+    const { provider, removeWordbook, getWordbookSummaries } = makeProvider({
+      summaries: makeSummaries([
+        { id: "book-cet6", status: "installed", installedCount: 5406, totalCount: 5406 },
+      ]),
+    });
+    render(<WordbookLibraryScreen provider={provider} onBack={() => {}} />);
+
+    await screen.findByText("大学英语六级");
+    fireEvent.click(screen.getByRole("button", { name: /删除词书/ }));
+    fireEvent.click(screen.getByRole("button", { name: "确认删除" }));
+
+    await waitFor(() => {
+      expect(removeWordbook).toHaveBeenCalledWith("book-cet6");
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "词书已移除。已学习的词记录保留在学习库中。",
+    );
+    // 删除后刷新状态
+    await waitFor(() => {
+      expect(getWordbookSummaries.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it("取消删除：关闭对话框，不调用 removeWordbook", async () => {
+    const { provider, removeWordbook } = makeProvider({
+      summaries: makeSummaries([
+        { id: "book-cet6", status: "installed", installedCount: 5406, totalCount: 5406 },
+      ]),
+    });
+    render(<WordbookLibraryScreen provider={provider} onBack={() => {}} />);
+
+    await screen.findByText("大学英语六级");
+    fireEvent.click(screen.getByRole("button", { name: /删除词书/ }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(removeWordbook).not.toHaveBeenCalled();
+  });
+
+  it("删除失败：展示错误提示", async () => {
+    const { provider } = makeProvider({
+      summaries: makeSummaries([
+        { id: "book-cet6", status: "installed", installedCount: 5406, totalCount: 5406 },
+      ]),
+      removeError: new Error("数据库锁定"),
+    });
+    render(<WordbookLibraryScreen provider={provider} onBack={() => {}} />);
+
+    await screen.findByText("大学英语六级");
+    fireEvent.click(screen.getByRole("button", { name: /删除词书/ }));
+    fireEvent.click(screen.getByRole("button", { name: "确认删除" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("移除失败：数据库锁定");
+  });
+
+  it("ESC 键关闭确认对话框，不调用 removeWordbook（RAY-320 review suggestion）", async () => {
+    const { provider, removeWordbook } = makeProvider({
+      summaries: makeSummaries([
+        { id: "book-cet6", status: "installed", installedCount: 5406, totalCount: 5406 },
+      ]),
+    });
+    render(<WordbookLibraryScreen provider={provider} onBack={() => {}} />);
+
+    await screen.findByText("大学英语六级");
+    fireEvent.click(screen.getByRole("button", { name: /删除词书/ }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    // 监听器绑在 document 上（见 ConfirmDeleteDialog 的 useEffect），所以派发到 document
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(removeWordbook).not.toHaveBeenCalled();
+  });
+
+  it("点击遮罩关闭确认对话框，不调用 removeWordbook（RAY-320 review suggestion）", async () => {
+    const { provider, removeWordbook } = makeProvider({
+      summaries: makeSummaries([
+        { id: "book-cet6", status: "installed", installedCount: 5406, totalCount: 5406 },
+      ]),
+    });
+    render(<WordbookLibraryScreen provider={provider} onBack={() => {}} />);
+
+    await screen.findByText("大学英语六级");
+    fireEvent.click(screen.getByRole("button", { name: /删除词书/ }));
+    const dialog = screen.getByRole("dialog");
+    // 遮罩是 dialog 的第一个子元素（aria-hidden 标记，唯一可识别）
+    const backdrop = dialog.querySelector('[aria-hidden="true"]');
+    if (!backdrop) {
+      throw new Error("遮罩元素未找到");
+    }
+    fireEvent.click(backdrop);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(removeWordbook).not.toHaveBeenCalled();
   });
 });

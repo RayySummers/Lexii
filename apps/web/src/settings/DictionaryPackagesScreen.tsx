@@ -8,7 +8,7 @@
  * - 取消与错误提示（并发错误映射文档 §3.2 可读文案）；
  * - Tier 2 安装完成回调 markTier1CoveredByTier2。
  *
- * 说明文案为过渡版（Vega 的正式文案交付后替换）。
+ * 文案：Vega 产出（RAY-326）；联网下载 / 离线可用口径与 RAY-304 一致。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DictionaryInstallStatus } from "@lexii/core";
@@ -129,9 +129,9 @@ function DownloadConfirmDialog({
           <p>
             扩展词包数据来自
             <strong> ECDICT</strong>（MIT 许可，© 2025
-            Linwei）。下载时需联网，下载后可离线使用；不埋点。
+            Linwei）。下载时需要联网，下载后可离线使用；不埋点。
           </p>
-          <p>词包仅扩充词典检索层，不影响已有学习数据。加入词书/生词本后才进入学习队列。</p>
+          <p>仅扩充检索层，不影响已有学习数据。</p>
         </div>
         <div className="flex justify-end gap-3">
           <button
@@ -345,8 +345,8 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
       <ScreenHeader title="扩展词包" onBack={onBack} backLabel="返回设置" />
 
       <p className="text-sm text-text-muted">
-        下载扩展词包（需联网，下载后可离线使用）可将词典检索范围从内置 7,195 词扩展到 ECDICT
-        全量覆盖。词包仅扩充检索层，不影响已有学习数据；加入词书/生词本后才进入学习队列。
+        下载扩展词包可将词典检索范围从内置 7,195 词扩展到 ECDICT
+        全量覆盖。下载时需要联网，下载后可离线使用。词包仅扩充检索层，不影响已有学习数据；只有加入词书或生词本后，才会进入学习队列。
       </p>
 
       {loadingManifest ? (
@@ -372,7 +372,7 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
       <div className="rounded-2xl border border-border bg-surface p-4">
         <h3 className="text-sm font-medium">数据来源与许可</h3>
         <p className="mt-2 text-xs leading-relaxed text-text-muted">
-          Tier 1/2 扩展词包数据来自 ECDICT（MIT 许可，© 2025 Linwei，
+          Tier 1 / 2 扩展词包数据来自 ECDICT（MIT 许可，© 2025 Linwei，
           <a
             href="https://github.com/skywind3000/ECDICT"
             target="_blank"
@@ -381,7 +381,7 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
           >
             GitHub
           </a>
-          ）。下载时需联网，下载后可离线使用；不埋点。
+          ）。下载时需要联网，下载后可离线使用；不埋点。
         </p>
       </div>
 
