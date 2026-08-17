@@ -2,12 +2,12 @@
  * 部署通道检测与切换目标计算（RAY-297 任务 B，通道切换器）。
  *
  * 纯路径字符串运算，不访问网络、不读取任何全局状态：
- * - Dev 通道部署在 `/dev/` 子路径（如 rayysummers.github.io/Lexilexi/dev/），
- *   稳定版（release）部署在父目录 / 根路径（rayysummers.github.io/Lexilexi/）；
+ * - Dev 通道部署在 `/dev/` 子路径（如 rayysummers.github.io/Lexii/dev/），
+ *   稳定版（release）部署在父目录 / 根路径（rayysummers.github.io/Lexii/）；
  * - 通道切换是纯页面跳转（<a href>），两通道同源、共享同一 IndexedDB，
  *   数据互通；
  * - 应用按相对 base（./）构建，同一份逻辑兼容根路径与任意子路径部署
- *   （不把 /Lexilexi 写死在代码里）。
+ *   （不把 /Lexii 写死在代码里）。
  */
 
 export type AppChannel = "release" | "dev";
@@ -45,8 +45,8 @@ function directorySegments(pathname: string): string[] {
 /**
  * 检测当前部署通道（纯函数）。
  *
- * - "/Lexilexi/dev"、"/Lexilexi/dev/"、"/Lexilexi/dev/index.html" → dev；
- * - 其余（"/Lexilexi/"、"/Lexilexi/index.html"、"/"）→ release。
+ * - "/Lexii/dev"、"/Lexii/dev/"、"/Lexii/dev/index.html" → dev；
+ * - 其余（"/Lexii/"、"/Lexii/index.html"、"/"）→ release。
  */
 export function detectChannel(pathname: string): AppChannel {
   const segments = directorySegments(pathname);
@@ -60,8 +60,8 @@ export function detectChannel(pathname: string): AppChannel {
  * - dev → release：去掉结尾的 `dev` 段，回到父目录。
  *
  * 例：
- * - "/Lexilexi/" → "/Lexilexi/dev/"；"/" → "/dev/"；
- * - "/Lexilexi/dev/" / "/Lexilexi/dev" / "/Lexilexi/dev/index.html" → "/Lexilexi/"；
+ * - "/Lexii/" → "/Lexii/dev/"；"/" → "/dev/"；
+ * - "/Lexii/dev/" / "/Lexii/dev" / "/Lexii/dev/index.html" → "/Lexii/"；
  * - "/dev/" → "/"。
  */
 export function getOtherChannelPath(pathname: string): string {

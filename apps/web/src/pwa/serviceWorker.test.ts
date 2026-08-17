@@ -238,7 +238,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     const harness = loadServiceWorker();
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexilexi-shell-v1");
+    const cache = harness.cachesByName.get("lexii-shell-v1");
     expect(cache).toBeDefined();
     for (const shellUrl of [
       "http://localhost/",
@@ -263,7 +263,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     });
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexilexi-shell-v1");
+    const cache = harness.cachesByName.get("lexii-shell-v1");
     expect(cache!.entries.has("http://localhost/")).toBe(false);
     expect(cache!.entries.has("http://localhost/index.html")).toBe(true);
     expect(cache!.entries.has("http://localhost/assets/index-abc123.js")).toBe(true);
@@ -272,12 +272,12 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
   it("activate 清理旧版本缓存并接管已打开的页面", async () => {
     const harness = loadServiceWorker();
     await runInstall(harness);
-    harness.cachesByName.set("lexilexi-shell-v0", new FakeCache("lexilexi-shell-v0"));
+    harness.cachesByName.set("lexii-shell-v0", new FakeCache("lexii-shell-v0"));
 
     await runActivate(harness);
 
-    expect(harness.cachesByName.has("lexilexi-shell-v0")).toBe(false);
-    expect(harness.cachesByName.has("lexilexi-shell-v1")).toBe(true);
+    expect(harness.cachesByName.has("lexii-shell-v0")).toBe(false);
+    expect(harness.cachesByName.has("lexii-shell-v1")).toBe(true);
     expect(harness.claim).toHaveBeenCalledTimes(1);
   });
 
@@ -321,7 +321,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
   it("静态资源未命中缓存时走网络并回填缓存（stale-while-revalidate）", async () => {
     const harness = loadServiceWorker();
     await runInstall(harness);
-    const cache = harness.cachesByName.get("lexilexi-shell-v1")!;
+    const cache = harness.cachesByName.get("lexii-shell-v1")!;
 
     const response = await dispatchFetch(harness, {
       method: "GET",
@@ -359,34 +359,34 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     expect(sandboxFetch).not.toHaveBeenCalled();
   });
 
-  it("子路径部署（GitHub Pages /Lexilexi/）：外壳与构建产物按 SW 位置解析缓存键（RAY-241 回归锁定）", async () => {
-    const SW_HREF = "https://rayysummers.github.io/Lexilexi/sw.js";
+  it("子路径部署（GitHub Pages /Lexii/）：外壳与构建产物按 SW 位置解析缓存键（RAY-241 回归锁定）", async () => {
+    const SW_HREF = "https://rayysummers.github.io/Lexii/sw.js";
     const harness = loadServiceWorker(defaultFetch, SW_HREF);
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexilexi-shell-v1");
+    const cache = harness.cachesByName.get("lexii-shell-v1");
     expect(cache).toBeDefined();
     for (const shellUrl of [
-      "https://rayysummers.github.io/Lexilexi/",
-      "https://rayysummers.github.io/Lexilexi/index.html",
-      "https://rayysummers.github.io/Lexilexi/manifest.webmanifest",
-      "https://rayysummers.github.io/Lexilexi/icons/icon-192.png",
+      "https://rayysummers.github.io/Lexii/",
+      "https://rayysummers.github.io/Lexii/index.html",
+      "https://rayysummers.github.io/Lexii/manifest.webmanifest",
+      "https://rayysummers.github.io/Lexii/icons/icon-192.png",
     ]) {
       expect(cache!.entries.has(shellUrl)).toBe(true);
     }
     // 构建产物同样解析到子路径下，而非站点根
     expect(
-      cache!.entries.has("https://rayysummers.github.io/Lexilexi/assets/index-abc123.js"),
+      cache!.entries.has("https://rayysummers.github.io/Lexii/assets/index-abc123.js"),
     ).toBe(true);
     expect(
-      cache!.entries.has("https://rayysummers.github.io/Lexilexi/assets/index-def456.css"),
+      cache!.entries.has("https://rayysummers.github.io/Lexii/assets/index-def456.css"),
     ).toBe(true);
 
     // 子路径下的导航请求离线时回退到子路径下的 index.html
     sandboxFetch = () => Promise.reject(new TypeError("Failed to fetch"));
     const response = await dispatchFetch(harness, {
       method: "GET",
-      url: "https://rayysummers.github.io/Lexilexi/review",
+      url: "https://rayysummers.github.io/Lexii/review",
       mode: "navigate",
     });
     expect(response).toBeDefined();

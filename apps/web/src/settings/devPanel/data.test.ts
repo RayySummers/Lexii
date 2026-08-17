@@ -8,8 +8,8 @@
  */
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
-import { DB_SCHEMA_VERSION, openDatabase } from "@lexilexi/core";
-import type { LexilexiDatabase } from "@lexilexi/core";
+import { DB_SCHEMA_VERSION, openDatabase } from "@lexii/core";
+import type { LexiiDatabase } from "@lexii/core";
 import { makeItem, makeMemory, makeSense } from "../../review/testFixtures";
 import { createIndexedDbDeveloperDataProvider, loadDatabaseDebug, loadFsrsDebug } from "./data";
 
@@ -17,9 +17,9 @@ function makeOptions() {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
-function freshDatabase(): LexilexiDatabase {
+function freshDatabase(): LexiiDatabase {
   db = openDatabase(makeOptions());
   return db;
 }
@@ -41,7 +41,7 @@ describe("loadDatabaseDebug 数据库现状", () => {
     await database.meta.put({ key: "preset:core-en-tier0:done", value: "1" });
 
     const debug = await loadDatabaseDebug(database);
-    expect(debug.dbName).toBe("lexilexi");
+    expect(debug.dbName).toBe("lexii");
     expect(debug.schemaVersion).toBe(DB_SCHEMA_VERSION);
 
     const byName = new Map(debug.tables.map((table) => [table.name, table.count]));

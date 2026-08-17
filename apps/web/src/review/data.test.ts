@@ -1,7 +1,7 @@
 /**
  * 复习数据源集成测试（fake-indexeddb）。
  *
- * 走真实 @lexilexi/core 路径：导入示例词表 → 按模式加载队列（学习 / 复习 /
+ * 走真实 @lexii/core 路径：导入示例词表 → 按模式加载队列（学习 / 复习 /
  * 混合）→ 评分落库 → 队列缩短。与 packages/core 的 persistence.test.ts 使用
  * 同一 fake-indexeddb 注入方式（IDBFactory + IDBKeyRange），不依赖浏览器环境。
  */
@@ -11,8 +11,8 @@ import {
   isReviewEvent,
   openDatabase,
   SAMPLE_WORDLIST_ROW_COUNT,
-} from "@lexilexi/core";
-import type { LexilexiDatabase } from "@lexilexi/core";
+} from "@lexii/core";
+import type { LexiiDatabase } from "@lexii/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIndexedDbReviewDataProvider } from "./data";
 import type { ReviewCard } from "./types";
@@ -23,7 +23,7 @@ function makeOptions(): Parameters<typeof openDatabase>[0] {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
 beforeEach(() => {
   db = openDatabase(makeOptions());
@@ -180,7 +180,7 @@ describe("createIndexedDbReviewDataProvider", () => {
   });
 
   it("每日新卡上限：设置 5 时 learn 队列只取前 5 张新卡，review 不受影响（RAY-260 suggestion 2）", async () => {
-    window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
+    window.localStorage.setItem("lexii:daily-new-card-limit", "5");
     const provider = createIndexedDbReviewDataProvider(db!);
     await provider.importSampleWordlist();
 
@@ -191,7 +191,7 @@ describe("createIndexedDbReviewDataProvider", () => {
   });
 
   it("loadQueueMeta：learn/mixed 返回剩余额度与未学新词标记，review 返回 null（RAY-276 诊断线 3）", async () => {
-    window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
+    window.localStorage.setItem("lexii:daily-new-card-limit", "5");
     const provider = createIndexedDbReviewDataProvider(db!);
 
     // 空库：没有未学新词，额度全额
@@ -228,7 +228,7 @@ describe("createIndexedDbReviewDataProvider", () => {
   });
 
   it("loadQueueMeta：剩余未学新词全部为暂停/删除条目时不报「仍有新词」（Oscar suggestion 2）", async () => {
-    window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
+    window.localStorage.setItem("lexii:daily-new-card-limit", "5");
     const provider = createIndexedDbReviewDataProvider(db!);
     await provider.importSampleWordlist();
 
@@ -263,7 +263,7 @@ describe("createIndexedDbReviewDataProvider", () => {
   });
 
   it("每日新卡上限：今日已学词条数扣减额度（已学 2 张后剩余额度只补到上限）", async () => {
-    window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
+    window.localStorage.setItem("lexii:daily-new-card-limit", "5");
     const provider = createIndexedDbReviewDataProvider(db!);
     await provider.importSampleWordlist();
 
@@ -282,7 +282,7 @@ describe("createIndexedDbReviewDataProvider", () => {
   });
 
   it("每日新卡上限：昨日已学的词条今日复习不重复扣减今日额度（Oscar 复评 suggestion 1 语义回归）", async () => {
-    window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
+    window.localStorage.setItem("lexii:daily-new-card-limit", "5");
     const provider = createIndexedDbReviewDataProvider(db!);
     await provider.importSampleWordlist();
 
@@ -369,7 +369,7 @@ describe("选择题出题方向（RAY-293，数据源集成）", () => {
   });
 
   it("设置中译英后：每道题 direction=zh-en，正确选项为词条原文、混淆项均为英文词条", async () => {
-    window.localStorage.setItem("lexilexi:quiz-direction", "zh-en");
+    window.localStorage.setItem("lexii:quiz-direction", "zh-en");
     const provider = createIndexedDbReviewDataProvider(db!);
     await provider.importSampleWordlist();
 
@@ -386,7 +386,7 @@ describe("选择题出题方向（RAY-293，数据源集成）", () => {
   });
 
   it("混合模式：每道题方向在 {en-zh, zh-en} 内且与选项文本口径一致", async () => {
-    window.localStorage.setItem("lexilexi:quiz-direction", "mixed");
+    window.localStorage.setItem("lexii:quiz-direction", "mixed");
     const provider = createIndexedDbReviewDataProvider(db!);
     await provider.importSampleWordlist();
 
@@ -404,7 +404,7 @@ describe("选择题出题方向（RAY-293，数据源集成）", () => {
   });
 
   it("损坏的方向设置值回落默认英译中（不出错、不出 zh-en 题）", async () => {
-    window.localStorage.setItem("lexilexi:quiz-direction", "garbage");
+    window.localStorage.setItem("lexii:quiz-direction", "garbage");
     const provider = createIndexedDbReviewDataProvider(db!);
     await provider.importSampleWordlist();
 
@@ -427,7 +427,7 @@ describe("保底填充 + 极端兜底跳题（RAY-293 修正决策，数据源�
     await importCsvWordlist(db!, CSV_3_WORDS, { source: "测试" });
 
     for (const preference of ["en-zh", "zh-en", "mixed"]) {
-      window.localStorage.setItem("lexilexi:quiz-direction", preference);
+      window.localStorage.setItem("lexii:quiz-direction", preference);
       const { questions, cards } = await provider.loadMultipleChoiceQueue("learn");
       expect(questions).toHaveLength(0);
       expect(cards).toHaveLength(0);
@@ -472,7 +472,7 @@ describe("保底填充 + 极端兜底跳题（RAY-293 修正决策，数据源�
       await db!.items.put(item);
       await db!.memoryStates.put(makeMemory(item.id));
     }
-    window.localStorage.setItem("lexilexi:quiz-direction", "zh-en");
+    window.localStorage.setItem("lexii:quiz-direction", "zh-en");
 
     const provider = createIndexedDbReviewDataProvider(db!);
     const { questions, cards } = await provider.loadMultipleChoiceQueue("learn");
@@ -537,7 +537,7 @@ describe("生词本开关（RAY-284，数据源集成）", () => {
     expect(withNotebook).toHaveLength(SAMPLE_WORDLIST_ROW_COUNT + 1);
 
     // 关闭开关：生词本条目排除，回到示例词表规模
-    window.localStorage.setItem("lexilexi:include-notebook", "0");
+    window.localStorage.setItem("lexii:include-notebook", "0");
     const withoutNotebook = await provider.loadQueue("learn");
     expect(withoutNotebook).toHaveLength(SAMPLE_WORDLIST_ROW_COUNT);
     // 生词本条目的独立实例不在队列中

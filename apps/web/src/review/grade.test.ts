@@ -1,5 +1,5 @@
-import { newCardFields } from "@lexilexi/fsrs";
-import { toItemId } from "@lexilexi/core";
+import { newCardFields } from "@lexii/fsrs";
+import { toItemId } from "@lexii/core";
 import { describe, expect, it } from "vitest";
 import { dueLabelForDisplay, formatDueLabel, previewGradeDueLabels, ratingFromKey } from "./grade";
 import { makeMemory } from "./testFixtures";

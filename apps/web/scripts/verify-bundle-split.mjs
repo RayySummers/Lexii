@@ -1,7 +1,7 @@
 /**
  * 构建产物拆包校验（RAY-262 评审 nit：拆包效果自动化断言，零依赖纯 Node）。
  *
- * 背景：core 子路径 `@lexilexi/core/presets/books` 词书数据（约 2 MB）与
+ * 背景：core 子路径 `@lexii/core/presets/books` 词书数据（约 2 MB）与
  * WordbookLibraryScreen 页面均按需加载（React.lazy），必须停留在独立
  * async chunk 中。若有人改回主入口静态 import，词书数据会重新进主
  * bundle，体积与首屏加载时间回退——本脚本在 build 后立即拦下。
@@ -13,7 +13,7 @@
  * 4. 词书库页面为独立 chunk（> 1 KB，实测约 4.7 KB），且被主 chunk
  *    或词书数据 chunk 动态引用（react 的 __vitePreload 依赖图）。
  *
- * 用法：pnpm --filter @lexilexi/web verify-bundle-split
+ * 用法：pnpm --filter @lexii/web verify-bundle-split
  * （由 web 的 build 脚本在 vite build 之后自动调用）
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";

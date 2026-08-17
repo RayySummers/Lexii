@@ -12,8 +12,8 @@
  * 历史走默认 window.localStorage（jsdom 提供），beforeEach 清空隔离。
  */
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { toSenseId } from "@lexilexi/core";
-import type { Sense } from "@lexilexi/core";
+import { toSenseId } from "@lexii/core";
+import type { Sense } from "@lexii/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SEARCH_HISTORY_STORAGE_KEY } from "../lib/searchHistory";
 import { SearchScreen } from "./SearchScreen";

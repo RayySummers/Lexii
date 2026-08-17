@@ -11,7 +11,7 @@
  * 自动评分：答对 → good，答错 → again（经 provider.grade 落库）。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReviewRating, StudyMode } from "@lexilexi/core";
+import type { ReviewRating, StudyMode } from "@lexii/core";
 import type { GradeContext, ReviewCard, ReviewDataProvider } from "./types";
 import type { MultipleChoiceQuestion } from "./MultipleChoiceCard";
 

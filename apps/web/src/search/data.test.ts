@@ -1,15 +1,15 @@
 /**
  * 搜词数据源集成测试（fake-indexeddb）。
  *
- * 走真实 @lexilexi/core 路径：写入义项 → searchAllSenses 检索 →
+ * 走真实 @lexii/core 路径：写入义项 → searchAllSenses 检索 →
  * 命中顺序（前缀 > 包含 > 释义）与词库空判定。与 review/data.test.ts
  * 使用同一 fake-indexeddb 注入方式，不依赖浏览器环境。
  *
  * RAY-294：词典来源的 addToNotebook 测试（promote 后再加词）。
  */
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
-import { openDatabase, toSenseId } from "@lexilexi/core";
-import type { LexilexiDatabase, Sense } from "@lexilexi/core";
+import { openDatabase, toSenseId } from "@lexii/core";
+import type { LexiiDatabase, Sense } from "@lexii/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIndexedDbSearchDataProvider } from "./data";
 
@@ -29,7 +29,7 @@ function makeOptions(): Parameters<typeof openDatabase>[0] {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
 beforeEach(() => {
   db = openDatabase(makeOptions());

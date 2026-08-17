@@ -1,7 +1,7 @@
 /**
  * 设置页数据源集成测试（fake-indexeddb）。
  *
- * 走真实 @lexilexi/core 路径：导入词表 → 导出/导入 round-trip。
+ * 走真实 @lexii/core 路径：导入词表 → 导出/导入 round-trip。
  * 与 review/data.test.ts 使用同一 fake-indexeddb 注入方式。
  * RAY-253 反馈 6：loadOverview（数据概览）已随设置页概览区删除，无相关用例。
  * RAY-294：扩展词包数据源测试（getDictionaryPackageSummaries /
@@ -15,16 +15,16 @@ import {
   importCsvWordlist,
   openDatabase,
   parseCsvWordlist,
-} from "@lexilexi/core";
-import type { LexilexiDatabase } from "@lexilexi/core";
+} from "@lexii/core";
+import type { LexiiDatabase } from "@lexii/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createIndexedDbSettingsDataProvider } from "./data";
 
 // 富化子路径 mock（RAY-276）：词书安装会内联加载富化数据包填充富化字段，
 // 测试用覆盖词书词条的小包替代 3.6MB 真实 enrichment.tier0.data.json，
 // 避免装载与解析拖慢用例（与 presets/bootstrap.test.ts 同口径）。
-vi.mock("@lexilexi/core/presets/enrichment", async () => {
-  const { parseEnrichmentPreset } = await import("@lexilexi/core");
+vi.mock("@lexii/core/presets/enrichment", async () => {
+  const { parseEnrichmentPreset } = await import("@lexii/core");
   return {
     ENRICHMENT_TIER0_PRESET: parseEnrichmentPreset(
       {
@@ -57,7 +57,7 @@ function makeOptions(): Parameters<typeof openDatabase>[0] {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
 beforeEach(() => {
   db = openDatabase(makeOptions());

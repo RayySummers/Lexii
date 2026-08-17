@@ -1,7 +1,7 @@
 /**
  * 统计数据源集成测试（fake-indexeddb）。
  *
- * 走真实 @lexilexi/core 路径：导入示例词表 → 到期数 = 词条数（导入即到期）→
+ * 走真实 @lexii/core 路径：导入示例词表 → 到期数 = 词条数（导入即到期）→
  * 评分后到期数减一、已复习数 +1、连续天数 1、今日已学习 1。与 review/data.test.ts
  * 使用同一 fake-indexeddb 注入方式。
  *
@@ -15,9 +15,9 @@ import {
   SAMPLE_WORDLIST_ROW_COUNT,
   toItemId,
   toSenseId,
-} from "@lexilexi/core";
-import type { LexilexiDatabase } from "@lexilexi/core";
-import { localDayBounds, MAX_EFFECTIVE_REVIEW_DURATION_MS } from "@lexilexi/stats";
+} from "@lexii/core";
+import type { LexiiDatabase } from "@lexii/core";
+import { localDayBounds, MAX_EFFECTIVE_REVIEW_DURATION_MS } from "@lexii/stats";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DAILY_NEW_CARD_LIMIT_STORAGE_KEY } from "../lib/dailyNewCardLimit";
 import { createIndexedDbReviewDataProvider } from "../review/data";
@@ -32,7 +32,7 @@ function makeOptions(): Parameters<typeof openDatabase>[0] {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
 beforeEach(() => {
   db = openDatabase(makeOptions());

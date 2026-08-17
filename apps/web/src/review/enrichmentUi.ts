@@ -4,7 +4,7 @@
  * 纯函数、无 React 依赖：组件只做渲染，双音标选择与词根词缀拆解
  * 的解析口径集中在此，便于单测锁定行为。
  */
-import type { Sense } from "@lexilexi/core";
+import type { Sense } from "@lexii/core";
 
 /** 双音标展示条目 */
 export interface PhoneticBadge {

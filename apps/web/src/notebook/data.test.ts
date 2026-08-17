@@ -1,12 +1,12 @@
 /**
  * 生词本数据源集成测试（fake-indexeddb，RAY-284）。
  *
- * 走真实 @lexilexi/core 路径：加词（幂等）→ 列表装配（条目 + 义项内容，
+ * 走真实 @lexii/core 路径：加词（幂等）→ 列表装配（条目 + 义项内容，
  * 最新在前）→ 移出（条目 removed + 底层学习条目软删除）。
  */
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
-import { openDatabase, toSenseId } from "@lexilexi/core";
-import type { LexilexiDatabase, Sense } from "@lexilexi/core";
+import { openDatabase, toSenseId } from "@lexii/core";
+import type { LexiiDatabase, Sense } from "@lexii/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { addWordToNotebook, createIndexedDbNotebookDataProvider } from "./data";
 
@@ -14,7 +14,7 @@ function makeOptions(): Parameters<typeof openDatabase>[0] {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
 beforeEach(() => {
   db = openDatabase(makeOptions());

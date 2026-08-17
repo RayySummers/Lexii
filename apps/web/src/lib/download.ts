@@ -4,12 +4,12 @@
  * 用 Blob + 对象 URL + 临时 <a download> 触发下载，随后清理；
  * 不依赖任何后端，符合 local-first 红线。
  */
-import type { LexilexiExportData } from "@lexilexi/core";
+import type { LexiiExportData } from "@lexii/core";
 
 /**
  * 以指定 MIME 类型下载一段文本为文件。
  *
- * @param filename 下载文件名（如 `lexilexi-backup-2026-08-14.json`）
+ * @param filename 下载文件名（如 `lexii-backup-2026-08-14.json`）
  * @param text 文件内容
  * @param mimeType MIME 类型（如 `application/json` / `text/csv`）
  */
@@ -32,11 +32,11 @@ export function downloadTextFile(filename: string, text: string, mimeType: strin
  * 设置页导出使用（评审建议 C5：序列化不再各写一遍；RAY-280 后复习页
  * 不再提供导出，仅设置页调用）。
  */
-export function serializeBackup(data: LexilexiExportData): string {
+export function serializeBackup(data: LexiiExportData): string {
   return JSON.stringify(data, null, 2);
 }
 
-/** 下载文件名日期戳（YYYY-MM-DD，本地时区），如 `lexilexi-backup-2026-08-14.json` */
+/** 下载文件名日期戳（YYYY-MM-DD，本地时区），如 `lexii-backup-2026-08-14.json` */
 export function datedFilename(prefix: string, ext: string): string {
   const now = new Date();
   const pad = (value: number) => String(value).padStart(2, "0");

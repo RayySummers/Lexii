@@ -1,7 +1,7 @@
 /**
  * 词书库页（RAY-262：应用内浏览分级词书 + 老用户手动安装入口）。
  *
- * - 词书目录来自 @lexilexi/core 的 WORDBOOK_CATALOG（随 PWA 打包的静态
+ * - 词书目录来自 @lexii/core 的 WORDBOOK_CATALOG（随 PWA 打包的静态
  *   数据，零网络请求），按 category 分组展示（考试词汇 / 冲刺词书）；
  * - 安装状态四态：已装 / 未装 / 安装中（断点进度）/ 可装（= 未装，有
  *   「安装」按钮）；安装中展示进度并可「继续安装」（installPreset 从
@@ -22,8 +22,8 @@
  * 说明文案为过渡版（Vega 的正式文案交付后替换）。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { WordbookCategory } from "@lexilexi/core";
-import { WORDBOOK_CATALOG, WORDBOOK_COUNT } from "@lexilexi/core/presets/books";
+import type { WordbookCategory } from "@lexii/core";
+import { WORDBOOK_CATALOG, WORDBOOK_COUNT } from "@lexii/core/presets/books";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { StatCard } from "../components/StatCard";
 import type { SettingsDataProvider, WordbookSummary } from "./types";
@@ -47,7 +47,7 @@ const CATEGORY_TITLES: Record<WordbookCategory, string> = {
  * RAY-288：词书库总规模（词条总数，供页首概览）。
  * 口径：词数一律按「词书规模」计——每本词书声明的词条数（terms.length），
  * 与卡片展示的 summary.totalCount 同源；跨词书重叠词条分别计入。
- * 词书总数复用 @lexilexi/core 的 WORDBOOK_COUNT（RAY-288 Oscar nit 1）。
+ * 词书总数复用 @lexii/core 的 WORDBOOK_COUNT（RAY-288 Oscar nit 1）。
  */
 const CATALOG_WORD_COUNT = WORDBOOK_CATALOG.reduce((sum, book) => sum + book.terms.length, 0);
 

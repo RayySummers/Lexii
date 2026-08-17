@@ -11,9 +11,9 @@
  * 数据量上限：到期样例只做一次全表 toArray + 截断（内存状态表为 MVP
  * 词库规模，数百至数千条，与 core 的既有说明口径一致）。
  */
-import { openDatabase } from "@lexilexi/core";
-import type { LexilexiDatabase, MemoryStatus } from "@lexilexi/core";
-import { normalizeParameters } from "@lexilexi/fsrs";
+import { openDatabase } from "@lexii/core";
+import type { LexiiDatabase, MemoryStatus } from "@lexii/core";
+import { normalizeParameters } from "@lexii/fsrs";
 import type {
   DatabaseDebug,
   DeveloperDataProvider,
@@ -36,7 +36,7 @@ function roundForDebug(value: number): number {
 }
 
 /** 读取数据库现状（供测试与默认工厂复用） */
-export async function loadDatabaseDebug(db: LexilexiDatabase): Promise<DatabaseDebug> {
+export async function loadDatabaseDebug(db: LexiiDatabase): Promise<DatabaseDebug> {
   const tables = [];
   for (const table of db.tables) {
     tables.push({ name: table.name, count: await table.count() });
@@ -46,7 +46,7 @@ export async function loadDatabaseDebug(db: LexilexiDatabase): Promise<DatabaseD
 
 /** 读取 FSRS 调试快照（供测试与默认工厂复用） */
 export async function loadFsrsDebug(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   now: Date = new Date(),
 ): Promise<FsrsDebug> {
   // 与 core studyLoop 的 `new Scheduler(card, now)` 默认参数同源：
@@ -94,8 +94,8 @@ export async function loadFsrsDebug(
   return { parameters, counts, dueSample };
 }
 
-/** 基于已打开的 Lexilexi 数据库创建开发者面板数据源（测试注入 fake-indexeddb 实例） */
-export function createIndexedDbDeveloperDataProvider(db: LexilexiDatabase): DeveloperDataProvider {
+/** 基于已打开的 Lexii 数据库创建开发者面板数据源（测试注入 fake-indexeddb 实例） */
+export function createIndexedDbDeveloperDataProvider(db: LexiiDatabase): DeveloperDataProvider {
   return {
     async loadDatabaseDebug(): Promise<DatabaseDebug> {
       return loadDatabaseDebug(db);
@@ -116,8 +116,8 @@ export function createIndexedDbDeveloperDataProvider(db: LexilexiDatabase): Deve
  * IndexedDB 不可用时首个方法调用抛错，由面板展示错误文案。
  */
 export function createDefaultDeveloperDataProvider(): DeveloperDataProvider {
-  let dbPromise: Promise<LexilexiDatabase> | null = null;
-  const getDb = (): Promise<LexilexiDatabase> => {
+  let dbPromise: Promise<LexiiDatabase> | null = null;
+  const getDb = (): Promise<LexiiDatabase> => {
     dbPromise ??= Promise.resolve().then(() => openDatabase());
     return dbPromise;
   };

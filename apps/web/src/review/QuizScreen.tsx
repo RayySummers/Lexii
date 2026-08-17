@@ -6,7 +6,7 @@
  *
  * 键盘快捷键：1–4 选择选项（与 MultipleChoiceCard 内的监听一致）。
  */
-import type { StudyMode } from "@lexilexi/core";
+import type { StudyMode } from "@lexii/core";
 import { BackArrowIcon } from "../components/icons";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { MultipleChoiceCard } from "./MultipleChoiceCard";

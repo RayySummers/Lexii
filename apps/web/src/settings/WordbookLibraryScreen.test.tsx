@@ -8,7 +8,7 @@
  */
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { WORDBOOK_CATALOG } from "@lexilexi/core/presets/books";
+import { WORDBOOK_CATALOG } from "@lexii/core/presets/books";
 import type { SettingsDataProvider, WordbookSummary } from "./types";
 import { WordbookLibraryScreen } from "./WordbookLibraryScreen";
 

@@ -6,7 +6,7 @@
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { DistractorOption } from "@lexilexi/core";
+import type { DistractorOption } from "@lexii/core";
 import { MultipleChoiceCard } from "./MultipleChoiceCard";
 import type { MultipleChoiceQuestion } from "./MultipleChoiceCard";
 import { makeSense } from "./testFixtures";

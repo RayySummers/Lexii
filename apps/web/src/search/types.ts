@@ -5,10 +5,10 @@
  * - `SearchResult`：一条检索命中（义项 + 命中类型），供结果列表展示
  * - `SearchDataProvider`：数据源接口（测试注入 mock，浏览器注入 IndexedDB 实现）
  *
- * 检索口径（拼写 + 释义、离线、排序）由 @lexilexi/core 的
- * searchLexilexiSenses / searchSenses 实现，apps/web 不做任何检索算法。
+ * 检索口径（拼写 + 释义、离线、排序）由 @lexii/core 的
+ * searchLexiiSenses / searchSenses 实现，apps/web 不做任何检索算法。
  */
-import type { Sense, SenseId, SenseSearchHitKind } from "@lexilexi/core";
+import type { Sense, SenseId, SenseSearchHitKind } from "@lexii/core";
 import type { AddToNotebookResult } from "../notebook/types";
 
 /** 一条搜索结果：义项 + 命中类型（命中类型供未来高亮等展示用，当前仅透传） */
@@ -23,7 +23,7 @@ export interface SearchResult {
  * 搜词数据源。
  *
  * 职责边界：只做「本地词库检索 / 词库是否为空 / 生词本加词（RAY-284）」，
- * 全部经由 @lexilexi/core 的公开 API（searchLexilexiSenses /
+ * 全部经由 @lexii/core 的公开 API（searchLexiiSenses /
  * addToNotebook），不在 apps/web 内实现任何检索算法或生词本语义。
  */
 export interface SearchDataProvider {

@@ -11,7 +11,7 @@
  */
 
 /** 偏好存储键 */
-export const INCLUDE_NOTEBOOK_STORAGE_KEY = "lexilexi:include-notebook";
+export const INCLUDE_NOTEBOOK_STORAGE_KEY = "lexii:include-notebook";
 
 /** 默认值：学习列表包含生词本 */
 export const DEFAULT_INCLUDE_NOTEBOOK = true;

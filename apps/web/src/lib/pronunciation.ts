@@ -23,7 +23,7 @@
  */
 export type PronunciationAccent = "us" | "uk";
 
-export const PRONUNCIATION_STORAGE_KEY = "lexilexi:pronunciation-accent";
+export const PRONUNCIATION_STORAGE_KEY = "lexii:pronunciation-accent";
 
 /** 默认口音：美式（en-US） */
 export const DEFAULT_PRONUNCIATION_ACCENT: PronunciationAccent = "us";

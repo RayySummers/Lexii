@@ -11,12 +11,12 @@
  * 方向只改变题目呈现（题面与选项文本），不改变评分与 FSRS 调度
  * （见 docs/quiz-fsrs-mapping.md）。
  */
-import type { QuizDirection } from "@lexilexi/core";
+import type { QuizDirection } from "@lexii/core";
 
 /** 设置档位：两方向 + 混合（逐题随机） */
 export type QuizDirectionPreference = QuizDirection | "mixed";
 
-export const QUIZ_DIRECTION_STORAGE_KEY = "lexilexi:quiz-direction";
+export const QUIZ_DIRECTION_STORAGE_KEY = "lexii:quiz-direction";
 
 /** 默认方向：英译中 */
 export const DEFAULT_QUIZ_DIRECTION_PREFERENCE: QuizDirectionPreference = "en-zh";

@@ -22,7 +22,7 @@
  * 搜词页结果行与复习卡页工具栏）；生词本工厂与其余工厂一样惰性创建。
  */
 import { useCallback, useState } from "react";
-import type { StudyMode } from "@lexilexi/core";
+import type { StudyMode } from "@lexii/core";
 import { BookmarkIcon } from "./components/icons";
 import { FirstOpenDialog } from "./components/FirstOpenDialog";
 import { HomeScreen, type StudyFormat } from "./HomeScreen";

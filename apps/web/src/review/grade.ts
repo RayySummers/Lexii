@@ -1,15 +1,15 @@
 /**
  * 评分预览与到期标签（纯函数，UI 副文案用）。
  *
- * 调度计算全部委托 @lexilexi/fsrs 的公开 API（Scheduler.preview），
- * 领域字段 → 调度器输入的换算直接复用 @lexilexi/core 的公开函数
+ * 调度计算全部委托 @lexii/fsrs 的公开 API（Scheduler.preview），
+ * 领域字段 → 调度器输入的换算直接复用 @lexii/core 的公开函数
  * memoryFieldsToCardInput（docs/domain-model.md §6），
  * 本模块只做：到期时间的中文相对标签格式化（纯展示）。
  */
-import type { DateInput } from "@lexilexi/fsrs";
-import { Scheduler } from "@lexilexi/fsrs";
-import { memoryFieldsToCardInput } from "@lexilexi/core";
-import type { IsoDate, MemoryStateFields, ReviewRating } from "@lexilexi/core";
+import type { DateInput } from "@lexii/fsrs";
+import { Scheduler } from "@lexii/fsrs";
+import { memoryFieldsToCardInput } from "@lexii/core";
+import type { IsoDate, MemoryStateFields, ReviewRating } from "@lexii/core";
 import type { RatingTierMode } from "../lib/ratingTiers";
 
 /** 四档评分的到期时间预览（评分按钮副文案，如 Again → 10分钟） */

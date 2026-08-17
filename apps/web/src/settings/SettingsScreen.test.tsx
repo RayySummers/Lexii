@@ -11,7 +11,7 @@
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LexilexiExportData } from "@lexilexi/core";
+import type { LexiiExportData } from "@lexii/core";
 import { APP_VERSION } from "../lib/appVersion";
 import type { ThemePreference } from "../theme/resolve";
 import { readDevPanelUnlocked, writeDevPanelUnlocked } from "./devPanel/unlock";
@@ -24,8 +24,8 @@ vi.mock("./persistenceStatus", () => ({
   usePersistenceStatus: vi.fn(),
 }));
 
-const EMPTY_EXPORT: LexilexiExportData = {
-  format: "lexilexi",
+const EMPTY_EXPORT: LexiiExportData = {
+  format: "lexii",
   exportFormatVersion: 1,
   dbSchemaVersion: 1,
   exportedAt: "2026-08-14T00:00:00.000Z",
@@ -63,7 +63,7 @@ interface Harness {
 }
 
 function makeHarness(): Harness {
-  const exportBackup = vi.fn<() => Promise<LexilexiExportData>>().mockResolvedValue(EMPTY_EXPORT);
+  const exportBackup = vi.fn<() => Promise<LexiiExportData>>().mockResolvedValue(EMPTY_EXPORT);
   const exportWordlistCsv = vi.fn<() => Promise<string>>().mockResolvedValue("term,definition,pos");
   const importBackup = vi
     .fn<(text: string) => Promise<ImportBackupResult>>()
@@ -127,7 +127,7 @@ function stubObjectUrl() {
 function makeDevProvider(): DeveloperDataProvider {
   return {
     loadDatabaseDebug: vi.fn().mockResolvedValue({
-      dbName: "lexilexi",
+      dbName: "lexii",
       schemaVersion: 4,
       tables: [],
     }),
@@ -229,7 +229,7 @@ describe("SettingsScreen", () => {
     expect(onThemePreferenceChange).toHaveBeenCalledWith("system");
     expect(onThemePreferenceChange).toHaveBeenCalledTimes(3);
     // 设置页只上报回调，主题持久化由 App 级 useTheme 负责
-    expect(window.localStorage.getItem("lexilexi:theme")).toBeNull();
+    expect(window.localStorage.getItem("lexii:theme")).toBeNull();
   });
 
   it("不渲染数据概览（RAY-253 反馈 6：与统计页重复，已删除）", async () => {
@@ -315,7 +315,7 @@ describe("SettingsScreen", () => {
     renderSettings({ provider: harness.provider });
     await screen.findByText("导入数据");
 
-    const file = new File(['{"format":"lexilexi"}'], "backup.json", { type: "application/json" });
+    const file = new File(['{"format":"lexii"}'], "backup.json", { type: "application/json" });
     fireEvent.change(screen.getByLabelText("选择备份文件…"), { target: { files: [file] } });
 
     expect(await screen.findByText("已恢复 3 个词条、3 个义项、3 条学习记录")).toBeInTheDocument();
@@ -340,7 +340,7 @@ describe("SettingsScreen", () => {
     await screen.findByText("关于");
 
     const link = screen.getByRole("link", { name: "GitHub 仓库" });
-    expect(link).toHaveAttribute("href", "https://github.com/RayySummers/Lexilexi");
+    expect(link).toHaveAttribute("href", "https://github.com/RayySummers/Lexii");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
@@ -351,7 +351,7 @@ describe("SettingsScreen", () => {
     await screen.findByText("关于");
 
     const link = screen.getByRole("link", { name: "反馈问题" });
-    expect(link).toHaveAttribute("href", "https://github.com/RayySummers/Lexilexi/issues");
+    expect(link).toHaveAttribute("href", "https://github.com/RayySummers/Lexii/issues");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
@@ -362,7 +362,7 @@ describe("SettingsScreen", () => {
     await screen.findByText("关于");
 
     // 断言 UI 走 APP_VERSION（构建注入），不硬编码具体版本——发版 bump package.json 后测试自动跟随
-    expect(screen.getByText(`乐希 Lexilexi v${APP_VERSION}`)).toBeInTheDocument();
+    expect(screen.getByText(`乐希 Lexii v${APP_VERSION}`)).toBeInTheDocument();
   });
 
   it("词书库：入口进入词书库页并展示分组词书目录，返回按钮回到设置（RAY-262）", async () => {
@@ -429,7 +429,7 @@ describe("SettingsScreen", () => {
 
     fireEvent.change(input, { target: { value: "35" } });
     expect(input).toHaveValue(35);
-    expect(window.localStorage.getItem("lexilexi:daily-new-card-limit")).toBe("35");
+    expect(window.localStorage.getItem("lexii:daily-new-card-limit")).toBe("35");
   });
 
   it("每日新卡上限：非法输入不持久化（存储保持原值）", async () => {
@@ -440,7 +440,7 @@ describe("SettingsScreen", () => {
     // number 输入框对非数字文本会被浏览器清空（value 为空串）
     fireEvent.change(input, { target: { value: "abc" } });
     expect(input).toHaveValue(null);
-    expect(window.localStorage.getItem("lexilexi:daily-new-card-limit")).toBeNull();
+    expect(window.localStorage.getItem("lexii:daily-new-card-limit")).toBeNull();
   });
 
   it("每日新卡上限：失焦时显示回落到生效值（Oscar 复评 nit 1）", async () => {
@@ -456,7 +456,7 @@ describe("SettingsScreen", () => {
     // 失焦：显示回落到存储中实际生效的值 35
     fireEvent.blur(input);
     expect(input).toHaveValue(35);
-    expect(window.localStorage.getItem("lexilexi:daily-new-card-limit")).toBe("35");
+    expect(window.localStorage.getItem("lexii:daily-new-card-limit")).toBe("35");
   });
 
   it("每日新卡上限：合法值失焦归一化显示（不改变生效值）", async () => {
@@ -467,16 +467,16 @@ describe("SettingsScreen", () => {
     fireEvent.change(input, { target: { value: "7" } });
     fireEvent.blur(input);
     expect(input).toHaveValue(7);
-    expect(window.localStorage.getItem("lexilexi:daily-new-card-limit")).toBe("7");
+    expect(window.localStorage.getItem("lexii:daily-new-card-limit")).toBe("7");
   });
 
   it("进行中的导出在进入二级页后不丢状态：返回后仍显示导出中并最终提示成功（RAY-260 评审 nit 2）", async () => {
     const harness = makeHarness();
     const restore = stubObjectUrl();
-    let resolveExport: ((value: LexilexiExportData) => void) | undefined;
+    let resolveExport: ((value: LexiiExportData) => void) | undefined;
     harness.exportBackup.mockImplementation(
       () =>
-        new Promise<LexilexiExportData>((resolve) => {
+        new Promise<LexiiExportData>((resolve) => {
           resolveExport = resolve;
         }),
     );
@@ -513,15 +513,15 @@ describe("RAY-265 学习设置：评分档位与发音口音", () => {
 
     const select = screen.getByLabelText(/评分档位/);
     expect(select).toHaveValue("three");
-    expect(window.localStorage.getItem("lexilexi:rating-tiers")).toBeNull(); // 未显式设置
+    expect(window.localStorage.getItem("lexii:rating-tiers")).toBeNull(); // 未显式设置
 
     fireEvent.change(select, { target: { value: "four" } });
     expect(select).toHaveValue("four");
-    expect(window.localStorage.getItem("lexilexi:rating-tiers")).toBe("four");
+    expect(window.localStorage.getItem("lexii:rating-tiers")).toBe("four");
   });
 
   it("评分档位读取已存储的四档", async () => {
-    window.localStorage.setItem("lexilexi:rating-tiers", "four");
+    window.localStorage.setItem("lexii:rating-tiers", "four");
     renderSettings();
     await screen.findByText("学习");
     expect(screen.getByLabelText(/评分档位/)).toHaveValue("four");
@@ -536,11 +536,11 @@ describe("RAY-265 学习设置：评分档位与发音口音", () => {
 
     fireEvent.change(select, { target: { value: "uk" } });
     expect(select).toHaveValue("uk");
-    expect(window.localStorage.getItem("lexilexi:pronunciation-accent")).toBe("uk");
+    expect(window.localStorage.getItem("lexii:pronunciation-accent")).toBe("uk");
   });
 
   it("发音口音读取已存储的英式", async () => {
-    window.localStorage.setItem("lexilexi:pronunciation-accent", "uk");
+    window.localStorage.setItem("lexii:pronunciation-accent", "uk");
     renderSettings();
     await screen.findByText("学习");
     expect(screen.getByLabelText(/发音口音/)).toHaveValue("uk");
@@ -554,11 +554,11 @@ describe("RAY-293 学习设置：选择题出题方向", () => {
 
     const select = screen.getByLabelText(/选择题出题方向/);
     expect(select).toHaveValue("en-zh");
-    expect(window.localStorage.getItem("lexilexi:quiz-direction")).toBeNull(); // 未显式设置
+    expect(window.localStorage.getItem("lexii:quiz-direction")).toBeNull(); // 未显式设置
 
     fireEvent.change(select, { target: { value: "zh-en" } });
     expect(select).toHaveValue("zh-en");
-    expect(window.localStorage.getItem("lexilexi:quiz-direction")).toBe("zh-en");
+    expect(window.localStorage.getItem("lexii:quiz-direction")).toBe("zh-en");
   });
 
   it("选择题出题方向三档可选（英译中 / 中译英 / 混合）", async () => {
@@ -571,7 +571,7 @@ describe("RAY-293 学习设置：选择题出题方向", () => {
   });
 
   it("选择题出题方向读取已存储的混合档", async () => {
-    window.localStorage.setItem("lexilexi:quiz-direction", "mixed");
+    window.localStorage.setItem("lexii:quiz-direction", "mixed");
     renderSettings();
     await screen.findByText("学习");
     expect(screen.getByLabelText(/选择题出题方向/)).toHaveValue("mixed");
@@ -588,15 +588,15 @@ describe("RAY-303 学习设置：学习列表包含生词本开关（从首页�
 
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-checked", "false");
-    expect(window.localStorage.getItem("lexilexi:include-notebook")).toBe("0");
+    expect(window.localStorage.getItem("lexii:include-notebook")).toBe("0");
 
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-checked", "true");
-    expect(window.localStorage.getItem("lexilexi:include-notebook")).toBe("1");
+    expect(window.localStorage.getItem("lexii:include-notebook")).toBe("1");
   });
 
   it("读取既有偏好：localStorage 为 0 时初始关闭", async () => {
-    window.localStorage.setItem("lexilexi:include-notebook", "0");
+    window.localStorage.setItem("lexii:include-notebook", "0");
     renderSettings();
     await screen.findByText("学习");
     expect(screen.getByRole("switch", { name: "学习列表是否包含生词本" })).toHaveAttribute(
@@ -622,7 +622,7 @@ describe("RAY-297 隐藏开发者面板", () => {
   it("版本号连点 5 次解锁，再连点 5 次折叠，状态存 localStorage", async () => {
     renderSettings();
 
-    const versionButton = screen.getByRole("button", { name: `乐希 Lexilexi v${APP_VERSION}` });
+    const versionButton = screen.getByRole("button", { name: `乐希 Lexii v${APP_VERSION}` });
     expect(screen.queryByRole("heading", { name: "开发者" })).not.toBeInTheDocument();
 
     for (let tap = 0; tap < 5; tap += 1) {

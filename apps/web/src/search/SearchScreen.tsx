@@ -2,7 +2,7 @@
  * 搜词页（RAY-266 搜词，验收期优先项；RAY-292 未收录提示 + 搜词历史）。
  *
  * - 输入即检索：词条拼写 + 释义（中文关键词），全本地、离线、不新增数据源；
- * - 检索逻辑在 @lexilexi/core（searchLexilexiSenses），本页只做输入、
+ * - 检索逻辑在 @lexii/core（searchLexiiSenses），本页只做输入、
  *   防抖（200ms）与结果展示；命中顺序由 core 决定（前缀 > 包含 > 释义）；
  * - 状态机：词库为空 → 无查询提示（有历史时先展示搜索历史）→ 检索中 →
  *   无命中（明确提示「库内无此词，可导入自建词库」）→ 结果列表（含
@@ -27,7 +27,7 @@
  * 说明文案为过渡版（Vega 的正式文案交付后替换）。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { SenseId } from "@lexilexi/core";
+import type { SenseId } from "@lexii/core";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { CheckIcon, CloseIcon, PlusIcon, SearchIcon } from "../components/icons";
 import {

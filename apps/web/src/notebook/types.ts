@@ -8,11 +8,11 @@
  * - `NotebookDataProvider`：生词本页数据源（测试注入 mock，
  *   浏览器注入 IndexedDB 实现）
  *
- * 全部数据操作经由 @lexilexi/core 的公开 API（addToNotebook /
+ * 全部数据操作经由 @lexii/core 的公开 API（addToNotebook /
  * listNotebookEntries / removeFromNotebook），不在 apps/web 内实现任何
  * 生词本语义。
  */
-import type { NotebookEntry, NotebookEntryId, Sense } from "@lexilexi/core";
+import type { NotebookEntry, NotebookEntryId, Sense } from "@lexii/core";
 
 /** 生词本列表项：条目记录 + 义项内容（展示释义/音标） */
 export interface NotebookListItem {

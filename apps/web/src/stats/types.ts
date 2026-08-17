@@ -8,7 +8,7 @@
  */
 /** 统计快照（统计页 10 项展示 + 首页到期徽标共用） */
 export interface StatsSnapshot {
-  /** 连续复习天数（0 = 无复习记录，口径见 @lexilexi/stats） */
+  /** 连续复习天数（0 = 无复习记录，口径见 @lexii/stats） */
   streakDays: number;
   /** 累计学习天数（有复习记录的不同本地日历日数） */
   totalDays: number;
@@ -41,8 +41,8 @@ export interface StatsSnapshot {
 /**
  * 统计数据源。
  *
- * 职责边界：只做到期数与事件流的读取聚合，全部经由 @lexilexi/core 的
- * 公开 API（getDueItemIds / getDueItemIdsInRange）与 @lexilexi/stats 的
+ * 职责边界：只做到期数与事件流的读取聚合，全部经由 @lexii/core 的
+ * 公开 API（getDueItemIds / getDueItemIdsInRange）与 @lexii/stats 的
  * 纯函数（computeStreak / computeTotalDays / computeLearnedTodayCount /
  * computeReviewedTodayCount / computeCompletedWordCount / localDayBounds），
  * 不在 apps/web 内实现任何统计算法。统计数据全本地计算，不联网不上传。

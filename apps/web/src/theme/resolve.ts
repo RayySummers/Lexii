@@ -16,7 +16,7 @@ export type Theme = "light" | "dark";
 /** 用户主题偏好三档：浅色 / 深色 / 跟随系统（RAY-261） */
 export type ThemePreference = "light" | "dark" | "system";
 
-export const THEME_STORAGE_KEY = "lexilexi:theme";
+export const THEME_STORAGE_KEY = "lexii:theme";
 
 /** 无持久化偏好时的默认档位：跟随系统 */
 export const DEFAULT_THEME_PREFERENCE: ThemePreference = "system";

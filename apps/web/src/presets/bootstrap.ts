@@ -10,7 +10,7 @@
  *   backfillEnrichment 的可恢复契约，幂等）；
  * - 任何失败都不阻塞启动（fire-and-forget，错误仅记录 console）。
  *
- * 数据层算法全部在 @lexilexi/core（getPresetInstallState / installPreset /
+ * 数据层算法全部在 @lexii/core（getPresetInstallState / installPreset /
  * backfillEnrichment），本模块只做「何时装/填」的产品口径判断
  * （apps/web 不做算法实现）。
  */
@@ -21,8 +21,8 @@ import {
   markEnrichmentDone,
   openDatabase,
   TIER0_PRESET,
-} from "@lexilexi/core";
-import type { EnrichmentPresetPackage, LexilexiDatabase, PresetPackage } from "@lexilexi/core";
+} from "@lexii/core";
+import type { EnrichmentPresetPackage, LexiiDatabase, PresetPackage } from "@lexii/core";
 
 export type BootstrapOutcome =
   | { status: "installed"; installedCount: number }
@@ -38,7 +38,7 @@ export type BootstrapOutcome =
  * @param enrichment 富化数据包（可选；随安装内联填充新装词条）
  */
 export async function bootstrapPresetData(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   preset: PresetPackage = TIER0_PRESET,
   enrichment?: EnrichmentPresetPackage,
 ): Promise<BootstrapOutcome> {
@@ -70,13 +70,13 @@ export async function bootstrapPresetData(
  * 绝不抛错、绝不阻塞启动；失败静默记录（首启安装失败不影响已有功能，
  * 用户仍可手动导入词库）。
  */
-export function bootstrapTier0Preset(db?: LexilexiDatabase): void {
+export function bootstrapTier0Preset(db?: LexiiDatabase): void {
   void (async () => {
     try {
       const database = db ?? openDatabase();
       // 富化数据包按需加载（子路径 + 动态 import，MB 级 JSON 不进主 bundle，
       // 与词书库 books.data.json 同口径）
-      const { ENRICHMENT_TIER0_PRESET } = await import("@lexilexi/core/presets/enrichment");
+      const { ENRICHMENT_TIER0_PRESET } = await import("@lexii/core/presets/enrichment");
       const outcome = await bootstrapPresetData(database, TIER0_PRESET, ENRICHMENT_TIER0_PRESET);
       if (outcome.status === "error") {
         console.error("[presets] 内置核心词表安装失败：", outcome.message);

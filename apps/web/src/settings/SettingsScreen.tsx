@@ -2,7 +2,7 @@
  * 设置页：数据安全 + 导出 / 导入（RAY-245），导航改版（RAY-253），
  * 每日新卡上限（RAY-260），主题三档选单（RAY-261）。
  *
- * - 数据安全：监听 `lexilexi:storage-permission` 事件（经 usePersistenceStatus），
+ * - 数据安全：监听 `lexii:storage-permission` 事件（经 usePersistenceStatus），
  *   状态为 "denied" 时提示「当前数据可能被清理，建议导出」并提供直达导出入口；
  *   "unsupported" 环境静默降级、不提示（验收点 6）。
  * - 导出：JSON 完整备份（可原样导回）+ CSV 词表（可经 importCsvWordlist 导回）。
@@ -92,8 +92,8 @@ const DictionaryPackagesScreen = lazy(() =>
 );
 
 /** 项目 GitHub 仓库与反馈入口（RAY-251）：纯外链跳转，不请求任何外部数据 */
-const GITHUB_REPO_URL = "https://github.com/RayySummers/Lexilexi";
-const GITHUB_ISSUES_URL = "https://github.com/RayySummers/Lexilexi/issues";
+const GITHUB_REPO_URL = "https://github.com/RayySummers/Lexii";
+const GITHUB_ISSUES_URL = "https://github.com/RayySummers/Lexii/issues";
 
 export interface SettingsScreenProps {
   provider: SettingsDataProvider;
@@ -167,7 +167,7 @@ export function SettingsScreen({
     try {
       const data = await provider.exportBackup();
       downloadTextFile(
-        datedFilename("lexilexi-backup", "json"),
+        datedFilename("lexii-backup", "json"),
         serializeBackup(data),
         "application/json",
       );
@@ -185,7 +185,7 @@ export function SettingsScreen({
     setNotice(null);
     try {
       const csv = await provider.exportWordlistCsv();
-      downloadTextFile(datedFilename("lexilexi-wordlist", "csv"), csv, "text/csv;charset=utf-8");
+      downloadTextFile(datedFilename("lexii-wordlist", "csv"), csv, "text/csv;charset=utf-8");
       setNotice("已导出 CSV 词表。");
     } catch (err) {
       setError(`导出失败：${toErrorMessage(err)}`);
@@ -662,7 +662,7 @@ function SettingsMainView({
 
       <Section title="关于">
         <p className="text-sm text-text-muted">
-          乐希 Lexilexi 是开源软件（local-first，学习数据只存本机）。欢迎在 GitHub
+          乐希 Lexii 是开源软件（local-first，学习数据只存本机）。欢迎在 GitHub
           上查看源码、反馈问题或提出建议。
         </p>
         {/* 规格称「反馈问题」为按钮，这里实现为按钮样式的语义化 <a>（RAY-251 评审
@@ -718,7 +718,7 @@ function SettingsMainView({
           onClick={onVersionTap}
           className="rounded-full px-3 py-1 text-xs text-text-muted transition-colors hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
         >
-          乐希 Lexilexi v{APP_VERSION}
+          乐希 Lexii v{APP_VERSION}
         </button>
       </footer>
     </main>

@@ -17,7 +17,7 @@
  * （core undoReview 单事务），统计口径随事件删除自然一致。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { EventId, MemoryState, ReviewRating, StudyMode } from "@lexilexi/core";
+import type { EventId, MemoryState, ReviewRating, StudyMode } from "@lexii/core";
 import type { GradeContext, ReviewCard, ReviewDataProvider } from "../review/types";
 
 export type SessionPhase = "loading" | "empty" | "no-due" | "reviewing" | "done" | "error";

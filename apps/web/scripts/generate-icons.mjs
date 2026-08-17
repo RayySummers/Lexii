@@ -8,7 +8,7 @@
  * 白色「闪卡」图形（两张叠放卡片 + 卡片上的文字行）。
  * 图形为轴对齐圆角矩形（无旋转、无字体），像素级确定性输出，可重复生成。
  *
- * 用法：pnpm --filter @lexilexi/web icons   （或在 apps/web 下 node scripts/generate-icons.mjs）
+ * 用法：pnpm --filter @lexii/web icons   （或在 apps/web 下 node scripts/generate-icons.mjs）
  * 生成结果提交进仓库；改设计或品牌色后重新运行本脚本。
  */
 import { deflateSync } from "node:zlib";

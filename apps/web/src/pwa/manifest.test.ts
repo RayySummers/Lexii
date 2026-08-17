@@ -54,7 +54,7 @@ describe("manifest.webmanifest（可安装性结构）", () => {
     expect(manifest.name).toBeTruthy();
     expect(manifest.short_name).toBeTruthy();
     expect(manifest.display).toBe("standalone");
-    // 相对 manifest 自身的路径：任意子路径部署（如 GitHub Pages /Lexilexi/）均可安装
+    // 相对 manifest 自身的路径：任意子路径部署（如 GitHub Pages /Lexii/）均可安装
     expect(manifest.start_url).toBe("./");
     expect(manifest.id).toBe("./");
   });

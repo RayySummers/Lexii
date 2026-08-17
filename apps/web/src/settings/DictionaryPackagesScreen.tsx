@@ -11,7 +11,7 @@
  * 说明文案为过渡版（Vega 的正式文案交付后替换）。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DictionaryInstallStatus } from "@lexilexi/core";
+import type { DictionaryInstallStatus } from "@lexii/core";
 import { ScreenHeader } from "../components/ScreenHeader";
 import type {
   DictionaryManifestInfo,

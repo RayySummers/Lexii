@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { toEventId } from "@lexilexi/core";
-import type { LexilexiExportData, StudyMode } from "@lexilexi/core";
+import { toEventId } from "@lexii/core";
+import type { LexiiExportData, StudyMode } from "@lexii/core";
 import { App } from "./App";
 import { makeCard } from "./review/testFixtures";
 import type { ReviewCard, ReviewDataProvider } from "./review/types";
@@ -14,8 +14,8 @@ import {
   FIRST_OPEN_DIALOG_STORAGE_KEY,
 } from "./lib/firstOpenDialog";
 
-const EMPTY_EXPORT: LexilexiExportData = {
-  format: "lexilexi",
+const EMPTY_EXPORT: LexiiExportData = {
+  format: "lexii",
   exportFormatVersion: 1,
   dbSchemaVersion: 1,
   exportedAt: "2026-08-14T00:00:00.000Z",
@@ -132,7 +132,7 @@ describe("App", () => {
   it("不显示品牌名；首页渲染三个模式按钮（学习 / 复习 / 混合）", () => {
     render(<App reviewProviderFactory={makeReviewProviderFactory().factory} />);
     expect(screen.queryByText("乐希")).not.toBeInTheDocument();
-    expect(screen.queryByText("Lexilexi")).not.toBeInTheDocument();
+    expect(screen.queryByText("Lexii")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "学习" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "复习" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "混合" })).toBeInTheDocument();
@@ -184,15 +184,15 @@ describe("App", () => {
 
     fireEvent.change(select, { target: { value: "dark" } });
     expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(window.localStorage.getItem("lexilexi:theme")).toBe("dark");
+    expect(window.localStorage.getItem("lexii:theme")).toBe("dark");
 
     fireEvent.change(select, { target: { value: "light" } });
     expect(document.documentElement.dataset.theme).toBe("light");
-    expect(window.localStorage.getItem("lexilexi:theme")).toBe("light");
+    expect(window.localStorage.getItem("lexii:theme")).toBe("light");
 
     fireEvent.change(select, { target: { value: "system" } });
     expect(document.documentElement.dataset.theme).toBe("light");
-    expect(window.localStorage.getItem("lexilexi:theme")).toBe("system");
+    expect(window.localStorage.getItem("lexii:theme")).toBe("system");
   });
 
   it("点击复习进入复习界面（惰性创建数据源，模式为 review），返回首页退出", async () => {
