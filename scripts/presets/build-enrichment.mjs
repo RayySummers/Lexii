@@ -56,7 +56,7 @@ const TIER0_ENRICHMENT_JSON = path.join(
 const KAIKKI_FILE = path.join(DATA_DIR, "kaikki", "kaikki.org-dictionary-English.jsonl");
 
 /** 富化包版本：来源快照固定后版本随内容变更递增 */
-const ENRICHMENT_VERSION = "1.0.0";
+const ENRICHMENT_VERSION = "1.1.0";
 
 /**
  * 每词上限与文本截断——Tier 0 / Tier 1 两档体积口径：
@@ -64,7 +64,7 @@ const ENRICHMENT_VERSION = "1.0.0";
  * （余量充足，保留完整内容：例句 3 条、列表 8/8/12、词源不截）。
  */
 const TIER0_CAPS = { examples: 2, synonyms: 3, antonyms: 3, derived: 2 };
-const TIER0_TRUNCATE = { etymology: 84, etymologyZh: 64, wordPartsNote: 8 };
+const TIER0_TRUNCATE = { etymology: 84, etymologyZh: 256, wordPartsNote: 8 };
 const TIER1_CAPS = { examples: 3, synonyms: 8, antonyms: 8, derived: 12 };
 const TIER1_TRUNCATE = { etymology: 400, etymologyZh: 400, wordPartsNote: 64 };
 
