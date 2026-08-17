@@ -219,6 +219,16 @@ export async function installDictionaryPackage(
   const total = pkg.entries.length;
   let skipped = 0;
 
+  // ─── term 去重优化（O(n)） ─────────────────────────────────────────────────
+  // 首次安装：该包在 dictionarySenses 中无记录，committedTerms 初始为空。
+  // 升级/续装：一次性读取该包已有全部 term（source 索引查询，O(n)），
+  // 后续每块提交后追加新 term，避免在 while 循环内重复全量读取（O(n²)）。
+  const committedTerms = new Set(
+    (await db.dictionarySenses.where("source").equals(pkg.id).toArray()).map((s) =>
+      s.term.toLowerCase(),
+    ),
+  );
+
   while (cursor < total) {
     // 块间取消检查（§6.4 AbortController）
     if (signal?.aborted) {
@@ -236,22 +246,16 @@ export async function installDictionaryPackage(
         if ((Number.isFinite(currentValue) ? currentValue : 0) !== expectedCursor) {
           throw new ConcurrentDictionaryInstallError(pkg.id);
         }
-        // term 去重：读取该包已有的全部 term（source 索引查询），
-        // 内存中按小写 term 建 Set，跳过已存在的词条。
-        // 不使用 .where("term").anyOfIgnoreCase()：复合键场景下
-        // IDBKeyRange 匹配行为在 real IndexedDB 与 fake-indexeddb 间不一致。
-        const existingTerms = new Set(
-          (await db.dictionarySenses.where("source").equals(pkg.id).toArray()).map((s) =>
-            s.term.toLowerCase(),
-          ),
-        );
+        // term 去重：使用循环前预加载的 committedTerms Set（O(1) 查找），
+        // 避免每块事务内重复全量读取 IDB。
         for (const entry of chunk) {
-          if (existingTerms.has(entry.term.toLowerCase())) {
+          if (committedTerms.has(entry.term.toLowerCase())) {
             skippedInChunk += 1;
             continue;
           }
           const sense = toDictionarySense(entry, pkg.lang, pkg.id);
           await db.dictionarySenses.put(sense);
+          committedTerms.add(entry.term.toLowerCase());
         }
         await db.meta.put({ key: dictionaryProgressKey(pkg.id), value: String(nextCursor) });
       });
@@ -271,6 +275,16 @@ export async function installDictionaryPackage(
           : cursor;
       if (advancedCursor === cursor) {
         throw new ConcurrentDictionaryInstallError(pkg.id);
+      }
+      // CAS 重试：另一标签页已推进进度，重读已提交的 term 集合
+      const reloaded = new Set(
+        (await db.dictionarySenses.where("source").equals(pkg.id).toArray()).map((s) =>
+          s.term.toLowerCase(),
+        ),
+      );
+      committedTerms.clear();
+      for (const t of reloaded) {
+        committedTerms.add(t);
       }
       cursor = advancedCursor;
       continue;
