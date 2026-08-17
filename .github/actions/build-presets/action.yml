@@ -1,0 +1,46 @@
+name: "构建 Tier 1/2 扩展词包"
+description: "构建 tier1/tier2 词包 + 可选富化包 + manifest，与 publish-presets.yml 口径一致"
+
+# Nit RAY-300：将 deploy-dev / deploy-release / publish-presets 三份 workflow 共享的
+# 5 步 preset 构建块提取为 composite action，防口径漂移。
+# 使用方式：在 workflow 中 checkout + install deps 后调用本 action 即可。
+
+inputs:
+  cache-key:
+    description: "ECDICT 数据缓存 key（默认 ecdict-bc015ed，数据 commit 固定永不失效）"
+    required: false
+    default: "ecdict-bc015ed"
+
+runs:
+  using: "composite"
+  steps:
+    # ECDICT 数据缓存：避免每次推送重新下载 ~63MB，消除对 raw.githubusercontent.com 可达性的依赖。
+    - name: 缓存 ECDICT 数据
+      uses: actions/cache@v4
+      with:
+        path: scripts/presets/.data
+        key: ${{ inputs.cache-key }}
+
+    - name: 获取 ECDICT 数据（固定 commit bc015ed + SHA256 校验）
+      run: node scripts/presets/fetch-ecdict.mjs
+      shell: bash
+
+    - name: 构建 Tier 1 词包
+      run: node scripts/presets/build.mjs --tier 1
+      shell: bash
+
+    - name: 构建 Tier 2 词包
+      run: node scripts/presets/build.mjs --tier 2
+      shell: bash
+
+    - name: 构建 Tier 1 富化包（可选）
+      run: node scripts/presets/build-enrichment.mjs
+      shell: bash
+      # 富化构建依赖外部数据（kaikki/ipa-dict/OpenEtymology/Tatoeba），
+      # 脚本内已处理数据缺失 → 提示跳过并 exit 0（Nit RAY-300），
+      # continue-on-error 保留作为额外保险。
+      continue-on-error: true
+
+    - name: 生成 manifest + 压缩包
+      run: node scripts/presets/build-manifest.mjs
+      shell: bash
