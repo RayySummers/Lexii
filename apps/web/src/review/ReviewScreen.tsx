@@ -26,7 +26,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
 import type { ReviewRating, StudyMode } from "@lexilexi/core";
-import { BackArrowIcon, PlusIcon, SpeakerIcon, UndoIcon } from "../components/icons";
+import { BackArrowIcon, CheckIcon, PlusIcon, SpeakerIcon, UndoIcon } from "../components/icons";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { primeSpeechEngine, readPronunciationAccent, speakWord } from "../lib/pronunciation";
 import { readRatingTierMode } from "../lib/ratingTiers";
@@ -60,11 +60,6 @@ const NO_QUEUE_COPY: Record<StudyMode, { title: string; body: string }> = {
     body: "今天没有到期词，也没有待学习的新词。休息一下，或返回首页换一种模式。",
   },
 };
-
-/** 数据源错误 → 原始错误信息（加词失败反馈用；不暴露内部实现细节给主界面） */
-function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 /** 当前卡评分的到期文案（预览计算轻量，无需 memo）；
  * 分钟级（「X 分钟后复习」类，RAY-279）为 null，不展示 */
@@ -102,11 +97,8 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
   // 评分档位（RAY-265）：会话内固定读取一次；改设置后下次进入复习生效
   const [tierMode] = useState<RatingTierMode>(() => readRatingTierMode());
   const [speakNotice, setSpeakNotice] = useState<string | null>(null);
-  // 加词反馈（RAY-284）：按卡锚定——反馈记录其所属卡 id，切卡后不再展示
-  const [notebookNotice, setNotebookNotice] = useState<{
-    itemId: string;
-    text: string;
-  } | null>(null);
+  // 生词本覆盖的义项 id 集合（RAY-302：加词按钮切换 +/✓ 状态；进入页面读一次）
+  const [notebookSenseIds, setNotebookSenseIds] = useState<ReadonlySet<string>>(new Set());
   // 朗读目标经 ref 读取（session 每次渲染换身份，useCallback 依赖其字段会
   // 让回调每次重建；ref 与提交同步即可保证点击时读到当前卡）
   const currentCardRef = useRef(session.current);
@@ -129,23 +121,49 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
     });
   }, []);
 
-  /** 把当前卡加入生词本（RAY-284）：幂等，反馈按卡锚定 */
-  const handleAddToNotebook = useCallback(async () => {
+  // 生词本义项集合（RAY-302：加词按钮 +/✓ 状态；进入页面读一次）
+  useEffect(() => {
+    let cancelled = false;
+    void provider
+      .getNotebookSenseIds()
+      .then((ids) => {
+        if (!cancelled) {
+          setNotebookSenseIds(new Set(ids));
+        }
+      })
+      .catch(() => {
+        // 静默：按钮默认显示 +，不影响复习主流程
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [provider]);
+
+  /** 把当前卡加入 / 移出生词本（RAY-284 + RAY-302）：可撤销切换 */
+  const handleToggleNotebook = useCallback(async () => {
     const card = currentCardRef.current;
     if (!card) {
       return;
     }
-    setNotebookNotice(null);
+    const senseId = card.sense.id;
+    const inNotebook = notebookSenseIds.has(senseId);
     try {
-      const result = await provider.addToNotebook(card.sense.id);
-      setNotebookNotice({
-        itemId: card.item.id,
-        text: result === "added" ? "已加入生词本" : "已在生词本中",
-      });
-    } catch (error) {
-      setNotebookNotice({ itemId: card.item.id, text: `加入失败：${toErrorMessage(error)}` });
+      if (inNotebook) {
+        await provider.removeFromNotebookBySenseId(senseId);
+        setNotebookSenseIds((previous) => {
+          const next = new Set(previous);
+          next.delete(senseId);
+          return next;
+        });
+      } else {
+        await provider.addToNotebook(senseId);
+        setNotebookSenseIds((previous) => new Set([...previous, senseId]));
+      }
+    } catch (err) {
+      // 静默：按钮状态不变，用户可重试
+      console.warn("生词本操作失败", err);
     }
-  }, [provider]);
+  }, [provider, notebookSenseIds]);
 
   // 键盘监听：监听器生命周期与组件绑定（空依赖），阶段与回调经 ref 读取。
   // 之前依赖 [phase] 会在阶段切换时移除/重挂监听——重挂窗口内（或闭包
@@ -243,8 +261,8 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
         tierMode={tierMode}
         onSpeak={handleSpeak}
         speakNotice={speakNotice}
-        onAddToNotebook={handleAddToNotebook}
-        notebookNotice={notebookNotice}
+        notebookSenseIds={notebookSenseIds}
+        onToggleNotebook={handleToggleNotebook}
         onExit={onExit}
       />
     </main>
@@ -262,10 +280,10 @@ interface PhaseContentProps {
   onSpeak(): void;
   /** 发音不可用的提示（null = 无提示） */
   speakNotice: string | null;
-  /** 把当前卡加入生词本（RAY-284） */
-  onAddToNotebook(): void;
-  /** 加词结果反馈（按卡锚定：itemId 不属于当前卡时不展示） */
-  notebookNotice: { itemId: string; text: string } | null;
+  /** 生词本覆盖的义项 id 集合（RAY-302：加词按钮 +/✓ 状态） */
+  notebookSenseIds: ReadonlySet<string>;
+  /** 切换当前卡加入 / 移出生词本（RAY-302） */
+  onToggleNotebook(): void;
   onExit(): void;
 }
 
@@ -277,8 +295,8 @@ function PhaseContent({
   tierMode,
   onSpeak,
   speakNotice,
-  onAddToNotebook,
-  notebookNotice,
+  notebookSenseIds,
+  onToggleNotebook,
   onExit,
 }: PhaseContentProps) {
   switch (session.phase) {
@@ -396,12 +414,29 @@ function PhaseContent({
             </button>
             <button
               type="button"
-              onClick={onAddToNotebook}
-              aria-label={`把「${session.current.sense.term}」加入生词本`}
-              className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+              onClick={onToggleNotebook}
+              aria-label={
+                notebookSenseIds.has(session.current.sense.id)
+                  ? `把「${session.current.sense.term}」移出生词本`
+                  : `把「${session.current.sense.term}」加入生词本`
+              }
+              className={`flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
+                notebookSenseIds.has(session.current.sense.id)
+                  ? "border-success/40 bg-success/10 text-success hover:border-danger/40 hover:bg-danger/10 hover:text-danger"
+                  : "border-border bg-surface text-text-muted hover:border-primary hover:text-primary"
+              }`}
             >
-              <PlusIcon className="h-4 w-4" />
-              加词
+              {notebookSenseIds.has(session.current.sense.id) ? (
+                <>
+                  <CheckIcon className="h-4 w-4" />
+                  已加
+                </>
+              ) : (
+                <>
+                  <PlusIcon className="h-4 w-4" />
+                  加词
+                </>
+              )}
             </button>
           </div>
           <RatingButtons
@@ -412,11 +447,6 @@ function PhaseContent({
           {speakNotice ? (
             <p role="status" className="text-center text-xs text-text-muted">
               {speakNotice}
-            </p>
-          ) : null}
-          {notebookNotice && notebookNotice.itemId === session.current.item.id ? (
-            <p role="status" className="text-center text-xs text-text-muted">
-              {notebookNotice.text}
             </p>
           ) : null}
           {session.canUndo ? <UndoButton onUndo={() => void session.undo()} /> : null}

@@ -41,6 +41,8 @@ function makeReviewProviderFactory(queue: ReviewCard[] = [makeCard()]) {
     hasAnyItems: vi.fn().mockResolvedValue(queue.length > 0),
     importSampleWordlist: vi.fn().mockResolvedValue(14),
     addToNotebook: vi.fn().mockResolvedValue("added"),
+    getNotebookSenseIds: vi.fn().mockResolvedValue([]),
+    removeFromNotebookBySenseId: vi.fn().mockResolvedValue(undefined),
   };
   return { provider, factory: vi.fn().mockReturnValue(provider) };
 }
@@ -69,6 +71,7 @@ function makeSearchProviderFactory() {
     hasAnySenses: vi.fn().mockResolvedValue(true),
     getNotebookSenseIds: vi.fn().mockResolvedValue([]),
     addToNotebook: vi.fn().mockResolvedValue("added"),
+    removeFromNotebookBySenseId: vi.fn().mockResolvedValue(undefined),
   };
   return { provider, factory: vi.fn().mockReturnValue(provider) };
 }

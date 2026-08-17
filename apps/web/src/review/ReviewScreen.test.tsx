@@ -25,6 +25,8 @@ interface ProviderHarness {
   hasAnyItems: ReturnType<typeof vi.fn>;
   importSampleWordlist: ReturnType<typeof vi.fn>;
   addToNotebook: ReturnType<typeof vi.fn>;
+  getNotebookSenseIds: ReturnType<typeof vi.fn>;
+  removeFromNotebookBySenseId: ReturnType<typeof vi.fn>;
 }
 
 afterEach(() => {
@@ -82,6 +84,8 @@ function makeHarness(
   const addToNotebook = vi
     .fn<(senseId: SenseId) => Promise<AddToNotebookResult>>()
     .mockResolvedValue("added");
+  const getNotebookSenseIds = vi.fn<() => Promise<readonly SenseId[]>>().mockResolvedValue([]);
+  const removeFromNotebookBySenseId = vi.fn().mockResolvedValue(undefined);
   const provider: ReviewDataProvider = {
     loadQueue,
     loadMultipleChoiceQueue,
@@ -91,6 +95,8 @@ function makeHarness(
     hasAnyItems,
     importSampleWordlist,
     addToNotebook,
+    getNotebookSenseIds,
+    removeFromNotebookBySenseId,
   };
   return {
     provider,
@@ -102,6 +108,8 @@ function makeHarness(
     hasAnyItems,
     importSampleWordlist,
     addToNotebook,
+    getNotebookSenseIds,
+    removeFromNotebookBySenseId,
   };
 }
 
@@ -599,8 +607,8 @@ describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
   });
 });
 
-describe("ReviewScreen 生词本加词入口（RAY-284）", () => {
-  it("点「加词」：以当前卡义项调用 addToNotebook，反馈已加入", async () => {
+describe("ReviewScreen 生词本加词入口（RAY-284 + RAY-302 可撤销）", () => {
+  it("点「加词」：以当前卡义项调用 addToNotebook，按钮切换为「已加」✓ 状态", async () => {
     const harness = makeHarness();
     const card = makeCard();
     harness.loadQueue.mockResolvedValue([card]);
@@ -609,24 +617,55 @@ describe("ReviewScreen 生词本加词入口（RAY-284）", () => {
     await expectCardShown(card.sense.term);
     fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` }));
 
-    expect(await screen.findByText("已加入生词本")).toBeInTheDocument();
     expect(harness.addToNotebook).toHaveBeenCalledWith(card.sense.id);
+    // 按钮切换为 ✓ 状态
+    expect(
+      await screen.findByRole("button", { name: `把「${card.sense.term}」移出生词本` }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: `把「${card.sense.term}」加入生词本` }),
+    ).not.toBeInTheDocument();
   });
 
-  it("词已在生词本（provider 返回 already）：反馈已在生词本中", async () => {
+  it("已在生词本的卡直接显示「已加」✓ 按钮（进入页面读一次）", async () => {
     const harness = makeHarness();
     const card = makeCard();
     harness.loadQueue.mockResolvedValue([card]);
-    harness.addToNotebook.mockResolvedValue("already");
+    harness.getNotebookSenseIds.mockResolvedValue([card.sense.id]);
     render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
 
     await expectCardShown(card.sense.term);
-    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` }));
-
-    expect(await screen.findByText("已在生词本中")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: `把「${card.sense.term}」移出生词本` }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: `把「${card.sense.term}」加入生词本` }),
+    ).not.toBeInTheDocument();
   });
 
-  it("加词失败：反馈失败原因，不影响继续复习", async () => {
+  it("已加词后再次点击「已加」按钮：调用 removeFromNotebookBySenseId，按钮恢复为「加词」", async () => {
+    const harness = makeHarness();
+    const card = makeCard();
+    harness.loadQueue.mockResolvedValue([card]);
+    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
+
+    await expectCardShown(card.sense.term);
+    // 先加词
+    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` }));
+    expect(
+      await screen.findByRole("button", { name: `把「${card.sense.term}」移出生词本` }),
+    ).toBeInTheDocument();
+
+    // 再次点击撤销
+    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」移出生词本` }));
+
+    expect(harness.removeFromNotebookBySenseId).toHaveBeenCalledWith(card.sense.id);
+    expect(
+      await screen.findByRole("button", { name: `把「${card.sense.term}」加入生词本` }),
+    ).toBeInTheDocument();
+  });
+
+  it("加词失败时按钮保持原状态（静默，不阻塞复习）", async () => {
     const harness = makeHarness();
     const card = makeCard();
     harness.loadQueue.mockResolvedValue([card]);
@@ -636,8 +675,11 @@ describe("ReviewScreen 生词本加词入口（RAY-284）", () => {
     await expectCardShown(card.sense.term);
     fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` }));
 
-    expect(await screen.findByText("加入失败：义项不存在")).toBeInTheDocument();
-    // 评分仍可用：失败反馈不阻塞继续复习
+    // 按钮保持原样（加词失败，不切换状态）
+    expect(
+      screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` }),
+    ).toBeInTheDocument();
+    // 评分仍可用：失败不阻塞继续复习
     expect(screen.getByRole("button", { name: /评分：认识/ })).toBeInTheDocument();
   });
 });
