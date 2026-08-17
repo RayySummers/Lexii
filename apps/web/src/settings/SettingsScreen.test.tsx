@@ -578,6 +578,41 @@ describe("RAY-293 学习设置：选择题出题方向", () => {
   });
 });
 
+describe("RAY-303 学习设置：学习列表包含生词本开关（从首页移至设置页）", () => {
+  it("默认开启（localStorage 无记录）；切换后写回偏好", async () => {
+    renderSettings();
+    await screen.findByText("学习");
+
+    const toggle = screen.getByRole("switch", { name: "学习列表是否包含生词本" });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    expect(window.localStorage.getItem("lexilexi:include-notebook")).toBe("0");
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(window.localStorage.getItem("lexilexi:include-notebook")).toBe("1");
+  });
+
+  it("读取既有偏好：localStorage 为 0 时初始关闭", async () => {
+    window.localStorage.setItem("lexilexi:include-notebook", "0");
+    renderSettings();
+    await screen.findByText("学习");
+    expect(screen.getByRole("switch", { name: "学习列表是否包含生词本" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+  });
+
+  it("开关说明文案展示「词书不受影响」口径", async () => {
+    renderSettings();
+    await screen.findByText("学习");
+    expect(screen.getByText("学习列表包含生词本")).toBeInTheDocument();
+    expect(screen.getByText(/词书不受影响/)).toBeInTheDocument();
+  });
+});
+
 describe("RAY-297 隐藏开发者面板", () => {
   beforeEach(() => {
     vi.mocked(usePersistenceStatus).mockReturnValue(null);
