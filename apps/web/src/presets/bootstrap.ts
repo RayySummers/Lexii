@@ -87,6 +87,10 @@ export async function bootstrapPresetData(
  * 词书数据走 "@lexii/core/presets/books" 子路径动态 import，
  * 不进主 bundle。
  *
+ * 返回值：结果数组顺序与 `wordbookIds` 入参顺序一致（按入参逐项产出
+ * `already-installed` / `error` / `skipped-existing-data` /
+ * `installed`）。调用方可依赖 `results[i]` 与 `wordbookIds[i]` 对应。
+ *
  * @param db 已打开的数据库（测试注入 fake-indexeddb 实例）
  * @param wordbookIds 要安装的词书 id 列表（默认 CORE_WORDBOOK_IDS；测试注入）
  * @param enrichment 富化数据包（可选；随安装内联填充新装词条）
@@ -102,7 +106,7 @@ export async function bootstrapCoreWordbooks(
     const { WORDBOOK_CATALOG, getWordbookPackage } = await import("@lexii/core/presets/books");
 
     // 预检查每本词书的安装状态（幂等 + 跳过未找到的词书）
-    type BookEntry = { bookId: string; preset: PresetPackage; alreadyInstalled: boolean };
+    type BookEntry = { bookId: string; preset: PresetPackage };
     const bookEntries: BookEntry[] = [];
     for (const bookId of wordbookIds) {
       const book = WORDBOOK_CATALOG.find((candidate) => candidate.id === bookId);
@@ -115,7 +119,7 @@ export async function bootstrapCoreWordbooks(
       if (state.status === "installed") {
         results.push({ status: "already-installed" });
       } else {
-        bookEntries.push({ bookId, preset, alreadyInstalled: false });
+        bookEntries.push({ bookId, preset });
       }
     }
 
@@ -150,9 +154,11 @@ export async function bootstrapCoreWordbooks(
       }
     }
   } catch (err) {
-    // 模块加载失败或数据库检查失败
+    // 模块加载失败或数据库检查失败（异常路径）：预检查循环可能已部分
+    // 产出结果（`already-installed` / `error`），也可能在 import 立即
+    // 失败时 `results` 为空——使用 `while` 一次性补齐至 `wordbookIds`
+    // 长度，保证调用方拿到与入参等长的结果数组
     const message = err instanceof Error ? err.message : String(err);
-    // 补齐缺失的结果
     while (results.length < wordbookIds.length) {
       results.push({ status: "error", message });
     }
@@ -196,14 +202,22 @@ export function bootstrapTier0Preset(db?: LexiiDatabase): void {
 
       // RAY-319：核心词书默认安装（中考/高考/四级/六级）
       // 与 Tier 0 同口径：全新库安装、已有数据跳过、fire-and-forget
+      // 记录安装前 db.items.count()，用于日志反映真实的净增词条数
+      // （4 本词书存在大量重叠词，installedCount 之和 ≠ 净增）
+      const itemsBefore = await database.items.count();
       const wordbookResults = await bootstrapCoreWordbooks(database, CORE_WORDBOOK_IDS, ENRICHMENT_TIER0_PRESET);
       const installedBooks = wordbookResults.filter((r) => r.status === "installed");
       if (installedBooks.length > 0) {
-        const totalCount = installedBooks.reduce(
+        const itemsAfter = await database.items.count();
+        const netDelta = itemsAfter - itemsBefore;
+        const sumInstalled = installedBooks.reduce(
           (sum, r) => sum + (r.status === "installed" ? r.installedCount : 0),
           0,
         );
-        console.info(`[presets] 核心词书安装完成：${installedBooks.length} 本，共 ${totalCount} 词条`);
+        // 与 Tier 0 / 词书库重叠已去重；sumInstalled 是「按本去重」的虚高数字
+        console.info(
+          `[presets] 核心词书安装完成：${installedBooks.length} 本，净增 ${netDelta} 词条（各本去重后累计 ${sumInstalled}，与 Tier 0 / 词书库重叠已去重）`,
+        );
       }
     } catch (err) {
       console.error("[presets] 内置核心词表引导异常：", err);
