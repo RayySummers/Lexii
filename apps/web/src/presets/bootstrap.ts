@@ -202,22 +202,30 @@ export function bootstrapTier0Preset(db?: LexiiDatabase): void {
 
       // RAY-319：核心词书默认安装（中考/高考/四级/六级）
       // 与 Tier 0 同口径：全新库安装、已有数据跳过、fire-and-forget
-      // 记录安装前 db.items.count()，用于日志反映真实的净增词条数
-      // （4 本词书存在大量重叠词，installedCount 之和 ≠ 净增）
+      // 记录安装前 db.items.count()（与 `bootstrapCoreWordbooks` 内部
+      // 老用户口径 `items > 0 || events > 0` 取的 items 同源），用于
+      // 日志反映真实的净增词条数（4 本词书存在大量重叠词，
+      // installedCount 之和 ≠ 净增）。
       const itemsBefore = await database.items.count();
       const wordbookResults = await bootstrapCoreWordbooks(database, CORE_WORDBOOK_IDS, ENRICHMENT_TIER0_PRESET);
       const installedBooks = wordbookResults.filter((r) => r.status === "installed");
+      const skippedBooks = wordbookResults.filter((r) => r.status === "skipped-existing-data");
       if (installedBooks.length > 0) {
         const itemsAfter = await database.items.count();
         const netDelta = itemsAfter - itemsBefore;
+        // 面向用户的口径用净增（不重叠虚高），sumInstalled 仅作开发者参考
         const sumInstalled = installedBooks.reduce(
           (sum, r) => sum + (r.status === "installed" ? r.installedCount : 0),
           0,
         );
-        // 与 Tier 0 / 词书库重叠已去重；sumInstalled 是「按本去重」的虚高数字
         console.info(
-          `[presets] 核心词书安装完成：${installedBooks.length} 本，净增 ${netDelta} 词条（各本去重后累计 ${sumInstalled}，与 Tier 0 / 词书库重叠已去重）`,
+          `[presets] 核心词书安装完成：${installedBooks.length} 本，净增 ${netDelta} 词条（dev 参考：各本去重累计 ${sumInstalled}，与 Tier 0 / 其它词书重叠已去重）`,
         );
+      }
+      if (skippedBooks.length > 0) {
+        // 老用户：库内已有数据，核心词书按口径全部跳过——给开发者
+        // 一行可视化反馈，避免无声静默
+        console.info(`[presets] 核心词书跳过：${skippedBooks.length} 本（库内已有数据，未追加安装）`);
       }
     } catch (err) {
       console.error("[presets] 内置核心词表引导异常：", err);
