@@ -8,7 +8,7 @@
  * `sm:grid-cols-3`（<640px 单列竖排），不带 base `grid-cols-3`（那会把
  * 移动端挤成一排三个）。
  */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StudyMode } from "@lexilexi/core";
 import { HomeScreen } from "./HomeScreen";
