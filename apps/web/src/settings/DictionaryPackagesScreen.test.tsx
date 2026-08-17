@@ -528,7 +528,7 @@ describe("DictionaryPackagesScreen", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("取消安装后调用 resetDictionaryPackageInstall 清除进度", async () => {
+  it("取消安装后调用 resetDictionaryPackageInstall 清除进度并恢复 UI", async () => {
     const installSpy = vi.fn().mockImplementation((_id: string, signal?: AbortSignal) => {
       return new Promise<DictionaryInstallResult>((_resolve, reject) => {
         signal?.addEventListener("abort", () => {
@@ -567,6 +567,11 @@ describe("DictionaryPackagesScreen", () => {
     // 应调用 resetDictionaryPackageInstall 清除 IDB 进度
     await waitFor(() => {
       expect(resetSpy).toHaveBeenCalledWith("core-en-tier1");
+    });
+
+    // UI 应恢复到「下载」按钮
+    await waitFor(() => {
+      expect(screen.getAllByText("下载")).toHaveLength(2);
     });
   });
 
