@@ -139,4 +139,14 @@ export interface ReviewDataProvider {
    * 条目（复用同一义项），进入现有 FSRS 调度（加入即到期）。
    */
   addToNotebook(senseId: SenseId): Promise<AddToNotebookResult>;
+  /**
+   * 当前生词本（active 条目）覆盖的义项 id 列表（RAY-302）：
+   * 复习卡页加词按钮据此切换「+」/「✓」状态，进入页面读一次。
+   */
+  getNotebookSenseIds(): Promise<readonly SenseId[]>;
+  /**
+   * 把义项移出生词本（RAY-302，复习卡页撤销加词入口）。
+   * 通过 senseId 查找对应的 active 生词本条目并移出；条目不存在时静默跳过。
+   */
+  removeFromNotebookBySenseId(senseId: SenseId): Promise<void>;
 }

@@ -41,6 +41,22 @@ export async function addWordToNotebook(
   return "added";
 }
 
+/**
+ * 按义项 id 移出生词本（RAY-302 搜词页 / 复习卡页共用）：
+ * 查找该义项的 active 生词本条目并移出；条目不存在则静默跳过。
+ */
+export async function removeWordBySenseId(db: LexilexiDatabase, senseId: SenseId): Promise<void> {
+  const existing = await db.notebookEntries
+    .where("senseId")
+    .equals(senseId)
+    .filter((entry) => entry.status === "active")
+    .first();
+  if (!existing) {
+    return;
+  }
+  await removeFromNotebook(db, { entryId: existing.id });
+}
+
 /** 基于已打开的 Lexilexi 数据库创建生词本数据源（测试注入 fake-indexeddb 实例） */
 export function createIndexedDbNotebookDataProvider(db: LexilexiDatabase): NotebookDataProvider {
   return {
