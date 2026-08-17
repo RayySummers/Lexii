@@ -25,7 +25,7 @@ function Harness({ sense }: { sense: Sense }) {
       sense={sense}
       flipped={flipped}
       onFlip={() => setFlipped((v) => !v)}
-      ratingHint="按 1–3（或 A / H / G）评分"
+      ratingHint="按 1–3 评分"
     />
   );
 }
@@ -257,7 +257,7 @@ describe("ReviewCard 固定高度与卡片内部滚动（RAY-291）", () => {
       expect(scrollRegion).toContainElement(screen.getByText(label));
     }
     // 评分提示不在滚动区内：内容滚动时提示恒留在卡片底部
-    const ratingHint = screen.getByText("按 1–3（或 A / H / G）评分");
+    const ratingHint = screen.getByText("按 1–3 评分");
     expect(scrollRegion).not.toContainElement(ratingHint);
     expect(ratingHint.parentElement).toBe(cardButton().lastElementChild);
   });
