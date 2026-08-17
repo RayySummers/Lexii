@@ -64,7 +64,7 @@ const ENRICHMENT_VERSION = "1.1.0";
  * （余量充足，保留完整内容：例句 3 条、列表 8/8/12、词源不截）。
  */
 const TIER0_CAPS = { examples: 2, synonyms: 3, antonyms: 3, derived: 2 };
-const TIER0_TRUNCATE = { etymology: 84, etymologyZh: 256, wordPartsNote: 8 };
+const TIER0_TRUNCATE = { etymology: 84, etymologyZh: 384, wordPartsNote: 8 };
 const TIER1_CAPS = { examples: 3, synonyms: 8, antonyms: 8, derived: 12 };
 const TIER1_TRUNCATE = { etymology: 400, etymologyZh: 400, wordPartsNote: 64 };
 

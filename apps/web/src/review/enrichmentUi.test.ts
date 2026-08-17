@@ -5,7 +5,7 @@
  * 词根词缀拆解解析（含防御性输入）。
  */
 import { describe, expect, it } from "vitest";
-import { dualPhonetics, parseWordParts } from "./enrichmentUi";
+import { dualPhonetics, parseInlineMarkdown, parseWordParts } from "./enrichmentUi";
 
 describe("dualPhonetics（美/英双音标选择）", () => {
   it("美/英双音标齐全：展示两条，富化值自带斜杠原样返回", () => {
@@ -69,5 +69,33 @@ describe("parseWordParts（词根词缀拆解解析）", () => {
       { part: "a", meaning: "加强" },
       { part: "bandon", meaning: "控制" },
     ]);
+  });
+});
+
+describe("parseInlineMarkdown（行内 Markdown 解析）", () => {
+  it("将 _text_ 转换为 <em>text</em>", () => {
+    expect(parseInlineMarkdown("古英语 _æfter_ 由表示")).toBe(
+      "古英语 <em>æfter</em> 由表示",
+    );
+  });
+
+  it("处理多个斜体标记", () => {
+    expect(parseInlineMarkdown("_af_ 与 _-ter_ 结合")).toBe(
+      "<em>af</em> 与 <em>-ter</em> 结合",
+    );
+  });
+
+  it("转义 HTML 特殊字符", () => {
+    expect(parseInlineMarkdown("a < b & c > d")).toBe(
+      "a &lt; b &amp; c &gt; d",
+    );
+  });
+
+  it("空串返回空串", () => {
+    expect(parseInlineMarkdown("")).toBe("");
+  });
+
+  it("无斜体标记时原样返回（HTML 转义后）", () => {
+    expect(parseInlineMarkdown("普通文本")).toBe("普通文本");
   });
 });

@@ -23,7 +23,7 @@
 import { useEffect, useRef } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type { Sense } from "@lexii/core";
-import { dualPhonetics, parseWordParts } from "./enrichmentUi";
+import { dualPhonetics, parseInlineMarkdown, parseWordParts } from "./enrichmentUi";
 import type { PhoneticBadge } from "./enrichmentUi";
 
 export interface ReviewCardProps {
@@ -169,7 +169,10 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardPro
               </ul>
             </CardSection>
             <CardSection title="中文词源" visible={Boolean(sense.etymologyZh)}>
-              <p className="text-sm leading-relaxed text-text-muted">{sense.etymologyZh}</p>
+              <p
+                className="text-sm leading-relaxed text-text-muted"
+                dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(sense.etymologyZh ?? "") }}
+              />
             </CardSection>
             <CardSection title="近义词" visible={(sense.synonyms?.length ?? 0) > 0}>
               <WordChips words={sense.synonyms ?? []} />
