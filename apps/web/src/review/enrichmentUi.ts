@@ -45,28 +45,6 @@ export interface WordPartSegment {
 }
 
 /**
- * 行内 Markdown 解析（轻量级，仅处理 _斜体_ 标记）。
- *
- * OpenEtymology 中文词源数据中部分条目使用 `_text_` 格式标记外来词或强调，
- * 本函数将其转换为 HTML <em> 标签供前端渲染。
- *
- * 防御性口径：
- * - 仅处理 `_..._` 格式（不处理 **bold** 等其他标记）；
- * - 转义 HTML 特殊字符防止 XSS；
- * - 返回 HTML 字符串，调用方需使用 dangerouslySetInnerHTML 渲染。
- */
-export function parseInlineMarkdown(raw: string): string {
-  if (!raw) return "";
-  // 先转义 HTML 特殊字符
-  const escaped = raw
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-  // 将 _text_ 转换为 <em>text</em>
-  return escaped.replace(/_([^_]+)_/g, "<em>$1</em>");
-}
-
-/**
  * 解析词根词缀拆解（OpenEtymology 形态，如 "a<加强> · bandon<控制>"）。
  *
  * 防御性口径：
