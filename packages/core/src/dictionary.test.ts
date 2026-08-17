@@ -682,11 +682,9 @@ describe("downloadAndVerifyPackage（元组转换）", () => {
       tags: t[4]!.split(/\s+/).filter((s) => s !== ""),
     }));
 
-    await installDictionaryPackage(
-      database,
-      makePackage(entries, "core-en-tier2", "1.0.0"),
-      { yield: async () => {} },
-    );
+    await installDictionaryPackage(database, makePackage(entries, "core-en-tier2", "1.0.0"), {
+      yield: async () => {},
+    });
     invalidateDictionaryCache();
 
     // 前缀命中
