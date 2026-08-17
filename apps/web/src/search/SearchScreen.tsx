@@ -205,8 +205,9 @@ export function SearchScreen({ provider, onExit, historyStorage }: SearchScreenP
           await provider.addToNotebook(senseId);
           setNotebookSenseIds((previous) => new Set([...(previous ?? []), senseId]));
         }
-      } catch {
+      } catch (err) {
         // 静默：按钮状态不变，用户可重试
+        console.warn("生词本操作失败", err);
       }
     },
     [provider, notebookSenseIds],
