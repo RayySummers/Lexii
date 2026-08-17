@@ -584,8 +584,8 @@ function SettingsMainView({
 
       <Section title="扩展词包">
         <p className="text-sm text-text-muted">
-          下载 Tier 1/2 扩展词包（需联网，下载后可离线使用），将词典检索范围从内置 7,195 词扩展到 ECDICT 全量覆盖（如
-          kaleidoscope、menstrual 等 Tier 0 未收录词均可搜到）。
+          下载 Tier 1/2 扩展词包（需联网，下载后可离线使用），将词典检索范围从内置 7,195 词扩展到
+          ECDICT 全量覆盖（如 kaleidoscope、menstrual 等 Tier 0 未收录词均可搜到）。
           词包仅扩充检索层，加入词书/生词本后才进入学习队列。
         </p>
         <button
