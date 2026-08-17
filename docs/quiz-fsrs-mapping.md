@@ -27,7 +27,7 @@
 ```
 useMultipleChoiceSession.select
   → provider.grade(card, rating, context)          // rating ∈ {good, again}
-  → @lexilexi/core gradeReview(db, input)
+  → @lexii/core gradeReview(db, input)
   → new Scheduler(memoryFieldsToCardInput(previous.fields), now).review(input.rating)
   → 同一 Dexie 事务内原子写入：review 事件 + 新 MemoryState
 ```
@@ -55,7 +55,7 @@ useMultipleChoiceSession.select
 
 `gradeReview` 内部只把 `input.rating` 传给 `Scheduler.review()`，
 `exerciseType` / `answerWasCorrect` / `reviewDurationMs` 均不进入
-FSRS 计算。这一点与官方参考实现口径一致（`@lexilexi/fsrs`，
+FSRS 计算。这一点与官方参考实现口径一致（`@lexii/fsrs`，
 `fsrs-verify` 对照用例覆盖），选择题没有改动任何调度代码路径。
 
 ## 4. 混淆项来源（隐私红线）

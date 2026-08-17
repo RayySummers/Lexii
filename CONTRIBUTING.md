@@ -1,6 +1,6 @@
 # 参与贡献（CONTRIBUTING）
 
-感谢你对乐希 Lexilexi 的关注！这是一份社区贡献指南，涵盖 PR 流程、代码评审标准与评审流程。内容不多，请先通读再动手。
+感谢你对乐希 Lexii 的关注！这是一份社区贡献指南，涵盖 PR 流程、代码评审标准与评审流程。内容不多，请先通读再动手。
 
 - **许可证**：本项目采用 [GPL-3.0-or-later](./LICENSE)。你在 GPL-3.0 或更高版本的条款下向本项目贡献代码，并同意你的贡献按同一许可证分发。贡献前请确认你的代码不包含与 GPL-3.0 不兼容的第三方代码；若你复用了他人的代码，请在 PR 描述中说明来源与许可证。
 - **提交签名**：项目尚未启用 CLA / DCO，可直接贡献；若未来引入，以本文件更新为准。
@@ -145,7 +145,7 @@ PR 描述使用下方模板，并自行对照「13 条评审标准」在描述�
 2. **Bump 版本号**：在发布 PR 中把 `apps/web/package.json` 的 `version` 更新为新版本（如 `0.1.0-alpha.2`）。设置页底部版本号会自动跟随，无需改动任何组件代码。
 3. **合入 main**：版本 bump 与功能变更一起走 PR（禁止绕过 PR 直推 `main`），CI 全绿后合并。
 4. **打 tag**：在包含该版本 bump 的 main 合并提交上打 tag，格式为 `v<版本号>`（与 package.json 完全一致，如 `v0.1.0-alpha.2`），并推送 tag。
-5. **部署验证**（RAY-297 双通道）：推送 tag 自动触发 Release 通道部署（`.github/workflows/deploy-release.yml`，发布到 `rayysummers.github.io/Lexilexi/` 根路径）；`main` 每次合入自动触发 Dev 通道部署（`.github/workflows/deploy-dev.yml`，发布到 `/Lexilexi/dev/` 子路径，保留 RAY-241 以来的 main push 预览行为）。两通道每次部署都发布自洽的完整站点（互相携带对方快照），任一通道的部署不会把另一通道冲成 404。部署完成后：在根路径真机确认设置页底部版本号与 tag 一致；在 `/Lexilexi/dev/` 确认开发预览正常。两个通道均可经 `workflow_dispatch` 手动触发。
+5. **部署验证**（RAY-297 双通道）：推送 tag 自动触发 Release 通道部署（`.github/workflows/deploy-release.yml`，发布到 `rayysummers.github.io/Lexii/` 根路径）；`main` 每次合入自动触发 Dev 通道部署（`.github/workflows/deploy-dev.yml`，发布到 `/Lexii/dev/` 子路径，保留 RAY-241 以来的 main push 预览行为）。两通道每次部署都发布自洽的完整站点（互相携带对方快照），任一通道的部署不会把另一通道冲成 404。部署完成后：在根路径真机确认设置页底部版本号与 tag 一致；在 `/Lexii/dev/` 确认开发预览正常。两个通道均可经 `workflow_dispatch` 手动触发。
 6. **从对内版活文档同步对外版**：从 Mell 维护的「Release 档案对内版（活文档）」（RAY-285，带状态标注的完整版）按「对外版」口径同步到 `docs/archive/release-pipeline-archive.md`——保留版本 / 波次分组、事项标题与父子依赖缩进；去掉状态标注（✅🔵🟡 等）、内部排期备注与 RAY 编号（对外版不带状态）。
 7. **提炼 CHANGELOG**：由 Vega 从对内版活文档（RAY-285）提炼 CHANGELOG，以对外版档案为骨架、按实际合入版本归类，随 GitHub Release 公开。
 

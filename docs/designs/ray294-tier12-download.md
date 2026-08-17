@@ -49,7 +49,7 @@ db.version(6).stores({
 
 - `source`：所属包标识（如 `"core-en-tier1"` / `"core-en-tier2"`），写入 IDB 时附带，供增量替换按 source 范围删除；
 - 不产生 `LearningItem` / `MemoryState` / `Event`；
-- 仅用于检索，不参与复习队列、统计、导出（`exportLexilexiData` 不导出此表）。
+- 仅用于检索，不参与复习队列、统计、导出（`exportLexiiData` 不导出此表）。
 
 **安装函数**：`installDictionaryPackage`（新函数，不复用 `installPreset`），每词条仅写 1 条 `dictionarySense` 记录（vs `installPreset` 的 4 条），分块 400、可恢复、幂等、并发安全——沿用 `installPreset` 的 progress + done + check-and-set 三件套。
 
@@ -67,7 +67,7 @@ db.version(6).stores({
 
 **promote 生成新 SenseId**：`promoteDictionarySense` 从 dictionarySenses 复制到 senses 表时，**新生成 SenseId**（不复用字典条目 id），避免与词典条目 id 命名空间冲突。字典条目保留原 id 不变（仍可通过 dictionarySenses 检索），senses 表副本使用独立 id（与 `importCsvWordlist` / `installPreset` 新建 Sense 的 id 生成方式一致）。
 
-**导出/备份**：`dictionarySenses` **不随 `exportLexilexiData` 导出**——它属于可重建的下载数据，不属于用户学习数据。备份恢复到新设备后需重新下载扩展包（安装幂等，done 标记已含版本，重装无副作用）。已晋升到 senses 表的副本属于学习数据，正常随导出/备份。
+**导出/备份**：`dictionarySenses` **不随 `exportLexiiData` 导出**——它属于可重建的下载数据，不属于用户学习数据。备份恢复到新设备后需重新下载扩展包（安装幂等，done 标记已含版本，重装无副作用）。已晋升到 senses 表的副本属于学习数据，正常随导出/备份。
 
 ---
 
@@ -75,7 +75,7 @@ db.version(6).stores({
 
 ### 2.1 现状分析
 
-`searchLexilexiSenses`（`packages/core/src/search.ts`）当前实现：
+`searchLexiiSenses`（`packages/core/src/search.ts`）当前实现：
 
 ```typescript
 const senses = await db.senses.toArray(); // 全量读入内存
@@ -124,7 +124,7 @@ const hits = allTerms.filter((sense) => sense.term.toLowerCase().includes(q));
 
 ```typescript
 export async function searchAllSenses(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   query: string,
   options: SenseSearchOptions = {},
 ): Promise<SenseSearchHit[]> {
@@ -134,7 +134,7 @@ export async function searchAllSenses(
 
   // 两层并行取回（学习表通常很小，词典表可能很大）
   const [learningHits, dictHits] = await Promise.all([
-    searchLexilexiSenses(db, q, { limit: 0 }), // 不截断，取全部命中
+    searchLexiiSenses(db, q, { limit: 0 }), // 不截断，取全部命中
     searchDictionarySenses(db, q, { limit: 0 }),
   ]);
 
@@ -242,7 +242,7 @@ https://<host>/presets/core-en-tier2-v1.0.0-e5f6g7h8.json.br
 - 版本号（`v1.0.0`）+ 内容哈希前 8 位（`a1b2c3d4`）= URL 唯一；
 - 版本化 URL 保证每版内容对应唯一地址，便于审计与回溯。
 
-**SW 排除**（双重保险）：在 `sw.js` 的 `fetch` 事件处理器中，**沿用 `resolveUrl` 相对口径**（Pages 部署在 `/Lexilexi/` 子路径），显式排除 presets 路径和 manifest URL：
+**SW 排除**（双重保险）：在 `sw.js` 的 `fetch` 事件处理器中，**沿用 `resolveUrl` 相对口径**（Pages 部署在 `/Lexii/` 子路径），显式排除 presets 路径和 manifest URL：
 
 ```javascript
 // 在现有 fetch handler 的同源检查之后、navigate 检查之前追加
@@ -252,7 +252,7 @@ if (url.href.startsWith(presetsUrl)) {
 }
 ```
 
-- `resolveUrl("./presets/")` 在 Pages 子路径下解析为 `https://<host>/Lexilexi/presets/`，根路径下解析为 `https://<host>/presets/`——与 sw.js 其它路径（`APP_SHELL` / `INDEX_URL`）口径一致；
+- `resolveUrl("./presets/")` 在 Pages 子路径下解析为 `https://<host>/Lexii/presets/`，根路径下解析为 `https://<host>/presets/`——与 sw.js 其它路径（`APP_SHELL` / `INDEX_URL`）口径一致；
 - manifest URL（`/presets/manifest.json`）同样被排除（`startsWith` 匹配）。
 
 **下载请求**：`fetch(packageUrl, { cache: "no-store" })`——绕过浏览器 HTTP 缓存（`no-store` = 不读缓存、不写缓存），确保每次下载都是最新版本。
@@ -513,7 +513,7 @@ db.version(6).stores({
 
 ---
 
-## 12. API 清单（`@lexilexi/core` 新增导出）
+## 12. API 清单（`@lexii/core` 新增导出）
 
 | 函数                                             | 说明                                                                       |
 | ------------------------------------------------ | -------------------------------------------------------------------------- |

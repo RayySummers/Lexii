@@ -34,9 +34,9 @@
 - **忆语（Yìyǔ）** — AI 口语对练 / 情境故事记忆；依赖 BYOK（自带 API Key），默认关闭、显式开启。
 - **听写（Dictation）** — 练习形式扩展（Recall / Production / Cloze / 多选 / 易混辨析之外）。
 - **F-Droid / Android** — 分发路线 Web → PWA → GitHub → F-Droid；native Android 非当前目标。
-- **`lexilexi_eval` evidence model v1** — 把正确性、延迟、提示、修改、首次尝试、练习类型、混淆选项等证据转化为复习评分。
+- **`lexii_eval` evidence model v1** — 把正确性、延迟、提示、修改、首次尝试、练习类型、混淆选项等证据转化为复习评分。
 - **易混词与多义词建模、母语迁移错误**等认知方向。
-- **独立仓库拆分** — 当某模块形成独立用户与稳定 API 后再考虑（最可能先拆 `lexilexi-eval`）。
+- **独立仓库拆分** — 当某模块形成独立用户与稳定 API 后再考虑（最可能先拆 `lexii-eval`）。
 
 ## 开源与许可证
 
