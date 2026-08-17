@@ -1,6 +1,6 @@
 # 首启导入耗时基准（RAY-258）
 
-> 测量方式：`pnpm --filter @lexilexi/core bench`（vitest bench，
+> 测量方式：`pnpm --filter @lexii/core bench`（vitest bench，
 > `packages/core/src/presets/install.bench.ts`），Node + fake-indexeddb
 > （内存实现，无真实磁盘与移动端开销——结果为「本地逻辑耗时下界」）。
 > 真实设备数据待真机试用（RAY-241 验收路径）复测后补充。

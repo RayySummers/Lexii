@@ -1,6 +1,6 @@
 # 领域模型与数据层设计（v1）
 
-> 状态：**已定稿**（对应 `packages/core` 的公开类型，任何接口变更需先更新本文档并通知 `@lexilexi/fsrs`）
+> 状态：**已定稿**（对应 `packages/core` 的公开类型，任何接口变更需先更新本文档并通知 `@lexii/fsrs`）
 > 关联 issue：RAY-244（领域模型与数据层）
 > 数据设计原则来源：`INFO_260812.md` 第四、五节——「保存细粒度原始学习事件」「MVP 每个词义一个主 memory state」
 
@@ -132,7 +132,7 @@ interface MemoryStateFields {
 }
 ```
 
-- 每个 Learning Item 恰一份；由 `newCardFields()`（`@lexilexi/fsrs` 公开 API，RAY-236 契约）初始化：状态 new、难度与稳定度为 0、`learningSteps` 为 0、`due` 为当前时刻（导入即到期）。
+- 每个 Learning Item 恰一份；由 `newCardFields()`（`@lexii/fsrs` 公开 API，RAY-236 契约）初始化：状态 new、难度与稳定度为 0、`learningSteps` 为 0、`due` 为当前时刻（导入即到期）。
 - `learningSteps` 为 RAY-242 新增字段（打通学习回路所需）：不持久化步骤游标，学习阶段的卡片将永远无法走完步骤转 Review。该字段进 `fields` payload，不改变 IndexedDB 表结构（Dexie 记录无 schema 约束），**不触发数据库版本迁移**；但导出/回读与事件重放需保留该字段。
 - **恢复不变量（MemoryState 必须是事件的投影）**：在任一 `ReviewEvent` 序列前缀上重放调度，得到的状态必须与库中 MemoryState 一致。`delete-item` 事件后记录归档，重放跳过被删条目。
 - 多词义合并（未来）若修改本结构，必须走 IndexedDB 版本迁移（红线）。
@@ -148,7 +148,7 @@ interface MemoryStateFields {
 | `due`                       | 下次复习日期     | 直存（ISO 字符串）                                      |
 | 评分 `again/hard/good/easy` | `1/2/3/4`        | 直映射                                                  |
 
-`packages/fsrs` 公开 API 即消费本类型：输入「旧 `MemoryStateFields` + 当前时间 + 评分」→ 输出新 `MemoryStateFields`。`ReviewRating = "again" | "hard" | "good" | "easy"`（数字映射 1–4 由 `Scheduler.review()` 内部完成，实现在 `@lexilexi/fsrs`）。
+`packages/fsrs` 公开 API 即消费本类型：输入「旧 `MemoryStateFields` + 当前时间 + 评分」→ 输出新 `MemoryStateFields`。`ReviewRating = "again" | "hard" | "good" | "easy"`（数字映射 1–4 由 `Scheduler.review()` 内部完成，实现在 `@lexii/fsrs`）。
 
 ## 7. Event（schema v0，落库格式）
 
@@ -202,7 +202,7 @@ interface ReviewEvent extends BaseEvent {
 - 格式错误报「第 N 行 + 原因」（`CsvFormatError`），整份数据全通过或全拒绝，绝不静默丢弃行；空文件 → 空列表，空行跳过。
 - 词条校验：英文字母/撇号/连字符/点（如 `don't`、`well-known`、`Mr.`），字段长度 ≤ 500。
 - 语言默认 `en`（可覆盖）；同词条重复导入 = 新条目（保留全部轨迹）。
-- 导出（`exportCsvWordlist`）与导入互逆的边界：CSV 只承载 term/definitions/pos 三列；**释义本身含全角分号「；」的词条导回后会被拆成多条释义**（「；」是多释义分隔符）、**释义含换行的词条无法原样导回**（解析器不支持字段内换行）、词条须满足上面的单词模式。特殊内容请以 `exportLexilexiData` 的 JSON 备份为准。导出文件前置 UTF-8 BOM（Windows 中文版 Excel 兼容），解析侧自动忽略。
+- 导出（`exportCsvWordlist`）与导入互逆的边界：CSV 只承载 term/definitions/pos 三列；**释义本身含全角分号「；」的词条导回后会被拆成多条释义**（「；」是多释义分隔符）、**释义含换行的词条无法原样导回**（解析器不支持字段内换行）、词条须满足上面的单词模式。特殊内容请以 `exportLexiiData` 的 JSON 备份为准。导出文件前置 UTF-8 BOM（Windows 中文版 Excel 兼容），解析侧自动忽略。
 
 ## 8. 存储决策（每个实体为什么存、存在哪、留多久）
 
@@ -219,7 +219,7 @@ interface ReviewEvent extends BaseEvent {
 
 ## 9. 数据层与版本迁移
 
-- Dexie 数据库 **`lexilexi`**，`SCHEMA_VERSION = 5`，表：`items`(`id`)、`senses`(`id`, `term`)、`memoryStates`(`id`, `fields.due`)、`events`(`id`, `time`, `type`)、`meta`(`key`)、`notebookEntries`(`id`, `senseId`, `status`)。
+- Dexie 数据库 **`lexii`**，`SCHEMA_VERSION = 6`，表：`items`(`id`)、`senses`(`id`, `term`)、`memoryStates`(`id`, `fields.due`)、`events`(`id`, `time`, `type`)、`meta`(`key`)、`notebookEntries`(`id`, `senseId`, `status`)、`dictionarySenses`(`id`, `term`, `source`)。
 - **schema 升级必须走 `db.version(n).stores(...).upgrade(...)` 迁移**，严禁 `db.delete()` / `db.close()` 后重建（清库重来是红线）。每版迁移函数带独立单元测试。
 - 版本链：v1 = 初始四表；v2（RAY-258）= 新增 `meta` 表（`{ key, value }` 字符串键值，
   承载预设词表安装进度/完成标记 `preset:<id>:progress` / `preset:<id>:done`
@@ -232,31 +232,34 @@ interface ReviewEvent extends BaseEvent {
   `status` 索引按 active 列表）。纯新增表，无数据迁移，存量数据原样保留；
   版本与 P0 数据任务错开（RAY-288 纯展示、RAY-270 只读事件流，均不改
   schema），禁止两线并发改 schema（红线）。
+  v6（RAY-294）= 新增 `dictionarySenses` 表（`id`、`term`、`source` 索引，
+  Tier 1/2 扩展词包检索，不产生学习四表记录）。纯新增表，无数据迁移，
+  存量数据原样保留。
 - 升级不丢数据回归防线（RAY-276）：`upgradePath.test.ts` 以 alpha.2 的 v1
   schema 直接建库、按旧版本落库形态写入已学词/新词/学习记录，再由当前
-  `openDatabase` 执行 v1→v4 迁移链，断言四表数量与到期队列完整。
+  `openDatabase` 执行 v1→v6 迁移链，断言四表数量与到期队列完整。
 - 数据库操作一律走 `db.transaction("rw", ...)`；同一「评分 → 写状态 + 写事件」必须单事务原子落库。
 - 预设词表安装（`installPreset`）分块事务落库：每 400 词条一个事务（词条 → Sense / Item / Memory State / import 事件 4 记录），进度标记与块同事务提交，中断后从断点续装、不重复导入；完成标记 `preset:<id>:done` 命中即幂等跳过。并发首装（RAY-260）：起始事务先写 `progress=0` 占位 + 每块事务 check-and-set（进度必须仍是本调用读到的 cursor），双标签页同时首启不产生重复导入。
 - 每日新卡上限（RAY-260）：`getStudyQueueItemIds` 的 `newCardLimit` 按 due 升序截取新词
-  （learn / mixed）；「今日已学新词数」由 review 事件投影（`@lexilexi/stats` 的
+  （learn / mixed）；「今日已学新词数」由 review 事件投影（`@lexii/stats` 的
   `computeLearnedTodayCount`）折算，产品默认值 20/日 与设置存储（localStorage 偏好）在 apps/web。
 - 「今日到期」日历日口径（RAY-276）：`getDueItemIds` / `getStudyQueueItemIds` /
   复习队列装配以 `due <= endOfLocalDay(now)`（本地日历日 23:59:59.999 含）为
   今日边界，而不是 `due <= now`。昨晚学过的词今天上午即可复习（提前复习为
   FSRS 合法输入，调度器按实际经过天数排期），不再等到 due 的精确时刻；
-  `@lexilexi/fsrs` 的排期算法与差分验证口径不变（`dayBoundary.ts` 只作用于查询层）。
+  `@lexii/fsrs` 的排期算法与差分验证口径不变（`dayBoundary.ts` 只作用于查询层）。
 
 ## 10. 持久化防线（storage.persist）
 
-- 启动时检查 `navigator.storage.persisted()`；返回 `false` 则调用 `navigator.storage.persist()` 申请，并触发 `lexilexi:storage-permission` 事件（前端设置页据此提示「当前数据可能被清理，建议导出」）。
+- 启动时检查 `navigator.storage.persisted()`；返回 `false` 则调用 `navigator.storage.persist()` 申请，并触发 `lexii:storage-permission` 事件（前端设置页据此提示「当前数据可能被清理，建议导出」）。
 - 不可用环境（不支持 StorageManager 的浏览器）静默降级，绝不阻塞启动、绝不抛错。
 - 不写 cookie、不写 localStorage 学习数据；`localStorage` 仅存主题等非学习偏好。
 
 ## 11. 导出/导入
 
-- **导出必须完整可恢复**：`exportLexilexiData()` 产出单文件 JSON，含 `items`、`senses`、`memoryStates`、`events`、`notebookEntries` 五张表 + schema 版本号；`importLexilexiData()` 能将其原样导回（JSON round-trip 测试保证）。`meta` 表为安装/偏好标记（非学习数据），不随导出；备份恢复后若库中已有数据，首启引导按「已有数据」跳过内置词表安装，不会重复导入。
+- **导出必须完整可恢复**：`exportLexiiData()` 产出单文件 JSON，含 `items`、`senses`、`memoryStates`、`events`、`notebookEntries` 五张表 + schema 版本号；`importLexiiData()` 能将其原样导回（JSON round-trip 测试保证）。`meta` 表为安装/偏好标记（非学习数据），不随导出；备份恢复后若库中已有数据，首启引导按「已有数据」跳过内置词表安装，不会重复导入。
 - 导出格式版本（`EXPORT_FORMAT_VERSION = 1`）不变：`notebookEntries` 为 RAY-284
   新增字段，**旧备份（无该字段）导入时按空生词本处理**，绝不因备份格式升级
   拒绝恢复；新导出含该字段，可完整恢复生词本。
 - 导入时同 `id` 冲突按「导入覆盖」处理，版本高于当前的不合法数据明确报错，绝不静默清库。
-- **低版本导入策略（v1 定稿，v0 无此字段）**：`dbSchemaVersion === 当前版本` 直接导入；`dbSchemaVersion < 当前版本` 允许导入，**不隐式迁移**——记录数据为 `put` 覆盖，未来 schema 升级时由数据库自身的 `version(n).upgrade()` 迁移链在打开时补齐（导入路径本身不做表结构改写）。若未来引入破坏性 schema 变更导致旧版无法安全导入，须在 `importLexilexiData` 显式拒绝并给出升级指引，且必须随新版本更新本文档。
+- **低版本导入策略（v1 定稿，v0 无此字段）**：`dbSchemaVersion === 当前版本` 直接导入；`dbSchemaVersion < 当前版本` 允许导入，**不隐式迁移**——记录数据为 `put` 覆盖，未来 schema 升级时由数据库自身的 `version(n).upgrade()` 迁移链在打开时补齐（导入路径本身不做表结构改写）。若未来引入破坏性 schema 变更导致旧版无法安全导入，须在 `importLexiiData` 显式拒绝并给出升级指引，且必须随新版本更新本文档。

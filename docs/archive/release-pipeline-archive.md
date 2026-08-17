@@ -10,7 +10,7 @@
 
 ### v0.1.0-alpha — 项目规划启动
 
-Start planning Lexilexi（规划 epic）
+Start planning Lexii（规划 epic）
 
     alpha 发布：GitHub Release + 静态托管部署 + 真机试用 + 里程碑验收
 
