@@ -236,14 +236,27 @@ describe("DictionaryPackagesScreen", () => {
     });
   });
 
-  it("manifest 不可用时展示错误提示", async () => {
+  it("manifest 不可用时展示错误提示（网络不可达）", async () => {
     const provider = makeProvider({
-      fetchDictionaryManifest: vi.fn().mockResolvedValue(null),
+      fetchDictionaryManifest: vi
+        .fn()
+        .mockRejectedValue(new Error("无法获取词包信息：网络不可达，请检查网络连接")),
     });
     render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText(/无法获取词包信息/)).toBeInTheDocument();
+    });
+  });
+
+  it("manifest 404 时展示 HTTP 错误提示", async () => {
+    const provider = makeProvider({
+      fetchDictionaryManifest: vi.fn().mockRejectedValue(new Error("manifest 获取失败：HTTP 404")),
+    });
+    render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/HTTP 404/)).toBeInTheDocument();
     });
   });
 
@@ -514,9 +527,11 @@ describe("DictionaryPackagesScreen", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("manifest 不可用时确认对话框不展示体积（降级）", async () => {
+  it("manifest 不可用时展示错误提示（降级）", async () => {
     const provider = makeProvider({
-      fetchDictionaryManifest: vi.fn().mockResolvedValue(null),
+      fetchDictionaryManifest: vi
+        .fn()
+        .mockRejectedValue(new Error("无法获取词包信息：网络不可达，请检查网络连接")),
     });
     render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
 
