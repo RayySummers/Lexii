@@ -69,6 +69,10 @@ const DICTIONARY_PACKAGES: readonly {
  * RAY-294 Phase 3：默认从当前部署的 presets/ 路径获取（GitHub Pages 子路径兼容）。
  * 可通过环境变量 LEXILEXI_MANIFEST_URL 覆盖（如指向 GitHub Releases 的绝对 URL）。
  * 启动时不发任何网络请求——仅用户进入扩展词包设置页时触发。
+ *
+ * 相对路径基准为 `window.location.href`（含完整页面路径），确保在
+ * GitHub Pages 子路径部署（如 /Lexilexi/dev/）下解析为
+ * /Lexilexi/dev/presets/manifest.json（presets 部署在 dev/ 子目录下）。
  */
 function getManifestUrl(): string {
   // 构建时注入的绝对 URL（可选，指向 GitHub Releases 等外部源）
@@ -76,7 +80,8 @@ function getManifestUrl(): string {
   if (injected) {
     return injected;
   }
-  // 默认：相对路径，兼容 Pages 子路径部署（rayysummers.github.io/Lexilexi/presets/）
+  // 相对路径基准为当前页面完整 URL（含 /Lexilexi/dev/ 等子路径），
+  // 确保 ./presets/manifest.json 解析到页面所在子路径下的 presets/ 目录。
   return new URL("./presets/manifest.json", window.location.href).href;
 }
 
@@ -238,15 +243,22 @@ export function createIndexedDbSettingsDataProvider(db: LexilexiDatabase): Setti
           };
         });
       } catch (err: unknown) {
-        // 区分错误类型：网络错误 vs 格式错误（供 UI 展示更精确的提示）
-        if (err instanceof Error && err.message.includes("manifest 格式非法")) {
-          // 格式错误：manifest 文件损坏或版本不兼容，静默返回 null
-          console.warn("manifest 格式异常：", err.message);
-        } else if (err instanceof TypeError) {
-          // 网络错误（fetch 失败、CORS 等）
-          console.warn("manifest 网络不可达");
+        // 向上抛出可读错误（供 UI 展示精确提示），而非吞掉为 null
+        if (err instanceof Error) {
+          if (err.message.includes("manifest 格式非法")) {
+            throw new Error(`词包清单格式异常：${err.message}`, { cause: err });
+          }
+          if (err.message.includes("HTTP")) {
+            // fetchManifest 抛出的 HTTP 错误（如 404）
+            throw err;
+          }
         }
-        return null;
+        if (err instanceof TypeError) {
+          throw new Error("无法获取词包信息：网络不可达，请检查网络连接", { cause: err });
+        }
+        throw new Error(`无法获取词包信息：${err instanceof Error ? err.message : String(err)}`, {
+          cause: err,
+        });
       }
     },
 

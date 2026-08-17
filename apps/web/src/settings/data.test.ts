@@ -212,11 +212,10 @@ describe("扩展词包（RAY-294）", () => {
     expect(tier1?.installedVersion).toBe("covered-by-tier2");
   });
 
-  it("fetchDictionaryManifest：网络不可用时返回 null（不抛错）", async () => {
+  it("fetchDictionaryManifest：网络不可用时抛出可读错误", async () => {
     const provider = createIndexedDbSettingsDataProvider(db!);
-    const result = await provider.fetchDictionaryManifest();
-    // 在测试环境中 fetch 会失败（无本地 manifest 文件），应返回 null
-    expect(result).toBeNull();
+    // 在测试环境中 fetch 会失败（无本地 manifest 文件），应抛出包含"无法获取词包信息"的错误
+    await expect(provider.fetchDictionaryManifest()).rejects.toThrow(/无法获取词包信息/);
   });
 
   it("installDictionaryPackage：未知包 id 抛错", async () => {
@@ -228,9 +227,9 @@ describe("扩展词包（RAY-294）", () => {
 
   it("installDictionaryPackage：manifest 不可用时抛出可读错误", async () => {
     const provider = createIndexedDbSettingsDataProvider(db!);
-    // fetchDictionaryManifest 返回 null（网络不可用）→ installDictionaryPackage 应抛错
+    // fetchDictionaryManifest 抛错（网络不可达）→ installDictionaryPackage 应抛错
     await expect(provider.installDictionaryPackage("core-en-tier1")).rejects.toThrow(
-      "无法获取词包 manifest",
+      /无法获取词包信息/,
     );
   });
 });

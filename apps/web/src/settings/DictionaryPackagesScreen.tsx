@@ -190,17 +190,29 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
   // 首次进入：读本地安装状态 + fetch manifest（用户主动触发口径）
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([provider.getDictionaryPackageSummaries(), provider.fetchDictionaryManifest()])
-      .then(([localSummaries, manifest]) => {
+
+    // 两个请求独立处理：manifest 失败不应阻止本地状态加载
+    async function load() {
+      // 本地状态始终加载
+      const localSummaries = await provider.getDictionaryPackageSummaries();
+      if (cancelled) return;
+      setSummaries(localSummaries);
+
+      // manifest 可能失败（网络/文件不存在），错误展示在 UI 中
+      try {
+        const manifest = await provider.fetchDictionaryManifest();
+        if (cancelled) return;
+        setManifestInfos(manifest);
+      } catch (err: unknown) {
         if (!cancelled) {
-          setSummaries(localSummaries);
-          setManifestInfos(manifest);
-          if (manifest === null) {
-            setError("无法获取词包信息，请检查网络连接后重试");
-          }
+          setError(toErrorMessage(err));
         }
-      })
+      }
+    }
+
+    void load()
       .catch((err: unknown) => {
+        // getDictionaryPackageSummaries 失败（IDB 异常等）
         if (!cancelled) {
           setError(toErrorMessage(err));
         }
