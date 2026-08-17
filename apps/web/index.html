@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script data-lexilexi-theme-init>
+    <script data-lexii-theme-init>
       // 在首次渲染前应用主题，避免深色偏好用户看到浅色闪烁（FOUC）。
       // 解析规则必须与 src/theme/resolve.ts 保持一致（themeInitScript.test.ts 会校验）。
       // RAY-261 三档偏好：存储值为 light / dark 时直接采用；system（及缺失/非法值）
       // 跟随系统 prefers-color-scheme；「跟随系统」档位的后续自动切换由 useTheme 监听。
       (function () {
         try {
-          var stored = window.localStorage.getItem("lexilexi:theme");
+          var stored = window.localStorage.getItem("lexii:theme");
           var theme =
             stored === "light" || stored === "dark"
               ? stored
@@ -31,12 +31,12 @@
     <meta name="theme-color" content="#fafaf9" />
     <meta
       name="description"
-      content="乐希 Lexilexi — 定制化背单词体验：现代简洁、多语言、支持导入词库、local-first"
+      content="乐希 Lexii — 定制化背单词体验：现代简洁、多语言、支持导入词库、local-first"
     />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
-    <title>乐希 Lexilexi</title>
+    <title>乐希 Lexii</title>
   </head>
   <body>
     <div id="root"></div>

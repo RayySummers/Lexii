@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { CsvFormatError, parseCsvWordlist } from "./csv";
 import { isImportEvent } from "./events";
 import { importCsvWordlist, toSense } from "./importWords";
-import type { LexilexiDatabase } from "./persistence";
+import type { LexiiDatabase } from "./persistence";
 import { openDatabase } from "./persistence";
 import { SAMPLE_WORDLIST, SAMPLE_WORDLIST_CSV, SAMPLE_WORDLIST_ROW_COUNT } from "./sampleWordlist";
 
@@ -13,10 +13,10 @@ function makeOptions(): DexieOptions {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
 /** 每个用例用独立数据库实例，避免用例间残留状态 */
-function freshDatabase(): LexilexiDatabase {
+function freshDatabase(): LexiiDatabase {
   db = openDatabase(makeOptions());
   return db;
 }

@@ -14,8 +14,8 @@
  * 绝不阻塞检索（与 useTheme / dailyNewCardLimit 同一持久化口径）。
  */
 
-/** localStorage 键（沿用 lexilexi:* 命名空间） */
-export const SEARCH_HISTORY_STORAGE_KEY = "lexilexi:search-history";
+/** localStorage 键（沿用 lexii:* 命名空间） */
+export const SEARCH_HISTORY_STORAGE_KEY = "lexii:search-history";
 
 /** 历史条目上限（超出丢弃最旧） */
 export const SEARCH_HISTORY_LIMIT = 20;

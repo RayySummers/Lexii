@@ -11,7 +11,7 @@
  * - 三档（默认）全视口一排三个（RAY-278 返工：手机端此前 2×2 缺右下角）；
  *   四档移动端 2×2、sm 以上一排四个；网格等宽，触控目标 ≥ 48px。
  */
-import type { ReviewRating } from "@lexilexi/core";
+import type { ReviewRating } from "@lexii/core";
 import type { RatingTierMode } from "../lib/ratingTiers";
 import { RATING_SHORTCUTS } from "./grade";
 

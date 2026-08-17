@@ -3,7 +3,7 @@
  * 避免模块级 current 状态跨测试串扰）。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { STORAGE_PERMISSION_EVENT } from "@lexilexi/core";
+import { STORAGE_PERMISSION_EVENT } from "@lexii/core";
 
 beforeEach(() => {
   vi.resetModules();

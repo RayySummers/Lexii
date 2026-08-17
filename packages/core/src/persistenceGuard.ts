@@ -12,7 +12,7 @@
 export type PersistenceStatus = "persisted" | "granted" | "denied" | "unsupported";
 
 /** 申请结果事件名（apps/web 监听并展示提示） */
-export const STORAGE_PERMISSION_EVENT = "lexilexi:storage-permission";
+export const STORAGE_PERMISSION_EVENT = "lexii:storage-permission";
 
 export interface StoragePermissionRequestedDetail {
   status: PersistenceStatus;

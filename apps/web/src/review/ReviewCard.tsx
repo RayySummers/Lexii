@@ -22,7 +22,7 @@
  */
 import { useEffect, useRef } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import type { Sense } from "@lexilexi/core";
+import type { Sense } from "@lexii/core";
 import { dualPhonetics, parseWordParts } from "./enrichmentUi";
 import type { PhoneticBadge } from "./enrichmentUi";
 

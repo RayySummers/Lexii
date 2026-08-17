@@ -7,8 +7,8 @@
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { toEventId } from "@lexilexi/core";
-import type { ReviewRating, StudyMode } from "@lexilexi/core";
+import { toEventId } from "@lexii/core";
+import type { ReviewRating, StudyMode } from "@lexii/core";
 import { makeCard } from "./testFixtures";
 import type { GradeContext, GradeResult, ReviewCard, ReviewDataProvider } from "./types";
 import { useReviewSession } from "./useReviewSession";

@@ -17,7 +17,7 @@ export const DEV_PANEL_UNLOCK_TAPS = 5;
 /** 连点时间窗（毫秒）：超过该间隔的两次点击视为新的连点序列 */
 export const DEV_PANEL_TAP_WINDOW_MS = 3_000;
 
-export const DEV_PANEL_UNLOCK_STORAGE_KEY = "lexilexi:dev-panel-unlocked";
+export const DEV_PANEL_UNLOCK_STORAGE_KEY = "lexii:dev-panel-unlocked";
 
 /** 连点状态：是否已解锁 + 当前连续点击数 + 最近一次点击时间戳 */
 export interface DevPanelTapState {

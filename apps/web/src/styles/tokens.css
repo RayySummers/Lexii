@@ -1,5 +1,5 @@
 /*
- * Lexilexi 语义化 design tokens
+ * Lexii 语义化 design tokens
  *
  * 规则：
  * - 组件中禁止硬编码颜色，一律引用这里的语义 token（浅色/深色两套）

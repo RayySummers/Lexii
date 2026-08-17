@@ -1,7 +1,7 @@
 /**
  * 生词本数据源（IndexedDB 实现，RAY-284）。
  *
- * 所有数据操作经由 @lexilexi/core 的公开 API：
+ * 所有数据操作经由 @lexii/core 的公开 API：
  * - loadEntries：listNotebookEntries（active、最新在前）→ senses.bulkGet
  *   （一次批量往返装配义项内容，不在循环里逐条查询）；
  * - removeWord：removeFromNotebook（条目标记 removed + 底层学习条目
@@ -10,13 +10,8 @@
  * 加词入口（搜词页 / 复习卡页）分别由各自数据源调用 core 的
  * addToNotebook；本文件提供共用的幂等判定 helper（hasActiveEntryForSense）。
  */
-import {
-  addToNotebook,
-  listNotebookEntries,
-  openDatabase,
-  removeFromNotebook,
-} from "@lexilexi/core";
-import type { LexilexiDatabase, NotebookEntryId, SenseId } from "@lexilexi/core";
+import { addToNotebook, listNotebookEntries, openDatabase, removeFromNotebook } from "@lexii/core";
+import type { LexiiDatabase, NotebookEntryId, SenseId } from "@lexii/core";
 import type { AddToNotebookResult, NotebookDataProvider, NotebookListItem } from "./types";
 
 /**
@@ -26,7 +21,7 @@ import type { AddToNotebookResult, NotebookDataProvider, NotebookListItem } from
  * （并发窗口下不会产生重复条目）。
  */
 export async function addWordToNotebook(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   senseId: SenseId,
 ): Promise<AddToNotebookResult> {
   const existing = await db.notebookEntries
@@ -45,7 +40,7 @@ export async function addWordToNotebook(
  * 按义项 id 移出生词本（RAY-302 搜词页 / 复习卡页共用）：
  * 查找该义项的 active 生词本条目并移出；条目不存在则静默跳过。
  */
-export async function removeWordBySenseId(db: LexilexiDatabase, senseId: SenseId): Promise<void> {
+export async function removeWordBySenseId(db: LexiiDatabase, senseId: SenseId): Promise<void> {
   const existing = await db.notebookEntries
     .where("senseId")
     .equals(senseId)
@@ -57,8 +52,8 @@ export async function removeWordBySenseId(db: LexilexiDatabase, senseId: SenseId
   await removeFromNotebook(db, { entryId: existing.id });
 }
 
-/** 基于已打开的 Lexilexi 数据库创建生词本数据源（测试注入 fake-indexeddb 实例） */
-export function createIndexedDbNotebookDataProvider(db: LexilexiDatabase): NotebookDataProvider {
+/** 基于已打开的 Lexii 数据库创建生词本数据源（测试注入 fake-indexeddb 实例） */
+export function createIndexedDbNotebookDataProvider(db: LexiiDatabase): NotebookDataProvider {
   return {
     async loadEntries(): Promise<NotebookListItem[]> {
       const entries = await listNotebookEntries(db);

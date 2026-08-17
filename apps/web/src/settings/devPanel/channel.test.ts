@@ -7,14 +7,14 @@ import { detectChannel, getOtherChannelPath } from "./channel";
 
 describe("detectChannel 通道检测", () => {
   it.each([
-    ["/Lexilexi/dev/", "dev"],
-    ["/Lexilexi/dev", "dev"],
-    ["/Lexilexi/dev/index.html", "dev"],
-    ["/Lexilexi/dev/index.html?x=1", "dev"],
+    ["/Lexii/dev/", "dev"],
+    ["/Lexii/dev", "dev"],
+    ["/Lexii/dev/index.html", "dev"],
+    ["/Lexii/dev/index.html?x=1", "dev"],
     ["/dev/", "dev"],
-    ["/Lexilexi/", "release"],
-    ["/Lexilexi", "release"],
-    ["/Lexilexi/index.html", "release"],
+    ["/Lexii/", "release"],
+    ["/Lexii", "release"],
+    ["/Lexii/index.html", "release"],
     ["/", "release"],
     ["/foo/devbar/", "release"],
   ])("%s → %s", (pathname, expected) => {
@@ -25,28 +25,22 @@ describe("detectChannel 通道检测", () => {
 describe("getOtherChannelPath 切换目标", () => {
   it.each([
     // release → dev（追加 dev/ 子路径）
-    ["/Lexilexi/", "/Lexilexi/dev/"],
-    ["/Lexilexi", "/Lexilexi/dev/"],
-    ["/Lexilexi/index.html", "/Lexilexi/dev/"],
+    ["/Lexii/", "/Lexii/dev/"],
+    ["/Lexii", "/Lexii/dev/"],
+    ["/Lexii/index.html", "/Lexii/dev/"],
     ["/", "/dev/"],
     // dev → release（去掉 dev 段）
-    ["/Lexilexi/dev/", "/Lexilexi/"],
-    ["/Lexilexi/dev", "/Lexilexi/"],
-    ["/Lexilexi/dev/index.html", "/Lexilexi/"],
+    ["/Lexii/dev/", "/Lexii/"],
+    ["/Lexii/dev", "/Lexii/"],
+    ["/Lexii/dev/index.html", "/Lexii/"],
     ["/dev/", "/"],
-    ["/Lexilexi/dev?from=settings", "/Lexilexi/"],
+    ["/Lexii/dev?from=settings", "/Lexii/"],
   ])("%s → %s", (pathname, expected) => {
     expect(getOtherChannelPath(pathname)).toBe(expected);
   });
 
   it("与 detectChannel 互逆：任意路径切换两次回到自身通道目录", () => {
-    for (const pathname of [
-      "/Lexilexi/",
-      "/Lexilexi/dev/",
-      "/",
-      "/dev/",
-      "/Lexilexi/dev/index.html",
-    ]) {
+    for (const pathname of ["/Lexii/", "/Lexii/dev/", "/", "/dev/", "/Lexii/dev/index.html"]) {
       const other = getOtherChannelPath(pathname);
       expect(detectChannel(other)).not.toBe(detectChannel(pathname));
       // 再切换一次回到原通道（目录级等价）

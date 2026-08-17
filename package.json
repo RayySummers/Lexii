@@ -1,14 +1,14 @@
 {
-  "name": "lexilexi",
+  "name": "lexii",
   "version": "0.1.0-alpha.8",
   "private": true,
-  "description": "乐希 Lexilexi — local-first 定制化背单词体验（现代简洁、多语言、支持导入词库）",
+  "description": "乐希 Lexii — local-first 定制化背单词体验（现代简洁、多语言、支持导入词库）",
   "packageManager": "pnpm@10.34.5",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "dev": "pnpm --filter @lexilexi/web dev",
+    "dev": "pnpm --filter @lexii/web dev",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",

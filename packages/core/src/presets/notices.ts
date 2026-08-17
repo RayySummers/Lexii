@@ -89,7 +89,7 @@ export const THIRD_PARTY_DATA_SOURCES: readonly ThirdPartyDataSource[] = [
 export const THIRD_PARTY_NOTICES = [
   "# 数据来源与许可声明（NOTICE）",
   "",
-  "乐希（Lexilexi）内置预设词表包含以下第三方数据（本文件为过渡版事实性署名，",
+  "乐希（Lexii）内置预设词表包含以下第三方数据（本文件为过渡版事实性署名，",
   "正式文案由团队后续修订）：",
   "",
   "## ECDICT",

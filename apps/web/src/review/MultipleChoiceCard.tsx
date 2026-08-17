@@ -14,8 +14,8 @@
  * 动画尊重 prefers-reduced-motion。
  */
 import { useEffect, useRef } from "react";
-import type { Sense } from "@lexilexi/core";
-import type { DistractorOption, QuizDirection } from "@lexilexi/core";
+import type { Sense } from "@lexii/core";
+import type { DistractorOption, QuizDirection } from "@lexii/core";
 
 export interface MultipleChoiceQuestion {
   /** 当前考查的义项 */

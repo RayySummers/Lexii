@@ -7,7 +7,7 @@
  *     空格 / 回车 → 翻面（焦点在按钮上时交给按钮原生行为，避免双触发）
  *     三档（默认）：1–3 或 A / H / G → 不认识 / 模糊 / 认识
  *     四档（Anki 传统）：1–4 或 A / H / G / E → Again / Hard / Good / Easy
- * - 评分按钮副文案为各档到期时间预览（@lexilexi/fsrs Scheduler.preview）；
+ * - 评分按钮副文案为各档到期时间预览（@lexii/fsrs Scheduler.preview）；
  *   分钟级文案不展示（RAY-279：移除「X 分钟后复习」提示）。
  *
  * RAY-265：
@@ -24,8 +24,8 @@
  * （加入即到期），是否进入学习列表由首页开关控制。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexilexi/core";
-import type { ReviewRating, StudyMode } from "@lexilexi/core";
+import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexii/core";
+import type { ReviewRating, StudyMode } from "@lexii/core";
 import { BackArrowIcon, CheckIcon, PlusIcon, SpeakerIcon, UndoIcon } from "../components/icons";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { primeSpeechEngine, readPronunciationAccent, speakWord } from "../lib/pronunciation";

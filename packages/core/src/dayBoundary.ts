@@ -11,10 +11,10 @@
  * 当天早上起就进入「今日待学」与复习队列。
  *
  * 提前复习是 FSRS 允许的正常输入（调度器按实际经过天数排期），不改任何
- * 调度算法与 @lexilexi/fsrs 的差分验证口径；本边界只作用于「哪些卡今天
+ * 调度算法与 @lexii/fsrs 的差分验证口径；本边界只作用于「哪些卡今天
  * 出现」的查询层。
  *
- * 与 @lexilexi/stats 的 localDayBounds（明日到期统计）同源：均由本地日历
+ * 与 @lexii/stats 的 localDayBounds（明日到期统计）同源：均由本地日历
  * 分量构造，与夏令时无关。
  */
 import type { IsoDate } from "./domain";

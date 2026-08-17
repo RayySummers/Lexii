@@ -2,20 +2,20 @@
  * 学习回路：练习 → 评分 → FSRS 排期 → 事件落库（端到端）。
  *
  * 对应 docs/domain-model.md §5、§6、§7：
- * - 评分从四档自我评分直映射到 FSRS 评分（v0 按键直映射，评测在 @lexilexi/eval）；
+ * - 评分从四档自我评分直映射到 FSRS 评分（v0 按键直映射，评测在 @lexii/eval）；
  * - 排期输出写回 Memory State，复习记录写为 review 事件——
  *   同一次 Dexie 事务原子落库（与 recordReview 的原子性契约一致，任一环节失败整体回滚）。
  * - MemoryStateFields 与 ts-fsrs Card 的字段换算见 domain-model.md §6。
  */
-import { Scheduler, dateDiffInDays } from "@lexilexi/fsrs";
-import type { CardInput, RecordLogItem } from "@lexilexi/fsrs";
+import { Scheduler, dateDiffInDays } from "@lexii/fsrs";
+import type { CardInput, RecordLogItem } from "@lexii/fsrs";
 import { endOfLocalDay } from "./dayBoundary";
 import type { IsoDate } from "./domain";
 import type { ExerciseType, ReviewEvent, ReviewRating } from "./events";
 import { createId, toEventId } from "./id";
 import type { EventId, ItemId, SenseId } from "./id";
 import type { MemoryState, MemoryStateFields } from "./memory";
-import type { LexilexiDatabase } from "./persistence";
+import type { LexiiDatabase } from "./persistence";
 
 /** 一次复习的输入（练习会话提供） */
 export interface GradeReviewInput {
@@ -125,7 +125,7 @@ function elapsedDaysSince(lastReviewAt: IsoDate | null, review: Date): number {
  * 评分非法等错误由底层抛出，调用方直接透传。
  */
 export async function gradeReview(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   input: GradeReviewInput,
 ): Promise<GradeReviewResult> {
   validateGradeReviewInput(input);
@@ -193,7 +193,7 @@ export interface UndoReviewInput {
  *   若之后又发生了新评分（更晚的事件），撤销旧事件会让新事件失去投影，
  *   此时拒绝撤销（单步撤销场景下正常不会出现，防线为防御性兜底）。
  */
-export async function undoReview(db: LexilexiDatabase, input: UndoReviewInput): Promise<void> {
+export async function undoReview(db: LexiiDatabase, input: UndoReviewInput): Promise<void> {
   if (input.previousMemoryState.itemId !== input.itemId) {
     throw new Error(
       `撤销状态与条目不一致：${input.previousMemoryState.itemId} !== ${input.itemId}`,
@@ -255,7 +255,7 @@ function validateGradeReviewInput(input: GradeReviewInput): void {
  * 生词本条目（学习列表不包含生词本），与 getStudyQueueItemIds 同口径。
  */
 export async function getDueItemIds(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   now: IsoDate,
   options: DueQueryOptions = {},
 ): Promise<ItemId[]> {
@@ -305,7 +305,7 @@ export interface StudyQueueOptions {
 }
 
 export async function getStudyQueueItemIds(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   now: IsoDate,
   mode: StudyMode,
   options: StudyQueueOptions = {},
@@ -380,7 +380,7 @@ function compareStatesByDue(a: MemoryState, b: MemoryState): number {
  *
  * 与 getDueItemIds 同口径（不过滤条目 status，由调用方如复习队列自行过滤），
  * 供统计「明日到期」等按本地日历日区间查询到期数的场景使用——区间边界由
- * @lexilexi/stats 的 localDayBounds 换算（本地日 00:00 到次日 00:00），
+ * @lexii/stats 的 localDayBounds 换算（本地日 00:00 到次日 00:00），
  * 与夏令时无关。
  *
  * 查询走 fields.due 索引（DB schema v3，RAY-260）：between 区间查询
@@ -390,7 +390,7 @@ function compareStatesByDue(a: MemoryState, b: MemoryState): number {
  * 生词本条目，与 getDueItemIds / getStudyQueueItemIds 同口径。
  */
 export async function getDueItemIdsInRange(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   from: IsoDate,
   to: IsoDate,
   options: DueQueryOptions = {},
@@ -413,7 +413,7 @@ export interface DueQueryOptions {
  * - false → 查询 active 生词本条目（status 索引），返回其 itemId 集合。
  */
 async function resolveExcludedNotebookItemIds(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   includeNotebook: boolean | undefined,
 ): Promise<Set<string> | null> {
   if (includeNotebook !== false) {

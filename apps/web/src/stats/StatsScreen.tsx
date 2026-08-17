@@ -25,7 +25,7 @@
  * - RAY-253 反馈 5：统一导航头（左侧返回箭头、标题右对齐，同设置页）；
  * - 全部颜色走 design tokens（浅色/深色两套自动生效）。
  */
-import { formatStudyDuration } from "@lexilexi/stats";
+import { formatStudyDuration } from "@lexii/stats";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { StatCard } from "../components/StatCard";
 import { useStats } from "./useStats";

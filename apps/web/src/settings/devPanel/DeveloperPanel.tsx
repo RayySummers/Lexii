@@ -142,7 +142,7 @@ export function DeveloperPanel({ providerFactory }: DeveloperPanelProps) {
             {APP_BUILD.releaseTags.map((tag) => (
               <li key={tag} className="flex items-center gap-2">
                 <a
-                  href={`https://github.com/RayySummers/Lexilexi/releases/tag/${tag}`}
+                  href={`https://github.com/RayySummers/Lexii/releases/tag/${tag}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"

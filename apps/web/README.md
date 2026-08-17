@@ -1,6 +1,6 @@
-# @lexilexi/web
+# @lexii/web
 
-Lexilexi Web / PWA 应用（Vite + React + TypeScript + Tailwind CSS）。
+Lexii Web / PWA 应用（Vite + React + TypeScript + Tailwind CSS）。
 
 ## 开发
 
@@ -34,8 +34,8 @@ pnpm build          # tsc --noEmit + vite build
   - `icons/` — 由 `scripts/generate-icons.mjs` 生成的 PNG 图标（`pnpm icons` 重新生成）
 - `src/settings/` — 设置页（RAY-245）：
   - `types.ts` — `SettingsDataProvider` / `ImportBackupResult`（UI 与数据源之间的契约）
-  - `data.ts` — IndexedDB 数据源：`createIndexedDbSettingsDataProvider`（包装 core 的 `exportLexilexiData` / `exportCsvWordlist` / `parseLexilexiExport` / `importLexilexiData`）
-  - `persistenceStatus.ts` — 持久化权限状态（启动申请 + `usePersistenceStatus` hook，监听 `lexilexi:storage-permission`）
+  - `data.ts` — IndexedDB 数据源：`createIndexedDbSettingsDataProvider`（包装 core 的 `exportLexiiData` / `exportCsvWordlist` / `parseLexiiExport` / `importLexiiData`）
+  - `persistenceStatus.ts` — 持久化权限状态（启动申请 + `usePersistenceStatus` hook，监听 `lexii:storage-permission`）
   - `SettingsScreen.tsx` — 设置页 UI：主题三档下拉选单（浅色 / 深色 / 跟随系统，RAY-261）、每日新卡上限（默认 20/日，localStorage 持久化）、持久化提示、JSON/CSV 导出、JSON 导入、关于（GitHub 仓库链接 + 反馈问题入口，纯外链新窗口打开）与底部版本号（RAY-253 起无数据概览，概览已并入统计页）
 - `src/stats/` — 统计页（RAY-240）：
   - `types.ts` — `StatsSnapshot`（今日待学 / 已复习 / 连续天数等 8 项 + 首页徽标共用的 `dueCount`）/ `StatsDataProvider`（UI 与数据源之间的契约）
@@ -45,14 +45,14 @@ pnpm build          # tsc --noEmit + vite build
 - `src/review/` — 复习界面（RAY-237，RAY-253 三模式）：
   - `types.ts` — `ReviewCard` / `ReviewDataProvider` / `GradeContext`（UI 与数据源之间的契约）
   - `queue.ts` — `buildReviewQueue`：id 列表 → 可复习卡片（完整性校验，纯函数，保持 core 给定的顺序）
-  - `grade.ts` — 评分预览与文案：`previewGradeDueLabels`（按钮到期时间预览，走 `@lexilexi/fsrs` 公开 API）+ `formatDueLabel`（中文相对时间）
+  - `grade.ts` — 评分预览与文案：`previewGradeDueLabels`（按钮到期时间预览，走 `@lexii/fsrs` 公开 API）+ `formatDueLabel`（中文相对时间）
   - `data.ts` — IndexedDB 数据源：`createIndexedDbReviewDataProvider`（包装 core 的 `getStudyQueueItemIds` / `gradeReview` / `importCsvWordlist`）
   - `useReviewSession.ts` — 会话状态机（loading / empty / no-due / reviewing / done / error）
   - `ReviewCard.tsx` / `RatingButtons.tsx` / `ReviewScreen.tsx` — 卡片正反面、四档评分按钮、会话容器
 
 ## 三模式学习队列（RAY-253）
 
-首页三个入口对应 `@lexilexi/core` 的 `StudyMode`（`getStudyQueueItemIds`）：
+首页三个入口对应 `@lexii/core` 的 `StudyMode`（`getStudyQueueItemIds`）：
 
 - **学习**（learn）：仅未评分新词（`reps === 0`），按 due 升序
 - **复习**（review）：仅已评分且到期的卡（`reps > 0 && due <= now`），按 due 升序
@@ -65,7 +65,7 @@ pnpm build          # tsc --noEmit + vite build
 新词数」折算剩余额度，经 `getStudyQueueItemIds` 的 `newCardLimit` 参数截取新词；
 复习侧不受限。读取路径（Oscar 复评 suggestion 1）：今日复习事件走 time 索引区间
 查询，「是否今日首次复习」反向扫描时间索引取证据、候选集清零即提前停止，
-不再整表读历史事件；「今日已学」口径复用 `@lexilexi/stats` 的
+不再整表读历史事件；「今日已学」口径复用 `@lexii/stats` 的
 `computeLearnedTodayCount`（事件投影）。首页有待学词时展示「今日新卡额度剩余
 N 张」，说明徽标数字（未截断到期数）与每日实际可学队列的关系（复评 suggestion 2）。
 
@@ -80,7 +80,7 @@ N 张」，说明徽标数字（未截断到期数）与每日实际可学队列
 - 缓存版本：`public/sw.js` 顶部 `CACHE_NAME` 在缓存结构或预缓存清单变化时递增。
 - 路径策略（部署无关）：Vite `base: "./"`，manifest / index.html / sw.js 全部按
   「相对自身位置」解析路径，因此产物可部署在任意子路径（如 GitHub Pages 的
-  `/Lexilexi/`）、根路径或自定义域名，无需按环境改写（`serviceWorker.test.ts`
+  `/Lexii/`）、根路径或自定义域名，无需按环境改写（`serviceWorker.test.ts`
   有子路径部署回归用例锁定）。
 - 已知限制（记录在案）：manifest 的 `theme_color` / `background_color` 是静态浅色值，
   深色主题下安装启动屏/标题栏仍为浅色——manifest 静态配色是平台限制；
@@ -91,10 +91,10 @@ N 张」，说明徽标数字（未截断到期数）与每日实际可学队列
 - 卡片点击或**空格**翻面（正面词条，背面释义）；
 - **1–4** 或 **A / H / G / E** 评分（Again / Hard / Good / Easy，与按钮等价），评分后进入下一张卡；
 - 评分按钮副文案为各档到期时间预览（与真实排期一致）；
-- 空库时提供「导入内置示例词表」入口（数据来自 `@lexilexi/core` 的 `SAMPLE_WORDLIST_CSV`）。
+- 空库时提供「导入内置示例词表」入口（数据来自 `@lexii/core` 的 `SAMPLE_WORDLIST_CSV`）。
 
 ## 约束
 
 - 只做界面与交互；算法逻辑一律放在 `packages/*`
-- 跨包引用走公开 API（`@lexilexi/core` 等）
+- 跨包引用走公开 API（`@lexii/core` 等）
 - local-first：不引入任何必须联网才能用的功能

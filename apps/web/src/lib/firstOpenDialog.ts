@@ -12,8 +12,8 @@
  *   不重复打扰用户。
  */
 
-/** localStorage 键（沿用 lexilexi:* 命名空间） */
-export const FIRST_OPEN_DIALOG_STORAGE_KEY = "lexilexi:first-open-dismissed";
+/** localStorage 键（沿用 lexii:* 命名空间） */
+export const FIRST_OPEN_DIALOG_STORAGE_KEY = "lexii:first-open-dismissed";
 
 /** 已读标记的存储值（存在即视为已看过，值内容不作强校验） */
 export const FIRST_OPEN_DIALOG_DISMISSED_VALUE = "1";

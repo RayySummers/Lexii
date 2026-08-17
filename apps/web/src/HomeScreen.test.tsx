@@ -10,7 +10,7 @@
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StudyMode } from "@lexilexi/core";
+import type { StudyMode } from "@lexii/core";
 import { HomeScreen } from "./HomeScreen";
 import type { StatsDataProvider, StatsSnapshot } from "./stats/types";
 
@@ -156,7 +156,7 @@ describe("HomeScreen", () => {
   });
 
   it("额度按设置值折算；今日已学满时显示剩余 0 张", async () => {
-    window.localStorage.setItem("lexilexi:daily-new-card-limit", "5");
+    window.localStorage.setItem("lexii:daily-new-card-limit", "5");
     render(
       <HomeScreen
         onStart={vi.fn()}

@@ -1,9 +1,9 @@
 /**
- * Lexilexi Service Worker（PWA 离线能力）。
+ * Lexii Service Worker（PWA 离线能力）。
  *
  * 路径策略（重要）：本文件所有应用内路径一律「相对 SW 自身位置」解析
  * （resolveUrl），缓存键统一为绝对 URL。因此应用可部署在任意子路径下
- * （GitHub Pages 的 /Lexilexi/、根路径、自定义域名），无需按部署环境改写。
+ * （GitHub Pages 的 /Lexii/、根路径、自定义域名），无需按部署环境改写。
  * 与 Vite base "./"、manifest / index.html 的相对路径策略保持一致。
  *
  * 缓存策略（全部仅限同源 GET，不缓存任何跨域请求）：
@@ -20,7 +20,7 @@
  * CACHE_NAME 在「缓存结构或预缓存清单变化」时递增；纯内容更新无需改版本。
  * 本文件为纯静态资源（public/ 原样拷贝进产物），不经 Vite 构建。
  */
-const CACHE_NAME = "lexilexi-shell-v1";
+const CACHE_NAME = "lexii-shell-v1";
 
 /** 以 SW 自身位置解析应用内路径为绝对 URL（同源）。 */
 function resolveUrl(path) {
@@ -109,7 +109,18 @@ self.addEventListener("activate", (event) => {
     caches
       .keys()
       .then((names) =>
-        Promise.all(names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))),
+        Promise.all(
+          names
+            .filter((name) => name !== CACHE_NAME)
+            // RAY-307 Oscar suggestion 5：额外清理旧版 lexilexi-shell-* 缓存
+            // （改名前残留，activate 的 name !== CACHE_NAME 已覆盖，此处显式
+            // 匹配确保即使未来 CACHE_NAME 前缀变化也能清理旧缓存）
+            .concat(
+              names.filter((name) => name.startsWith("lexilexi-shell-") && name !== CACHE_NAME),
+            )
+            .filter((name, i, arr) => arr.indexOf(name) === i) // 去重
+            .map((name) => caches.delete(name)),
+        ),
       )
       .then(() => self.clients.claim()),
   );

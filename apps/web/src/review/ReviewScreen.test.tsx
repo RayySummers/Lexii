@@ -7,8 +7,8 @@
  */
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { toEventId } from "@lexilexi/core";
-import type { ReviewRating, SenseId, StudyMode } from "@lexilexi/core";
+import { toEventId } from "@lexii/core";
+import type { ReviewRating, SenseId, StudyMode } from "@lexii/core";
 import type { AddToNotebookResult } from "../notebook/types";
 import { RATING_TIER_STORAGE_KEY } from "../lib/ratingTiers";
 import { ReviewScreen } from "./ReviewScreen";

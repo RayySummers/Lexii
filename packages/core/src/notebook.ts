@@ -25,7 +25,7 @@ import type { IsoDate } from "./domain";
 import { createId, toEventId, toItemId, toNotebookEntryId } from "./id";
 import type { ItemId, NotebookEntryId, SenseId } from "./id";
 import { toMemoryState } from "./importWords";
-import type { LexilexiDatabase } from "./persistence";
+import type { LexiiDatabase } from "./persistence";
 
 /** 生词本条目状态：active（在生词本中）⇢ removed（已移出，记录保留） */
 export type NotebookEntryStatus = "active" | "removed";
@@ -77,7 +77,7 @@ export interface RemoveFromNotebookInput {
  * 义项不存在时整个事务中止，不留下半条记录。
  */
 export async function addToNotebook(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   input: AddToNotebookInput,
 ): Promise<NotebookEntry> {
   const now = input.now ?? new Date().toISOString();
@@ -145,7 +145,7 @@ export async function addToNotebook(
  * 重复移出报错；条目不存在报错，事务回滚。
  */
 export async function removeFromNotebook(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   input: RemoveFromNotebookInput,
 ): Promise<void> {
   const now = input.now ?? new Date().toISOString();
@@ -181,7 +181,7 @@ export async function removeFromNotebook(
  * 列表展示按 addedAt 倒序（ISO-8601 同格式字符串可直接字典序比较）；
  * 词条内容（释义等）由调用方按 senseId 取义项。
  */
-export async function listNotebookEntries(db: LexilexiDatabase): Promise<NotebookEntry[]> {
+export async function listNotebookEntries(db: LexiiDatabase): Promise<NotebookEntry[]> {
   const entries = await db.notebookEntries.where("status").equals("active").toArray();
   return entries.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
 }
@@ -192,7 +192,7 @@ export async function listNotebookEntries(db: LexilexiDatabase): Promise<Noteboo
  * 供队列与到期查询按「学习列表是否包含生词本」过滤（includeNotebook
  * 关闭时排除这些条目）；查询走 status 索引，不整表扫描。
  */
-export async function getActiveNotebookItemIds(db: LexilexiDatabase): Promise<ItemId[]> {
+export async function getActiveNotebookItemIds(db: LexiiDatabase): Promise<ItemId[]> {
   const entries = await db.notebookEntries.where("status").equals("active").toArray();
   return entries.map((entry) => entry.itemId);
 }

@@ -6,9 +6,9 @@
  * 重新加载列表，移出失败给出反馈。
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { NotebookEntry } from "@lexilexi/core";
-import { toNotebookEntryId, toSenseId } from "@lexilexi/core";
-import type { Sense } from "@lexilexi/core";
+import type { NotebookEntry } from "@lexii/core";
+import { toNotebookEntryId, toSenseId } from "@lexii/core";
+import type { Sense } from "@lexii/core";
 import { describe, expect, it, vi } from "vitest";
 import { NotebookScreen } from "./NotebookScreen";
 import type { NotebookDataProvider, NotebookListItem } from "./types";

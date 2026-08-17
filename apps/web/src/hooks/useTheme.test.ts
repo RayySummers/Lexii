@@ -288,7 +288,7 @@ describe("useTheme", () => {
       act(() => {
         window.dispatchEvent(
           new StorageEvent("storage", {
-            key: "lexilexi:daily-new-card-limit",
+            key: "lexii:daily-new-card-limit",
             oldValue: "20",
             newValue: "35",
           }),

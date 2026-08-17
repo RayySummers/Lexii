@@ -1,13 +1,13 @@
 /**
  * 设置页数据源（IndexedDB 实现）。
  *
- * 所有数据操作经由 @lexilexi/core 的公开 API：
- * - exportBackup：exportLexilexiData（完整 JSON 快照）
+ * 所有数据操作经由 @lexii/core 的公开 API：
+ * - exportBackup：exportLexiiData（完整 JSON 快照）
  * - exportWordlistCsv：exportCsvWordlist（词表 CSV，仅未删除条目）
- * - importBackup：parseLexilexiExport → importLexilexiData（单事务、同 id 覆盖）
+ * - importBackup：parseLexiiExport → importLexiiData（单事务、同 id 覆盖）
  * - getPresetSummaries：内置词表安装状态（RAY-258「数据来源与许可」页）
  * - getWordbookSummaries / installWordbook：词书库状态与选装（RAY-262；
- *   词书目录与共享池来自 @lexilexi/core 的 WORDBOOK_CATALOG / getWordbookPackage，
+ *   词书目录与共享池来自 @lexii/core 的 WORDBOOK_CATALOG / getWordbookPackage，
  *   安装落库复用 installPreset 的分块/可恢复/幂等/按 term 去重能力）
  * - RAY-294 扩展词包：getDictionaryPackageSummaries / fetchDictionaryManifest /
  *   installDictionaryPackage / markTier1CoveredByTier2
@@ -18,26 +18,26 @@ import {
   detectDecompression,
   downloadAndVerifyPackage,
   exportCsvWordlist,
-  exportLexilexiData,
+  exportLexiiData,
   fetchManifest,
   getDictionaryPackageState,
   getPresetInstallState,
-  importLexilexiData,
+  importLexiiData,
   installDictionaryPackage as coreInstallDictionaryPackage,
   installPreset,
   markTier1CoveredByTier2 as coreMarkTier1CoveredByTier2,
   openDatabase,
-  parseLexilexiExport,
+  parseLexiiExport,
   resetDictionaryPackageInstall as coreResetDictionaryPackageInstall,
   TIER0_PRESET,
-} from "@lexilexi/core";
+} from "@lexii/core";
 import type {
   DictionaryManifest,
-  LexilexiDatabase,
-  LexilexiExportData,
+  LexiiDatabase,
+  LexiiExportData,
   PresetPackage,
   WordbookDefinition,
-} from "@lexilexi/core";
+} from "@lexii/core";
 import type {
   DictionaryInstallResult,
   DictionaryManifestInfo,
@@ -68,12 +68,12 @@ const DICTIONARY_PACKAGES: readonly {
  * manifest 相对路径（与 SW 排除口径一致：resolveUrl("./presets/manifest.json")）。
  *
  * RAY-294 Phase 3：默认从当前部署的 presets/ 路径获取（GitHub Pages 子路径兼容）。
- * 可通过环境变量 LEXILEXI_MANIFEST_URL 覆盖（如指向 GitHub Releases 的绝对 URL）。
+ * 可通过环境变量 LEXII_MANIFEST_URL 覆盖（如指向 GitHub Releases 的绝对 URL）。
  * 启动时不发任何网络请求——仅用户进入扩展词包设置页时触发。
  *
  * 相对路径基准为 `window.location.href`（含完整页面路径），确保在
- * GitHub Pages 子路径部署（如 /Lexilexi/dev/）下解析为
- * /Lexilexi/dev/presets/manifest.json（presets 部署在 dev/ 子目录下）。
+ * GitHub Pages 子路径部署（如 /Lexii/dev/）下解析为
+ * /Lexii/dev/presets/manifest.json（presets 部署在 dev/ 子目录下）。
  */
 function getManifestUrl(): string {
   // 构建时注入的绝对 URL（可选，指向 GitHub Releases 等外部源）
@@ -81,39 +81,39 @@ function getManifestUrl(): string {
   if (injected) {
     return injected;
   }
-  // 相对路径基准为当前页面完整 URL（含 /Lexilexi/dev/ 等子路径），
+  // 相对路径基准为当前页面完整 URL（含 /Lexii/dev/ 等子路径），
   // 确保 ./presets/manifest.json 解析到页面所在子路径下的 presets/ 目录。
   return new URL("./presets/manifest.json", window.location.href).href;
 }
 
 /**
  * 词书模块按需加载（RAY-262 Oscar 评审 suggestion 3）：词书目录与共享池
- * 约 2 MB，经 "@lexilexi/core/presets/books" 子路径 + 动态 import 拆为
+ * 约 2 MB，经 "@lexii/core/presets/books" 子路径 + 动态 import 拆为
  * 独立 async chunk，只有打开词书库 / 安装词书时才加载，主 bundle 不再
  * 携带词书数据（tier0 数据仍随主 bundle，首启安装依赖）。
  */
-type WordbookModule = typeof import("@lexilexi/core/presets/books");
+type WordbookModule = typeof import("@lexii/core/presets/books");
 
 let wordbookModulePromise: Promise<WordbookModule> | null = null;
 
 function loadWordbookModule(): Promise<WordbookModule> {
-  wordbookModulePromise ??= import("@lexilexi/core/presets/books");
+  wordbookModulePromise ??= import("@lexii/core/presets/books");
   return wordbookModulePromise;
 }
 
 /**
  * 富化数据包按需加载（RAY-276 修复范围 2）：
  * 词书库安装的词条与 Tier 0 内置词表同口径内联填充富化字段
- * （只补缺失字段，见 @lexilexi/core 的 mergeEnrichmentIntoContent）。
+ * （只补缺失字段，见 @lexii/core 的 mergeEnrichmentIntoContent）。
  * 安装后立即受益，不依赖下一次富化包版本递增触发回填。
  * 3.6MB 数据包仅在用户安装词书时装载（与词书数据 chunk 同策略）。
  */
-type EnrichmentModule = typeof import("@lexilexi/core/presets/enrichment");
+type EnrichmentModule = typeof import("@lexii/core/presets/enrichment");
 
 let enrichmentModulePromise: Promise<EnrichmentModule> | null = null;
 
 function loadEnrichmentModule(): Promise<EnrichmentModule> {
-  enrichmentModulePromise ??= import("@lexilexi/core/presets/enrichment");
+  enrichmentModulePromise ??= import("@lexii/core/presets/enrichment");
   return enrichmentModulePromise;
 }
 
@@ -130,11 +130,11 @@ async function getCachedWordbookPackage(book: WordbookDefinition): Promise<Prese
   return preset;
 }
 
-/** 基于已打开的 Lexilexi 数据库创建设置页数据源（测试注入 fake-indexeddb 实例） */
-export function createIndexedDbSettingsDataProvider(db: LexilexiDatabase): SettingsDataProvider {
+/** 基于已打开的 Lexii 数据库创建设置页数据源（测试注入 fake-indexeddb 实例） */
+export function createIndexedDbSettingsDataProvider(db: LexiiDatabase): SettingsDataProvider {
   return {
-    async exportBackup(): Promise<LexilexiExportData> {
-      return exportLexilexiData(db, new Date().toISOString());
+    async exportBackup(): Promise<LexiiExportData> {
+      return exportLexiiData(db, new Date().toISOString());
     },
 
     async exportWordlistCsv(): Promise<string> {
@@ -142,8 +142,11 @@ export function createIndexedDbSettingsDataProvider(db: LexilexiDatabase): Setti
     },
 
     async importBackup(jsonText: string): Promise<ImportBackupResult> {
-      const data = parseLexilexiExport(jsonText);
-      await importLexilexiData(db, data);
+      // RAY-307 Oscar suggestion 4：向后兼容旧版 format: "lexilexi" 备份
+      // parseLexiiExport 只接受 format: "lexii"，旧备份需先替换 format 字段
+      const normalizedText = jsonText.replace(/"format"\s*:\s*"lexilexi"/, '"format": "lexii"');
+      const data = parseLexiiExport(normalizedText);
+      await importLexiiData(db, data);
       return {
         items: data.items.length,
         senses: data.senses.length,

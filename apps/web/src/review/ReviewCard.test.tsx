@@ -8,7 +8,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import type { Sense } from "@lexilexi/core";
+import type { Sense } from "@lexii/core";
 import {
   CARD_HEIGHT_MAX_REM,
   CARD_HEIGHT_MIN_REM,

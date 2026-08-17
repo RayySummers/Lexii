@@ -1,7 +1,7 @@
 /**
  * 搜词数据源（IndexedDB 实现）。
  *
- * 所有数据操作经由 @lexilexi/core 的公开 API：
+ * 所有数据操作经由 @lexii/core 的公开 API：
  * - search：searchAllSenses（senses + dictionarySenses 跨层合并检索，
  *   term 去重、学习义项优先、全局排序；RAY-294 升级路径）；
  * - hasAnySenses：senses + dictionarySenses 双表计数（空状态判定）；
@@ -18,14 +18,14 @@ import {
   openDatabase,
   promoteDictionarySense,
   searchAllSenses,
-} from "@lexilexi/core";
-import type { LexilexiDatabase, SenseId } from "@lexilexi/core";
+} from "@lexii/core";
+import type { LexiiDatabase, SenseId } from "@lexii/core";
 import { addWordToNotebook, removeWordBySenseId } from "../notebook/data";
 import type { AddToNotebookResult } from "../notebook/types";
 import type { SearchDataProvider, SearchResult } from "./types";
 
-/** 基于已打开的 Lexilexi 数据库创建搜词数据源（测试注入 fake-indexeddb 实例） */
-export function createIndexedDbSearchDataProvider(db: LexilexiDatabase): SearchDataProvider {
+/** 基于已打开的 Lexii 数据库创建搜词数据源（测试注入 fake-indexeddb 实例） */
+export function createIndexedDbSearchDataProvider(db: LexiiDatabase): SearchDataProvider {
   return {
     async search(query: string): Promise<SearchResult[]> {
       const hits = await searchAllSenses(db, query);

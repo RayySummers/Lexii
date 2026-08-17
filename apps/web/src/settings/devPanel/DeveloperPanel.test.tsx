@@ -14,7 +14,7 @@ import { DeveloperPanel } from "./DeveloperPanel";
 import type { DatabaseDebug, DeveloperDataProvider, FsrsDebug } from "./types";
 
 const DATABASE_DEBUG: DatabaseDebug = {
-  dbName: "lexilexi",
+  dbName: "lexii",
   schemaVersion: 4,
   tables: [
     { name: "items", count: 12 },
@@ -108,7 +108,7 @@ describe("DeveloperPanel", () => {
 
     for (const tag of APP_BUILD.releaseTags) {
       expect(screen.getByRole("link", { name: tag }).getAttribute("href")).toBe(
-        `https://github.com/RayySummers/Lexilexi/releases/tag/${tag}`,
+        `https://github.com/RayySummers/Lexii/releases/tag/${tag}`,
       );
     }
     // 当前版本（releaseTags 首位）带「（当前）」标记
@@ -120,7 +120,7 @@ describe("DeveloperPanel", () => {
     renderPanel(provider);
 
     expect(await screen.findByText("v4")).toBeInTheDocument();
-    expect(screen.getByText("lexilexi")).toBeInTheDocument();
+    expect(screen.getByText("lexii")).toBeInTheDocument();
     for (const table of DATABASE_DEBUG.tables) {
       expect(screen.getByText(table.name)).toBeInTheDocument();
       expect(screen.getByText(`${table.count} 条`)).toBeInTheDocument();
@@ -168,7 +168,7 @@ describe("DeveloperPanel", () => {
     fireEvent.click(checkbox);
     expect(checkbox).toBeChecked();
 
-    const stored = JSON.parse(window.localStorage.getItem("lexilexi:feature-flags") ?? "{}");
+    const stored = JSON.parse(window.localStorage.getItem("lexii:feature-flags") ?? "{}");
     expect(stored.dictation).toBe(true);
   });
 

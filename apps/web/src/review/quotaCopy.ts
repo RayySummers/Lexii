@@ -6,7 +6,7 @@
  * 词库仍有未学新词时展示，明确告知「顺延」，而不是暗示词库没有新词可学。
  * review 模式不含新词，返回 null（界面回落默认空状态文案）。
  */
-import type { StudyMode } from "@lexilexi/core";
+import type { StudyMode } from "@lexii/core";
 
 /** 空状态文案（title + body） */
 export interface EmptyStateCopy {

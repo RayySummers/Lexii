@@ -16,7 +16,7 @@
  * 读入内存过滤可接受；未来词库显著增大再评估索引 / 虚拟化（评审 C11）。
  */
 import type { Sense } from "./domain";
-import type { LexilexiDatabase } from "./persistence";
+import type { LexiiDatabase } from "./persistence";
 import { searchDictionarySenses } from "./dictionary";
 
 /** 命中类型：词条前缀 > 词条包含 > 释义包含（优先级从高到低） */
@@ -96,8 +96,8 @@ export function searchSenses(
  * 只读操作，不修改任何数据；检索逻辑全部委托 searchSenses，
  * 便于测试直接以纯函数验证排序与命中口径。
  */
-export async function searchLexilexiSenses(
-  db: LexilexiDatabase,
+export async function searchLexiiSenses(
+  db: LexiiDatabase,
   query: string,
   options: SenseSearchOptions = {},
 ): Promise<SenseSearchHit[]> {
@@ -131,7 +131,7 @@ function compareHits(a: SenseSearchHit, b: SenseSearchHit): number {
  * 两层完整取回 → 同一比较器全局排序 → 截断 DEFAULT_SEARCH_LIMIT。
  */
 export async function searchAllSenses(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   query: string,
   options: SenseSearchOptions = {},
 ): Promise<SenseSearchHit[]> {
@@ -141,7 +141,7 @@ export async function searchAllSenses(
 
   // 两层并行取回（学习表通常很小，词典表可能很大）
   const [learningHits, dictHits] = await Promise.all([
-    searchLexilexiSenses(db, q, { limit: 0 }), // 不截断，取全部命中
+    searchLexiiSenses(db, q, { limit: 0 }), // 不截断，取全部命中
     searchDictionarySenses(db, q, { limit: 0 }),
   ]);
 

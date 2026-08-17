@@ -6,7 +6,7 @@
  *   日历日口径含积压与今天稍后到期的卡，RAY-276；未截断，首页徽标用）；
  *   生词本开关关闭时排除生词本条目（RAY-284，与学习队列同口径）
  * - newCardsRemainingToday：getStudyQueueItemIds("learn")（未截断的新词队列
- *   长度，「剩余新卡数」与学习队列同口径）经 @lexilexi/stats 的
+ *   长度，「剩余新卡数」与学习队列同口径）经 @lexii/stats 的
  *   computeNewCardsRemainingToday 按「每日新卡上限 − 今日已学」与剩余新卡
  *   数取较小者（RAY-295：统计页「今日待学」按每日新卡上限过滤，不再
  *   显示全部未学新卡总数）
@@ -14,7 +14,7 @@
  *   的半开区间 [start, end)，与「今日待学」同为记忆状态口径）
  * - reviewCount / streakDays / totalDays / todayLearnCount / todayReviewCount /
  *   completedWordCount / todayStudyDurationMs / totalStudyDurationMs：
- *   @lexilexi/stats 纯函数（口径见 packages/stats，学习时长口径 RAY-270）
+ *   @lexii/stats 纯函数（口径见 packages/stats，学习时长口径 RAY-270）
  *
  * 性能说明（Oscar 评审 C1）：review 事件查询走 events 表的 type 索引
  * （where("type").equals("review")），不整表 toArray；事件数上万后
@@ -32,8 +32,8 @@ import {
   getStudyQueueItemIds,
   isReviewEvent,
   openDatabase,
-} from "@lexilexi/core";
-import type { LexilexiDatabase } from "@lexilexi/core";
+} from "@lexii/core";
+import type { LexiiDatabase } from "@lexii/core";
 import {
   computeCompletedWordCount,
   computeLearnedTodayCount,
@@ -45,13 +45,13 @@ import {
   computeTotalDays,
   countReviews,
   localDayBounds,
-} from "@lexilexi/stats";
+} from "@lexii/stats";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { readIncludeNotebook } from "../lib/notebookPreference";
 import type { StatsDataProvider, StatsSnapshot } from "./types";
 
-/** 基于已打开的 Lexilexi 数据库创建统计数据源（测试注入 fake-indexeddb 实例） */
-export function createIndexedDbStatsDataProvider(db: LexilexiDatabase): StatsDataProvider {
+/** 基于已打开的 Lexii 数据库创建统计数据源（测试注入 fake-indexeddb 实例） */
+export function createIndexedDbStatsDataProvider(db: LexiiDatabase): StatsDataProvider {
   return {
     async loadStats(): Promise<StatsSnapshot> {
       const now = new Date().toISOString();

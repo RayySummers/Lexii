@@ -63,7 +63,7 @@ jobs:
       # 全限定引用 @main：workflow_dispatch 时工作树可能切到旧 ref（无此 action），
       # 本地引用 `uses: ./.github/actions/build-presets` 会报 "Can't find action.yml"。
       - name: 构建 Tier 1/2 扩展词包
-        uses: RayySummers/Lexilexi/.github/actions/build-presets@main
+        uses: RayySummers/Lexii/.github/actions/build-presets@main
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4

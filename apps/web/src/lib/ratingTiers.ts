@@ -11,7 +11,7 @@
  */
 export type RatingTierMode = "three" | "four";
 
-export const RATING_TIER_STORAGE_KEY = "lexilexi:rating-tiers";
+export const RATING_TIER_STORAGE_KEY = "lexii:rating-tiers";
 
 /** 默认档位：三档（认识 / 模糊 / 不认识） */
 export const DEFAULT_RATING_TIER_MODE: RatingTierMode = "three";

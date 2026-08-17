@@ -9,7 +9,7 @@
  * - 未知 flag 的存量值原样保留（不丢用户数据），读取结果 = 默认值 ∪ 存量值。
  */
 
-export const FEATURE_FLAGS_STORAGE_KEY = "lexilexi:feature-flags";
+export const FEATURE_FLAGS_STORAGE_KEY = "lexii:feature-flags";
 
 /** 单个 flag 的登记项 */
 export interface FeatureFlagDefinition {
@@ -36,7 +36,7 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
     id: "evidence-model",
     name: "Evidence model 评分",
     description:
-      "下一期候选：lexilexi_eval 证据模型参与复习评分。当前仅为开关预留，尚未接入任何功能逻辑。",
+      "下一期候选：lexii_eval 证据模型参与复习评分。当前仅为开关预留，尚未接入任何功能逻辑。",
     defaultValue: false,
   },
   {

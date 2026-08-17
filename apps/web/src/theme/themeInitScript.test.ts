@@ -4,9 +4,9 @@ import { resolveTheme, THEME_STORAGE_KEY } from "./resolve";
 
 // 提取 index.html 中随应用实际发布的内联主题初始化脚本
 function extractInitScript(source: string): string {
-  const match = source.match(/<script data-lexilexi-theme-init>([\s\S]*?)<\/script>/);
+  const match = source.match(/<script data-lexii-theme-init>([\s\S]*?)<\/script>/);
   if (!match || match[1] === undefined) {
-    throw new Error("index.html 中未找到 data-lexilexi-theme-init 内联脚本");
+    throw new Error("index.html 中未找到 data-lexii-theme-init 内联脚本");
   }
   return match[1];
 }

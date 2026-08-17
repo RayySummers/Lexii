@@ -4,8 +4,8 @@
  * 用 `toItemId` / `toSenseId` 把字符串铸成品牌类型；时间与 id 由内部计数器
  * 递增，保证同文件内夹具互不冲突。
  */
-import { newCardFields } from "@lexilexi/fsrs";
-import { toItemId, toSenseId } from "@lexilexi/core";
+import { newCardFields } from "@lexii/fsrs";
+import { toItemId, toSenseId } from "@lexii/core";
 import type {
   IsoDate,
   LearningItem,
@@ -13,7 +13,7 @@ import type {
   MemoryStateFields,
   Sense,
   SenseId,
-} from "@lexilexi/core";
+} from "@lexii/core";
 import type { ReviewCard } from "./types";
 
 let counter = 0;

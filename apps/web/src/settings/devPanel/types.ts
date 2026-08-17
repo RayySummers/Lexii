@@ -7,11 +7,11 @@
  * - 数据库调试 / FSRS 调试的返回结构。
  *
  * 边界：面板只做「读取本机数据库现状 + 危险操作（清库）」，
- * 全部经由 @lexilexi/core / @lexilexi/fsrs 的公开 API，不在 apps/web
+ * 全部经由 @lexii/core / @lexii/fsrs 的公开 API，不在 apps/web
  * 内实现任何算法；不引入任何网络请求（local-first 红线）。
  */
-import type { IsoDate } from "@lexilexi/core";
-import type { FSRSParameters } from "@lexilexi/fsrs";
+import type { IsoDate } from "@lexii/core";
+import type { FSRSParameters } from "@lexii/fsrs";
 
 /** 单表记录数（表名 → 当前记录数） */
 export interface DatabaseTableDebug {
@@ -21,7 +21,7 @@ export interface DatabaseTableDebug {
 
 /** 数据库调试快照 */
 export interface DatabaseDebug {
-  /** 数据库名（与 @lexilexi/core 的库名一致） */
+  /** 数据库名（与 @lexii/core 的库名一致） */
   dbName: string;
   /** 当前 schema 版本（Dexie verno，即 core 的 DB_SCHEMA_VERSION） */
   schemaVersion: number;

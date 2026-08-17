@@ -1,13 +1,13 @@
 /**
  * 复习队列构建（纯函数）。
  *
- * 与 @lexilexi/core 的分工：`getStudyQueueItemIds` 负责「哪些记忆状态
+ * 与 @lexii/core 的分工：`getStudyQueueItemIds` 负责「哪些记忆状态
  * 进入队列、按什么顺序」（含三模式的筛选、排序与混合穿插），本函数负责
  * 「id 列表 → 可复习卡片」的完整性校验——这是 UI 侧的装配逻辑，不含任何
  * 调度算法，也不重排队列顺序。
  */
-import { endOfLocalDay } from "@lexilexi/core";
-import type { IsoDate, LearningItem, MemoryState, Sense } from "@lexilexi/core";
+import { endOfLocalDay } from "@lexii/core";
+import type { IsoDate, LearningItem, MemoryState, Sense } from "@lexii/core";
 import type { ReviewCard } from "./types";
 
 /**
@@ -25,7 +25,7 @@ import type { ReviewCard } from "./types";
  *   口径保持一致——「今日待学」含今天稍后到期的卡，RAY-276 诊断线 2），
  *   防止调用方传错时间导致未来卡提前进入队列；
  * - 保持输入顺序：队列组成与排序（due 升序 / 混合穿插）由
- *   @lexilexi/core 的 getStudyQueueItemIds 决定，本函数不得重排
+ *   @lexii/core 的 getStudyQueueItemIds 决定，本函数不得重排
  *   （RAY-253 三模式队列的穿插顺序必须原样保留）。
  */
 export function buildReviewQueue(

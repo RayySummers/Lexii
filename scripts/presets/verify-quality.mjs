@@ -56,7 +56,7 @@ async function fetchWiktionaryDefinition(term) {
     const timer = setTimeout(() => controller.abort(), 20000);
     try {
       const res = await fetch(url, {
-        headers: { "user-agent": "lexilexi-preset-pipeline (local-first vocabulary app)" },
+        headers: { "user-agent": "lexii-preset-pipeline (local-first vocabulary app)" },
         signal: controller.signal,
       });
       if (res.status === 404) {

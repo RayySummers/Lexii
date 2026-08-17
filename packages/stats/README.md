@@ -1,10 +1,10 @@
-# @lexilexi/stats
+# @lexii/stats
 
-Lexilexi 学习统计包：从本地事件流聚合学习统计。
+Lexii 学习统计包：从本地事件流聚合学习统计。
 
 ## 职责
 
-- 只依赖 `@lexilexi/core` 的领域类型（`ReviewEvent`），不碰 IndexedDB 表结构。
+- 只依赖 `@lexii/core` 的领域类型（`ReviewEvent`），不碰 IndexedDB 表结构。
 - 全部纯函数：输入事件数组 + 查询基准时刻，输出统计值；便于测试与重放。
 - 事件是唯一事实来源（docs/domain-model.md §7），全部在本地计算，不向任何外部服务发送数据。
 
@@ -23,10 +23,10 @@ Lexilexi 学习统计包：从本地事件流聚合学习统计。
 | 今日学习时长（毫秒） | `computeTodayStudyDurationMs(events, now?)`                             | 本地日历日落在今天的有效复习时长之和；RAY-270                                                                                                                               |
 | 单次有效时长（毫秒） | `effectiveReviewDurationMs(event)`                                      | reviewDurationMs 按 `MAX_EFFECTIVE_REVIEW_DURATION_MS`（5 分钟）截断；负数/非法值按 0                                                                                       |
 | 时长显示文案         | `formatStudyDuration(ms)`                                               | 自适应：0 →「0 分钟」；不足 1 分钟 →「不足 1 分钟」；不足 1 小时 →「X 分钟」；1 小时及以上 →「X 小时 Y 分钟」（Y=0 时省略，仅显示「X 小时」）                               |
-| 本地日区间           | `localDayBounds(now, offsetDays?)`                                      | 某本地日历日的半开区间 [start, end)（ISO），供「今日待学/明日到期」与 `@lexilexi/core` 的 `getDueItemIdsInRange` 对齐                                                       |
+| 本地日区间           | `localDayBounds(now, offsetDays?)`                                      | 某本地日历日的半开区间 [start, end)（ISO），供「今日待学/明日到期」与 `@lexii/core` 的 `getDueItemIdsInRange` 对齐                                                          |
 
 「今日待学 / 明日到期（词条）」由 `apps/web` 统计数据源经
-`@lexilexi/core` 的 `getDueItemIds` / `getDueItemIdsInRange` 查询记忆状态得到
+`@lexii/core` 的 `getDueItemIds` / `getDueItemIdsInRange` 查询记忆状态得到
 （due 口径见 core；统计包只负责把「基准时刻」换算成本地日历日区间）。
 措辞不对称（今日「待学」/ 明日「到期」）是口径使然而非遗漏：今日含 reps===0
 的新词（due = now），称「待学」更准确；明日均为已排期复习卡，称「到期」更
@@ -65,7 +65,7 @@ type ReviewOutcome = "correct" | "wrong" | "forgotten";
 ## 使用
 
 ```ts
-import { computeStreak, computeTotalDays, countReviewOutcomes } from "@lexilexi/stats";
+import { computeStreak, computeTotalDays, countReviewOutcomes } from "@lexii/stats";
 
 const reviews = await db.events.where("type").equals("review").toArray();
 const streak = computeStreak(reviews, new Date().toISOString());

@@ -8,8 +8,8 @@
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { toEventId } from "@lexilexi/core";
-import type { ReviewRating, StudyMode } from "@lexilexi/core";
+import { toEventId } from "@lexii/core";
+import type { ReviewRating, StudyMode } from "@lexii/core";
 import { RATING_TIER_STORAGE_KEY } from "../lib/ratingTiers";
 import { ReviewScreen } from "./ReviewScreen";
 import { makeCard } from "./testFixtures";

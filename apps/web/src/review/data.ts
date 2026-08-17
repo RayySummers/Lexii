@@ -1,7 +1,7 @@
 /**
  * 复习数据源（IndexedDB 实现）。
  *
- * 所有数据操作经由 @lexilexi/core 的公开 API：
+ * 所有数据操作经由 @lexii/core 的公开 API：
  * - loadQueue：getStudyQueueItemIds（按模式筛选 + 排序 + 混合穿插）→
  *   bulkGet（条目 / 义项 / 记忆状态，各一次批量往返，不在循环里逐条查询）
  *   → buildReviewQueue（完整性校验，保持 core 给定的顺序）
@@ -12,7 +12,7 @@
  * - importSampleWordlist：importCsvWordlist（内置示例词表，空状态一键体验）
  *
  * 每日新卡上限（RAY-260 评审 suggestion 2）：learn / mixed 模式在取队列前，
- * 用 @lexilexi/stats 的 computeLearnedTodayCount（今天首次被复习的词条数，
+ * 用 @lexii/stats 的 computeLearnedTodayCount（今天首次被复习的词条数，
  * 事件投影、无需额外状态）折算「今日剩余新卡额度」传给 core 截取；
  * review 模式只含复习卡，不触发额度计算。读取路径见 resolveNewCardLimit。
  */
@@ -28,19 +28,19 @@ import {
   MIN_QUIZ_OPTION_COUNT,
   openDatabase,
   undoReview,
-} from "@lexilexi/core";
+} from "@lexii/core";
 import type {
   EventId,
   ItemId,
   LearningItem,
-  LexilexiDatabase,
+  LexiiDatabase,
   MemoryState,
   ReviewEvent,
   ReviewRating,
   SenseId,
   StudyMode,
-} from "@lexilexi/core";
-import { computeLearnedTodayCount, localDayBounds } from "@lexilexi/stats";
+} from "@lexii/core";
+import { computeLearnedTodayCount, localDayBounds } from "@lexii/stats";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { readIncludeNotebook } from "../lib/notebookPreference";
 import { readQuizDirectionPreference, resolveQuizDirection } from "../lib/quizDirection";
@@ -71,7 +71,7 @@ const SAMPLE_SOURCE = "内置示例词表";
  *   最近的前日事件。最坏情形（今日复习的全是新导入词，历史中无证据）退化为
  *   一次早前历史扫描，与旧实现同阶，绝不更差。
  */
-async function resolveNewCardLimit(db: LexilexiDatabase, now: string): Promise<number> {
+async function resolveNewCardLimit(db: LexiiDatabase, now: string): Promise<number> {
   const configured = readDailyNewCardLimit();
   const bounds = localDayBounds(now);
 
@@ -104,14 +104,14 @@ async function resolveNewCardLimit(db: LexilexiDatabase, now: string): Promise<n
       }
     });
 
-  // 3. 「今日已学新词」口径复用 @lexilexi/stats 纯函数：给定集合内每词条的
+  // 3. 「今日已学新词」口径复用 @lexii/stats 纯函数：给定集合内每词条的
   //    最早 review 事件落在今天即计为今日新学（todayReviews ∪ 早前证据）。
   const learnedToday = computeLearnedTodayCount([...todayReviews, ...earlierEvidence], now);
   return Math.max(0, configured - learnedToday);
 }
 
-/** 基于已打开的 Lexilexi 数据库创建复习数据源（测试注入 fake-indexeddb 实例） */
-export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewDataProvider {
+/** 基于已打开的 Lexii 数据库创建复习数据源（测试注入 fake-indexeddb 实例） */
+export function createIndexedDbReviewDataProvider(db: LexiiDatabase): ReviewDataProvider {
   return {
     async loadQueue(mode: StudyMode): Promise<ReviewCard[]> {
       const now = new Date().toISOString();

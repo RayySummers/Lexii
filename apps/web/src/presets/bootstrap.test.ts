@@ -6,7 +6,7 @@
  */
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { LexilexiDatabase, PresetPackage } from "@lexilexi/core";
+import type { LexiiDatabase, PresetPackage } from "@lexii/core";
 import {
   enrichmentDoneKey,
   enrichmentProgressKey,
@@ -15,13 +15,13 @@ import {
   openDatabase,
   parseEnrichmentPreset,
   presetProgressKey,
-} from "@lexilexi/core";
+} from "@lexii/core";
 import { bootstrapPresetData, bootstrapTier0Preset } from "./bootstrap";
 
 // 富化子路径 mock（suggestion 3 入口测试）：避免在测试中装载 3.6MB 的
 // 真实 enrichment.tier0.data.json，用覆盖词表首词 "a" 的小包替代。
-vi.mock("@lexilexi/core/presets/enrichment", async () => {
-  const { parseEnrichmentPreset } = await import("@lexilexi/core");
+vi.mock("@lexii/core/presets/enrichment", async () => {
+  const { parseEnrichmentPreset } = await import("@lexii/core");
   return {
     ENRICHMENT_TIER0_PRESET: parseEnrichmentPreset(
       {
@@ -41,9 +41,9 @@ function makeOptions(): { indexedDB: IDBFactory; IDBKeyRange: typeof IDBKeyRange
   return { indexedDB: new IDBFactory(), IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
-function freshDatabase(): LexilexiDatabase {
+function freshDatabase(): LexiiDatabase {
   db = openDatabase(makeOptions());
   return db;
 }

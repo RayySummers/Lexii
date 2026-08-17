@@ -12,7 +12,7 @@
  * - 全部颜色走 design tokens（浅色/深色自动生效），不硬编码颜色。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { NotebookEntryId } from "@lexilexi/core";
+import type { NotebookEntryId } from "@lexii/core";
 import { ScreenHeader } from "../components/ScreenHeader";
 import type { NotebookDataProvider, NotebookListItem } from "./types";
 

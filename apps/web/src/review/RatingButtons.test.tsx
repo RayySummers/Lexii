@@ -8,7 +8,7 @@
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { ReviewRating } from "@lexilexi/core";
+import type { ReviewRating } from "@lexii/core";
 import { RatingButtons } from "./RatingButtons";
 
 const DUE_LABELS: Record<ReviewRating, string | null> = {

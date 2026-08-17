@@ -1,7 +1,7 @@
 /**
  * 持久化权限状态：启动时申请 + 设置页订阅。
  *
- * 对接 @lexilexi/core 的 requestPersistence / STORAGE_PERMISSION_EVENT：
+ * 对接 @lexii/core 的 requestPersistence / STORAGE_PERMISSION_EVENT：
  * - `initPersistenceStatus()` 在应用启动时调用一次（main.tsx），
  *   内部调用 requestPersistence(navigator) 并监听其派发的事件；
  * - 结果缓存在模块级，供设置页通过 `usePersistenceStatus()` 读取——
@@ -14,7 +14,7 @@ import {
   requestPersistence,
   type PersistenceStatus,
   type StoragePermissionRequestedDetail,
-} from "@lexilexi/core";
+} from "@lexii/core";
 
 let current: PersistenceStatus | null = null;
 const listeners = new Set<() => void>();

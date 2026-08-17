@@ -6,13 +6,13 @@
  * - 打包 NOTICE 全文（MIT 版权声明 + CC BY-SA 署名与共享义务）。
  *
  * 说明文案为过渡版（Vega RAY-259 的正式文案交付后替换）；数据事实层
- * （来源/许可/署名）来自 RAY-257 简报核对结论，随 @lexilexi/core 的
+ * （来源/许可/署名）来自 RAY-257 简报核对结论，随 @lexii/core 的
  * THIRD_PARTY_DATA_SOURCES / THIRD_PARTY_NOTICES 分发。
  * 全部颜色走 design tokens（浅色/深色自动生效）。
  */
 import { useEffect, useState } from "react";
-import type { ThirdPartyDataSource } from "@lexilexi/core";
-import { THIRD_PARTY_DATA_SOURCES, THIRD_PARTY_NOTICES } from "@lexilexi/core";
+import type { ThirdPartyDataSource } from "@lexii/core";
+import { THIRD_PARTY_DATA_SOURCES, THIRD_PARTY_NOTICES } from "@lexii/core";
 import { ScreenHeader } from "../components/ScreenHeader";
 import type { PresetSummary, SettingsDataProvider } from "./types";
 

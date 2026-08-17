@@ -30,7 +30,7 @@
  * - 全部颜色走 design tokens（浅色/深色两套自动生效）。
  */
 import { useState, type ReactNode } from "react";
-import type { StudyMode } from "@lexilexi/core";
+import type { StudyMode } from "@lexii/core";
 import { readDailyNewCardLimit } from "./lib/dailyNewCardLimit";
 import { useStats } from "./stats/useStats";
 import type { StatsDataProvider } from "./stats/types";

@@ -8,7 +8,7 @@
  * 设置值只影响「新卡」的数量上限：学习/混合队列中当日可引入的新词数。
  * 已学过的复习卡不受任何限制（复习不能欠账）。
  */
-export const DAILY_NEW_CARD_LIMIT_STORAGE_KEY = "lexilexi:daily-new-card-limit";
+export const DAILY_NEW_CARD_LIMIT_STORAGE_KEY = "lexii:daily-new-card-limit";
 
 /** 默认每日新卡上限（RAY-260 口径） */
 export const DEFAULT_DAILY_NEW_CARD_LIMIT = 20;
