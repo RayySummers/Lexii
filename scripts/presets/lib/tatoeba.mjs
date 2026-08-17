@@ -19,7 +19,7 @@ import { readFileSync } from "node:fs";
 import { Converter } from "opencc-js";
 
 /** 繁体→简体转换器（Tatoeba 中文句可能含繁体，统一转简体） */
-const toSimplified = Converter({ from: "tw", to: "cn" });
+const toSimplified = Converter({ from: "t", to: "cn" });
 
 /** 许可类型（过滤白名单外的许可；当前导出仅 CC-BY / CC0 两种形态） */
 const ALLOWED_LICENSES = new Set(["CC-BY", "CC0"]);
