@@ -1,5 +1,5 @@
 /**
- * 扩展词包设置页（RAY-294 Tier 1/2 大词库离线下载）。
+ * 扩展词包设置页（RAY-294 Tier 1/2 大词库联网下载、离线可用）。
  *
  * - 用户主动触发：仅进入本页时 fetchManifest（启动不联网）；
  * - 词包列表与状态：未装 / 已装 / 安装中（进度）/ covered（Tier 1 被 Tier 2 覆盖）；
@@ -129,7 +129,7 @@ function DownloadConfirmDialog({
           <p>
             扩展词包数据来自
             <strong> ECDICT</strong>（MIT 许可，© 2025
-            Linwei），下载后离线可用，全程不联网、不埋点。
+            Linwei）。下载时需联网，下载后可离线使用；不埋点。
           </p>
           <p>词包仅扩充词典检索层，不影响已有学习数据。加入词书/生词本后才进入学习队列。</p>
         </div>
@@ -345,7 +345,7 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
       <ScreenHeader title="扩展词包" onBack={onBack} backLabel="返回设置" />
 
       <p className="text-sm text-text-muted">
-        下载扩展词包可将词典检索范围从内置 7,195 词扩展到 ECDICT
+        下载扩展词包（需联网，下载后可离线使用）可将词典检索范围从内置 7,195 词扩展到 ECDICT
         全量覆盖。词包仅扩充检索层，不影响已有学习数据；加入词书/生词本后才进入学习队列。
       </p>
 
@@ -381,7 +381,7 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
           >
             GitHub
           </a>
-          ）。下载后离线可用，全程不联网、不埋点。
+          ）。下载时需联网，下载后可离线使用；不埋点。
         </p>
       </div>
 
