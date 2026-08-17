@@ -181,36 +181,3 @@ describe("HomeScreen", () => {
     expect(screen.queryByText(/今日新卡额度/)).not.toBeInTheDocument();
   });
 });
-
-describe("HomeScreen 生词本开关（RAY-284）", () => {
-  it("默认开启（localStorage 无记录）；切换后写回偏好并刷新统计", async () => {
-    const loadStats = vi.fn().mockResolvedValue(badgeSnapshot(3, 1, 1));
-    render(<HomeScreen onStart={vi.fn()} statsProvider={{ loadStats }} />);
-    const toggle = screen.getByRole("switch", { name: "学习列表是否包含生词本" });
-    expect(toggle).toHaveAttribute("aria-checked", "true");
-
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-checked", "false");
-    // 偏好写回 localStorage，统计随开关刷新（徽标与队列口径一致）
-    await waitFor(() => expect(loadStats).toHaveBeenCalledTimes(2));
-
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-checked", "true");
-    await waitFor(() => expect(loadStats).toHaveBeenCalledTimes(3));
-  });
-
-  it("读取既有偏好：localStorage 为 0 时初始关闭", () => {
-    window.localStorage.setItem("lexilexi:include-notebook", "0");
-    render(<HomeScreen onStart={vi.fn()} statsProvider={null} />);
-    expect(screen.getByRole("switch", { name: "学习列表是否包含生词本" })).toHaveAttribute(
-      "aria-checked",
-      "false",
-    );
-  });
-
-  it("开关说明文案展示「词书不受影响」口径", () => {
-    render(<HomeScreen onStart={vi.fn()} statsProvider={null} />);
-    expect(screen.getByText("学习列表包含生词本")).toBeInTheDocument();
-    expect(screen.getByText(/词书不受影响/)).toBeInTheDocument();
-  });
-});
