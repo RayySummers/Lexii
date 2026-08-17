@@ -16,6 +16,10 @@
  * maxPerTerm 对（按英文句 id 升序取先收录的句子）。
  */
 import { readFileSync } from "node:fs";
+import { Converter } from "opencc-js";
+
+/** 繁体→简体转换器（Tatoeba 中文句可能含繁体，统一转简体） */
+const toSimplified = Converter({ from: "tw", to: "cn" });
 
 /** 许可类型（过滤白名单外的许可；当前导出仅 CC-BY / CC0 两种形态） */
 const ALLOWED_LICENSES = new Set(["CC-BY", "CC0"]);
@@ -155,11 +159,13 @@ export function buildPairPool({ engLines, cmnLines, linkLines, cc0EngLines, cc0C
       }
       seenPair.add(pairKey);
       seenEngText.add(textKey);
+      // 繁体→简体：Tatoeba 中文句可能含繁体，统一转简体确保一致性
+      const translation = toSimplified(cmnSentence.text);
       const list = pairs.get(engId);
       if (list) {
-        list.push({ text: engSentence.text, translation: cmnSentence.text });
+        list.push({ text: engSentence.text, translation });
       } else {
-        pairs.set(engId, [{ text: engSentence.text, translation: cmnSentence.text }]);
+        pairs.set(engId, [{ text: engSentence.text, translation }]);
       }
     }
   }

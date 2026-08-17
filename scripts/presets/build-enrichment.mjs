@@ -56,7 +56,7 @@ const TIER0_ENRICHMENT_JSON = path.join(
 const KAIKKI_FILE = path.join(DATA_DIR, "kaikki", "kaikki.org-dictionary-English.jsonl");
 
 /** 富化包版本：来源快照固定后版本随内容变更递增 */
-const ENRICHMENT_VERSION = "1.0.0";
+const ENRICHMENT_VERSION = "1.2.0";
 
 /**
  * 每词上限与文本截断——Tier 0 / Tier 1 两档体积口径：
