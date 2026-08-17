@@ -830,14 +830,29 @@ export async function downloadAndVerifyPackage(
     throw new Error(`SHA-256 校验失败：期望 ${variant.sha256}，实际 ${hashHex}`);
   }
 
-  // 解析 JSON：打包侧生成紧凑元组数组 [term, definitions, pos, ipa, tags]，
-  // 需转换为 PresetWordEntry 对象（与 tier0.ts / books.ts 的 convertPresetEntry 口径一致）。
+  // 解析 JSON：打包侧（build.mjs）生成结构化对象
+  // { id, version, name, ..., entries: [[term, definitions, pos, ipa, tags], ...] }
+  // 需从 entries 字段提取元组数组并转换为 PresetWordEntry 对象。
+  // 兼容裸数组格式（测试 / 旧版产物）。
   const text = new TextDecoder().decode(decompressed);
-  const raw = JSON.parse(text) as unknown[];
-  if (!Array.isArray(raw)) {
-    throw new Error("包文件格式非法：顶层不是数组");
+  const parsed: unknown = JSON.parse(text);
+
+  let rawEntries: unknown[];
+  if (Array.isArray(parsed)) {
+    // 裸数组格式（测试 / 旧版产物）：顶层即为词条元组数组
+    rawEntries = parsed;
+  } else if (parsed && typeof parsed === "object" && "entries" in parsed) {
+    // 结构化格式（build.mjs 产物）：{ id, version, name, ..., entries: [...] }
+    const obj = parsed as { entries: unknown };
+    if (!Array.isArray(obj.entries)) {
+      throw new Error("包文件格式非法：entries 字段不是数组");
+    }
+    rawEntries = obj.entries;
+  } else {
+    throw new Error("包文件格式非法：顶层不是数组且不含 entries 字段");
   }
-  return raw.map((entry, index) => {
+
+  return rawEntries.map((entry, index) => {
     if (Array.isArray(entry)) {
       return tupleToPresetWordEntry(entry, index);
     }

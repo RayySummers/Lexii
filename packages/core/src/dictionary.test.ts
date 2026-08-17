@@ -666,6 +666,97 @@ describe("downloadAndVerifyPackage（元组转换）", () => {
     URL.revokeObjectURL(url);
   });
 
+  it("build.mjs 结构化对象格式（{entries: [...]}）正确转换", async () => {
+    // 模拟 build.mjs 实际输出：{ id, version, name, ..., entries: [[...], ...] }
+    const payload = {
+      id: "core-en-tier2",
+      version: "1.0.0",
+      name: "全量词表（清洗后全部词条）",
+      generatedAt: "2026-08-17T00:00:00.000Z",
+      source: "ECDICT (MIT)",
+      entries: [
+        ["kaleidoscope", "万花筒", "n.", "/kəˈlaɪdəskoʊp/", ""],
+        ["menstrual", "月经的\n经期的", "a.", "/ˈmenstruəl/", "考研"],
+      ],
+    };
+    const jsonBytes = new TextEncoder().encode(JSON.stringify(payload));
+
+    const hashBuffer = await crypto.subtle.digest("SHA-256", jsonBytes);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const sha256 = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+
+    const blob = new Blob([jsonBytes], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const variant: ManifestVariant = {
+      url,
+      size: jsonBytes.length,
+      sha256,
+    };
+
+    const entries = await downloadAndVerifyPackage(variant);
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0]!.term).toBe("kaleidoscope");
+    expect(entries[0]!.definitions).toEqual(["万花筒"]);
+    expect(entries[0]!.pos).toBe("n.");
+    expect(entries[0]!.tags).toEqual([]);
+
+    expect(entries[1]!.term).toBe("menstrual");
+    expect(entries[1]!.definitions).toEqual(["月经的", "经期的"]);
+    expect(entries[1]!.tags).toEqual(["考研"]);
+
+    URL.revokeObjectURL(url);
+  });
+
+  it("顶层非数组且无 entries 字段时抛出格式错误", async () => {
+    const jsonBytes = new TextEncoder().encode(JSON.stringify({ foo: "bar" }));
+
+    const hashBuffer = await crypto.subtle.digest("SHA-256", jsonBytes);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const sha256 = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+
+    const blob = new Blob([jsonBytes], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const variant: ManifestVariant = {
+      url,
+      size: jsonBytes.length,
+      sha256,
+    };
+
+    await expect(downloadAndVerifyPackage(variant)).rejects.toThrow(
+      "包文件格式非法：顶层不是数组且不含 entries 字段",
+    );
+
+    URL.revokeObjectURL(url);
+  });
+
+  it("entries 字段非数组时抛出格式错误", async () => {
+    const jsonBytes = new TextEncoder().encode(
+      JSON.stringify({ id: "test", entries: "not-an-array" }),
+    );
+
+    const hashBuffer = await crypto.subtle.digest("SHA-256", jsonBytes);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const sha256 = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+
+    const blob = new Blob([jsonBytes], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const variant: ManifestVariant = {
+      url,
+      size: jsonBytes.length,
+      sha256,
+    };
+
+    await expect(downloadAndVerifyPackage(variant)).rejects.toThrow(
+      "包文件格式非法：entries 字段不是数组",
+    );
+
+    URL.revokeObjectURL(url);
+  });
+
   it("元组格式安装后可通过 searchDictionarySenses 检索到", async () => {
     const database = freshDatabase();
 
