@@ -452,9 +452,7 @@ function PhaseContent({
           {session.canUndo ? <UndoButton onUndo={() => void session.undo()} /> : null}
           <p className="text-center text-xs text-text-muted">
             空格翻面 ·{" "}
-            {tierMode === "three"
-              ? "数字键 1–3 评分"
-              : "数字键 1–4 或字母 A / H / G / E 评分"}
+            {tierMode === "three" ? "数字键 1–3 评分" : "数字键 1–4 或字母 A / H / G / E 评分"}
           </p>
         </>
       );
