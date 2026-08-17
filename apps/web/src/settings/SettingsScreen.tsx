@@ -22,6 +22,11 @@
  * - 选择题出题方向（RAY-293）：学习分组三档选单（英译中 / 中译英 / 混合），
  *   与评分档位、发音口音同一 localStorage 持久化模式；方向只影响题目
  *   呈现，不影响评分与 FSRS 调度（见 docs/quiz-fsrs-mapping.md）。
+ * - 卡片字体（RAY-323）：外观分组内 2×2 卡片选择器（4 档：现代简约 /
+ *   现代圆润 / 手写温润 / 优雅衬线），每张卡片用对应字体渲染示例单词，
+ *   让用户选择前看清字面特征；选中立即写入 localStorage，并通过
+ *   <html data-card-font="..."> 同步到全局 CSS 变量 --lex-card-font，
+ *   复习卡本体（ReviewCard 词条）下次渲染即生效。
  * - 隐藏开发者面板（RAY-297）：页面底部版本号连点 5 次解锁「开发者」分组
  *   （再次连点 5 次折叠，解锁状态存 localStorage）；分组内为通道切换器 /
  *   构建信息 / 版本回退 / 数据库调试 / FSRS 调试 / Feature flags，
@@ -40,6 +45,7 @@ import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { APP_VERSION } from "../lib/appVersion";
+import type { CardFont } from "../lib/cardFont";
 import {
   DAILY_NEW_CARD_LIMIT_MAX,
   DAILY_NEW_CARD_LIMIT_MIN,
@@ -69,6 +75,7 @@ import { DeveloperPanel } from "./devPanel/DeveloperPanel";
 import { createDefaultDeveloperDataProvider } from "./devPanel/data";
 import type { DeveloperDataProvider } from "./devPanel/types";
 import { nextTapState, readDevPanelUnlocked, writeDevPanelUnlocked } from "./devPanel/unlock";
+import { FontPicker } from "./FontPicker";
 import { usePersistenceStatus } from "./persistenceStatus";
 import type { SettingsDataProvider } from "./types";
 
@@ -101,6 +108,9 @@ export interface SettingsScreenProps {
   /** 主题偏好（RAY-261：App 级 useTheme 单一数据源，本页仅选择与回调，不自行持久化） */
   themePreference: ThemePreference;
   onThemePreferenceChange(preference: ThemePreference): void;
+  /** 卡片字体（RAY-323：App 级 useCardFont 单一数据源，本页仅选择与回调，不自行持久化） */
+  cardFont: CardFont;
+  onCardFontChange(font: CardFont): void;
   /** 开发者面板数据源工厂（RAY-297：默认浏览器 IndexedDB；测试注入 mock，解锁时才创建） */
   developerDataProviderFactory?: () => DeveloperDataProvider;
 }
@@ -125,6 +135,8 @@ export function SettingsScreen({
   onExit,
   themePreference,
   onThemePreferenceChange,
+  cardFont,
+  onCardFontChange,
   developerDataProviderFactory = createDefaultDeveloperDataProvider,
 }: SettingsScreenProps) {
   // 二级视图分发（hooks 规则：主视图的全部 hooks 在 SettingsMainView 内，此处仅一个 state）
@@ -267,6 +279,15 @@ export function SettingsScreen({
     });
   }, []);
 
+  /**
+   * 卡片字体切换（RAY-323）：选档只产出合法值（FontPicker 的 onChange 来自
+   *  CARD_FONT_OPTIONS，类型已收敛）；与主题（RAY-261）同一模式——App 级
+   *  useCardFont 单一数据源持有状态与持久化、DOM 同步，本页只透传回调。
+   *  持久化与 <html data-card-font> 同步由 useCardFont 统一处理，避免两处
+   *  state 漂移（评审 C-12 可维护性）。
+   */
+  const handleCardFontChange = onCardFontChange;
+
   /** 版本号连点（RAY-297）：累计 N 次翻转解锁状态并持久化；未到阈值只计数。
    *  Oscar 评审 nit 1：localStorage 写入放在 updater 外（updater 保持纯函数）。 */
   const handleVersionTap = useCallback(() => {
@@ -333,6 +354,8 @@ export function SettingsScreen({
       onQuizDirectionChange={handleQuizDirectionChange}
       includeNotebook={includeNotebook}
       onIncludeNotebookToggle={handleIncludeNotebookToggle}
+      cardFont={cardFont}
+      onCardFontChange={handleCardFontChange}
       themePreference={themePreference}
       onThemePreferenceChange={onThemePreferenceChange}
       devPanelUnlocked={devPanelTapState.unlocked}
@@ -375,6 +398,9 @@ interface SettingsMainViewProps {
   /** 生词本开关（RAY-284 / RAY-303）：学习列表是否包含生词本 */
   includeNotebook: boolean;
   onIncludeNotebookToggle(): void;
+  /** 卡片字体（RAY-323）：4 档（inter / google-sans / playpen / newsreader） */
+  cardFont: CardFont;
+  onCardFontChange(next: CardFont): void;
   /** 主题偏好三档（RAY-261）：App 级 useTheme 单一数据源下发 */
   themePreference: ThemePreference;
   onThemePreferenceChange(preference: ThemePreference): void;
@@ -408,6 +434,8 @@ function SettingsMainView({
   onQuizDirectionChange,
   includeNotebook,
   onIncludeNotebookToggle,
+  cardFont,
+  onCardFontChange,
   themePreference,
   onThemePreferenceChange,
   devPanelUnlocked,
@@ -503,6 +531,17 @@ function SettingsMainView({
             <option value="system">跟随系统</option>
           </select>
         </label>
+        {/* 卡片字体（RAY-323）：2×2 卡片选单，每张以对应字体渲染示例单词，
+            让用户选择前直接看到字面特征；选档立即持久化并同步到复习卡 */}
+        <div className="flex flex-col gap-2">
+          <div>
+            <span className="text-sm font-semibold">卡片字体</span>
+            <span className="mt-1 block text-xs text-text-muted">
+              复习卡上单词本体的字体（4 档 Google Fonts，选档立即生效）。
+            </span>
+          </div>
+          <FontPicker value={cardFont} onChange={onCardFontChange} groupLabel="卡片字体" />
+        </div>
       </Section>
 
       <Section title="学习">

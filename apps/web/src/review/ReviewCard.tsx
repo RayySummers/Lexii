@@ -16,6 +16,11 @@
  * 底栏（翻面/评分提示）布局一致）。滚动区以 sense.id 为 key，换卡
  * 时重建、滚动位置不跨卡残留。
  *
+ * RAY-323：正反面词本体（sense.term）应用用户选择的卡片字体
+ * （见 src/lib/cardFont），4 档字体经 CSS 变量 --lex-card-font
+ * 单点切换；本组件只引用变量，不在多处硬编码字体名，也不在多档
+ * 各自定义一套样式（评审 C-12 可维护性）。
+ *
  * 可访问性：
  * - 整卡是一个可聚焦的 <button>，aria-expanded 表达翻面（展开/收起）状态；
  * - 背面初始不可见且 aria-hidden，翻面后互换，屏幕阅读器只读到当前面；
@@ -100,7 +105,12 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardPro
             className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto overscroll-contain px-6 pb-4 pt-6"
           >
             <div className="m-auto flex flex-col items-center justify-center gap-3">
-              <span className="text-4xl font-bold tracking-tight sm:text-5xl">{sense.term}</span>
+              <span
+                className="text-4xl font-bold tracking-tight sm:text-5xl"
+                style={{ fontFamily: "var(--lex-card-font)" }}
+              >
+                {sense.term}
+              </span>
               <span className="flex flex-wrap items-center justify-center gap-2 text-sm text-text-muted">
                 <PhoneticsRow sense={sense} />
                 {sense.pos ? (
@@ -137,7 +147,12 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardPro
           >
             <span className="flex flex-wrap items-baseline justify-between gap-3">
               <span className="flex items-center gap-2">
-                <span className="text-2xl font-bold tracking-tight">{sense.term}</span>
+                <span
+                  className="text-2xl font-bold tracking-tight"
+                  style={{ fontFamily: "var(--lex-card-font)" }}
+                >
+                  {sense.term}
+                </span>
                 {sense.pos ? (
                   <span className="rounded-full border border-border bg-surface-raised px-2 py-0.5 text-xs text-text-muted">
                     {sense.pos}

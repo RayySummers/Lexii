@@ -9,10 +9,11 @@
  * 主题偏好由 App 级 useTheme 持有：本页测试只验证选单渲染受控与回调
  * 参数正确；解析、应用与持久化行为在 useTheme.test.ts 覆盖。
  */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LexiiExportData } from "@lexii/core";
 import { APP_VERSION } from "../lib/appVersion";
+import type { CardFont } from "../lib/cardFont";
 import type { ThemePreference } from "../theme/resolve";
 import { readDevPanelUnlocked, writeDevPanelUnlocked } from "./devPanel/unlock";
 import type { DeveloperDataProvider } from "./devPanel/types";
@@ -158,6 +159,9 @@ interface RenderSettingsOptions {
   /** 主题偏好（RAY-261 必传 props；默认跟随系统） */
   themePreference?: ThemePreference;
   onThemePreferenceChange?: (preference: ThemePreference) => void;
+  /** 卡片字体（RAY-323 必传 props；默认 modern） */
+  cardFont?: CardFont;
+  onCardFontChange?: (font: CardFont) => void;
   /** 开发者面板数据源工厂（RAY-297：默认 mock，避免误触真实 IndexedDB） */
   developerDataProviderFactory?: () => DeveloperDataProvider;
 }
@@ -170,6 +174,8 @@ function renderSettings(options: RenderSettingsOptions = {}) {
       onExit={options.onExit ?? (() => {})}
       themePreference={options.themePreference ?? "system"}
       onThemePreferenceChange={options.onThemePreferenceChange ?? vi.fn()}
+      cardFont={options.cardFont ?? "inter"}
+      onCardFontChange={options.onCardFontChange ?? vi.fn()}
       developerDataProviderFactory={options.developerDataProviderFactory ?? makeDevProvider}
     />,
   );
@@ -614,6 +620,76 @@ describe("RAY-303 学习设置：学习列表包含生词本开关（从首页�
     await screen.findByText("学习");
     expect(screen.getByText("学习列表包含生词本")).toBeInTheDocument();
     expect(screen.getByText(/词书不受影响/)).toBeInTheDocument();
+  });
+});
+
+describe("RAY-323 外观：卡片字体 2×2 选择器", () => {
+  it("外观分组下展示 4 张字体卡片，按 CARD_FONT_OPTIONS 顺序排列", async () => {
+    renderSettings();
+    await screen.findByText("外观");
+
+    const group = screen.getByRole("radiogroup", { name: "卡片字体" });
+    const cards = within(group).getAllByRole("radio", { hidden: true });
+    expect(cards).toHaveLength(4);
+    expect(cards.map((card) => (card as HTMLInputElement).value)).toEqual([
+      "inter",
+      "google-sans",
+      "playpen",
+      "newsreader",
+    ]);
+  });
+
+  it("默认档位（inter）显示「已选」徽标，其他三档无徽标", async () => {
+    renderSettings();
+    await screen.findByText("外观");
+
+    expect(screen.getByLabelText("已选中")).toBeInTheDocument();
+    const selectedLabel = screen.getByLabelText("已选中").closest("label");
+    expect(selectedLabel).not.toBeNull();
+    expect(selectedLabel!.className).toContain("border-primary");
+    // 4 档中只有 1 个「已选」徽标
+    expect(screen.getAllByLabelText("已选中")).toHaveLength(1);
+  });
+
+  it("切换字体：回调 onCardFontChange(目标 id)；本页只透传、不自行持久化（与主题同模式）", async () => {
+    const onCardFontChange = vi.fn();
+    renderSettings({ onCardFontChange });
+    await screen.findByText("外观");
+
+    const group = screen.getByRole("radiogroup", { name: "卡片字体" });
+    // 模拟原生 radio click（受控组件必须 change 才会回调，重复点已选项不触发）；
+    // 选「非默认」三档以保证 onChange 必触发，避免点击已选中档导致 change 静默吞掉。
+    const sequence: Array<"playpen" | "newsreader" | "google-sans"> = [
+      "playpen",
+      "newsreader",
+      "google-sans",
+    ];
+    for (const next of sequence) {
+      const radio = within(group).getByDisplayValue(next) as HTMLInputElement;
+      fireEvent.click(radio);
+      expect(onCardFontChange).toHaveBeenLastCalledWith(next);
+    }
+    expect(onCardFontChange).toHaveBeenCalledTimes(sequence.length);
+    // 设置页不自行持久化，由 App 级 useCardFont 负责
+    expect(window.localStorage.getItem("lexii:card-font")).toBeNull();
+  });
+
+  it("受控 props：父级传 playpen 时初始 playpen 卡片显示「已选」", async () => {
+    renderSettings({ cardFont: "playpen" });
+    await screen.findByText("外观");
+
+    const selectedLabel = screen.getByLabelText("已选中").closest("label");
+    expect(selectedLabel).toHaveTextContent("手写温润");
+    const playpenRadio = screen.getByDisplayValue("playpen") as HTMLInputElement;
+    expect(playpenRadio.checked).toBe(true);
+  });
+
+  it("受控 props：父级传 newsreader 时初始 newsreader 卡片显示「已选」", async () => {
+    renderSettings({ cardFont: "newsreader" });
+    await screen.findByText("外观");
+
+    const selectedLabel = screen.getByLabelText("已选中").closest("label");
+    expect(selectedLabel).toHaveTextContent("优雅衬线");
   });
 });
 

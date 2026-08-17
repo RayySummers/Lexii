@@ -31,6 +31,7 @@ import type { StudyMode } from "@lexii/core";
 import { BookmarkIcon } from "./components/icons";
 import { FirstOpenDialog } from "./components/FirstOpenDialog";
 import { HomeScreen, type StudyFormat } from "./HomeScreen";
+import { useCardFont } from "./hooks/useCardFont";
 import { useHashRoute } from "./hooks/useHashRoute";
 import { useTheme } from "./hooks/useTheme";
 import { markFirstOpenDialogDismissed, shouldShowFirstOpenDialog } from "./lib/firstOpenDialog";
@@ -73,6 +74,10 @@ export function App({
   notebookProviderFactory = createDefaultNotebookDataProvider,
 }: AppProps) {
   const { preference, setPreference } = useTheme();
+  // RAY-323: 卡片字体（App 级 useCardFont 单一数据源，复习卡与设置页共享），
+  // 挂载即同步到 <html data-card-font>，CSS 变量单点切换字体栈；
+  // setFont 下发到设置页，写入与 DOM 同步由本 hook 统一处理。
+  const { font: cardFont, setFont: setCardFont } = useCardFont();
   // RAY-315: Hash-based routing so refresh preserves the current view.
   const [view, navigate] = useHashRoute();
   // RAY-315: Auto-create providers for the initial hash-restored view to avoid
@@ -188,6 +193,8 @@ export function App({
           onExit={goHome}
           themePreference={preference}
           onThemePreferenceChange={setPreference}
+          cardFont={cardFont}
+          onCardFontChange={setCardFont}
         />
       ) : view === "stats" && statsProvider ? (
         <StatsScreen provider={statsProvider} onExit={goHome} />

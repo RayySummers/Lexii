@@ -49,3 +49,34 @@
   --lex-success: #4ade80;
   --lex-focus-ring: #818cf8;
 }
+
+/*
+ * 卡片字体（RAY-323）：
+ * - 默认值与四种档位在 :root / [data-card-font="..."] 上定义，
+ *   复习卡片本体与设置页示例区均引用 var(--lex-card-font)。
+ * - 单点来源在 src/lib/cardFont.ts 的 CARD_FONT_OPTIONS（每个
+ *   档位的 fontFamily 与示例文案），CSS 只负责把"档位"映射到
+ *   "font-family 字符串"——组件层不感知具体字体名，也不在多处
+ *   重复字面量（评审 C-11 性能/可维护性）。
+ * - 字体降级栈：每档在 Google Fonts 失败 / 离线时退回系统字体
+ *   （无衬线 / 衬线 / 手写体），卡片仍可读，绝不出现空字形。
+ */
+:root {
+  --lex-card-font: "Inter", "Inter Display", system-ui, sans-serif;
+}
+
+[data-card-font="inter"] {
+  --lex-card-font: "Inter", "Inter Display", system-ui, sans-serif;
+}
+
+[data-card-font="google-sans"] {
+  --lex-card-font: "Google Sans Flex", system-ui, sans-serif;
+}
+
+[data-card-font="playpen"] {
+  --lex-card-font: "Playpen Sans", "Comic Sans MS", cursive;
+}
+
+[data-card-font="newsreader"] {
+  --lex-card-font: "Newsreader", Georgia, "Times New Roman", serif;
+}
