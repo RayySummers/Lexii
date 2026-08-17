@@ -116,6 +116,9 @@ describe("App", () => {
     window.localStorage.clear();
     // 默认视为「已看过首次弹窗」，避免干扰既有用例；RAY-282 专项用例自行清标记
     window.localStorage.setItem(FIRST_OPEN_DIALOG_STORAGE_KEY, FIRST_OPEN_DIALOG_DISMISSED_VALUE);
+    // RAY-315: Reset URL hash between tests — useHashRoute reads it on mount,
+    // and history.pushState in one test would leak into the next otherwise.
+    history.replaceState(null, "", window.location.pathname + window.location.search);
     // useTheme 会注册 prefers-color-scheme change 监听（RAY-261），mock 需提供对应 API
     window.matchMedia = vi.fn().mockReturnValue({
       matches: false,
@@ -347,6 +350,7 @@ describe("App 生词本入口（RAY-284）", () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.localStorage.setItem(FIRST_OPEN_DIALOG_STORAGE_KEY, FIRST_OPEN_DIALOG_DISMISSED_VALUE);
+    history.replaceState(null, "", window.location.pathname + window.location.search);
     window.matchMedia = vi.fn().mockReturnValue({
       matches: false,
       addEventListener: () => {},
