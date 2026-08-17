@@ -2,14 +2,14 @@ name: Deploy Release（稳定通道）
 
 # RAY-297 任务 A（双通道部署架构，上半部分）：Release 通道。
 # - 自动触发：仅发版 tag（v*）推送时，把该 tag 构建为稳定版并发布到
-#   Pages 根路径（rayysummers.github.io/Lexilexi/）。main push 不再触发根路径部署。
+#   Pages 根路径（rayysummers.github.io/Lexii/）。main push 不再触发根路径部署。
 # - 手动触发：workflow_dispatch 保留，可对任意 ref 发布稳定版
 #   （ref 留空时自动解析最新 v* tag）。
 # - 与 deploy-dev.yml 互补：每次部署都发布「自洽的完整站点」——根路径为本通道
 #   产物，dev/ 子目录为 main 当前快照的 dev 构建。两通道互相携带对方快照，
 #   任何一次部署都不会把另一个通道冲成 404。
 #
-# 构建信息注入（RAY-297 任务 B）：两次构建分别设置 LEXILEXI_CHANNEL 与
+# 构建信息注入（RAY-297 任务 B）：两次构建分别设置 LEXII_CHANNEL 与
 # BUILD_BRANCH，vite.config.ts 在构建时收集 SHA/时间/分支/通道/历史 tag，
 # 运行时零网络请求。
 #
@@ -92,12 +92,12 @@ jobs:
       # 全限定引用 @main：workflow_dispatch 时工作树可能切到旧 ref（无此 action），
       # 本地引用 `uses: ./.github/actions/build-presets` 会报 "Can't find action.yml"。
       - name: 构建 Tier 1/2 扩展词包
-        uses: RayySummers/Lexilexi/.github/actions/build-presets@main
+        uses: RayySummers/Lexii/.github/actions/build-presets@main
 
       - name: 构建稳定版（根路径）
-        run: pnpm --filter @lexilexi/web build
+        run: pnpm --filter @lexii/web build
         env:
-          LEXILEXI_CHANNEL: release
+          LEXII_CHANNEL: release
           BUILD_BRANCH: ${{ env.BUILD_BRANCH }}
 
       - name: 暂存稳定版产物
@@ -115,11 +115,11 @@ jobs:
         run: |
           git checkout -B main origin/main
           pnpm install --frozen-lockfile
-          pnpm --filter @lexilexi/web build
+          pnpm --filter @lexii/web build
           mkdir -p site/dev
           cp -a apps/web/dist/. site/dev/
         env:
-          LEXILEXI_CHANNEL: dev
+          LEXII_CHANNEL: dev
           BUILD_BRANCH: main
 
       - name: 暂存 dev 词包（presets → dev/presets/）

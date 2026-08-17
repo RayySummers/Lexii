@@ -281,6 +281,21 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     expect(harness.claim).toHaveBeenCalledTimes(1);
   });
 
+  it("activate 清理旧版 lexilexi-shell-* 残留缓存（RAY-307 改名迁移）", async () => {
+    const harness = loadServiceWorker();
+    await runInstall(harness);
+    // 模拟旧版缓存残留
+    harness.cachesByName.set("lexilexi-shell-v1", new FakeCache("lexilexi-shell-v1"));
+    harness.cachesByName.set("lexilexi-shell-v0", new FakeCache("lexilexi-shell-v0"));
+
+    await runActivate(harness);
+
+    expect(harness.cachesByName.has("lexilexi-shell-v0")).toBe(false);
+    expect(harness.cachesByName.has("lexilexi-shell-v1")).toBe(false);
+    expect(harness.cachesByName.has("lexii-shell-v1")).toBe(true);
+    expect(harness.claim).toHaveBeenCalledTimes(1);
+  });
+
   it("导航请求离线时回退到缓存的 index.html（验收点：离线可打开应用）", async () => {
     const harness = loadServiceWorker();
     await runInstall(harness);

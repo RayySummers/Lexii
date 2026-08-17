@@ -109,7 +109,20 @@ self.addEventListener("activate", (event) => {
     caches
       .keys()
       .then((names) =>
-        Promise.all(names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))),
+        Promise.all(
+          names
+            .filter((name) => name !== CACHE_NAME)
+            // RAY-307 Oscar suggestion 5：额外清理旧版 lexilexi-shell-* 缓存
+            // （改名前残留，activate 的 name !== CACHE_NAME 已覆盖，此处显式
+            // 匹配确保即使未来 CACHE_NAME 前缀变化也能清理旧缓存）
+            .concat(
+              names.filter(
+                (name) => name.startsWith("lexilexi-shell-") && name !== CACHE_NAME,
+              ),
+            )
+            .filter((name, i, arr) => arr.indexOf(name) === i) // 去重
+            .map((name) => caches.delete(name)),
+        ),
       )
       .then(() => self.clients.claim()),
   );

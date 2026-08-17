@@ -142,7 +142,13 @@ export function createIndexedDbSettingsDataProvider(db: LexiiDatabase): Settings
     },
 
     async importBackup(jsonText: string): Promise<ImportBackupResult> {
-      const data = parseLexiiExport(jsonText);
+      // RAY-307 Oscar suggestion 4：向后兼容旧版 format: "lexilexi" 备份
+      // parseLexiiExport 只接受 format: "lexii"，旧备份需先替换 format 字段
+      const normalizedText = jsonText.replace(
+        /"format"\s*:\s*"lexilexi"/,
+        '"format": "lexii"',
+      );
+      const data = parseLexiiExport(normalizedText);
       await importLexiiData(db, data);
       return {
         items: data.items.length,

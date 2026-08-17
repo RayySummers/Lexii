@@ -63,10 +63,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright Chromium
-        run: pnpm --filter @lexilexi/web exec playwright install --with-deps chromium
+        run: pnpm --filter @lexii/web exec playwright install --with-deps chromium
 
       - name: E2E
-        run: pnpm --filter @lexilexi/web test:e2e
+        run: pnpm --filter @lexii/web test:e2e
 
   fsrs-verify:
     name: FSRS-7 对照官方参考实现验证
@@ -90,4 +90,4 @@ jobs:
       # 对照官方 ts-fsrs 参考实现的差分验证，单独 job、结果独立可见。
       # 验收红线：与官方参考实现输出一致才算通过（见 packages/fsrs/README.md）。
       - name: FSRS-7 verify
-        run: pnpm --filter @lexilexi/fsrs test:verify
+        run: pnpm --filter @lexii/fsrs test:verify
