@@ -309,12 +309,21 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
   );
 
   // 取消安装
-  const handleCancelInstall = useCallback((packageId: string) => {
-    const controller = abortControllersRef.current.get(packageId);
-    if (controller) {
-      controller.abort();
-    }
-  }, []);
+  const handleCancelInstall = useCallback(
+    (packageId: string) => {
+      const controller = abortControllersRef.current.get(packageId);
+      if (controller) {
+        controller.abort();
+      }
+      // 清除 IDB 进度标记，使 getDictionaryPackageState 回退到 not-installed；
+      // 随后刷新列表，UI 立即恢复「下载」按钮。
+      void provider
+        .resetDictionaryPackageInstall(packageId)
+        .then(() => refresh())
+        .catch(() => {});
+    },
+    [provider, refresh],
+  );
 
   // 获取 manifest 中的体积信息
   const getManifestSize = useCallback(

@@ -60,6 +60,7 @@ function makeSettingsProviderFactory() {
     fetchDictionaryManifest: vi.fn().mockRejectedValue(new Error("无法获取词包信息：网络不可达")),
     installDictionaryPackage: vi.fn().mockResolvedValue({ status: "installed", installedCount: 0 }),
     markTier1CoveredByTier2: vi.fn().mockResolvedValue(undefined),
+    resetDictionaryPackageInstall: vi.fn().mockResolvedValue(undefined),
   };
   return { provider, factory: vi.fn().mockReturnValue(provider) };
 }

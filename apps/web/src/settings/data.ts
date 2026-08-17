@@ -28,6 +28,7 @@ import {
   markTier1CoveredByTier2 as coreMarkTier1CoveredByTier2,
   openDatabase,
   parseLexilexiExport,
+  resetDictionaryPackageInstall as coreResetDictionaryPackageInstall,
   TIER0_PRESET,
 } from "@lexilexi/core";
 import type {
@@ -327,6 +328,10 @@ export function createIndexedDbSettingsDataProvider(db: LexilexiDatabase): Setti
 
     async markTier1CoveredByTier2(): Promise<void> {
       return coreMarkTier1CoveredByTier2(db);
+    },
+
+    async resetDictionaryPackageInstall(packageId: string): Promise<void> {
+      return coreResetDictionaryPackageInstall(db, packageId);
     },
   };
 }

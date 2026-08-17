@@ -67,6 +67,7 @@ function makeProvider(overrides: Partial<SettingsDataProvider> = {}): SettingsDa
       skippedCount: 0,
     } satisfies DictionaryInstallResult),
     markTier1CoveredByTier2: vi.fn().mockResolvedValue(undefined),
+    resetDictionaryPackageInstall: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -525,6 +526,48 @@ describe("DictionaryPackagesScreen", () => {
     });
     // 不应展示错误
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("取消安装后调用 resetDictionaryPackageInstall 清除进度", async () => {
+    const installSpy = vi.fn().mockImplementation((_id: string, signal?: AbortSignal) => {
+      return new Promise<DictionaryInstallResult>((_resolve, reject) => {
+        signal?.addEventListener("abort", () => {
+          reject(new DOMException("安装已取消", "AbortError"));
+        });
+      });
+    });
+    const resetSpy = vi.fn().mockResolvedValue(undefined);
+    const provider = makeProvider({
+      installDictionaryPackage: installSpy,
+      resetDictionaryPackageInstall: resetSpy,
+    });
+    render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("下载")).toHaveLength(2);
+    });
+
+    // 点击下载 → 确认
+    fireEvent.click(screen.getAllByText("下载")[0]!);
+    await waitFor(() => {
+      expect(screen.getByText("确认下载")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("确认下载"));
+
+    await waitFor(() => {
+      expect(installSpy).toHaveBeenCalledOnce();
+    });
+
+    // 点击取消
+    await waitFor(() => {
+      expect(screen.getByText("取消")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("取消"));
+
+    // 应调用 resetDictionaryPackageInstall 清除 IDB 进度
+    await waitFor(() => {
+      expect(resetSpy).toHaveBeenCalledWith("core-en-tier1");
+    });
   });
 
   it("manifest 不可用时展示错误提示（降级）", async () => {
