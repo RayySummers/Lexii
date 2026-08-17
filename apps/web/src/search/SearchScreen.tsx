@@ -443,7 +443,9 @@ function SearchResultRow({
         <button
           type="button"
           onClick={() => onToggleNotebook(sense.id)}
-          aria-label={inNotebook ? `把「${sense.term}」移出生词本` : `把「${sense.term}」加入生词本`}
+          aria-label={
+            inNotebook ? `把「${sense.term}」移出生词本` : `把「${sense.term}」加入生词本`
+          }
           className={`flex items-center gap-1 rounded-full border px-4 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
             inNotebook
               ? "border-success/40 bg-success/10 text-success hover:border-danger/40 hover:bg-danger/10 hover:text-danger"

@@ -338,7 +338,9 @@ describe("SearchScreen 生词本加词入口（RAY-284 + RAY-302 可撤销）", 
 
     expect(addToNotebook).toHaveBeenCalledWith(toSenseId("sense_ui_apple"));
     // 按钮切换为 ✓ 状态
-    expect(await screen.findByRole("button", { name: "把「apple」移出生词本" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "把「apple」移出生词本" }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "把「apple」加入生词本" })).not.toBeInTheDocument();
   });
 
@@ -376,14 +378,18 @@ describe("SearchScreen 生词本加词入口（RAY-284 + RAY-302 可撤销）", 
     fireEvent.click(await screen.findByRole("button", { name: "把「apple」加入生词本" }));
 
     // 切换到 ✓ 状态
-    expect(await screen.findByRole("button", { name: "把「apple」移出生词本" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "把「apple」移出生词本" }),
+    ).toBeInTheDocument();
 
     // 再次点击撤销
     fireEvent.click(screen.getByRole("button", { name: "把「apple」移出生词本" }));
 
     expect(removeFromNotebookBySenseId).toHaveBeenCalledWith(toSenseId("sense_ui_apple"));
     // 恢复为「加词」按钮
-    expect(await screen.findByRole("button", { name: "把「apple」加入生词本" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "把「apple」加入生词本" }),
+    ).toBeInTheDocument();
   });
 
   it("加词失败时按钮保持原状态（静默，用户可重试）", async () => {

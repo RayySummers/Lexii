@@ -619,8 +619,12 @@ describe("ReviewScreen 生词本加词入口（RAY-284 + RAY-302 可撤销）", 
 
     expect(harness.addToNotebook).toHaveBeenCalledWith(card.sense.id);
     // 按钮切换为 ✓ 状态
-    expect(await screen.findByRole("button", { name: `把「${card.sense.term}」移出生词本` })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: `把「${card.sense.term}」加入生词本` })).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: `把「${card.sense.term}」移出生词本` }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: `把「${card.sense.term}」加入生词本` }),
+    ).not.toBeInTheDocument();
   });
 
   it("已在生词本的卡直接显示「已加」✓ 按钮（进入页面读一次）", async () => {
@@ -631,8 +635,12 @@ describe("ReviewScreen 生词本加词入口（RAY-284 + RAY-302 可撤销）", 
     render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
 
     await expectCardShown(card.sense.term);
-    expect(screen.getByRole("button", { name: `把「${card.sense.term}」移出生词本` })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: `把「${card.sense.term}」加入生词本` })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: `把「${card.sense.term}」移出生词本` }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: `把「${card.sense.term}」加入生词本` }),
+    ).not.toBeInTheDocument();
   });
 
   it("已加词后再次点击「已加」按钮：调用 removeFromNotebookBySenseId，按钮恢复为「加词」", async () => {
@@ -644,13 +652,17 @@ describe("ReviewScreen 生词本加词入口（RAY-284 + RAY-302 可撤销）", 
     await expectCardShown(card.sense.term);
     // 先加词
     fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` }));
-    expect(await screen.findByRole("button", { name: `把「${card.sense.term}」移出生词本` })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: `把「${card.sense.term}」移出生词本` }),
+    ).toBeInTheDocument();
 
     // 再次点击撤销
     fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」移出生词本` }));
 
     expect(harness.removeFromNotebookBySenseId).toHaveBeenCalledWith(card.sense.id);
-    expect(await screen.findByRole("button", { name: `把「${card.sense.term}」加入生词本` })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: `把「${card.sense.term}」加入生词本` }),
+    ).toBeInTheDocument();
   });
 
   it("加词失败时按钮保持原状态（静默，不阻塞复习）", async () => {
@@ -664,7 +676,9 @@ describe("ReviewScreen 生词本加词入口（RAY-284 + RAY-302 可撤销）", 
     fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` }));
 
     // 按钮保持原样（加词失败，不切换状态）
-    expect(screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` }),
+    ).toBeInTheDocument();
     // 评分仍可用：失败不阻塞继续复习
     expect(screen.getByRole("button", { name: /评分：认识/ })).toBeInTheDocument();
   });

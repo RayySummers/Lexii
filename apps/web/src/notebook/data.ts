@@ -45,10 +45,7 @@ export async function addWordToNotebook(
  * 按义项 id 移出生词本（RAY-302 搜词页 / 复习卡页共用）：
  * 查找该义项的 active 生词本条目并移出；条目不存在则静默跳过。
  */
-export async function removeWordBySenseId(
-  db: LexilexiDatabase,
-  senseId: SenseId,
-): Promise<void> {
+export async function removeWordBySenseId(db: LexilexiDatabase, senseId: SenseId): Promise<void> {
   const existing = await db.notebookEntries
     .where("senseId")
     .equals(senseId)
