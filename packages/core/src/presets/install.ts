@@ -30,7 +30,7 @@ import { DEFAULT_WORDLIST_LANG } from "../csv";
 import type { LanguageCode } from "../domain";
 import { createId, toEventId, toItemId } from "../id";
 import { toMemoryState, toSense } from "../importWords";
-import type { LexilexiDatabase } from "../persistence";
+import type { LexiiDatabase } from "../persistence";
 import { mergeEnrichmentIntoContent, toEnrichmentMap } from "./enrichment";
 import type { EnrichmentPresetPackage, PresetPackage } from "./types";
 
@@ -94,7 +94,7 @@ function yieldToMainThread(): Promise<void> {
 
 /** 读取安装状态（done/progress 标记） */
 export async function getPresetInstallState(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   preset: PresetPackage,
 ): Promise<PresetInstallState> {
   const done = await db.meta.get(presetDoneKey(preset.id));
@@ -120,14 +120,14 @@ export async function getPresetInstallState(
 /**
  * 分块安装预设词表（可恢复、幂等、并发安全）。
  *
- * @param db 已打开的 Lexilexi 数据库
+ * @param db 已打开的 Lexii 数据库
  * @param preset 预设词表包（entries 已由打包侧清洗/排序/去重）
  * @param options 语言 / 时刻 / 让出函数（测试注入）
  * @returns installed = 本次实际新写入词条数（不含跳过的已存在词条）；
  *   already-installed = 完成标记命中，跳过
  */
 export async function installPreset(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   preset: PresetPackage,
   options: PresetInstallOptions = {},
 ): Promise<PresetInstallResult> {

@@ -13,16 +13,16 @@ import { CsvFormatError, parseCsvWordlist } from "./csv";
 import { exportCsvWordlist } from "./exportCsv";
 import { makeLearningItem, makeMemoryState, makeSense, makeReviewEvent, now } from "./helpers";
 import { importCsvWordlist } from "./importWords";
-import type { LexilexiDatabase } from "./persistence";
-import { createLexilexiDatabase, openDatabase, recordReview } from "./persistence";
+import type { LexiiDatabase } from "./persistence";
+import { createLexiiDatabase, openDatabase, recordReview } from "./persistence";
 
 function makeOptions(): DexieOptions {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
-function freshDatabase(): LexilexiDatabase {
+function freshDatabase(): LexiiDatabase {
   db = openDatabase(makeOptions());
   return db;
 }
@@ -92,9 +92,9 @@ describe("损坏 CSV 边界", () => {
 });
 
 describe("存储不可用", () => {
-  it("createLexilexiDatabase 注入自定义 Dexie 构造函数（无 IndexedDB 环境时的测试接缝）", async () => {
-    const custom = createLexilexiDatabase(makeOptions(), undefined, Dexie);
-    expect(custom.name).toBe("lexilexi"); // 库名由工厂固定
+  it("createLexiiDatabase 注入自定义 Dexie 构造函数（无 IndexedDB 环境时的测试接缝）", async () => {
+    const custom = createLexiiDatabase(makeOptions(), undefined, Dexie);
+    expect(custom.name).toBe("lexii"); // 库名由工厂固定
     custom.version(1).stores({ items: "id" });
     await custom.open();
     await custom.table("items").put({ id: "x" });

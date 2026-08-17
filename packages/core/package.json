@@ -1,9 +1,9 @@
 {
-  "name": "@lexilexi/core",
+  "name": "@lexii/core",
   "version": "0.1.0-alpha.8",
   "private": true,
   "type": "module",
-  "description": "Lexilexi 核心领域模型与共享类型（local-first 骨架）",
+  "description": "Lexii 核心领域模型与共享类型（local-first 骨架）",
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -27,7 +27,7 @@
     "bench": "vitest bench"
   },
   "dependencies": {
-    "@lexilexi/fsrs": "workspace:*",
+    "@lexii/fsrs": "workspace:*",
     "dexie": "^4.2.0"
   },
   "devDependencies": {

@@ -1,8 +1,8 @@
 /**
- * @lexilexi/stats — 学习统计（连击、累计天数、今日学习/复习、词条完成、结果分类）
+ * @lexii/stats — 学习统计（连击、累计天数、今日学习/复习、词条完成、结果分类）
  *
  * 从本地事件流聚合（事件是唯一事实来源，见 docs/domain-model.md §7），
- * 只依赖 @lexilexi/core 的领域类型，不碰 IndexedDB 表结构。
+ * 只依赖 @lexii/core 的领域类型，不碰 IndexedDB 表结构。
  * 全部函数为纯函数（输入事件数组 + 查询基准时刻）。
  *
  * 口径说明：
@@ -30,7 +30,7 @@
  *   否则按 answerWasCorrect 分对/错。为后续「最晚背到几点」「遗忘最多的
  *   单词」统计打底（时间戳与每词结果均已随 review 事件落库）。
  */
-import type { EventId, IsoDate, ItemId, ReviewEvent } from "@lexilexi/core";
+import type { EventId, IsoDate, ItemId, ReviewEvent } from "@lexii/core";
 
 /** 一天的毫秒数 */
 const DAY_MS = 86_400_000;
@@ -365,7 +365,7 @@ export function countReviewOutcomesByItem(
  *
  * 以「基准时刻所在本地日历日」为第 0 天，offsetDays 偏移后返回该天的
  * 00:00:00.000（含）到次日 00:00:00.000（不含）。用于把「今日/明日到期」
- * 换算成 due 时间区间查询（与 @lexilexi/core 的 getDueItemIdsInRange 对齐）。
+ * 换算成 due 时间区间查询（与 @lexii/core 的 getDueItemIdsInRange 对齐）。
  * 直接由本地日历分量构造 Date，与夏令时无关。
  */
 export interface LocalDayBounds {
@@ -447,4 +447,4 @@ function localDayOrdinal(ms: number): number {
 }
 
 /** 包名（保留原骨架导出的兼容） */
-export const PACKAGE_NAME = "@lexilexi/stats";
+export const PACKAGE_NAME = "@lexii/stats";

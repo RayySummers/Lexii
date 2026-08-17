@@ -7,7 +7,7 @@
 import type { EventId, ItemId, SenseId } from "./id";
 
 /** 应用名（英文） */
-export const APP_NAME = "Lexilexi";
+export const APP_NAME = "Lexii";
 
 /** 应用名（中文） */
 export const APP_NAME_ZH = "乐希";

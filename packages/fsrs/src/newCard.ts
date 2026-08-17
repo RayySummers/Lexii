@@ -2,7 +2,7 @@
  * 新卡初始状态工厂：把「无状态的条目」变成可调度的卡片状态。
  *
  * 对应 docs/domain-model.md §6 的接口契约（RAY-236）：
- * 「初始状态由 @lexilexi/fsrs 的 newCardFields() 创建」。
+ * 「初始状态由 @lexii/fsrs 的 newCardFields() 创建」。
  * 纯函数，不持有存储；输入不携带调度状态，输出可直接作为
  * MemoryStateFields 持久化（due 为 ISO 字符串）。
  */

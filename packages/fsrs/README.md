@@ -1,12 +1,12 @@
-# @lexilexi/fsrs
+# @lexii/fsrs
 
-Lexilexi 的 FSRS-7 调度算法包。
+Lexii 的 FSRS-7 调度算法包。
 
 ## 职责
 
 - 实现 FSRS-7 调度算法（记忆状态更新、间隔计算、到期复习调度）
 - 替换传统 SM-2 类算法，是学习体验的核心引擎
-- 只负责「什么时候复习」；「这次表现意味着什么」由 `@lexilexi/eval` 负责
+- 只负责「什么时候复习」；「这次表现意味着什么」由 `@lexii/eval` 负责
 
 ## FSRS-7 版本口径
 
@@ -67,7 +67,7 @@ interface ReviewLog {
 ### 调用方式
 
 ```ts
-import { Scheduler } from "@lexilexi/fsrs";
+import { Scheduler } from "@lexii/fsrs";
 
 // 用户点「Good」：
 const { card, log } = new Scheduler(persistedCard, new Date()).review("good");

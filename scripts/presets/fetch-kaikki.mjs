@@ -128,7 +128,7 @@ function readManifest() {
 async function headRequest() {
   const res = await fetch(KAIKKI_URL, {
     method: "HEAD",
-    headers: { "user-agent": "lexilexi-preset-pipeline", "accept-encoding": "identity" },
+    headers: { "user-agent": "lexii-preset-pipeline", "accept-encoding": "identity" },
   });
   if (!res.ok) {
     throw new Error(`HEAD 失败：HTTP ${res.status}`);
@@ -144,7 +144,7 @@ async function headRequest() {
 async function downloadRange(url, start, end, partFile, expected, resumeBytes, partIndex) {
   const res = await fetch(url, {
     headers: {
-      "user-agent": "lexilexi-preset-pipeline",
+      "user-agent": "lexii-preset-pipeline",
       "accept-encoding": "identity",
       range: `bytes=${start}-${end}`,
     },

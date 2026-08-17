@@ -18,7 +18,7 @@ export type EventType =
 export type ExerciseType =
   "recall" | "production" | "cloze" | "multiple-choice" | "confusion-discrimination";
 
-/** 复习评分，与 FSRS 的 1/2/3/4 直映射（换算函数在 @lexilexi/fsrs） */
+/** 复习评分，与 FSRS 的 1/2/3/4 直映射（换算函数在 @lexii/fsrs） */
 export type ReviewRating = "again" | "hard" | "good" | "easy";
 
 /** JSON Patch 风格的最小变更描述（v0 仅要求结构化可解析，不要求自动重放） */

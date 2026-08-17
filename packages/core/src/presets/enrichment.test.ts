@@ -16,7 +16,7 @@ import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
 import { installPreset } from "./install";
 import { toSense } from "../importWords";
-import type { LexilexiDatabase } from "../persistence";
+import type { LexiiDatabase } from "../persistence";
 import { openDatabase } from "../persistence";
 import {
   backfillEnrichment,
@@ -36,9 +36,9 @@ function makeOptions(): DexieOptions {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
-function freshDatabase(): LexilexiDatabase {
+function freshDatabase(): LexiiDatabase {
   db = openDatabase(makeOptions());
   return db;
 }

@@ -1,5 +1,5 @@
 /**
- * @lexilexi/core 的 vitest 配置。
+ * @lexii/core 的 vitest 配置。
  *
  * 测试与 bench 扫描范围钉在 src/ 内——`tsc -p tsconfig.build.json` 会把
  * src 编译进 dist/，若扫描范围放开，vitest bench 会把 dist 下编译产物

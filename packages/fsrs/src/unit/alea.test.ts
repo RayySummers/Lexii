@@ -10,8 +10,8 @@ import { fuzzRange } from "../algorithm";
 
 describe("alea（确定性 PRNG）", () => {
   it("同一 seed 产生相同序列；不同 seed 序列不同", () => {
-    const a = alea("lexilexi");
-    const b = alea("lexilexi");
+    const a = alea("lexii");
+    const b = alea("lexii");
     const c = alea("different");
     const seqA = [a(), a(), a()];
     const seqB = [b(), b(), b()];

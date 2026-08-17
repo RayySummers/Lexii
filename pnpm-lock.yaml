@@ -38,13 +38,13 @@ importers:
 
   apps/web:
     dependencies:
-      '@lexilexi/core':
+      '@lexii/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@lexilexi/fsrs':
+      '@lexii/fsrs':
         specifier: workspace:*
         version: link:../../packages/fsrs
-      '@lexilexi/stats':
+      '@lexii/stats':
         specifier: workspace:*
         version: link:../../packages/stats
       react:
@@ -108,7 +108,7 @@ importers:
 
   packages/core:
     dependencies:
-      '@lexilexi/fsrs':
+      '@lexii/fsrs':
         specifier: workspace:*
         version: link:../fsrs
       dexie:
@@ -151,7 +151,7 @@ importers:
 
   packages/stats:
     dependencies:
-      '@lexilexi/core':
+      '@lexii/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:

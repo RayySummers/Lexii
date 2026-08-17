@@ -2,12 +2,12 @@ import type { DexieOptions } from "dexie";
 import Dexie from "dexie";
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
-import type { LexilexiDatabase } from "./persistence";
+import type { LexiiDatabase } from "./persistence";
 import {
-  createLexilexiDatabase,
+  createLexiiDatabase,
   deleteItem,
   openDatabase,
-  openLexilexiDatabase,
+  openLexiiDatabase,
   recordReview,
   suspendItem,
   unsuspendItem,
@@ -20,10 +20,10 @@ function makeOptions(): DexieOptions {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
 /** 每个用例用独立数据库实例，避免用例间残留状态 */
-function freshDatabase(): LexilexiDatabase {
+function freshDatabase(): LexiiDatabase {
   db = openDatabase(makeOptions());
   return db;
 }
@@ -50,20 +50,20 @@ describe("数据层 CRUD", () => {
     expect((await database.memoryStates.get(item.id))?.id).toBe(item.id);
   });
 
-  it("createLexilexiDatabase 注入实例时直接复用；openLexilexiDatabase 幂等", async () => {
+  it("createLexiiDatabase 注入实例时直接复用；openLexiiDatabase 幂等", async () => {
     const injected = openDatabase(makeOptions());
     await injected.open();
     // 注入实例时复用同一个实例
-    expect(createLexilexiDatabase(undefined, injected)).toBe(injected);
+    expect(createLexiiDatabase(undefined, injected)).toBe(injected);
     // 已打开的库重复应用 schema 不报错
-    openLexilexiDatabase(injected);
+    openLexiiDatabase(injected);
     expect(injected.isOpen()).toBe(true);
     await injected.delete();
   });
 
-  it("createLexilexiDatabase 支持注入自定义 Dexie 构造函数", async () => {
-    const database = createLexilexiDatabase(makeOptions(), undefined, Dexie);
-    expect(database.name).toBe("lexilexi");
+  it("createLexiiDatabase 支持注入自定义 Dexie 构造函数", async () => {
+    const database = createLexiiDatabase(makeOptions(), undefined, Dexie);
+    expect(database.name).toBe("lexii");
     // 裸实例需自行声明 schema；写入一条数据使数据库真实创建后再删除
     database.version(1).stores({ items: "id" });
     await database.open();
@@ -227,7 +227,7 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
     const options = makeOptions();
 
     // 1. 按 v1 schema 建库并写入存量数据（模拟旧版本用户）
-    const legacy = new Dexie("lexilexi", options);
+    const legacy = new Dexie("lexii", options);
     legacy.version(1).stores({
       items: "id",
       senses: "id",
@@ -261,7 +261,7 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
     const options = makeOptions();
 
     // 1. 按 v2 schema 建库（RAY-258 形态）并写入存量数据
-    const v2 = new Dexie("lexilexi", options);
+    const v2 = new Dexie("lexii", options);
     v2.version(1).stores({
       items: "id",
       senses: "id",
@@ -328,7 +328,7 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
     const options = makeOptions();
 
     // 1. 按 v3 schema 建库（RAY-260 形态）并写入存量数据
-    const v3 = new Dexie("lexilexi", options);
+    const v3 = new Dexie("lexii", options);
     v3.version(1).stores({
       items: "id",
       senses: "id",
@@ -372,7 +372,7 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
     const options = makeOptions();
 
     // 1. 按 v4 schema 建库（RAY-262 形态，生词本发布前的线上形态）并写入存量数据
-    const v4 = new Dexie("lexilexi", options);
+    const v4 = new Dexie("lexii", options);
     v4.version(1).stores({
       items: "id",
       senses: "id",

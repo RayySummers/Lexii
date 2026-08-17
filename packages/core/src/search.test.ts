@@ -7,8 +7,8 @@
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDatabase } from "./persistence";
-import type { LexilexiDatabase } from "./persistence";
-import { DEFAULT_SEARCH_LIMIT, searchLexilexiSenses, searchSenses } from "./search";
+import type { LexiiDatabase } from "./persistence";
+import { DEFAULT_SEARCH_LIMIT, searchLexiiSenses, searchSenses } from "./search";
 import type { Sense } from "./domain";
 import { toSenseId } from "./id";
 
@@ -118,8 +118,8 @@ describe("searchSenses（纯函数口径）", () => {
   });
 });
 
-describe("searchLexilexiSenses（IndexedDB 只读检索）", () => {
-  let db: LexilexiDatabase | undefined;
+describe("searchLexiiSenses（IndexedDB 只读检索）", () => {
+  let db: LexiiDatabase | undefined;
 
   function makeOptions(): Parameters<typeof openDatabase>[0] {
     return { indexedDB: new IDBFactory(), IDBKeyRange };
@@ -135,12 +135,12 @@ describe("searchLexilexiSenses（IndexedDB 只读检索）", () => {
   });
 
   it("空库返回空结果", async () => {
-    expect(await searchLexilexiSenses(db!, "a")).toEqual([]);
+    expect(await searchLexiiSenses(db!, "a")).toEqual([]);
   });
 
   it("在库内义项中检索并返回完整义项", async () => {
     await db!.senses.bulkPut(SENSES);
-    const hits = await searchLexilexiSenses(db!, "app", { limit: 5 });
+    const hits = await searchLexiiSenses(db!, "app", { limit: 5 });
     expect(hits.map((hit) => hit.sense.term)).toEqual(["apple", "apply", "pineapple"]);
     expect(hits[0]!.sense.definitions).toEqual(["苹果", "苹果公司"]);
     expect(hits[0]!.kind).toBe("term-prefix");
@@ -150,7 +150,7 @@ describe("searchLexilexiSenses（IndexedDB 只读检索）", () => {
   it("检索只读：不修改 senses 表内容", async () => {
     await db!.senses.bulkPut(SENSES);
     const before = await db!.senses.count();
-    await searchLexilexiSenses(db!, "apple");
+    await searchLexiiSenses(db!, "apple");
     expect(await db!.senses.count()).toBe(before);
     const stored = await db!.senses.get(toSenseId("sense_search_1"));
     expect(stored?.term).toBe("apple");

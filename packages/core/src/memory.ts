@@ -6,7 +6,7 @@
  * - FSRS 实现细节不进入领域模型：字段从调度角度命名，内部再换算为
  *   ts-fsrs 的 t（天）与 d ∈ [1,10]。stabilityDays / difficulty /
  *   elapsedDays 与 ts-fsrs 官方 Card.stability / difficulty / elapsed_days 同语义。
- * - 初始状态由 @lexilexi/fsrs 的 newCardFields() 创建（RAY-236 接口契约）。
+ * - 初始状态由 @lexii/fsrs 的 newCardFields() 创建（RAY-236 接口契约）。
  * - 恢复不变量：在任意 ReviewEvent 序列前缀上重放调度，得到的状态必须
  *   与库中 MemoryState 一致——MemoryState 是事件的投影，可随时重建。
  */
@@ -16,7 +16,7 @@ import type { ReviewRating } from "./events";
 
 export type MemoryStatus = "new" | "learning" | "review" | "relearning";
 
-/** FSRS 调度字段（MemoryState 的 payload，@lexilexi/fsrs 消费此类型） */
+/** FSRS 调度字段（MemoryState 的 payload，@lexii/fsrs 消费此类型） */
 export interface MemoryStateFields {
   /** 调度状态机阶段 */
   status: MemoryStatus;

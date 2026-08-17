@@ -13,7 +13,7 @@
  *
  * 导出边界（CSV 格式固有限制，详见 docs/domain-model.md §7）：
  * - CSV 只能承载 term / definitions / pos 三列；音标、标签、例句、记忆状态
- *   不在 CSV 范围内（完整备份请用 exportLexilexiData 的 JSON）；
+ *   不在 CSV 范围内（完整备份请用 exportLexiiData 的 JSON）；
  * - 释义本身含全角分号「；」的词条导回后会被拆成多条释义（「；」是多释义
  *   分隔符）；释义含换行的词条无法原样导回（解析器不支持字段内换行）；
  * - 词条须满足导入格式的单词模式（英文字母、'、-、.），否则无法经
@@ -22,7 +22,7 @@
  */
 import type { CsvWordEntry } from "./csv";
 import type { LearningItem, Sense } from "./domain";
-import type { LexilexiDatabase } from "./persistence";
+import type { LexiiDatabase } from "./persistence";
 
 /** CSV 表头（与 parseCsvWordlist 的表头识别对齐：term / definition / pos） */
 const CSV_HEADER = "term,definition,pos";
@@ -47,7 +47,7 @@ export function serializeWordlistCsv(entries: readonly CsvWordEntry[]): string {
 }
 
 /** 导出当前词表为 CSV 文本（仅未删除条目，按 createdAt 升序；按 senseId 去重；前置 UTF-8 BOM） */
-export async function exportCsvWordlist(db: LexilexiDatabase): Promise<string> {
+export async function exportCsvWordlist(db: LexiiDatabase): Promise<string> {
   return db.transaction("r", db.items, db.senses, async () => {
     const items = await db.items.toArray();
     const kept = items.filter((item) => item.status !== "deleted").sort(byCreatedAt);

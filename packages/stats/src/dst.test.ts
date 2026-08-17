@@ -12,8 +12,8 @@
  * 若某平台无 2026 规则导致失败，说明该平台时区数据过旧，而非实现错误。
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { toEventId, toItemId, toSenseId } from "@lexilexi/core";
-import type { ReviewEvent, ReviewRating } from "@lexilexi/core";
+import { toEventId, toItemId, toSenseId } from "@lexii/core";
+import type { ReviewEvent, ReviewRating } from "@lexii/core";
 import {
   computeLearnedTodayCount,
   computeReviewedTodayCount,

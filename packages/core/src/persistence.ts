@@ -2,7 +2,10 @@
  * IndexedDB/Dexie 持久化层。
  *
  * 对应 docs/domain-model.md §9：
- * - 数据库 "lexilexi"，表 items / senses / memoryStates / events。
+ * - 数据库 "lexii"，表 items / senses / memoryStates / events。
+ * - 改名（Lexilexi → Lexii，RAY-306）后数据库名由 "lexilexi" 改为 "lexii"。
+ *   按项目所有者决定不提供旧库迁移：当前无存量用户，升级即全新开始，
+ *   旧 "lexilexi" 库不会被自动发现或复制。
  * - schema 升级必须走 version(n).stores().upgrade() 迁移，禁止清库重来。
  * - 读写一律走显式事务；「评分 → 写状态 + 写事件」单事务原子落库。
  * - 允许注入 Dexie 实例（Node 测试用 fake-indexeddb，浏览器用 window.indexedDB）。
@@ -39,7 +42,7 @@ export type DexieConstructor = new (databaseName: string, options?: DexieOptions
  * 否则用默认构造函数创建；dexieOptions 可注入自定义 indexedDB
  * （Node 测试用 fake-indexeddb，浏览器用原生 window.indexedDB）。
  */
-export function createLexilexiDatabase(
+export function createLexiiDatabase(
   dexieOptions: DexieOptions | undefined,
   injectedDexie?: Dexie,
   dexieConstructor?: DexieConstructor,
@@ -48,7 +51,7 @@ export function createLexilexiDatabase(
     return injectedDexie;
   }
   const dexie = dexieConstructor ? dexieConstructor : Dexie;
-  return new dexie("lexilexi", dexieOptions);
+  return new dexie("lexii", dexieOptions);
 }
 
 /**
@@ -69,7 +72,7 @@ export function createLexilexiDatabase(
  * v6（RAY-294）：新增 dictionarySenses 表（词典检索层）。纯新增表，
  *   无数据迁移，存量数据原样保留。
  */
-export function openLexilexiDatabase(db: Dexie): void {
+export function openLexiiDatabase(db: Dexie): void {
   if (db.isOpen()) {
     return;
   }
@@ -125,7 +128,7 @@ export interface MetaRecord {
   value: string;
 }
 
-export interface LexilexiTables {
+export interface LexiiTables {
   items: Table<LearningItem, string>;
   senses: Table<Sense, string>;
   memoryStates: Table<MemoryState, string>;
@@ -135,7 +138,7 @@ export interface LexilexiTables {
   dictionarySenses: Table<DictionarySense, string>;
 }
 
-export interface LexilexiDatabase extends Dexie {
+export interface LexiiDatabase extends Dexie {
   items: Table<LearningItem, string>;
   senses: Table<Sense, string>;
   memoryStates: Table<MemoryState, string>;
@@ -146,15 +149,15 @@ export interface LexilexiDatabase extends Dexie {
 }
 
 /**
- * 打开 Lexilexi 数据库。
+ * 打开 Lexii 数据库。
  *
  * @param dexieOptions 构造选项（Node 测试注入 fake-indexeddb；浏览器省略即用原生）
  * @param injectedDexie 已配置好的 Dexie 实例（测试用）
  */
-export function openDatabase(dexieOptions?: DexieOptions, injectedDexie?: Dexie): LexilexiDatabase {
-  const dexie = createLexilexiDatabase(dexieOptions, injectedDexie);
-  openLexilexiDatabase(dexie);
-  return dexie as LexilexiDatabase;
+export function openDatabase(dexieOptions?: DexieOptions, injectedDexie?: Dexie): LexiiDatabase {
+  const dexie = createLexiiDatabase(dexieOptions, injectedDexie);
+  openLexiiDatabase(dexie);
+  return dexie as LexiiDatabase;
 }
 
 /**
@@ -169,7 +172,7 @@ export function openDatabase(dexieOptions?: DexieOptions, injectedDexie?: Dexie)
  * 原子写入」的完整学习回路。改动任何一处落库路径时，必须同步检查另一处。
  */
 export async function recordReview(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   reviewEvent: Extract<Event, { type: "review" }>,
   nextMemoryState: MemoryState,
 ): Promise<void> {
@@ -190,7 +193,7 @@ export async function recordReview(
 
 /** 暂停条目（状态标记 + 事件，单事务） */
 export async function suspendItem(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   itemId: LearningItem["id"],
   reason: string,
   now: IsoDate,
@@ -216,7 +219,7 @@ export async function suspendItem(
 
 /** 恢复暂停的条目（状态标记 + 事件，单事务） */
 export async function unsuspendItem(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   itemId: LearningItem["id"],
   reason: string,
   now: IsoDate,
@@ -242,7 +245,7 @@ export async function unsuspendItem(
 
 /** 删除条目（软删除：标记状态 + 记忆状态 + 事件，历史事件永久保留；→ deleted 不可逆，重复删除报错） */
 export async function deleteItem(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   itemId: LearningItem["id"],
   now: IsoDate,
 ): Promise<void> {

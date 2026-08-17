@@ -1,10 +1,10 @@
 /**
- * @lexilexi/fsrs — FSRS-7 领域类型定义
+ * @lexii/fsrs — FSRS-7 领域类型定义
  *
  * 命名与语义对齐官方参考实现 ts-fsrs v5.4.1（FSRS-6.0 主分支，FSRS-7 算法，
  * 见 README「FSRS-7 版本口径」），保证两个实现可以在同一输入上做差分验证。
  *
- * 与本包导出 API 的差异（面向 Lexilexi 的使用方式）：
+ * 与本包导出 API 的差异（面向 Lexii 的使用方式）：
  * - 通过包公开 API 使用时，`Card` 不携带 `elapsed_days` / `last_elapsed_days`
  *   （官方实现已标记 deprecated、将于 v6 移除；我们直接不引入）。
  * - 官方实现以枚举 `Rating`（Manual=0/Again=1/Hard=2/Good=3/Easy=4）做输入输出；
