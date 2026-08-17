@@ -45,6 +45,8 @@ export interface SearchScreenProps {
   provider: SearchDataProvider;
   /** 返回首页 */
   onExit(): void;
+  /** RAY-319：跳转设置页安装扩展词包 */
+  onNavigateToSettings?(): void;
   /**
    * 搜词历史存储（测试注入内存 storage；默认 window.localStorage）。
    * 仅本地读写，绝不上传。
@@ -68,7 +70,12 @@ function resolveHistoryStorage(storage?: SearchHistoryStorage): SearchHistorySto
   return window.localStorage;
 }
 
-export function SearchScreen({ provider, onExit, historyStorage }: SearchScreenProps) {
+export function SearchScreen({
+  provider,
+  onExit,
+  onNavigateToSettings,
+  historyStorage,
+}: SearchScreenProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -245,6 +252,7 @@ export function SearchScreen({ provider, onExit, historyStorage }: SearchScreenP
         onSelectHistory={handleHistorySelect}
         onRemoveHistory={handleHistoryRemove}
         onToggleNotebook={handleToggleNotebook}
+        onNavigateToSettings={onNavigateToSettings}
       />
     </main>
   );
@@ -264,6 +272,8 @@ interface SearchContentProps {
   onSelectHistory(term: string): void;
   onRemoveHistory(term: string): void;
   onToggleNotebook(senseId: SenseId): void;
+  /** RAY-319：跳转设置页安装扩展词包 */
+  onNavigateToSettings?(): void;
 }
 
 /** 按状态渲染检索区内容（独立于容器，便于逐状态阅读与测试） */
@@ -278,6 +288,7 @@ function SearchContent({
   onSelectHistory,
   onRemoveHistory,
   onToggleNotebook,
+  onNavigateToSettings,
 }: SearchContentProps) {
   if (error) {
     // 友好文案 + 原始信息折叠（与统计页同一模式，Oscar 评审 nit 1）：
@@ -340,12 +351,21 @@ function SearchContent({
   }
   if (results !== null && results.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface p-8 text-center">
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-8 text-center">
         <h2 className="text-xl font-semibold">库内无此词</h2>
         <p className="max-w-sm text-sm text-text-muted">
           词库里没有与「{query}」匹配的词条，可以导入自建词库再搜——到设置页导入 CSV
           词表，或到词书库安装更多词书，之后再试一次。
         </p>
+        {onNavigateToSettings ? (
+          <button
+            type="button"
+            onClick={onNavigateToSettings}
+            className="mt-1 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            前往设置安装扩展词包
+          </button>
+        ) : null}
       </div>
     );
   }
