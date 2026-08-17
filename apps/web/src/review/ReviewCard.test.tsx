@@ -130,6 +130,31 @@ describe("ReviewCard 背面富化内容", () => {
     expect(within(antonymsSection).getByText("retain")).toBeInTheDocument();
   });
 
+  it("正面和背面均展示词性标注（pos badge）", () => {
+    render(<Harness sense={makeRichSense()} />);
+    // 正面已有 pos
+    const frontPos = screen.getAllByText("v.");
+    expect(frontPos.length).toBeGreaterThanOrEqual(2); // 正反面各一
+
+    flipCard();
+
+    // 背面也展示 pos
+    const allPos = screen.getAllByText("v.");
+    expect(allPos.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("pos 缺失时正反面均不渲染词性标注", () => {
+    render(
+      <Harness
+        sense={makeSense({ term: "abandon", definitions: ["放弃；抛弃"], ipa: "əˈbændən" })}
+      />,
+    );
+    expect(screen.queryByText(/^[nv]\.$|adj\.|adv\./)).toBeNull();
+
+    flipCard();
+    expect(screen.queryByText(/^[nv]\.$|adj\.|adv\./)).toBeNull();
+  });
+
   it("富化字段缺失：各区块不渲染，卡片退化为释义形态", () => {
     render(
       <Harness

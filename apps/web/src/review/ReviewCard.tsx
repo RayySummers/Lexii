@@ -132,7 +132,14 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardPro
             className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-6 pb-4 pt-6 outline-none"
           >
             <span className="flex flex-wrap items-baseline justify-between gap-3">
-              <span className="text-2xl font-bold tracking-tight">{sense.term}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-2xl font-bold tracking-tight">{sense.term}</span>
+                {sense.pos ? (
+                  <span className="rounded-full border border-border bg-surface-raised px-2 py-0.5 text-xs text-text-muted">
+                    {sense.pos}
+                  </span>
+                ) : null}
+              </span>
               <PhoneticsRow sense={sense} className="text-sm" />
             </span>
             <span className="flex flex-col gap-1.5">
