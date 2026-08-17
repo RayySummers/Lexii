@@ -143,6 +143,19 @@ describe("ReviewCard 背面富化内容", () => {
     expect(allPos.length).toBeGreaterThanOrEqual(2);
   });
 
+  it("pos badge 正反面均显式带 text-xs（不依赖父容器继承，RAY-321 nit）", () => {
+    render(<Harness sense={makeRichSense()} />);
+    flipCard();
+
+    // 正反面两处 pos badge 都必须自己带 text-xs 类（与 Oscar 评审 nit 一致）
+    const posBadges = screen.getAllByText("v.");
+    expect(posBadges.length).toBeGreaterThanOrEqual(2);
+    for (const badge of posBadges) {
+      expect(badge).toHaveClass("text-xs");
+      expect(badge).toHaveClass("text-text-muted");
+    }
+  });
+
   it("pos 缺失时正反面均不渲染词性标注", () => {
     render(
       <Harness

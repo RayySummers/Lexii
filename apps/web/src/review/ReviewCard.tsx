@@ -6,6 +6,10 @@
  * 均展示美/英双音标（富化缺省回退词书自带音标）。
  * 富化字段全部可选：缺失时不渲染对应区块，卡片退化为既有形态。
  *
+ * RAY-321：正反面标题行均展示词性 chip（n. / v. / adj. 等），
+ * 与词条标签同口径——圆角 chip、文字色继承 text-text-muted、显式
+ * text-xs（不依赖父容器继承，避免父级 text-sm 改动时静默连带变化）。
+ *
  * RAY-291（真机反馈）：卡片高度固定、与内容长度无关——不同词条
  * 不再让卡片忽长忽短；高度控制在移动端一屏内，内容超出时在卡片
  * 内部滚动（正反面同口径：共用同一 CardFace 结构，滚动区与固定
@@ -100,7 +104,7 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardPro
               <span className="flex flex-wrap items-center justify-center gap-2 text-sm text-text-muted">
                 <PhoneticsRow sense={sense} />
                 {sense.pos ? (
-                  <span className="rounded-full border border-border bg-surface-raised px-2 py-0.5">
+                  <span className="rounded-full border border-border bg-surface-raised px-2 py-0.5 text-xs text-text-muted">
                     {sense.pos}
                   </span>
                 ) : null}
