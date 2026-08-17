@@ -16,6 +16,12 @@ name: Deploy Release（稳定通道）
 # RAY-300：Tier 1/2 扩展词包构建并入 Pages 部署——presets 产物随 Pages 一起
 # 发布到根路径 /presets/ 和 /dev/presets/，使用户可直接从 Pages 下载词包。
 # 构建逻辑与 publish-presets.yml 口径一致（同一脚本、同一 ECDICT 固定 commit）。
+#
+# Suggestion 2 镜像语义：presets 仅从当前触发 ref（tag）构建一次，产物镜像到两个通道目录。
+# - 根路径（/presets/）：用 tag 的脚本产物 ✅ 与 release 页面内容一致
+# - dev 通道（/dev/presets/）：镜像 tag 的 presets 产物，站点内容为 main 快照
+# 当前 main 与最新 tag 的 preset 脚本一致且 ECDICT 数据 commit 固定，实际内容无差异；
+# 若未来脚本分叉，需改为按各自 ref 独立构建（见 Nit 1 的 composite action 封装）。
 
 on:
   push:
@@ -82,33 +88,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       #─── RAY-300：构建 Tier 1/2 扩展词包（并入 Pages 部署） ──────────
-      # 与 publish-presets.yml 口径一致：同一脚本、同一 ECDICT 固定 commit、
-      # 同一 SHA-256 校验；产物随 Pages 部署到根路径 /presets/ 和 /dev/presets/。
-      # ECDICT 数据缓存（Oscar suggestion 1）：key 固定为 bc015ed（数据 commit 不变），
-      # 避免每次 tag 推送重新下载 ~63MB，也消除对 raw.githubusercontent.com 可达性的依赖。
-      - name: 缓存 ECDICT 数据
-        uses: actions/cache@v4
-        with:
-          path: scripts/presets/.data
-          key: ecdict-bc015ed
-
-      - name: 获取 ECDICT 数据（固定 commit bc015ed + SHA256 校验）
-        run: node scripts/presets/fetch-ecdict.mjs
-
-      - name: 构建 Tier 1 词包
-        run: node scripts/presets/build.mjs --tier 1
-
-      - name: 构建 Tier 2 词包
-        run: node scripts/presets/build.mjs --tier 2
-
-      - name: 构建 Tier 1 富化包（可选）
-        run: node scripts/presets/build-enrichment.mjs
-        # 富化构建依赖外部数据（kaikki/ipa-dict/OpenEtymology/Tatoeba），
-        # CI 环境无 .data/ 缓存时跳过（富化包为可选，与 publish-presets 口径一致）。
-        continue-on-error: true
-
-      - name: 生成 manifest + 压缩包
-        run: node scripts/presets/build-manifest.mjs
+      # 使用 composite action 封装 5 步构建块（Nit 1），防口径漂移。
+      - name: 构建 Tier 1/2 扩展词包
+        uses: ./.github/actions/build-presets
 
       - name: 构建稳定版（根路径）
         run: pnpm --filter @lexilexi/web build
