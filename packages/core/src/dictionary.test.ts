@@ -19,6 +19,7 @@ import {
   dictionaryDoneKey,
   dictionaryProgressKey,
   dictionaryUpgradeLockKey,
+  downloadAndVerifyPackage,
   getDictionaryPackageState,
   invalidateDictionaryCache,
   installDictionaryPackage,
@@ -26,7 +27,7 @@ import {
   promoteDictionarySense,
   searchDictionarySenses,
 } from "./dictionary";
-import type { DictionaryPackage } from "./dictionary";
+import type { DictionaryPackage, ManifestVariant } from "./dictionary";
 import type { PresetWordEntry } from "./presets/types";
 import { toSenseId } from "./id";
 import { searchAllSenses } from "./search";
@@ -622,5 +623,86 @@ describe("searchAllSenses（跨层合并检索）", () => {
     expect(substringHits[0]!.sense.term.length).toBeLessThanOrEqual(
       substringHits[1]?.sense.term.length ?? Infinity,
     );
+  });
+});
+
+describe("downloadAndVerifyPackage（元组转换）", () => {
+  it("紧凑元组格式正确转换为 PresetWordEntry 对象", async () => {
+    // 模拟打包侧输出：[term, definitions, pos, ipa, tags]
+    const tuples = [
+      ["kaleidoscope", "万花筒", "n.", "/kəˈlaɪdəskoʊp/", ""],
+      ["menstrual", "月经的\n经期的", "a.", "/ˈmenstruəl/", "考研"],
+    ];
+    const jsonBytes = new TextEncoder().encode(JSON.stringify(tuples));
+
+    // 计算 SHA-256
+    const hashBuffer = await crypto.subtle.digest("SHA-256", jsonBytes);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const sha256 = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+
+    // 创建 Blob URL（模拟 fetch 返回）
+    const blob = new Blob([jsonBytes], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const variant: ManifestVariant = {
+      url,
+      size: jsonBytes.length,
+      sha256,
+    };
+
+    const entries = await downloadAndVerifyPackage(variant);
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0]!.term).toBe("kaleidoscope");
+    expect(entries[0]!.definitions).toEqual(["万花筒"]);
+    expect(entries[0]!.pos).toBe("n.");
+    expect(entries[0]!.ipa).toBe("/kəˈlaɪdəskoʊp/");
+    expect(entries[0]!.tags).toEqual([]);
+
+    expect(entries[1]!.term).toBe("menstrual");
+    expect(entries[1]!.definitions).toEqual(["月经的", "经期的"]);
+    expect(entries[1]!.tags).toEqual(["考研"]);
+
+    URL.revokeObjectURL(url);
+  });
+
+  it("元组格式安装后可通过 searchDictionarySenses 检索到", async () => {
+    const database = freshDatabase();
+
+    // 模拟打包侧元组 → 转换 → 安装
+    const tuples = [
+      ["kaleidoscope", "万花筒", "n.", "/kəˈlaɪdəskoʊp/", ""],
+      ["menstrual", "月经的", "a.", "/ˈmenstruəl/", "考研"],
+    ];
+    const entries: PresetWordEntry[] = tuples.map((t) => ({
+      term: t[0]!,
+      definitions: t[1]!.split("\n"),
+      ...(t[2] !== "" ? { pos: t[2] } : {}),
+      ...(t[3] !== "" ? { ipa: t[3] } : {}),
+      tags: t[4]!.split(/\s+/).filter((s) => s !== ""),
+    }));
+
+    await installDictionaryPackage(database, makePackage(entries, "core-en-tier2", "1.0.0"), {
+      yield: async () => {},
+    });
+    invalidateDictionaryCache();
+
+    // 前缀命中
+    const prefixHits = await searchDictionarySenses(database, "kaleidoscope");
+    expect(prefixHits).toHaveLength(1);
+    expect(prefixHits[0]!.sense.term).toBe("kaleidoscope");
+    expect(prefixHits[0]!.kind).toBe("term-prefix");
+
+    // 子串命中（搜索 "strual" 命中 "menstrual" 的子串）
+    const substringHits = await searchDictionarySenses(database, "strual");
+    expect(substringHits).toHaveLength(1);
+    expect(substringHits[0]!.sense.term).toBe("menstrual");
+    expect(substringHits[0]!.kind).toBe("term-substring");
+
+    // 释义命中（中文）
+    const defHits = await searchDictionarySenses(database, "万花筒");
+    expect(defHits).toHaveLength(1);
+    expect(defHits[0]!.sense.term).toBe("kaleidoscope");
+    expect(defHits[0]!.kind).toBe("definition");
   });
 });
