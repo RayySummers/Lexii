@@ -1,4 +1,4 @@
-# RAY-294 Tier 1/2 扩展词包离线下载技术方案
+# RAY-294 Tier 1/2 扩展词包联网下载、离线可用技术方案
 
 > 版本：draft-3（Harvey，2026-08-16）— 基于 Oscar 复审 `edd1178c` suggestion + nit 落实
 > 状态：已通过 Oscar 复审（draft-2 放行），本版落实实施前清单 + nit
