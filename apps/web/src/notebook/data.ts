@@ -10,12 +10,7 @@
  * 加词入口（搜词页 / 复习卡页）分别由各自数据源调用 core 的
  * addToNotebook；本文件提供共用的幂等判定 helper（hasActiveEntryForSense）。
  */
-import {
-  addToNotebook,
-  listNotebookEntries,
-  openDatabase,
-  removeFromNotebook,
-} from "@lexii/core";
+import { addToNotebook, listNotebookEntries, openDatabase, removeFromNotebook } from "@lexii/core";
 import type { LexiiDatabase, NotebookEntryId, SenseId } from "@lexii/core";
 import type { AddToNotebookResult, NotebookDataProvider, NotebookListItem } from "./types";
 

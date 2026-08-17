@@ -40,13 +40,7 @@ describe("getOtherChannelPath 切换目标", () => {
   });
 
   it("与 detectChannel 互逆：任意路径切换两次回到自身通道目录", () => {
-    for (const pathname of [
-      "/Lexii/",
-      "/Lexii/dev/",
-      "/",
-      "/dev/",
-      "/Lexii/dev/index.html",
-    ]) {
+    for (const pathname of ["/Lexii/", "/Lexii/dev/", "/", "/dev/", "/Lexii/dev/index.html"]) {
       const other = getOtherChannelPath(pathname);
       expect(detectChannel(other)).not.toBe(detectChannel(pathname));
       // 再切换一次回到原通道（目录级等价）

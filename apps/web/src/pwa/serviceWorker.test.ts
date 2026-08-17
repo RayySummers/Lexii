@@ -390,12 +390,12 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
       expect(cache!.entries.has(shellUrl)).toBe(true);
     }
     // 构建产物同样解析到子路径下，而非站点根
-    expect(
-      cache!.entries.has("https://rayysummers.github.io/Lexii/assets/index-abc123.js"),
-    ).toBe(true);
-    expect(
-      cache!.entries.has("https://rayysummers.github.io/Lexii/assets/index-def456.css"),
-    ).toBe(true);
+    expect(cache!.entries.has("https://rayysummers.github.io/Lexii/assets/index-abc123.js")).toBe(
+      true,
+    );
+    expect(cache!.entries.has("https://rayysummers.github.io/Lexii/assets/index-def456.css")).toBe(
+      true,
+    );
 
     // 子路径下的导航请求离线时回退到子路径下的 index.html
     sandboxFetch = () => Promise.reject(new TypeError("Failed to fetch"));

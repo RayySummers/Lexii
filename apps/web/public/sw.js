@@ -116,9 +116,7 @@ self.addEventListener("activate", (event) => {
             // （改名前残留，activate 的 name !== CACHE_NAME 已覆盖，此处显式
             // 匹配确保即使未来 CACHE_NAME 前缀变化也能清理旧缓存）
             .concat(
-              names.filter(
-                (name) => name.startsWith("lexilexi-shell-") && name !== CACHE_NAME,
-              ),
+              names.filter((name) => name.startsWith("lexilexi-shell-") && name !== CACHE_NAME),
             )
             .filter((name, i, arr) => arr.indexOf(name) === i) // 去重
             .map((name) => caches.delete(name)),

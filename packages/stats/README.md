@@ -23,7 +23,7 @@ Lexii 学习统计包：从本地事件流聚合学习统计。
 | 今日学习时长（毫秒） | `computeTodayStudyDurationMs(events, now?)`                             | 本地日历日落在今天的有效复习时长之和；RAY-270                                                                                                                               |
 | 单次有效时长（毫秒） | `effectiveReviewDurationMs(event)`                                      | reviewDurationMs 按 `MAX_EFFECTIVE_REVIEW_DURATION_MS`（5 分钟）截断；负数/非法值按 0                                                                                       |
 | 时长显示文案         | `formatStudyDuration(ms)`                                               | 自适应：0 →「0 分钟」；不足 1 分钟 →「不足 1 分钟」；不足 1 小时 →「X 分钟」；1 小时及以上 →「X 小时 Y 分钟」（Y=0 时省略，仅显示「X 小时」）                               |
-| 本地日区间           | `localDayBounds(now, offsetDays?)`                                      | 某本地日历日的半开区间 [start, end)（ISO），供「今日待学/明日到期」与 `@lexii/core` 的 `getDueItemIdsInRange` 对齐                                                       |
+| 本地日区间           | `localDayBounds(now, offsetDays?)`                                      | 某本地日历日的半开区间 [start, end)（ISO），供「今日待学/明日到期」与 `@lexii/core` 的 `getDueItemIdsInRange` 对齐                                                          |
 
 「今日待学 / 明日到期（词条）」由 `apps/web` 统计数据源经
 `@lexii/core` 的 `getDueItemIds` / `getDueItemIdsInRange` 查询记忆状态得到

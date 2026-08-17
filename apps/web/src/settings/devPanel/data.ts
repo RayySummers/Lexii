@@ -45,10 +45,7 @@ export async function loadDatabaseDebug(db: LexiiDatabase): Promise<DatabaseDebu
 }
 
 /** 读取 FSRS 调试快照（供测试与默认工厂复用） */
-export async function loadFsrsDebug(
-  db: LexiiDatabase,
-  now: Date = new Date(),
-): Promise<FsrsDebug> {
+export async function loadFsrsDebug(db: LexiiDatabase, now: Date = new Date()): Promise<FsrsDebug> {
   // 与 core studyLoop 的 `new Scheduler(card, now)` 默认参数同源：
   // 不传参即 normalizeParameters(undefined) → 默认 FSRS-7 参数。
   const parameters = normalizeParameters();

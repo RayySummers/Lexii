@@ -37,10 +37,7 @@ export interface LexiiExportData {
  * 五张表在同一个只读事务内读取：与并发写入（评分、导入、加词等）串行化，
  * 不会拍到「items 已写、memoryStates 未写」这类跨表中间态（评审建议 C2）。
  */
-export async function exportLexiiData(
-  db: LexiiDatabase,
-  now: IsoDate,
-): Promise<LexiiExportData> {
+export async function exportLexiiData(db: LexiiDatabase, now: IsoDate): Promise<LexiiExportData> {
   const [items, senses, memoryStates, events, notebookEntries] = await db.transaction(
     "r",
     db.items,
@@ -75,10 +72,7 @@ export async function exportLexiiData(
  *
  * 失败（版本不兼容、数据非法）时整个事务中止，库保持原样。
  */
-export async function importLexiiData(
-  db: LexiiDatabase,
-  data: LexiiExportData,
-): Promise<void> {
+export async function importLexiiData(db: LexiiDatabase, data: LexiiExportData): Promise<void> {
   // 兼容改名前的旧备份：Lexilexi 时代导出的 format 为 "lexilexi"，与新格式 "lexii" 同等接受。
   const format = data.format as string;
   if (format !== "lexii" && format !== "lexilexi") {

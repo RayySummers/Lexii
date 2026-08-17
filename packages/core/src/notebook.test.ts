@@ -45,12 +45,7 @@ afterEach(async () => {
 });
 
 /** 落库一个词书义项（带学习条目与记忆状态，模拟词库既有词条） */
-async function seedSense(
-  database: LexiiDatabase,
-  senseId: string,
-  term: string,
-  itemId: string,
-) {
+async function seedSense(database: LexiiDatabase, senseId: string, term: string, itemId: string) {
   const sense = makeSense(senseId);
   sense.term = term;
   const item = makeLearningItem(sense.id, itemId);

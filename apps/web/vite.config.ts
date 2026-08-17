@@ -46,11 +46,7 @@ const buildTime = new Date().toISOString();
 const currentVersionTag = `v${packageJson.version}`;
 const releaseTags = [
   currentVersionTag,
-  ...(
-    process.env.LEXII_RELEASE_TAGS ??
-    runGit(["tag", "--list", "v*", "--sort=-v:refname"]) ??
-    ""
-  )
+  ...(process.env.LEXII_RELEASE_TAGS ?? runGit(["tag", "--list", "v*", "--sort=-v:refname"]) ?? "")
     .split(/[\n,]/)
     .map((tag) => tag.trim())
     .filter((tag) => tag.length > 0 && tag !== currentVersionTag),

@@ -29,11 +29,7 @@ describe("downloadTextFile", () => {
     const anchor = document.createElement("a");
     const createElementSpy = vi.spyOn(document, "createElement").mockReturnValue(anchor);
 
-    downloadTextFile(
-      "lexii-backup-2026-08-14.json",
-      '{"format":"lexii"}',
-      "application/json",
-    );
+    downloadTextFile("lexii-backup-2026-08-14.json", '{"format":"lexii"}', "application/json");
 
     expect(anchor.download).toBe("lexii-backup-2026-08-14.json");
     expect(createObjectURL).toHaveBeenCalledTimes(1);
@@ -58,9 +54,7 @@ describe("downloadTextFile", () => {
 
 describe("datedFilename", () => {
   it("生成 YYYY-MM-DD 文件名", () => {
-    expect(datedFilename("lexii-backup", "json")).toMatch(
-      /^lexii-backup-\d{4}-\d{2}-\d{2}\.json$/,
-    );
+    expect(datedFilename("lexii-backup", "json")).toMatch(/^lexii-backup-\d{4}-\d{2}-\d{2}\.json$/);
   });
 });
 
