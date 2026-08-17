@@ -182,6 +182,7 @@ export {
   detectDecompression,
   dictionaryDoneKey,
   dictionaryProgressKey,
+  dictionaryUpgradeLockKey,
   downloadAndVerifyPackage,
   fetchManifest,
   getDictionaryPackageState,

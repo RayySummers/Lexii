@@ -130,14 +130,19 @@ function toDictionarySense(
 
 /**
  * 查询扩展包安装状态（done/progress 标记）。
+ *
+ * 使用显式只读事务避免隐式事务在并发写入时被中止（AbortError）。
  */
 export async function getDictionaryPackageState(
   db: LexilexiDatabase,
   packageId: string,
   totalCount: number,
 ): Promise<DictionaryPackageState> {
-  const done = await db.meta.get(dictionaryDoneKey(packageId));
-  const progress = await db.meta.get(dictionaryProgressKey(packageId));
+  const doneKey = dictionaryDoneKey(packageId);
+  const progressKey = dictionaryProgressKey(packageId);
+  const [done, progress] = await db.transaction("r", db.meta, async () => {
+    return Promise.all([db.meta.get(doneKey), db.meta.get(progressKey)]);
+  });
   const installedCount = progress ? Number(progress.value) : 0;
 
   if (done) {
@@ -231,11 +236,13 @@ export async function installDictionaryPackage(
         if ((Number.isFinite(currentValue) ? currentValue : 0) !== expectedCursor) {
           throw new ConcurrentDictionaryInstallError(pkg.id);
         }
-        // term 去重：按 dictionarySenses.term 索引查重
-        const chunkTerms = chunk.map((entry) => entry.term);
+        // term 去重：读取该包已有的全部 term（source 索引查询），
+        // 内存中按小写 term 建 Set，跳过已存在的词条。
+        // 不使用 .where("term").anyOfIgnoreCase()：复合键场景下
+        // IDBKeyRange 匹配行为在 real IndexedDB 与 fake-indexeddb 间不一致。
         const existingTerms = new Set(
-          (await db.dictionarySenses.where("term").anyOfIgnoreCase(chunkTerms).uniqueKeys()).map(
-            (key) => String(key).toLowerCase(),
+          (await db.dictionarySenses.where("source").equals(pkg.id).toArray()).map((s) =>
+            s.term.toLowerCase(),
           ),
         );
         for (const entry of chunk) {
@@ -327,6 +334,7 @@ async function upgradeDictionaryPackage(
 ): Promise<DictionaryInstallResult> {
   // CAS 升级锁：并发升级时只有一个能成功
   const lockKey = dictionaryUpgradeLockKey(pkg.id);
+  let lockAcquired = false;
   await db.transaction("rw", db.meta, async () => {
     const existing = await db.meta.get(lockKey);
     if (existing) {
@@ -335,17 +343,31 @@ async function upgradeDictionaryPackage(
       const now = new Date(time).getTime();
       const expired = Number.isFinite(lockTime) && now - lockTime > UPGRADE_LOCK_TTL_MS;
       if (!expired) {
-        // 锁未过期：重读 done 标记，若已达标则返回 already-installed
+        // 锁未过期：重读 done 标记，若已达标则清除锁并返回
         const doneNow = await db.meta.get(dictionaryDoneKey(pkg.id));
         if (doneNow && doneNow.value === pkg.version) {
-          return; // 另一标签页已完成，跳到外层 done 检查
+          // 另一标签页已完成升级，清除残留锁
+          await db.meta.delete(lockKey);
+          return;
         }
         throw new ConcurrentDictionaryInstallError(pkg.id);
       }
       // 锁已过期：接管（覆盖旧锁）
     }
     await db.meta.put({ key: lockKey, value: time });
+    lockAcquired = true;
   });
+
+  if (!lockAcquired) {
+    // 未获取锁：检查 done 标记是否已达标
+    const doneAfterCheck = await db.meta.get(dictionaryDoneKey(pkg.id));
+    if (doneAfterCheck && doneAfterCheck.value === pkg.version) {
+      return { status: "already-installed", installedVersion: doneAfterCheck.value };
+    }
+    // 不应该到达这里（锁未获取且未达标说明有并发错误）
+    throw new ConcurrentDictionaryInstallError(pkg.id);
+  }
+
   // 覆盖旧锁后重读 done：可能另一标签页在锁过期前已完成
   const doneAfterLock = await db.meta.get(dictionaryDoneKey(pkg.id));
   if (doneAfterLock && doneAfterLock.value === pkg.version) {
