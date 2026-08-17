@@ -76,7 +76,7 @@ function computeDueLabels(card: ReviewCardData): Record<ReviewRating, string | n
 
 /** 背面评分快捷键提示（随档位模式切换） */
 function ratingHintFor(mode: RatingTierMode): string {
-  return mode === "three" ? "按 1–3（或 A / H / G）评分" : "按 1–4（或 A / H / G / E）评分";
+  return mode === "three" ? "按 1–3 评分" : "按 1–4（或 A / H / G / E）评分";
 }
 
 /**
@@ -453,7 +453,7 @@ function PhaseContent({
           <p className="text-center text-xs text-text-muted">
             空格翻面 ·{" "}
             {tierMode === "three"
-              ? "数字键 1–3 或字母 A / H / G 评分"
+              ? "数字键 1–3 评分"
               : "数字键 1–4 或字母 A / H / G / E 评分"}
           </p>
         </>
