@@ -170,5 +170,35 @@ export {
   MIN_QUIZ_OPTION_COUNT,
 } from "./distractors";
 export type { DistractorOption, QuizDirection } from "./distractors";
-export { DEFAULT_SEARCH_LIMIT, searchLexilexiSenses, searchSenses } from "./search";
+export {
+  DEFAULT_SEARCH_LIMIT,
+  searchAllSenses,
+  searchLexilexiSenses,
+  searchSenses,
+} from "./search";
 export type { SenseSearchHit, SenseSearchHitKind, SenseSearchOptions } from "./search";
+export {
+  DICTIONARY_CHUNK_SIZE,
+  detectDecompression,
+  dictionaryDoneKey,
+  dictionaryProgressKey,
+  downloadAndVerifyPackage,
+  fetchManifest,
+  getDictionaryPackageState,
+  invalidateDictionaryCache,
+  installDictionaryPackage,
+  markTier1CoveredByTier2,
+  promoteDictionarySense,
+  searchDictionarySenses,
+} from "./dictionary";
+export type {
+  DictionaryInstallOptions,
+  DictionaryInstallResult,
+  DictionaryInstallStatus,
+  DictionaryManifest,
+  DictionaryPackage,
+  DictionaryPackageState,
+  ManifestPackage,
+  ManifestVariant,
+} from "./dictionary";
+export type { DictionarySense } from "./persistence";

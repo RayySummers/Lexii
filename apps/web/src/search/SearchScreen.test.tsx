@@ -28,7 +28,7 @@ function makeResult(term: string, definitions: string[]): SearchResult {
     tags: [],
     examples: [],
   };
-  return { sense, kind: "term-prefix" };
+  return { sense, kind: "term-prefix", source: "learning" };
 }
 
 /** mock 搜词数据源工厂：search / hasAnySenses / 生词本方法均返回可配置的 vi.fn */

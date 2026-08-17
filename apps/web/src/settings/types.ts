@@ -10,7 +10,7 @@
  * RAY-253 反馈 6：`DataOverview` / `loadOverview` 已删除（设置页数据概览
  * 与统计页功能重复）。
  */
-import type { PresetInstallStatus } from "@lexilexi/core";
+import type { DictionaryInstallStatus, PresetInstallStatus } from "@lexilexi/core";
 import type { LexilexiExportData } from "@lexilexi/core";
 
 /** JSON 备份恢复后的计数（用于成功提示，映射自 LexilexiExportData 各表长度） */
@@ -57,6 +57,45 @@ export interface WordbookInstallResult {
   skippedCount: number;
 }
 
+// ─── 扩展词包（RAY-294）─────────────────────────────────────────────────────
+
+/** 扩展词包摘要（供扩展词包设置页展示） */
+export interface DictionaryPackageSummary {
+  /** 包稳定标识（如 "core-en-tier1"） */
+  id: string;
+  /** 面向用户的名称 */
+  name: string;
+  /** 安装状态 */
+  status: DictionaryInstallStatus;
+  /** 已处理词条数（installing 时为进度游标，installed 时为总数） */
+  installedCount: number;
+  /** 包内词条总数 */
+  totalCount: number;
+  /** 已安装版本（status === "installed" 时有值；"covered" 时为 "covered-by-tier2"） */
+  installedVersion?: string;
+  /** 包体积（Brotli，字节；从 manifest 读取） */
+  sizeBytes?: number;
+}
+
+/** 扩展词包安装结果 */
+export interface DictionaryInstallResult {
+  status: "installed" | "already-installed";
+  installedCount?: number;
+  skippedCount?: number;
+  updatedCount?: number;
+  deletedCount?: number;
+  installedVersion?: string;
+}
+
+/** manifest 中的包信息（供下载确认界面展示） */
+export interface DictionaryManifestInfo {
+  id: string;
+  version: string;
+  sourceCommit: string;
+  /** Brotli variant（优先）或最佳可用 variant */
+  bestVariant?: { url: string; size: number; sha256: string };
+}
+
 /**
  * 设置页数据源。
  *
@@ -76,4 +115,25 @@ export interface SettingsDataProvider {
   getWordbookSummaries(): Promise<WordbookSummary[]>;
   /** 安装一本词书（分块落库、可恢复、幂等、按 term 去重）；失败抛错 */
   installWordbook(bookId: string): Promise<WordbookInstallResult>;
+
+  // ─── 扩展词包（RAY-294）─────────────────────────────────────────────────
+
+  /** 获取全部扩展词包安装状态（进入设置页时读一次） */
+  getDictionaryPackageSummaries(): Promise<DictionaryPackageSummary[]>;
+  /**
+   * 从远程 manifest 获取包信息（仅进入扩展词包设置页时调用，启动不联网）。
+   * 返回 null 表示 manifest 不可用（网络错误等）。
+   */
+  fetchDictionaryManifest(): Promise<DictionaryManifestInfo[] | null>;
+  /**
+   * 下载并安装扩展词包（fetch → 校验 → 解压 → 落库）。
+   * 失败抛错（网络/校验/安装错误）。
+   * signal 可选，用于取消下载（AbortController）。
+   */
+  installDictionaryPackage(
+    packageId: string,
+    signal?: AbortSignal,
+  ): Promise<DictionaryInstallResult>;
+  /** Tier 2 安装完成后标记 Tier 1 为 covered */
+  markTier1CoveredByTier2(): Promise<void>;
 }

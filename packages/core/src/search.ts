@@ -17,6 +17,7 @@
  */
 import type { Sense } from "./domain";
 import type { LexilexiDatabase } from "./persistence";
+import { searchDictionarySenses } from "./dictionary";
 
 /** 命中类型：词条前缀 > 词条包含 > 释义包含（优先级从高到低） */
 export type SenseSearchHitKind = "term-prefix" | "term-substring" | "definition";
@@ -25,6 +26,8 @@ export type SenseSearchHitKind = "term-prefix" | "term-substring" | "definition"
 export interface SenseSearchHit {
   sense: Sense;
   kind: SenseSearchHitKind;
+  /** 数据来源（"learning" = senses 学习表，"dictionary" = dictionarySenses 词典表） */
+  source: "learning" | "dictionary";
 }
 
 /** 检索选项 */
@@ -80,7 +83,7 @@ export function searchSenses(
     }
     if (kind !== null) {
       seen.add(sense.id);
-      hits.push({ sense, kind });
+      hits.push({ sense, kind, source: "learning" });
     }
   }
   hits.sort(compareHits);
@@ -113,4 +116,48 @@ function compareHits(a: SenseSearchHit, b: SenseSearchHit): number {
     return byLength;
   }
   return a.sense.term.localeCompare(b.sense.term);
+}
+
+/**
+ * 全局合并检索 senses + dictionarySenses（RAY-294）。
+ *
+ * 去重规则：
+ * - 层内（senses 或 dictionarySenses 各自内部）：按 sense.id 去重
+ *   （RAY-266 口径，searchSenses 已处理）；
+ * - 跨层（dictionarySenses ↔ senses）：按 term（大小写不敏感）去重、
+ *   学习义项优先（senses 表晋升后副本的 id 与 dictionarySenses 不同，
+ *   但 term 相同，保留学习版本）。
+ *
+ * 两层完整取回 → 同一比较器全局排序 → 截断 DEFAULT_SEARCH_LIMIT。
+ */
+export async function searchAllSenses(
+  db: LexilexiDatabase,
+  query: string,
+  options: SenseSearchOptions = {},
+): Promise<SenseSearchHit[]> {
+  const q = query.trim().toLowerCase().slice(0, MAX_QUERY_LENGTH);
+  if (q.length === 0) return [];
+  const limit = options.limit ?? DEFAULT_SEARCH_LIMIT;
+
+  // 两层并行取回（学习表通常很小，词典表可能很大）
+  const [learningHits, dictHits] = await Promise.all([
+    searchLexilexiSenses(db, q, { limit: 0 }), // 不截断，取全部命中
+    searchDictionarySenses(db, q, { limit: 0 }),
+  ]);
+
+  // learningHits 已按 sense.id 去重（searchSenses 口径），同 term 多义项
+  // 保留各自（RAY-266：层内按 sense.id 去重，各显一条）。
+  // 仅用学习层的 term 集合过滤词典层命中（跨层按 term 去重，学习优先）。
+  const learningTerms = new Set(learningHits.map((h) => h.sense.term.toLowerCase()));
+  const result: SenseSearchHit[] = [...learningHits];
+  for (const hit of dictHits) {
+    if (!learningTerms.has(hit.sense.term.toLowerCase())) {
+      result.push({ sense: hit.sense, kind: hit.kind, source: "dictionary" });
+    }
+    // 学习层已有同 term → 跳过词典义项（学习义项优先）
+  }
+
+  // 全局排序 → 截断
+  result.sort(compareHits);
+  return limit > 0 ? result.slice(0, limit) : result;
 }

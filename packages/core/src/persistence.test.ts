@@ -244,7 +244,7 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
 
     // 2. 用当前版本打开同一数据库 → Dexie 自动执行 v2/v3/v4/v5 升级
     const upgraded = openDatabase(options);
-    expect(upgraded.verno).toBe(5);
+    expect(upgraded.verno).toBe(6);
     expect(await upgraded.senses.count()).toBe(1);
     expect(await upgraded.items.count()).toBe(1);
     expect(await upgraded.memoryStates.count()).toBe(1);
@@ -287,7 +287,7 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
 
     // 2. 当前版本打开 → 升级到 v4（memoryStates 增加 fields.due 索引）
     const upgraded = openDatabase(options);
-    expect(upgraded.verno).toBe(5);
+    expect(upgraded.verno).toBe(6);
     expect(await upgraded.items.get(legacyItem.id)).toEqual(legacyItem);
     expect(await upgraded.memoryStates.get(legacyItem.id)).toEqual(state);
     expect((await upgraded.meta.get("preset:test:progress"))?.value).toBe("7");
@@ -303,7 +303,7 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
 
   it("全新库直接以 v5 创建（含 meta 表、fields.due / senses.term / notebookEntries 索引）", async () => {
     const database = freshDatabase();
-    expect(database.verno).toBe(5);
+    expect(database.verno).toBe(6);
     expect(await database.meta.count()).toBe(0);
     // fields.due 索引可用（空库查询不报错即证明索引已建）
     const dueIds = await database.memoryStates
@@ -358,7 +358,7 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
 
     // 2. 当前版本打开 → 升级到 v4（senses 增加 term 索引），存量数据原样保留
     const upgraded = openDatabase(options);
-    expect(upgraded.verno).toBe(5);
+    expect(upgraded.verno).toBe(6);
     expect(await upgraded.senses.get(sense.id)).toEqual(sense);
     expect((await upgraded.meta.get("preset:test:done"))?.value).toBe("1.0.0");
 
@@ -411,7 +411,7 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
 
     // 2. 当前版本打开 → 升级到 v5（新增 notebookEntries 表），存量数据原样保留
     const upgraded = openDatabase(options);
-    expect(upgraded.verno).toBe(5);
+    expect(upgraded.verno).toBe(6);
     expect(await upgraded.items.get(legacyItem.id)).toEqual(legacyItem);
     expect(await upgraded.memoryStates.get(legacyItem.id)).toBeDefined();
     expect((await upgraded.meta.get("preset:test:done"))?.value).toBe("1.0.0");

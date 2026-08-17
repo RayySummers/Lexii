@@ -2,17 +2,23 @@
  * 搜词数据源（IndexedDB 实现）。
  *
  * 所有数据操作经由 @lexilexi/core 的公开 API：
- * - search：searchLexilexiSenses（senses 表全量读入内存后按拼写 + 释义
- *   过滤排序，只读、离线、不上报；命中顺序由 core 决定）；
- * - hasAnySenses：senses 表计数（空状态判定）；
+ * - search：searchAllSenses（senses + dictionarySenses 跨层合并检索，
+ *   term 去重、学习义项优先、全局排序；RAY-294 升级路径）；
+ * - hasAnySenses：senses + dictionarySenses 双表计数（空状态判定）；
  * - getNotebookSenseIds / addToNotebook：生词本加词入口（RAY-284）——
  *   加词幂等判定与落库走 core 的 addToNotebook（notebook/data.ts 的
- *   addWordToNotebook helper）。
+ *   addWordToNotebook helper）。词典来源的 senseId 需先 promote 到
+ *   senses 表再走加词流程（RAY-294 晋升路径）。
  *
  * 检索数据量口径与复习选择题混淆项加载一致（词库规模数千条，单次全量
  * 可接受），见 packages/core/src/search.ts 的说明。
  */
-import { getActiveNotebookItemIds, openDatabase, searchLexilexiSenses } from "@lexilexi/core";
+import {
+  getActiveNotebookItemIds,
+  openDatabase,
+  promoteDictionarySense,
+  searchAllSenses,
+} from "@lexilexi/core";
 import type { LexilexiDatabase, SenseId } from "@lexilexi/core";
 import { addWordToNotebook } from "../notebook/data";
 import type { AddToNotebookResult } from "../notebook/types";
@@ -22,12 +28,15 @@ import type { SearchDataProvider, SearchResult } from "./types";
 export function createIndexedDbSearchDataProvider(db: LexilexiDatabase): SearchDataProvider {
   return {
     async search(query: string): Promise<SearchResult[]> {
-      const hits = await searchLexilexiSenses(db, query);
-      return hits.map((hit) => ({ sense: hit.sense, kind: hit.kind }));
+      const hits = await searchAllSenses(db, query);
+      return hits.map((hit) => ({ sense: hit.sense, kind: hit.kind, source: hit.source }));
     },
 
     async hasAnySenses(): Promise<boolean> {
-      return (await db.senses.count()) > 0;
+      const learningCount = await db.senses.count();
+      if (learningCount > 0) return true;
+      const dictCount = await db.dictionarySenses.count();
+      return dictCount > 0;
     },
 
     async getNotebookSenseIds(): Promise<readonly SenseId[]> {
@@ -45,7 +54,17 @@ export function createIndexedDbSearchDataProvider(db: LexilexiDatabase): SearchD
     },
 
     async addToNotebook(senseId: SenseId): Promise<AddToNotebookResult> {
-      // 搜词页加词入口（RAY-284）：幂等加词，生词进入现有 FSRS 调度
+      // 搜词页加词入口（RAY-284 + RAY-294）：
+      // 词典来源的 senseId 属于 dictionarySenses 表，需先 promote 到 senses 表
+      // 才能走 addToNotebook（后者要求 senseId 已存在于 senses 表）。
+      const inLearningTable = await db.senses.get(senseId);
+      if (!inLearningTable) {
+        // 不在学习表 → 可能是词典来源，尝试 promote
+        const promoted = await promoteDictionarySense(db, senseId);
+        if (promoted) {
+          return addWordToNotebook(db, promoted.id);
+        }
+      }
       return addWordToNotebook(db, senseId);
     },
   };

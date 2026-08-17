@@ -55,6 +55,10 @@ interface Harness {
   getPresetSummaries: ReturnType<typeof vi.fn>;
   getWordbookSummaries: ReturnType<typeof vi.fn>;
   installWordbook: ReturnType<typeof vi.fn>;
+  getDictionaryPackageSummaries: ReturnType<typeof vi.fn>;
+  fetchDictionaryManifest: ReturnType<typeof vi.fn>;
+  installDictionaryPackage: ReturnType<typeof vi.fn>;
+  markTier1CoveredByTier2: ReturnType<typeof vi.fn>;
 }
 
 function makeHarness(): Harness {
@@ -68,6 +72,12 @@ function makeHarness(): Harness {
     .mockResolvedValue(DEFAULT_PRESET_SUMMARIES);
   const getWordbookSummaries = vi.fn().mockResolvedValue([]);
   const installWordbook = vi.fn().mockResolvedValue({ installedCount: 0, skippedCount: 0 });
+  const getDictionaryPackageSummaries = vi.fn().mockResolvedValue([]);
+  const fetchDictionaryManifest = vi.fn().mockResolvedValue(null);
+  const installDictionaryPackage = vi
+    .fn()
+    .mockResolvedValue({ status: "installed", installedCount: 0 });
+  const markTier1CoveredByTier2 = vi.fn().mockResolvedValue(undefined);
   const provider: SettingsDataProvider = {
     exportBackup,
     exportWordlistCsv,
@@ -75,6 +85,10 @@ function makeHarness(): Harness {
     getPresetSummaries,
     getWordbookSummaries,
     installWordbook,
+    getDictionaryPackageSummaries,
+    fetchDictionaryManifest,
+    installDictionaryPackage,
+    markTier1CoveredByTier2,
   };
   return {
     provider,
@@ -84,6 +98,10 @@ function makeHarness(): Harness {
     getPresetSummaries,
     getWordbookSummaries,
     installWordbook,
+    getDictionaryPackageSummaries,
+    fetchDictionaryManifest,
+    installDictionaryPackage,
+    markTier1CoveredByTier2,
   };
 }
 

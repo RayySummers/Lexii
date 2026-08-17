@@ -15,6 +15,8 @@ import type { AddToNotebookResult } from "../notebook/types";
 export interface SearchResult {
   sense: Sense;
   kind: SenseSearchHitKind;
+  /** 数据来源（"learning" = 学习表，"dictionary" = 扩展词典表） */
+  source: "learning" | "dictionary";
 }
 
 /**

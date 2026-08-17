@@ -12,6 +12,10 @@ name: Deploy Release（稳定通道）
 # 构建信息注入（RAY-297 任务 B）：两次构建分别设置 LEXILEXI_CHANNEL 与
 # BUILD_BRANCH，vite.config.ts 在构建时收集 SHA/时间/分支/通道/历史 tag，
 # 运行时零网络请求。
+#
+# RAY-300：Tier 1/2 扩展词包构建并入 Pages 部署——presets 产物随 Pages 一起
+# 发布到根路径 /presets/ 和 /dev/presets/，使用户可直接从 Pages 下载词包。
+# 构建逻辑与 publish-presets.yml 口径一致（同一脚本、同一 ECDICT 固定 commit）。
 
 on:
   push:
@@ -77,6 +81,35 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      #─── RAY-300：构建 Tier 1/2 扩展词包（并入 Pages 部署） ──────────
+      # 与 publish-presets.yml 口径一致：同一脚本、同一 ECDICT 固定 commit、
+      # 同一 SHA-256 校验；产物随 Pages 部署到根路径 /presets/ 和 /dev/presets/。
+      # ECDICT 数据缓存（Oscar suggestion 1）：key 固定为 bc015ed（数据 commit 不变），
+      # 避免每次 tag 推送重新下载 ~63MB，也消除对 raw.githubusercontent.com 可达性的依赖。
+      - name: 缓存 ECDICT 数据
+        uses: actions/cache@v4
+        with:
+          path: scripts/presets/.data
+          key: ecdict-bc015ed
+
+      - name: 获取 ECDICT 数据（固定 commit bc015ed + SHA256 校验）
+        run: node scripts/presets/fetch-ecdict.mjs
+
+      - name: 构建 Tier 1 词包
+        run: node scripts/presets/build.mjs --tier 1
+
+      - name: 构建 Tier 2 词包
+        run: node scripts/presets/build.mjs --tier 2
+
+      - name: 构建 Tier 1 富化包（可选）
+        run: node scripts/presets/build-enrichment.mjs
+        # 富化构建依赖外部数据（kaikki/ipa-dict/OpenEtymology/Tatoeba），
+        # CI 环境无 .data/ 缓存时跳过（富化包为可选，与 publish-presets 口径一致）。
+        continue-on-error: true
+
+      - name: 生成 manifest + 压缩包
+        run: node scripts/presets/build-manifest.mjs
+
       - name: 构建稳定版（根路径）
         run: pnpm --filter @lexilexi/web build
         env:
@@ -87,6 +120,11 @@ jobs:
         run: |
           mkdir -p site
           cp -a apps/web/dist/. site/
+
+      - name: 暂存稳定版词包（presets → presets/）
+        run: |
+          mkdir -p site/presets
+          cp -a scripts/presets/output/presets/. site/presets/
 
       - name: 构建 dev 通道（main 快照 → dev/ 子目录）
         shell: bash
@@ -99,6 +137,11 @@ jobs:
         env:
           LEXILEXI_CHANNEL: dev
           BUILD_BRANCH: main
+
+      - name: 暂存 dev 词包（presets → dev/presets/）
+        run: |
+          mkdir -p site/dev/presets
+          cp -a scripts/presets/output/presets/. site/dev/presets/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

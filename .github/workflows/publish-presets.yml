@@ -1,0 +1,109 @@
+name: Publish Tier 1/2 Presets（扩展词包构建与发布）
+
+# RAY-294 Phase 3：CI 构建 tier1/tier2 产物 + manifest 生成 + 发布至 GitHub Releases。
+#
+# 触发条件：
+# - 发版 tag（v*）推送时自动构建并发布
+# - 手动触发（workflow_dispatch）可指定 tag 或默认取最新
+#
+# 产物：
+# - tier1/tier2 的 brotli/gzip/raw 三种编码
+# - enrichment.tier1 富化包（同通道）
+# - manifest.json（含版本/SHA256/体积/源 commit/enrichment 子字段）
+# - 全部打包为 GitHub Release asset
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "要构建的 ref（默认：最新 v* tag）"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-presets:
+    name: 构建 Tier 1/2 扩展词包
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 解析构建目标
+        shell: bash
+        run: |
+          ref="${{ github.event.inputs.ref }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -z "$ref" ]; then
+            ref="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+          fi
+          if [ -n "$ref" ]; then
+            git checkout "$ref"
+          fi
+          echo "BUILD_REF=${ref:-${{ github.ref_name }}}" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 获取 ECDICT 数据（固定 commit + SHA256 校验）
+        run: node scripts/presets/fetch-ecdict.mjs
+
+      - name: 构建 Tier 1 词包
+        run: node scripts/presets/build.mjs --tier 1
+
+      - name: 构建 Tier 2 词包
+        run: node scripts/presets/build.mjs --tier 2
+
+      - name: 构建 Tier 1 富化包
+        run: node scripts/presets/build-enrichment.mjs
+        # 富化构建依赖大量外部数据（kaikki/ipa-dict/OpenEtymology/Tatoeba），
+        # CI 环境需预置 .data/ 缓存或从 artifact 恢复。
+        # 若 .data/ 不存在则跳过（富化包为可选）。
+        continue-on-error: true
+
+      - name: 生成 manifest + 压缩包
+        run: node scripts/presets/build-manifest.mjs
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: presets
+          path: scripts/presets/output/presets/
+
+      - name: 发布到 GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.BUILD_REF }}
+          name: "扩展词包 ${{ env.BUILD_REF }}"
+          body: |
+            Tier 1/2 扩展词包构建产物（RAY-294）。
+
+            **使用方式**：将 `presets/` 目录部署到 GitHub Pages 的 `presets/` 路径下，
+            或在应用内扩展词包设置页配置 manifest URL。
+
+            **包含内容**：
+            - `manifest.json` — 包清单（版本/SHA256/体积/源 commit）
+            - `core-en-tier1-*.json.*` — Tier 1 标准词包（58,244 词）
+            - `core-en-tier2-*.json.*` — Tier 2 全量词包（401,222 词）
+            - `enrichment-tier1-*.json.*` — Tier 1 富化包（例句/近反义/词根，可选）
+
+            **校验**：所有 SHA-256 均为解压后原始 JSON 的哈希值。
+          files: scripts/presets/output/presets/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

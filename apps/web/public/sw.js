@@ -138,6 +138,12 @@ self.addEventListener("fetch", (event) => {
     return; // 跨域请求不缓存、不干预
   }
 
+  // RAY-294：扩展词包请求（presets 路径）不拦截、不缓存
+  const presetsUrl = resolveUrl("./presets/");
+  if (url.href.startsWith(presetsUrl)) {
+    return;
+  }
+
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request).catch(

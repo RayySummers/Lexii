@@ -30,8 +30,11 @@ export const EVENT_SCHEMA_VERSION = 0;
  *   senseId 索引按义项查重去重、status 索引按 active 列表）——
  *   纯新增表，无数据迁移，存量数据原样保留。schema 版本已与 P0 数据
  *   任务错开（RAY-288 纯展示、RAY-270 只读事件流，均不改 schema）。
+ * v6（RAY-294）：新增 dictionarySenses 表（词典检索层：id 主键、
+ *   term 索引供检索、source 索引供增量替换删除检测）——
+ *   纯新增表，无数据迁移，存量数据原样保留。
  */
-export const DB_SCHEMA_VERSION = 5;
+export const DB_SCHEMA_VERSION = 6;
 
 /** 导出文件（完整可恢复 JSON）的格式版本 */
 export const EXPORT_FORMAT_VERSION = 1;
