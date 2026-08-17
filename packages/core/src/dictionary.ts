@@ -172,6 +172,19 @@ export async function getDictionaryPackageState(
 }
 
 /**
+ * 取消安装：清除进度标记，使 `getDictionaryPackageState` 回退到 `not-installed`。
+ *
+ * 调用时机：用户主动取消下载后，由 UI 层调用。IDB 事务内删除进度 key，
+ * 不影响已完成的 done 标记（已安装包不受影响）。
+ */
+export async function resetDictionaryPackageInstall(
+  db: LexilexiDatabase,
+  packageId: string,
+): Promise<void> {
+  await db.meta.delete(dictionaryProgressKey(packageId));
+}
+
+/**
  * 安装/升级扩展词包到 dictionarySenses 表。
  *
  * 分块事务、可恢复、幂等、并发安全——沿用 installPreset 的 progress + done + CAS 三件套。

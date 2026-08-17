@@ -190,6 +190,7 @@ export {
   installDictionaryPackage,
   markTier1CoveredByTier2,
   promoteDictionarySense,
+  resetDictionaryPackageInstall,
   searchDictionarySenses,
 } from "./dictionary";
 export type {

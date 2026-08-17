@@ -287,8 +287,15 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
         }
       } catch (err) {
         if (!mountedRef.current) return;
-        // AbortError 静默处理（用户主动取消，不展示错误）
+        // AbortError：清除 IDB 进度标记，使 refresh 读到 not-installed
         if (err instanceof DOMException && err.name === "AbortError") {
+          try {
+            await provider.resetDictionaryPackageInstall(packageId);
+          } catch (resetErr) {
+            if (import.meta.env.DEV) {
+              console.warn("resetDictionaryPackageInstall failed", resetErr);
+            }
+          }
           setNotice("下载已取消。");
         } else {
           setError(`安装失败：${toErrorMessage(err)}`);
@@ -308,7 +315,7 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
     [provider, refresh],
   );
 
-  // 取消安装
+  // 取消安装（abort 后由 handleConfirmDownload 的 catch 分支清除 IDB 进度）
   const handleCancelInstall = useCallback((packageId: string) => {
     const controller = abortControllersRef.current.get(packageId);
     if (controller) {
