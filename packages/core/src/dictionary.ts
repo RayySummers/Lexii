@@ -619,6 +619,43 @@ export function invalidateDictionaryCache(_packageId?: string): void {
   dictionaryCache.clear();
 }
 
+// ─── 词条元组转换（与 convertEntry.ts 口径一致） ─────────────────────────────
+
+/**
+ * 紧凑元组 → 类型化词条。
+ *
+ * 打包侧（build.mjs）生成格式为 [term, definitions, pos, ipa, tags]，
+ * definitions 以 "\n" 连接多条释义。与 tier0.ts / books.ts 的
+ * convertPresetEntry 口径一致，本处内联避免跨模块依赖。
+ */
+function tupleToPresetWordEntry(raw: unknown[], index: number): PresetWordEntry {
+  if (raw.length !== 5) {
+    throw new Error(`词条 #${index} 元组长度非法：${raw.length}`);
+  }
+  const [term = "", defs = "", pos = "", ipa = "", tags = ""] = raw as string[];
+  if (!term) {
+    throw new Error(`词条 #${index} 词条为空`);
+  }
+  const definitions = (defs as string)
+    .split("\n")
+    .map((p) => p.trim())
+    .filter((p) => p !== "");
+  if (definitions.length === 0) {
+    throw new Error(`词条 #${index}（${term}）缺少释义`);
+  }
+  const tagList = (tags as string)
+    .split(/\s+/)
+    .map((p) => p.trim())
+    .filter((p) => p !== "");
+  return {
+    term,
+    definitions,
+    ...(pos !== "" ? { pos } : {}),
+    ...(ipa !== "" ? { ipa } : {}),
+    tags: tagList,
+  };
+}
+
 // ─── manifest 与解压 ──────────────────────────────────────────────────────────
 
 /** manifest 中每个包的 variant 描述 */
@@ -757,7 +794,18 @@ export async function downloadAndVerifyPackage(
     throw new Error(`SHA-256 校验失败：期望 ${variant.sha256}，实际 ${hashHex}`);
   }
 
-  // 解析 JSON
+  // 解析 JSON：打包侧生成紧凑元组数组 [term, definitions, pos, ipa, tags]，
+  // 需转换为 PresetWordEntry 对象（与 tier0.ts / books.ts 的 convertPresetEntry 口径一致）。
   const text = new TextDecoder().decode(decompressed);
-  return JSON.parse(text) as PresetWordEntry[];
+  const raw = JSON.parse(text) as unknown[];
+  if (!Array.isArray(raw)) {
+    throw new Error("包文件格式非法：顶层不是数组");
+  }
+  return raw.map((entry, index) => {
+    if (Array.isArray(entry)) {
+      return tupleToPresetWordEntry(entry, index);
+    }
+    // 兼容对象格式（未来可能切换）
+    return entry as PresetWordEntry;
+  });
 }

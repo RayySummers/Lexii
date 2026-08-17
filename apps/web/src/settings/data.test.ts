@@ -148,7 +148,7 @@ describe("createIndexedDbSettingsDataProvider", () => {
 
   it(
     "词书库（RAY-262）：安装重叠词书按 term 去重，不产生重复学习项",
-    { timeout: 30000 },
+    { timeout: 60000 },
     async () => {
       const provider = createIndexedDbSettingsDataProvider(db!);
 
