@@ -24,7 +24,7 @@
  *   进入页面时读一次（本页移出生词本后回到本页时以重新进入为准）；
  * - 全部颜色走 design tokens（浅色/深色自动生效），不硬编码颜色。
  *
- * 说明文案为过渡版（Vega 的正式文案交付后替换）。
+ * 文案：Vega 产出（RAY-326）。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SenseId } from "@lexii/core";
@@ -302,7 +302,7 @@ function SearchContent({
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface p-8 text-center">
           <h2 className="text-xl font-semibold">词库还是空的</h2>
           <p className="max-w-sm text-sm text-text-muted">
-            还没有任何词可搜。先在设置页导入 CSV 词表，或到词书库安装一本词书。
+            还没有任何词可搜。可以到设置页导入 CSV 词表，或到词书库安装一本词书。
           </p>
         </div>
         {query.length === 0 && history.length > 0 ? (
@@ -343,8 +343,8 @@ function SearchContent({
       <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface p-8 text-center">
         <h2 className="text-xl font-semibold">库内无此词</h2>
         <p className="max-w-sm text-sm text-text-muted">
-          词库里没有与「{query}」匹配的词条，可以导入自建词库再搜——在设置页导入 CSV
-          词表，或到词书库安装更多词书。
+          词库里没有与「{query}」匹配的词条，可以导入自建词库再搜——到设置页导入 CSV
+          词表，或到词书库安装更多词书，之后再试一次。
         </p>
       </div>
     );

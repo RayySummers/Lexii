@@ -22,7 +22,7 @@
  * - 全程离线（local-first）：不请求网络、不埋点；全部颜色走 design
  *   tokens（浅色/深色自动生效）。
  *
- * 说明文案为过渡版（Vega 的正式文案交付后替换）。
+ * 文案：Vega 产出（RAY-326）；删除对话框核心口径与 RAY-320 一致。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WordbookCategory } from "@lexii/core";
@@ -212,7 +212,8 @@ export function WordbookLibraryScreen({ provider, onBack }: WordbookLibraryScree
       <ScreenHeader title="词书库" onBack={onBack} backLabel="返回设置" />
 
       <p className="text-sm text-text-muted">
-        浏览并安装考试分级词书（随应用内置，全程离线）。安装的词条进入学习队列，装什么学什么；与已学词条相同的词会自动跳过，不会重复学习。
+        浏览并按需安装内置词书（考试词汇 /
+        冲刺词书）。所有词书随应用打包，无需联网。安装的词条自动进入学习队列；与已学词条重复的会跳过，不会重复学习。
       </p>
 
       {/* RAY-288：词书库概览——词书总数/词条总数（新用户看词书规模）
