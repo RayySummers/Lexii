@@ -20,6 +20,7 @@ import {
   SAMPLE_WORDLIST_CSV,
   generateOptions,
   generateTermOptions,
+  getActiveNotebookItemIds,
   getStudyQueueItemIds,
   gradeReview,
   importCsvWordlist,
@@ -43,7 +44,7 @@ import { computeLearnedTodayCount, localDayBounds } from "@lexilexi/stats";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { readIncludeNotebook } from "../lib/notebookPreference";
 import { readQuizDirectionPreference, resolveQuizDirection } from "../lib/quizDirection";
-import { addWordToNotebook } from "../notebook/data";
+import { addWordToNotebook, removeWordBySenseId } from "../notebook/data";
 import type { AddToNotebookResult } from "../notebook/types";
 import type { MultipleChoiceQuestion } from "./MultipleChoiceCard";
 import { buildReviewQueue } from "./queue";
@@ -289,6 +290,23 @@ export function createIndexedDbReviewDataProvider(db: LexilexiDatabase): ReviewD
     async addToNotebook(senseId: SenseId): Promise<AddToNotebookResult> {
       // 复习卡页加词入口（RAY-284）：幂等加词，生词进入现有 FSRS 调度
       return addWordToNotebook(db, senseId);
+    },
+
+    async getNotebookSenseIds(): Promise<readonly SenseId[]> {
+      // 复习卡页加词状态查询（RAY-302）：生词本条目 itemId → items → senseId
+      const itemIds = await getActiveNotebookItemIds(db);
+      if (itemIds.length === 0) {
+        return [];
+      }
+      const items = await db.items.bulkGet(itemIds);
+      return items
+        .filter((item): item is NonNullable<typeof item> => item !== undefined)
+        .map((item) => item.senseId);
+    },
+
+    async removeFromNotebookBySenseId(senseId: SenseId): Promise<void> {
+      // 复习卡页撤销加词入口（RAY-302）：按 senseId 查找 active 条目并移出
+      return removeWordBySenseId(db, senseId);
     },
   };
 }

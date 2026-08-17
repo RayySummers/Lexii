@@ -70,6 +70,8 @@ function makeHarness(
     hasAnyItems,
     importSampleWordlist: vi.fn().mockResolvedValue(14),
     addToNotebook: vi.fn().mockResolvedValue("added"),
+    getNotebookSenseIds: vi.fn().mockResolvedValue([]),
+    removeFromNotebookBySenseId: vi.fn().mockResolvedValue(undefined),
   };
   return { provider, loadMultipleChoiceQueue, grade, hasAnyItems };
 }

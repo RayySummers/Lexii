@@ -20,7 +20,7 @@ import {
   searchAllSenses,
 } from "@lexilexi/core";
 import type { LexilexiDatabase, SenseId } from "@lexilexi/core";
-import { addWordToNotebook } from "../notebook/data";
+import { addWordToNotebook, removeWordBySenseId } from "../notebook/data";
 import type { AddToNotebookResult } from "../notebook/types";
 import type { SearchDataProvider, SearchResult } from "./types";
 
@@ -66,6 +66,11 @@ export function createIndexedDbSearchDataProvider(db: LexilexiDatabase): SearchD
         }
       }
       return addWordToNotebook(db, senseId);
+    },
+
+    async removeFromNotebookBySenseId(senseId: SenseId): Promise<void> {
+      // 搜词页撤销加词入口（RAY-302）：按 senseId 查找 active 条目并移出
+      return removeWordBySenseId(db, senseId);
     },
   };
 }
