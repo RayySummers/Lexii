@@ -136,4 +136,9 @@ export interface SettingsDataProvider {
   ): Promise<DictionaryInstallResult>;
   /** Tier 2 安装完成后标记 Tier 1 为 covered */
   markTier1CoveredByTier2(): Promise<void>;
+  /**
+   * 取消安装后清除进度标记，使包状态回退到 `not-installed`。
+   * 不影响已完成的 done 标记（已安装包不受影响）。
+   */
+  resetDictionaryPackageInstall(packageId: string): Promise<void>;
 }

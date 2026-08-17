@@ -25,6 +25,7 @@ import {
   installDictionaryPackage,
   markTier1CoveredByTier2,
   promoteDictionarySense,
+  resetDictionaryPackageInstall,
   searchDictionarySenses,
 } from "./dictionary";
 import type { DictionaryPackage, ManifestVariant } from "./dictionary";
@@ -220,6 +221,44 @@ describe("getDictionaryPackageState（安装状态查询）", () => {
     const state = await getDictionaryPackageState(database, "core-en-tier1", 100);
     expect(state.status).toBe("covered");
     expect(state.installedVersion).toBe("covered-by-tier2");
+  });
+});
+
+describe("resetDictionaryPackageInstall（取消安装后清除进度）", () => {
+  it("清除进度标记后状态回退到 not-installed", async () => {
+    const database = freshDatabase();
+    // 模拟安装中断：写入进度标记但不写完成标记
+    await database.meta.put({ key: dictionaryProgressKey("core-en-tier1"), value: "500" });
+
+    // 确认为 installing 状态
+    const before = await getDictionaryPackageState(database, "core-en-tier1", 1000);
+    expect(before.status).toBe("installing");
+    expect(before.installedCount).toBe(500);
+
+    // 取消安装：清除进度
+    await resetDictionaryPackageInstall(database, "core-en-tier1");
+
+    // 状态应回退到 not-installed
+    const after = await getDictionaryPackageState(database, "core-en-tier1", 1000);
+    expect(after.status).toBe("not-installed");
+    expect(after.installedCount).toBe(0);
+  });
+
+  it("不影响已完成的安装（done 标记保留）", async () => {
+    const database = freshDatabase();
+    const pkg = makePackage(makeEntries(10));
+    await installDictionaryPackage(database, pkg, { yield: async () => {} });
+
+    // 确认为 installed 状态
+    const before = await getDictionaryPackageState(database, "core-en-tier1", 10);
+    expect(before.status).toBe("installed");
+
+    // reset 不影响已完成的安装
+    await resetDictionaryPackageInstall(database, "core-en-tier1");
+
+    const after = await getDictionaryPackageState(database, "core-en-tier1", 10);
+    expect(after.status).toBe("installed");
+    expect(after.installedVersion).toBe("1.0.0");
   });
 });
 

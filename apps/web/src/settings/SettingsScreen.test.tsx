@@ -59,6 +59,7 @@ interface Harness {
   fetchDictionaryManifest: ReturnType<typeof vi.fn>;
   installDictionaryPackage: ReturnType<typeof vi.fn>;
   markTier1CoveredByTier2: ReturnType<typeof vi.fn>;
+  resetDictionaryPackageInstall: ReturnType<typeof vi.fn>;
 }
 
 function makeHarness(): Harness {
@@ -78,6 +79,7 @@ function makeHarness(): Harness {
     .fn()
     .mockResolvedValue({ status: "installed", installedCount: 0 });
   const markTier1CoveredByTier2 = vi.fn().mockResolvedValue(undefined);
+  const resetDictionaryPackageInstall = vi.fn().mockResolvedValue(undefined);
   const provider: SettingsDataProvider = {
     exportBackup,
     exportWordlistCsv,
@@ -89,6 +91,7 @@ function makeHarness(): Harness {
     fetchDictionaryManifest,
     installDictionaryPackage,
     markTier1CoveredByTier2,
+    resetDictionaryPackageInstall,
   };
   return {
     provider,
@@ -102,6 +105,7 @@ function makeHarness(): Harness {
     fetchDictionaryManifest,
     installDictionaryPackage,
     markTier1CoveredByTier2,
+    resetDictionaryPackageInstall,
   };
 }
 
