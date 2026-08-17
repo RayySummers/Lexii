@@ -210,6 +210,13 @@ export function bootstrapTier0Preset(db?: LexiiDatabase): void {
       const wordbookResults = await bootstrapCoreWordbooks(database, CORE_WORDBOOK_IDS, ENRICHMENT_TIER0_PRESET);
       const installedBooks = wordbookResults.filter((r) => r.status === "installed");
       const skippedBooks = wordbookResults.filter((r) => r.status === "skipped-existing-data");
+      // 互斥契约：`bootstrapCoreWordbooks` 对同一 `wordbookIds` 入参
+      // 只会产出 `installed` 或 `skipped-existing-data` 其中一类——
+      // 全新库全装走 `installed`、老用户全跳走 `skipped-existing-data`，
+      // 不会有部分 `installed` + 部分 `skipped` 的混合态。
+      // 下列两个 `if` 因此互斥，绝不会同时触发，避免重复日志。
+      // 未来若 `bootstrapCoreWordbooks` 实现变化允许混合态，
+      // 应将两个 `if` 合并为单一 `else if` 链或互斥的 `switch`。
       if (installedBooks.length > 0) {
         const itemsAfter = await database.items.count();
         const netDelta = itemsAfter - itemsBefore;
