@@ -74,7 +74,7 @@ async function main() {
     }
     const url = `${BASE}/${rel}`;
     console.log(`下载 ${url} …`);
-    const res = await fetch(url, { headers: { "user-agent": "lexilexi-preset-pipeline" } });
+    const res = await fetch(url, { headers: { "user-agent": "lexii-preset-pipeline" } });
     if (!res.ok) {
       throw new Error(`下载失败：HTTP ${res.status}`);
     }

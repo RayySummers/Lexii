@@ -1,5 +1,5 @@
 /**
- * @lexilexi/eval — 学习评测包（lexilexi_eval，骨架）
+ * @lexii/eval — 学习评测包（lexii_eval，骨架）
  *
  * 负责把「用户怎么作答」转化为可验证的学习证据（evidence model）：
  * 正确性、首次尝试、提示使用、编辑、混淆选项等，并据此得出 Review Rating，
@@ -7,4 +7,4 @@
  */
 
 /** 包名 */
-export const PACKAGE_NAME = "@lexilexi/eval";
+export const PACKAGE_NAME = "@lexii/eval";

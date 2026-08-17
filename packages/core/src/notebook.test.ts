@@ -2,7 +2,7 @@
  * 生词本（RAY-284）：addToNotebook / removeFromNotebook / listNotebookEntries /
  * getActiveNotebookItemIds 的数据层测试。
  *
- * 走真实 @lexilexi/core 路径（fake-indexeddb）：
+ * 走真实 @lexii/core 路径（fake-indexeddb）：
  * - 加词：单事务创建 学习条目（source = 生词本）+ 记忆状态（newCardFields，
  *   加入即到期、进入现有 FSRS 调度）+ import 事件 + 生词本条目；
  *   义项复用词库既有 Sense（不复制内容）；
@@ -25,16 +25,16 @@ import {
   openDatabase,
   removeFromNotebook,
 } from "./index";
-import type { LexilexiDatabase } from "./persistence";
+import type { LexiiDatabase } from "./persistence";
 
 /** 每个用例用独立的 fake-indexeddb 实例（互不干扰） */
 function makeOptions(): DexieOptions {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
-function freshDatabase(): LexilexiDatabase {
+function freshDatabase(): LexiiDatabase {
   db = openDatabase(makeOptions());
   return db;
 }
@@ -46,7 +46,7 @@ afterEach(async () => {
 
 /** 落库一个词书义项（带学习条目与记忆状态，模拟词库既有词条） */
 async function seedSense(
-  database: LexilexiDatabase,
+  database: LexiiDatabase,
   senseId: string,
   term: string,
   itemId: string,

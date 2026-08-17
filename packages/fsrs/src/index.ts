@@ -1,5 +1,5 @@
 /**
- * @lexilexi/fsrs — Lexilexi 的 FSRS-7 调度算法包
+ * @lexii/fsrs — Lexii 的 FSRS-7 调度算法包
  *
  * 职责：记忆状态更新（难度/稳定性）、间隔计算、到期复习调度。
  * 这是学习体验的核心引擎，替换传统 SM-2 类算法。

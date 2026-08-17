@@ -6,14 +6,14 @@
  * - 整批导入在同一个 Dexie 事务内落库：任一环节失败整体回滚，
  *   不留下半份词表、不产生孤儿 import 事件；
  * - 同词条的重复行按重复导入处理（新条目，保持每行一条轨迹）；
- * - 每个新条目的记忆状态由 @lexilexi/fsrs 的 newCardFields() 初始化。
+ * - 每个新条目的记忆状态由 @lexii/fsrs 的 newCardFields() 初始化。
  */
-import { newCardFields } from "@lexilexi/fsrs";
+import { newCardFields } from "@lexii/fsrs";
 import { DEFAULT_WORDLIST_LANG, parseCsvWordlist } from "./csv";
 import type { ExampleSentence, IsoDate, LanguageCode, LearningItem, Sense } from "./domain";
 import { createId, toEventId, toItemId, toSenseId } from "./id";
 import type { MemoryState } from "./memory";
-import type { LexilexiDatabase } from "./persistence";
+import type { LexiiDatabase } from "./persistence";
 /** 导入选项 */
 export interface ImportWordsOptions {
   /** 词库标识（写入 LearningItem.source 与导入记录，如 "导入:四级词表.csv"） */
@@ -35,13 +35,13 @@ export interface ImportWordsResult {
 /**
  * 把 CSV 词表文本导入数据库（解析 + 落库一气呵成，失败整体回滚）。
  *
- * @param db 已打开的 Lexilexi 数据库
+ * @param db 已打开的 Lexii 数据库
  * @param csvText CSV 原始文本（格式见 csv.ts）
  * @param options 导入选项（source 必填，与许可证溯源挂钩）
  * @throws CsvFormatError 任一数据行格式非法（带行号与原因），库保持原样
  */
 export async function importCsvWordlist(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   csvText: string,
   options: ImportWordsOptions,
 ): Promise<ImportWordsResult> {
@@ -122,7 +122,7 @@ export function toSense(entry: WordEntryContent, lang: LanguageCode): Sense {
   };
 }
 
-/** 新条目的初始记忆状态（@lexilexi/fsrs 的 newCardFields，due = 导入时刻，导入即到期） */
+/** 新条目的初始记忆状态（@lexii/fsrs 的 newCardFields，due = 导入时刻，导入即到期） */
 export function toMemoryState(itemId: LearningItem["id"], time: IsoDate): MemoryState {
   const fields = newCardFields({ now: time });
   return {

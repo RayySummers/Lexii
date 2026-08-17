@@ -10,7 +10,7 @@
  */
 import type { LanguageCode, Sense } from "./domain";
 import { createId, toSenseId } from "./id";
-import type { DictionarySense, LexilexiDatabase } from "./persistence";
+import type { DictionarySense, LexiiDatabase } from "./persistence";
 import type { PresetWordEntry } from "./presets/types";
 
 // ─── 常量 ────────────────────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ function toDictionarySense(
  * 使用显式只读事务避免隐式事务在并发写入时被中止（AbortError）。
  */
 export async function getDictionaryPackageState(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   packageId: string,
   totalCount: number,
 ): Promise<DictionaryPackageState> {
@@ -178,7 +178,7 @@ export async function getDictionaryPackageState(
  * 不影响已完成的 done 标记（已安装包不受影响）。
  */
 export async function resetDictionaryPackageInstall(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   packageId: string,
 ): Promise<void> {
   await db.meta.delete(dictionaryProgressKey(packageId));
@@ -193,7 +193,7 @@ export async function resetDictionaryPackageInstall(
  * 版本升级：done 标记存在但版本不匹配时触发增量替换（不清库）。
  */
 export async function installDictionaryPackage(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   pkg: DictionaryPackage,
   options: DictionaryInstallOptions = {},
 ): Promise<DictionaryInstallResult> {
@@ -352,7 +352,7 @@ function isEntryContentEqual(entry: PresetWordEntry, sense: DictionarySense): bo
  * 并发防线：CAS 升级锁（meta 键），防止两标签页并发升级产生重复记录。
  */
 async function upgradeDictionaryPackage(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   pkg: DictionaryPackage,
   oldVersion: string,
   time: string,
@@ -513,7 +513,7 @@ async function upgradeDictionaryPackage(
  *
  * 写入 dictionaryDoneKey("core-en-tier1") = "covered-by-tier2"。
  */
-export async function markTier1CoveredByTier2(db: LexilexiDatabase): Promise<void> {
+export async function markTier1CoveredByTier2(db: LexiiDatabase): Promise<void> {
   await db.meta.put({ key: dictionaryDoneKey("core-en-tier1"), value: "covered-by-tier2" });
 }
 
@@ -529,7 +529,7 @@ export async function markTier1CoveredByTier2(db: LexilexiDatabase): Promise<voi
  * 连点/并发场景下事务串行化保证不会产生双记录。
  */
 export async function promoteDictionarySense(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   dictSenseId: string,
 ): Promise<Sense | null> {
   const dictSense = await db.dictionarySenses.get(dictSenseId);
@@ -564,7 +564,7 @@ export async function promoteDictionarySense(
  * - definition：全量 toArray → 内存 definitions.some
  */
 export async function searchDictionarySenses(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   query: string,
   options: { limit?: number } = {},
 ): Promise<
@@ -647,7 +647,7 @@ const dictionaryCache = new Map<string, DictionarySense[]>();
  * 获取缓存的全量词典数据（合并所有已装包）。
  * 首次调用时从 IDB 加载，后续走缓存。
  */
-async function getDictionarySensesCached(db: LexilexiDatabase): Promise<DictionarySense[]> {
+async function getDictionarySensesCached(db: LexiiDatabase): Promise<DictionarySense[]> {
   // 使用单一缓存键 "_all" 合并所有包的数据
   const CACHE_KEY = "_all";
   const cached = dictionaryCache.get(CACHE_KEY);

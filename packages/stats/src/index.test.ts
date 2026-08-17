@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { toEventId, toItemId, toSenseId } from "@lexilexi/core";
-import type { ReviewEvent, ReviewRating } from "@lexilexi/core";
+import { toEventId, toItemId, toSenseId } from "@lexii/core";
+import type { ReviewEvent, ReviewRating } from "@lexii/core";
 import {
   classifyReviewOutcome,
   computeCompletedWordCount,

@@ -1,10 +1,10 @@
-# @lexilexi/ai — AI 能力包（空壳）
+# @lexii/ai — AI 能力包（空壳）
 
 > 状态：**MVP 阶段不实现任何 AI 功能**。本包只承载规划文档与未来的实现边界。
 
 ## 为什么现在（MVP）不做 AI
 
-Lexilexi 的第一性原理是 **local-first**：
+Lexii 的第一性原理是 **local-first**：
 
 1. **隐私红线**：学习数据是用户最私密的数据之一。MVP 不允许把学习数据发送到任何外部服务，而当前几乎所有 AI 能力都依赖云端推理——两者直接冲突。
 2. **必须联网才可用的功能违反 local-first 红线**：AI 生成内容（例句、辨析、对话）需要外部模型服务，断网即失效，破坏「本地优先、离线可用」的承诺。
@@ -32,7 +32,7 @@ Lexilexi 的第一性原理是 **local-first**：
 ### 4. 辨析（Confusion discrimination）
 
 - 为易混词（形近/义近）生成对比辨析内容，并生成对应的辨析练习题
-- 与 `@lexilexi/eval` 的 confusion choice 题型衔接
+- 与 `@lexii/eval` 的 confusion choice 题型衔接
 
 ## 实现边界（红线）
 

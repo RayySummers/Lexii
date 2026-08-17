@@ -16,14 +16,14 @@ import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
 import { endOfLocalDay } from "./dayBoundary";
 import { openDatabase } from "./persistence";
-import type { LexilexiDatabase } from "./persistence";
+import type { LexiiDatabase } from "./persistence";
 import { getDueItemIds, getStudyQueueItemIds } from "./studyLoop";
 
 function makeOptions(factory: IDBFactory): DexieOptions {
   return { indexedDB: factory, IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
 afterEach(async () => {
   await db?.delete();
@@ -32,7 +32,7 @@ afterEach(async () => {
 
 /** 以 alpha.2 的 v1 schema 直接建库（模拟旧版本写入的真实数据） */
 async function createLegacyV1Database(factory: IDBFactory): Promise<Dexie> {
-  const legacy = new Dexie("lexilexi", makeOptions(factory));
+  const legacy = new Dexie("lexii", makeOptions(factory));
   legacy.version(1).stores({
     items: "id",
     senses: "id",

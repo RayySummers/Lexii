@@ -3,7 +3,7 @@
  *
  * 对应 docs/domain-model.md §3、§4：
  * - Learning Item 是用户要掌握的最小学习对象：一个词条的「一个词义」。
- *   同一词条多个词义 = 多个 Learning Item，各自独立调度（与 @lexilexi/fsrs 的对接契约）。
+ *   同一词条多个词义 = 多个 Learning Item，各自独立调度（与 @lexii/fsrs 的对接契约）。
  * - Sense 是词义快照（词条、语言、释义），是 Learning Item 的内容部分，不含调度状态。
  */
 import type { ItemId, SenseId } from "./id";

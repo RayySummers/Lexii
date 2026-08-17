@@ -1,7 +1,7 @@
 /**
  * 测试夹具：构造合法的领域实体，避免各测试文件重复样板。
  */
-import { newCardFields } from "@lexilexi/fsrs";
+import { newCardFields } from "@lexii/fsrs";
 import { createId, toEventId, toItemId, toSenseId } from "./id";
 import type { IsoDate, LearningItem, Sense } from "./domain";
 import type { MemoryState } from "./memory";
@@ -42,7 +42,7 @@ export function makeLearningItem(senseId: Sense["id"], id?: string): LearningIte
 /**
  * 构造一份合法的 MemoryState（与给定 item 1─1 锚定）。
  *
- * 字段直接复用生产路径 @lexilexi/fsrs 的 newCardFields()（评审建议 #3：
+ * 字段直接复用生产路径 @lexii/fsrs 的 newCardFields()（评审建议 #3：
  * 夹具与生产初始状态必须一致——真实新卡是 new / 0 难度 / 0 稳定度）。
  */
 export function makeMemoryState(itemId: LearningItem["id"]): MemoryState {

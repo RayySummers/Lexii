@@ -9,11 +9,11 @@
  *
  * 口径说明：fake-indexeddb 为内存实现，无真实磁盘/移动端开销，
  * 结果作为「本地逻辑耗时下界」基准；真实设备数据待真机试用复测。
- * 运行方式：pnpm --filter @lexilexi/core bench（vitest bench，不进 CI 测试套件）。
+ * 运行方式：pnpm --filter @lexii/core bench（vitest bench，不进 CI 测试套件）。
  */
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { bench, describe } from "vitest";
-import type { LexilexiDatabase } from "../persistence";
+import type { LexiiDatabase } from "../persistence";
 import { openDatabase } from "../persistence";
 import { backfillEnrichment } from "./enrichment";
 import { installPreset } from "./install";
@@ -21,7 +21,7 @@ import { ENRICHMENT_TIER0_PRESET } from "./enrichmentTier0";
 import { TIER0_PRESET } from "./tier0";
 import type { PresetPackage } from "./types";
 
-function freshDatabase(): LexilexiDatabase {
+function freshDatabase(): LexiiDatabase {
   return openDatabase({ indexedDB: new IDBFactory(), IDBKeyRange });
 }
 

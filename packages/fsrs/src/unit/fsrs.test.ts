@@ -1,5 +1,5 @@
 /**
- * @lexilexi/fsrs 单元测试：公开 API 契约、数值公式与状态流转。
+ * @lexii/fsrs 单元测试：公开 API 契约、数值公式与状态流转。
  *
  * 与官方参考实现的逐字段对照在 src/verify（fsrs-verify，CI 单独跑）。
  */

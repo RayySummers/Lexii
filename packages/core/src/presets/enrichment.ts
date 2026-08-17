@@ -30,7 +30,7 @@
  * 补齐富化字段（词书库安装路径自 v1.1.0 起同时内联填充，见 apps/web）。
  */
 import type { Sense } from "../domain";
-import type { LexilexiDatabase } from "../persistence";
+import type { LexiiDatabase } from "../persistence";
 import type { WordEntryContent } from "../importWords";
 import type { EnrichmentPresetEntry, EnrichmentPresetPackage } from "./types";
 
@@ -320,7 +320,7 @@ export interface EnrichmentBackfillOptions {
  * 中断续填的进度不再有意义）。
  */
 export async function markEnrichmentDone(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   pkg: EnrichmentPresetPackage,
 ): Promise<void> {
   await db.transaction("rw", db.meta, async () => {
@@ -345,13 +345,13 @@ export async function markEnrichmentDone(
  * - 完成标记比对版本：`enrichment:<id>:done` 的值 ≠ 包版本即重跑
  *   （ENRICHMENT_VERSION 递增后存量用户能收到新回填；合并幂等，重跑安全）。
  *
- * @param db 已打开的 Lexilexi 数据库
+ * @param db 已打开的 Lexii 数据库
  * @param pkg 富化数据包（装载校验后的形态）
  * @returns backfilled = 本次实际改写的 Sense 数；
  *   already-backfilled = 完成标记版本与包版本一致，跳过
  */
 export async function backfillEnrichment(
-  db: LexilexiDatabase,
+  db: LexiiDatabase,
   pkg: EnrichmentPresetPackage,
   options: EnrichmentBackfillOptions = {},
 ): Promise<EnrichmentBackfillResult> {

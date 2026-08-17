@@ -3,7 +3,7 @@
  *
  * 锁定日历日语义：due <= 今日 23:59:59.999（本地日历日）即进入今日队列，
  * 明天起才到期的卡不提前进入；endOfLocalDay 由本地日历分量构造，
- * 与夏令时无关（与 @lexilexi/stats 的 localDayBounds 同源）。
+ * 与夏令时无关（与 @lexii/stats 的 localDayBounds 同源）。
  */
 import { afterEach, describe, expect, it } from "vitest";
 import type { DexieOptions } from "dexie";
@@ -11,14 +11,14 @@ import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { endOfLocalDay } from "./dayBoundary";
 import { makeLearningItem, makeMemoryState, makeSense } from "./helpers";
 import { openDatabase } from "./persistence";
-import type { LexilexiDatabase } from "./persistence";
+import type { LexiiDatabase } from "./persistence";
 import { getDueItemIds } from "./studyLoop";
 
 function makeOptions(): DexieOptions {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
 afterEach(async () => {
   await db?.delete();

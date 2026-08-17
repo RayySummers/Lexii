@@ -1,5 +1,5 @@
 import type { DexieOptions } from "dexie";
-import { newCardFields } from "@lexilexi/fsrs";
+import { newCardFields } from "@lexii/fsrs";
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, expect, it } from "vitest";
 import { importCsvWordlist } from "./importWords";
@@ -7,7 +7,7 @@ import { makeLearningItem, makeMemoryState, makeSense } from "./helpers";
 import { toEventId, toItemId } from "./id";
 import type { MemoryStateFields } from "./memory";
 import { openDatabase } from "./persistence";
-import type { LexilexiDatabase } from "./persistence";
+import type { LexiiDatabase } from "./persistence";
 import {
   getDueItemIds,
   getDueItemIdsInRange,
@@ -21,10 +21,10 @@ function makeOptions(): DexieOptions {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
 /** 每个用例用独立数据库实例，避免用例间残留状态 */
-function freshDatabase(): LexilexiDatabase {
+function freshDatabase(): LexiiDatabase {
   db = openDatabase(makeOptions());
   return db;
 }

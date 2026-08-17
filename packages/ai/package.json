@@ -1,9 +1,9 @@
 {
-  "name": "@lexilexi/ai",
+  "name": "@lexii/ai",
   "version": "0.1.0-alpha.8",
   "private": true,
   "type": "module",
-  "description": "Lexilexi AI 能力包（空壳：仅规划文档，MVP 不实现任何 AI 功能）",
+  "description": "Lexii AI 能力包（空壳：仅规划文档，MVP 不实现任何 AI 功能）",
   "exports": {
     ".": {
       "types": "./src/index.ts",

@@ -1,7 +1,7 @@
 /**
  * 三模式学习队列（RAY-253）：getStudyQueueItemIds + interleaveCards。
  *
- * 走真实 @lexilexi/core 路径：手工落库条目的记忆状态（reps / due），
+ * 走真实 @lexii/core 路径：手工落库条目的记忆状态（reps / due），
  * 验证 learn / review / mixed 三种模式的筛选与排序、混合穿插节奏与
  * 任一侧耗尽时的补齐行为。
  *
@@ -21,7 +21,7 @@ import type { IsoDate } from "./domain";
 import { makeLearningItem, makeMemoryState, makeSense } from "./helpers";
 import type { ItemId } from "./id";
 import { openDatabase } from "./persistence";
-import type { LexilexiDatabase } from "./persistence";
+import type { LexiiDatabase } from "./persistence";
 import { getStudyQueueItemIds, interleaveCards } from "./studyLoop";
 
 /** 每个用例用独立的 fake-indexeddb 实例（互不干扰） */
@@ -29,9 +29,9 @@ function makeOptions(): DexieOptions {
   return { indexedDB: new IDBFactory(), IDBKeyRange };
 }
 
-let db: LexilexiDatabase | undefined;
+let db: LexiiDatabase | undefined;
 
-function freshDatabase(): LexilexiDatabase {
+function freshDatabase(): LexiiDatabase {
   db = openDatabase(makeOptions());
   return db;
 }
@@ -51,7 +51,7 @@ interface Seed {
 }
 
 /** 按种子列表落库条目 + 义项 + 记忆状态（reps / due 覆写），返回条目 id 列表 */
-async function seed(database: LexilexiDatabase, seeds: Seed[]): Promise<ItemId[]> {
+async function seed(database: LexiiDatabase, seeds: Seed[]): Promise<ItemId[]> {
   const ids: ItemId[] = [];
   for (const entry of seeds) {
     const sense = makeSense(`sense_${entry.id}`);
@@ -282,7 +282,7 @@ describe("getStudyQueueItemIds（学习 / 复习 / 混合三模式）", () => {
 describe("getStudyQueueItemIds / getDueItemIds（生词本开关，RAY-284）", () => {
   /** 落库一个生词本条目：义项先入库（复用），返回生词本条目 id 与其学习条目 id */
   async function seedNotebookEntry(
-    database: LexilexiDatabase,
+    database: LexiiDatabase,
     senseSuffix: string,
     addedAt: IsoDate,
     reps: number,

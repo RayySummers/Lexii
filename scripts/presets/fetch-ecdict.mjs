@@ -35,7 +35,7 @@ async function main() {
   }
   console.log(`下载 ${ECDICT_URL} …`);
   const res = await fetch(ECDICT_URL, {
-    headers: { "user-agent": "lexilexi-preset-pipeline" },
+    headers: { "user-agent": "lexii-preset-pipeline" },
   });
   if (!res.ok) {
     throw new Error(`下载失败：HTTP ${res.status}`);
