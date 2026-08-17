@@ -1,8 +1,8 @@
 /**
  * 富化字段的展示辅助（RAY-272 批次 B 功能层）。
  *
- * 纯函数、无 React 依赖：组件只做渲染，双音标选择与词根词缀拆解
- * 的解析口径集中在此，便于单测锁定行为。
+ * 纯函数、仅依赖 React createElement：组件只做渲染，双音标选择与
+ * 词根词缀拆解的解析口径集中在此，便于单测锁定行为。
  */
 import { createElement, type ReactNode } from "react";
 import type { Sense } from "@lexii/core";
