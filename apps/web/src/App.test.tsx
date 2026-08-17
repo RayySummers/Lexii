@@ -56,6 +56,7 @@ function makeSettingsProviderFactory() {
     getPresetSummaries: vi.fn().mockResolvedValue([]),
     getWordbookSummaries: vi.fn().mockResolvedValue([]),
     installWordbook: vi.fn().mockResolvedValue({ installedCount: 0, skippedCount: 0 }),
+    removeWordbook: vi.fn().mockResolvedValue(undefined),
     getDictionaryPackageSummaries: vi.fn().mockResolvedValue([]),
     fetchDictionaryManifest: vi.fn().mockRejectedValue(new Error("无法获取词包信息：网络不可达")),
     installDictionaryPackage: vi.fn().mockResolvedValue({ status: "installed", installedCount: 0 }),

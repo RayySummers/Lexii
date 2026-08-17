@@ -89,6 +89,7 @@ export {
   presetDoneKey,
   presetProgressKey,
   PRESET_CHUNK_SIZE,
+  removePreset,
 } from "./presets/install";
 export type {
   PresetInstallOptions,

@@ -28,6 +28,7 @@ import {
   markTier1CoveredByTier2 as coreMarkTier1CoveredByTier2,
   openDatabase,
   parseLexiiExport,
+  removePreset,
   resetDictionaryPackageInstall as coreResetDictionaryPackageInstall,
   TIER0_PRESET,
 } from "@lexii/core";
@@ -204,6 +205,10 @@ export function createIndexedDbSettingsDataProvider(db: LexiiDatabase): Settings
         return { installedCount: 0, skippedCount: 0 };
       }
       return { installedCount: result.installedCount, skippedCount: result.skippedCount };
+    },
+
+    async removeWordbook(bookId: string): Promise<void> {
+      await removePreset(db, bookId);
     },
 
     // ─── RAY-294 扩展词包 ─────────────────────────────────────────────────

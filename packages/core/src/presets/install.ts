@@ -275,6 +275,21 @@ export async function installPreset(
   };
 }
 
+/**
+ * 移除已安装预设词表（RAY-320：词书删除功能）。
+ *
+ * 删除 meta 表中的完成标记（done）与进度标记（progress），
+ * 使词书状态回退到 `not-installed`。已导入的词条数据（senses /
+ * items / memoryStates / events）保留不动——学习记录不受影响，
+ * 重新安装时 term 去重会跳过已存在的词条。
+ */
+export async function removePreset(db: LexiiDatabase, presetId: string): Promise<void> {
+  await db.transaction("rw", db.meta, async () => {
+    await db.meta.delete(presetDoneKey(presetId));
+    await db.meta.delete(presetProgressKey(presetId));
+  });
+}
+
 /** 并发安装检测错误（内部哨兵：不面向调用方文案） */
 class ConcurrentInstallError extends Error {
   constructor(presetId: string) {

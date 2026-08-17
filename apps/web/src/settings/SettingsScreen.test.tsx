@@ -55,6 +55,7 @@ interface Harness {
   getPresetSummaries: ReturnType<typeof vi.fn>;
   getWordbookSummaries: ReturnType<typeof vi.fn>;
   installWordbook: ReturnType<typeof vi.fn>;
+  removeWordbook: ReturnType<typeof vi.fn>;
   getDictionaryPackageSummaries: ReturnType<typeof vi.fn>;
   fetchDictionaryManifest: ReturnType<typeof vi.fn>;
   installDictionaryPackage: ReturnType<typeof vi.fn>;
@@ -73,6 +74,7 @@ function makeHarness(): Harness {
     .mockResolvedValue(DEFAULT_PRESET_SUMMARIES);
   const getWordbookSummaries = vi.fn().mockResolvedValue([]);
   const installWordbook = vi.fn().mockResolvedValue({ installedCount: 0, skippedCount: 0 });
+  const removeWordbook = vi.fn().mockResolvedValue(undefined);
   const getDictionaryPackageSummaries = vi.fn().mockResolvedValue([]);
   const fetchDictionaryManifest = vi.fn().mockResolvedValue(null);
   const installDictionaryPackage = vi
@@ -87,6 +89,7 @@ function makeHarness(): Harness {
     getPresetSummaries,
     getWordbookSummaries,
     installWordbook,
+    removeWordbook,
     getDictionaryPackageSummaries,
     fetchDictionaryManifest,
     installDictionaryPackage,
@@ -101,6 +104,7 @@ function makeHarness(): Harness {
     getPresetSummaries,
     getWordbookSummaries,
     installWordbook,
+    removeWordbook,
     getDictionaryPackageSummaries,
     fetchDictionaryManifest,
     installDictionaryPackage,

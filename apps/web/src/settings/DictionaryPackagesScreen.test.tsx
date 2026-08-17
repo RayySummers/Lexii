@@ -31,6 +31,7 @@ function makeProvider(overrides: Partial<SettingsDataProvider> = {}): SettingsDa
     getPresetSummaries: vi.fn().mockResolvedValue([]),
     getWordbookSummaries: vi.fn().mockResolvedValue([]),
     installWordbook: vi.fn(),
+    removeWordbook: vi.fn(),
     getDictionaryPackageSummaries: vi.fn().mockResolvedValue([
       {
         id: "core-en-tier1",
