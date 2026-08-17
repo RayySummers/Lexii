@@ -1,9 +1,9 @@
 {
-  "name": "@lexilexi/web",
+  "name": "@lexii/web",
   "version": "0.1.0-alpha.8",
   "private": true,
   "type": "module",
-  "description": "Lexilexi Web / PWA 应用",
+  "description": "Lexii Web / PWA 应用",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node scripts/verify-bundle-split.mjs",
@@ -15,9 +15,9 @@
     "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
-    "@lexilexi/core": "workspace:*",
-    "@lexilexi/fsrs": "workspace:*",
-    "@lexilexi/stats": "workspace:*",
+    "@lexii/core": "workspace:*",
+    "@lexii/fsrs": "workspace:*",
+    "@lexii/stats": "workspace:*",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

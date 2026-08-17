@@ -79,8 +79,10 @@ export async function importLexiiData(
   db: LexiiDatabase,
   data: LexiiExportData,
 ): Promise<void> {
-  if (data.format !== "lexii") {
-    throw new Error(`导出文件格式未知：${String(data.format)}`);
+  // 兼容改名前的旧备份：Lexilexi 时代导出的 format 为 "lexilexi"，与新格式 "lexii" 同等接受。
+  const format = data.format as string;
+  if (format !== "lexii" && format !== "lexilexi") {
+    throw new Error(`导出文件格式未知：${format}（支持 lexii 及旧版 lexilexi 备份）`);
   }
   if (data.exportFormatVersion !== EXPORT_FORMAT_VERSION) {
     throw new Error(
@@ -149,6 +151,9 @@ function assertArrayOfPlainObjects(
  *
  * notebookEntries（RAY-284）缺失时按空数组处理——旧备份（本字段引入前
  * 导出）可原样导入，绝不因备份格式升级拒绝恢复。
+ *
+ * 改名兼容（RAY-306）：Lexilexi 时代的备份 format 为 "lexilexi"，解析时
+ * 同样接受并归一化为 "lexii"，保证旧备份文件可正常恢复。
  */
 export function parseLexiiExport(json: string): LexiiExportData {
   let raw: unknown;
@@ -158,8 +163,9 @@ export function parseLexiiExport(json: string): LexiiExportData {
     throw new Error("导出文件不是合法 JSON");
   }
   assertPlainObject(raw, "导出数据");
-  if (raw.format !== "lexii") {
-    throw new Error(`导出文件格式未知：${String(raw.format)}`);
+  const format = raw.format;
+  if (format !== "lexii" && format !== "lexilexi") {
+    throw new Error(`导出文件格式未知：${String(format)}（支持 lexii 及旧版 lexilexi 备份）`);
   }
   if (typeof raw.exportFormatVersion !== "number") {
     throw new Error("数据非法：exportFormatVersion 必须是数字");
@@ -177,5 +183,9 @@ export function parseLexiiExport(json: string): LexiiExportData {
   if (raw.notebookEntries !== undefined) {
     assertArrayOfPlainObjects(raw.notebookEntries, "notebookEntries");
   }
-  return { ...raw, notebookEntries: raw.notebookEntries ?? [] } as unknown as LexiiExportData;
+  return {
+    ...raw,
+    format: "lexii",
+    notebookEntries: raw.notebookEntries ?? [],
+  } as unknown as LexiiExportData;
 }

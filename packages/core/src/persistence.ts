@@ -3,6 +3,9 @@
  *
  * 对应 docs/domain-model.md §9：
  * - 数据库 "lexii"，表 items / senses / memoryStates / events。
+ * - 改名（Lexilexi → Lexii，RAY-306）后数据库名由 "lexilexi" 改为 "lexii"。
+ *   按项目所有者决定不提供旧库迁移：当前无存量用户，升级即全新开始，
+ *   旧 "lexilexi" 库不会被自动发现或复制。
  * - schema 升级必须走 version(n).stores().upgrade() 迁移，禁止清库重来。
  * - 读写一律走显式事务；「评分 → 写状态 + 写事件」单事务原子落库。
  * - 允许注入 Dexie 实例（Node 测试用 fake-indexeddb，浏览器用 window.indexedDB）。

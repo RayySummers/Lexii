@@ -165,6 +165,19 @@ describe("exportLexiiData / importLexiiData", () => {
     await target.delete();
   });
 
+  it("接受旧版 lexilexi 格式备份导入（RAY-306 改名兼容）", async () => {
+    const source = openDatabase(makeOptions());
+    await makeExport(source);
+    const data = await exportLexiiData(source, now());
+
+    const target = openDatabase(makeOptions());
+    const legacy = { ...data, format: "lexilexi" } as unknown as LexiiExportData;
+    await importLexiiData(target, legacy);
+    expect(await target.items.count()).toBe(await source.items.count());
+    await source.delete();
+    await target.delete();
+  });
+
   it("格式不符或版本过高时整体拒绝，库保持原样", async () => {
     const target = openDatabase(makeOptions());
     await makeExport(target);
@@ -239,6 +252,14 @@ describe("parseLexiiExport（结构校验）", () => {
     expect(parsed.format).toBe("lexii");
     expect(parsed.items).toEqual([]);
     expect((parsed as unknown as Record<string, unknown>).custom).toBe("kept");
+  });
+
+  it("接受旧版 lexilexi 格式并归一化为 lexii（RAY-306 改名兼容）", () => {
+    const parsed = parseLexiiExport(
+      `{"format":"lexilexi","exportFormatVersion":1,"dbSchemaVersion":1,"exportedAt":"2026-01-01T00:00:00.000Z","items":[],"senses":[],"memoryStates":[],"events":[]}`,
+    );
+    expect(parsed.format).toBe("lexii");
+    expect(parsed.items).toEqual([]);
   });
 });
 
