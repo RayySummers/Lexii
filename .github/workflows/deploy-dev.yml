@@ -80,8 +80,10 @@ jobs:
 
       #─── RAY-300：构建 Tier 1/2 扩展词包（并入 Pages 部署） ──────────
       # 使用 composite action 封装 5 步构建块（Nit 1），防口径漂移。
+      # 全限定引用 @main：workflow_dispatch 时工作树可能切到旧 ref（无此 action），
+      # 本地引用 `uses: ./.github/actions/build-presets` 会报 "Can't find action.yml"。
       - name: 构建 Tier 1/2 扩展词包
-        uses: ./.github/actions/build-presets
+        uses: RayySummers/Lexilexi/.github/actions/build-presets@main
 
       - name: 构建 dev 通道（dev/ 子目录）
         run: pnpm --filter @lexilexi/web build

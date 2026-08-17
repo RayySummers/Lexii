@@ -357,7 +357,18 @@ async function main() {
     { label: "ipa-dict en_US", path: path.join(DATA_DIR, "ipa-dict", "en_US.txt") },
     { label: "ipa-dict en_UK", path: path.join(DATA_DIR, "ipa-dict", "en_UK.txt") },
     { label: "OpenEtymology", path: path.join(DATA_DIR, "openetymology") },
+    { label: "ecdict", path: path.join(DATA_DIR, "ecdict", "ecdict.csv") },
     { label: "Tatoeba eng_sentences", path: path.join(DATA_DIR, "tatoeba", "eng_sentences.tsv") },
+    { label: "Tatoeba cmn_sentences", path: path.join(DATA_DIR, "tatoeba", "cmn_sentences.tsv") },
+    { label: "Tatoeba eng-cmn_links", path: path.join(DATA_DIR, "tatoeba", "eng-cmn_links.tsv") },
+    {
+      label: "Tatoeba eng_sentences_CC0",
+      path: path.join(DATA_DIR, "tatoeba", "eng_sentences_CC0.tsv"),
+    },
+    {
+      label: "Tatoeba cmn_sentences_CC0",
+      path: path.join(DATA_DIR, "tatoeba", "cmn_sentences_CC0.tsv"),
+    },
   ];
   const missingData = REQUIRED_DATA_FILES.filter((f) => !existsSync(f.path));
   if (missingData.length > 0) {
