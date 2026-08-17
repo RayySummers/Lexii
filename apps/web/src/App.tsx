@@ -9,6 +9,11 @@
  * - header 不再常驻主题开关；主题偏好（浅色 / 深色 / 跟随系统）改为
  *   设置页下拉选单，经 `useTheme`（App 级单一数据源）下发到设置页。
  *
+ * RAY-315 路由改版：
+ * - 用 `useHashRoute`（URL hash）替换 `useState<View>` 管理当前界面，
+ *   解决 GitHub Pages 刷新回到首页的问题。刷新时浏览器保留 hash，
+ *   无需服务端配置；视图内嵌数据源在初始化时自动创建（避免首页闪烁）。
+ *
  * 数据源注入：`reviewProviderFactory` / `settingsProviderFactory` /
  * `statsProviderFactory` / `searchProviderFactory` 是测试接缝——测试传入
  * mock 工厂，生产环境使用默认工厂（浏览器 IndexedDB）。复习/设置/搜词工厂
@@ -26,6 +31,7 @@ import type { StudyMode } from "@lexii/core";
 import { BookmarkIcon } from "./components/icons";
 import { FirstOpenDialog } from "./components/FirstOpenDialog";
 import { HomeScreen, type StudyFormat } from "./HomeScreen";
+import { useHashRoute } from "./hooks/useHashRoute";
 import { useTheme } from "./hooks/useTheme";
 import { markFirstOpenDialogDismissed, shouldShowFirstOpenDialog } from "./lib/firstOpenDialog";
 import { NotebookScreen } from "./notebook/NotebookScreen";
@@ -45,8 +51,6 @@ import { StatsScreen } from "./stats/StatsScreen";
 import { createDefaultStatsDataProvider } from "./stats/data";
 import { useStatsProvider } from "./stats/useStatsProvider";
 import type { StatsDataProvider } from "./stats/types";
-
-type View = "home" | "review" | "search" | "notebook" | "settings" | "stats";
 
 export interface AppProps {
   /** 复习数据源工厂（测试注入 mock；默认浏览器 IndexedDB） */
@@ -69,12 +73,23 @@ export function App({
   notebookProviderFactory = createDefaultNotebookDataProvider,
 }: AppProps) {
   const { preference, setPreference } = useTheme();
-  const [reviewProvider, setReviewProvider] = useState<ReviewDataProvider | null>(null);
-  const [settingsProvider, setSettingsProvider] = useState<SettingsDataProvider | null>(null);
-  const [searchProvider, setSearchProvider] = useState<SearchDataProvider | null>(null);
-  const [notebookProvider, setNotebookProvider] = useState<NotebookDataProvider | null>(null);
+  // RAY-315: Hash-based routing so refresh preserves the current view.
+  const [view, navigate] = useHashRoute();
+  // RAY-315: Auto-create providers for the initial hash-restored view to avoid
+  // a flash of the home screen when the user navigates directly via URL.
+  const [reviewProvider, setReviewProvider] = useState<ReviewDataProvider | null>(() =>
+    view === "review" ? reviewProviderFactory() : null,
+  );
+  const [settingsProvider, setSettingsProvider] = useState<SettingsDataProvider | null>(() =>
+    view === "settings" ? settingsProviderFactory() : null,
+  );
+  const [searchProvider, setSearchProvider] = useState<SearchDataProvider | null>(() =>
+    view === "search" ? searchProviderFactory() : null,
+  );
+  const [notebookProvider, setNotebookProvider] = useState<NotebookDataProvider | null>(() =>
+    view === "notebook" ? notebookProviderFactory() : null,
+  );
   const statsProvider = useStatsProvider(statsProviderFactory);
-  const [view, setView] = useState<View>("home");
   const [reviewMode, setReviewMode] = useState<StudyMode>("review");
   const [studyFormat, setStudyFormat] = useState<StudyFormat>("card");
   // RAY-282 首次打开弹窗：仅无已读标记的首次打开展示（懒初始化只读一次）
@@ -90,33 +105,33 @@ export function App({
       setReviewProvider((current) => current ?? reviewProviderFactory());
       setReviewMode(mode);
       setStudyFormat(format);
-      setView("review");
+      navigate("review");
     },
-    [reviewProviderFactory],
+    [reviewProviderFactory, navigate],
   );
 
   const openSettings = useCallback(() => {
     setSettingsProvider((current) => current ?? settingsProviderFactory());
-    setView("settings");
-  }, [settingsProviderFactory]);
+    navigate("settings");
+  }, [settingsProviderFactory, navigate]);
 
   const openSearch = useCallback(() => {
     setSearchProvider((current) => current ?? searchProviderFactory());
-    setView("search");
-  }, [searchProviderFactory]);
+    navigate("search");
+  }, [searchProviderFactory, navigate]);
 
   const openNotebook = useCallback(() => {
     setNotebookProvider((current) => current ?? notebookProviderFactory());
-    setView("notebook");
-  }, [notebookProviderFactory]);
+    navigate("notebook");
+  }, [notebookProviderFactory, navigate]);
 
   const openStats = useCallback(() => {
-    setView("stats");
-  }, []);
+    navigate("stats");
+  }, [navigate]);
 
   const goHome = useCallback(() => {
-    setView("home");
-  }, []);
+    navigate("home");
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-bg text-text transition-colors">
