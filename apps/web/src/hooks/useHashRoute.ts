@@ -11,7 +11,9 @@ const VALID_VIEWS: readonly HashView[] = [
   "stats",
 ];
 
-function parseHash(): HashView {
+/** Parse the current URL hash into a known view, falling back to "home". */
+export function parseHash(): HashView {
+  // Strip leading #/ and then drop query string and trailing path segments.
   const raw = window.location.hash.replace(/^#\/?/, "").split(/[?/]/)[0];
   return VALID_VIEWS.includes(raw as HashView) ? (raw as HashView) : "home";
 }
