@@ -272,12 +272,12 @@ describe("bootstrapCoreWordbooks（RAY-319 核心词书默认安装）", () => {
 
   it("未知词书 id：返回 error 状态，不阻塞其余词书安装", async () => {
     const database = freshDatabase();
-    const results = await bootstrapCoreWordbooks(database, [
-      "book-nonexistent",
-      "book-test-zk",
-    ]);
+    const results = await bootstrapCoreWordbooks(database, ["book-nonexistent", "book-test-zk"]);
     expect(results).toHaveLength(2);
-    expect(results[0]).toEqual({ status: "error", message: expect.stringContaining("book-nonexistent") });
+    expect(results[0]).toEqual({
+      status: "error",
+      message: expect.stringContaining("book-nonexistent"),
+    });
     expect(results[1]).toEqual({ status: "installed", installedCount: 3 });
   });
 });

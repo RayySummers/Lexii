@@ -179,7 +179,11 @@ export function App({
           <ReviewScreen provider={reviewProvider} mode={reviewMode} onExit={goHome} />
         )
       ) : view === "search" && searchProvider ? (
-        <SearchScreen provider={searchProvider} onExit={goHome} onNavigateToSettings={openSettings} />
+        <SearchScreen
+          provider={searchProvider}
+          onExit={goHome}
+          onNavigateToSettings={openSettings}
+        />
       ) : view === "notebook" && notebookProvider ? (
         <NotebookScreen provider={notebookProvider} onExit={goHome} />
       ) : view === "settings" && settingsProvider ? (

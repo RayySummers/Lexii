@@ -27,12 +27,7 @@ import {
 import type { EnrichmentPresetPackage, LexiiDatabase, PresetPackage } from "@lexii/core";
 
 /** RAY-319：首启自动安装的核心词书 id（中考/高考/四级/六级） */
-const CORE_WORDBOOK_IDS: readonly string[] = [
-  "book-zk",
-  "book-gk",
-  "book-cet4",
-  "book-cet6",
-];
+const CORE_WORDBOOK_IDS: readonly string[] = ["book-zk", "book-gk", "book-cet4", "book-cet6"];
 
 export type BootstrapOutcome =
   | { status: "installed"; installedCount: number }
@@ -132,7 +127,7 @@ export async function bootstrapCoreWordbooks(
     const [items, events] = await Promise.all([db.items.count(), db.events.count()]);
     if (items > 0 || events > 0) {
       // 已有数据（老用户）→ 跳过未安装的词书
-      for (const entry of bookEntries) {
+      for (const _entry of bookEntries) {
         results.push({ status: "skipped-existing-data" });
       }
       return results;
@@ -207,7 +202,11 @@ export function bootstrapTier0Preset(db?: LexiiDatabase): void {
       // 日志反映真实的净增词条数（4 本词书存在大量重叠词，
       // installedCount 之和 ≠ 净增）。
       const itemsBefore = await database.items.count();
-      const wordbookResults = await bootstrapCoreWordbooks(database, CORE_WORDBOOK_IDS, ENRICHMENT_TIER0_PRESET);
+      const wordbookResults = await bootstrapCoreWordbooks(
+        database,
+        CORE_WORDBOOK_IDS,
+        ENRICHMENT_TIER0_PRESET,
+      );
       const installedBooks = wordbookResults.filter((r) => r.status === "installed");
       const skippedBooks = wordbookResults.filter((r) => r.status === "skipped-existing-data");
       // 互斥契约：`bootstrapCoreWordbooks` 对同一 `wordbookIds` 入参
@@ -232,7 +231,9 @@ export function bootstrapTier0Preset(db?: LexiiDatabase): void {
       if (skippedBooks.length > 0) {
         // 老用户：库内已有数据，核心词书按口径全部跳过——给开发者
         // 一行可视化反馈，避免无声静默
-        console.info(`[presets] 核心词书跳过：${skippedBooks.length} 本（库内已有数据，未追加安装）`);
+        console.info(
+          `[presets] 核心词书跳过：${skippedBooks.length} 本（库内已有数据，未追加安装）`,
+        );
       }
     } catch (err) {
       console.error("[presets] 内置核心词表引导异常：", err);

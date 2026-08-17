@@ -70,7 +70,12 @@ function resolveHistoryStorage(storage?: SearchHistoryStorage): SearchHistorySto
   return window.localStorage;
 }
 
-export function SearchScreen({ provider, onExit, onNavigateToSettings, historyStorage }: SearchScreenProps) {
+export function SearchScreen({
+  provider,
+  onExit,
+  onNavigateToSettings,
+  historyStorage,
+}: SearchScreenProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
