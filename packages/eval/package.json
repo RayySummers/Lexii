@@ -1,6 +1,6 @@
 {
   "name": "@lexilexi/eval",
-  "version": "0.1.0-alpha.7",
+  "version": "0.1.0-alpha.8",
   "private": true,
   "type": "module",
   "description": "Lexilexi 学习评测包（lexilexi_eval，骨架）",
