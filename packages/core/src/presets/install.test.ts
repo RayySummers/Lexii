@@ -53,7 +53,10 @@ function makeEntries(count: number): PresetWordEntry[] {
   return entries;
 }
 
-function makePreset(entries: PresetWordEntry[]): PresetPackage {
+function makePreset(
+  entries: PresetWordEntry[],
+  overrides: Partial<PresetPackage> = {},
+): PresetPackage {
   return {
     id: "test-tier0",
     version: "1.0.0",
@@ -61,6 +64,7 @@ function makePreset(entries: PresetWordEntry[]): PresetPackage {
     source: "测试来源（MIT）",
     lang: "en",
     entries,
+    ...overrides,
   };
 }
 
@@ -422,14 +426,9 @@ describe("removePreset（RAY-320：移除已安装词书）", () => {
     const database = freshDatabase();
     // 无 done/progress 标记，直接调用 removePreset 不抛错
     await removePreset(database, "nonexistent-book");
-    const state = await getPresetInstallState(database, {
-      id: "nonexistent-book",
-      version: "1.0.0",
-      name: "不存在",
-      source: "",
-      lang: "en",
-      entries: [],
-    });
+    // 用 makePreset + override 复用 fixture factory，避免手写 literal 漏字段
+    const preset = makePreset([], { id: "nonexistent-book", name: "不存在", source: "" });
+    const state = await getPresetInstallState(database, preset);
     expect(state.status).toBe("not-installed");
   });
 });

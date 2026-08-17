@@ -365,4 +365,48 @@ describe("WordbookLibraryScreen", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("移除失败：数据库锁定");
   });
+
+  it("ESC 键关闭确认对话框，不调用 removeWordbook（RAY-320 review suggestion）", async () => {
+    const { provider, removeWordbook } = makeProvider({
+      summaries: makeSummaries([
+        { id: "book-cet6", status: "installed", installedCount: 5406, totalCount: 5406 },
+      ]),
+    });
+    render(<WordbookLibraryScreen provider={provider} onBack={() => {}} />);
+
+    await screen.findByText("大学英语六级");
+    fireEvent.click(screen.getByRole("button", { name: /删除词书/ }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    // 监听器绑在 document 上（见 ConfirmDeleteDialog 的 useEffect），所以派发到 document
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(removeWordbook).not.toHaveBeenCalled();
+  });
+
+  it("点击遮罩关闭确认对话框，不调用 removeWordbook（RAY-320 review suggestion）", async () => {
+    const { provider, removeWordbook } = makeProvider({
+      summaries: makeSummaries([
+        { id: "book-cet6", status: "installed", installedCount: 5406, totalCount: 5406 },
+      ]),
+    });
+    render(<WordbookLibraryScreen provider={provider} onBack={() => {}} />);
+
+    await screen.findByText("大学英语六级");
+    fireEvent.click(screen.getByRole("button", { name: /删除词书/ }));
+    const dialog = screen.getByRole("dialog");
+    // 遮罩是 dialog 的第一个子元素（aria-hidden 标记，唯一可识别）
+    const backdrop = dialog.querySelector('[aria-hidden="true"]');
+    if (!backdrop) {
+      throw new Error("遮罩元素未找到");
+    }
+    fireEvent.click(backdrop);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(removeWordbook).not.toHaveBeenCalled();
+  });
 });
