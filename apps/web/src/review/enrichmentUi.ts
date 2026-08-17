@@ -1,9 +1,10 @@
 /**
  * 富化字段的展示辅助（RAY-272 批次 B 功能层）。
  *
- * 纯函数、无 React 依赖：组件只做渲染，双音标选择与词根词缀拆解
- * 的解析口径集中在此，便于单测锁定行为。
+ * 纯函数、仅依赖 React createElement：组件只做渲染，双音标选择与
+ * 词根词缀拆解的解析口径集中在此，便于单测锁定行为。
  */
+import { createElement, type ReactNode } from "react";
 import type { Sense } from "@lexii/core";
 
 /** 双音标展示条目 */
@@ -68,4 +69,41 @@ export function parseWordParts(raw: string): WordPartSegment[] {
         .trim();
       return { part: part !== "" ? part : segment, meaning };
     });
+}
+
+/**
+ * 轻量内联 Markdown → React 元素（仅处理斜体：`*text*` / `_text_`）。
+ *
+ * 中文词源说明（etymologyZh）来自 OpenEtymology EPUB，内含 Markdown
+ * 斜体标记（如下划线包裹的外来语）。此函数将纯文本中的斜体语法
+ * 转换为 <em> 元素，其余文字保持原样。
+ *
+ * 防御性口径：
+ * - 匹配 `*…*` 或 `_…_`（不含空格开头/结尾的非贪婪匹配）；
+ * - 未闭合的标记原样输出，不做猜测；
+ * - 返回 ReactNode 数组，可直接嵌入 JSX。
+ */
+export function parseInlineMarkdown(text: string): ReactNode[] {
+  // 匹配 *text* 或 _text_（斜体）
+  const italicPattern = /([*_])(?!\s)(.+?)(?<!\s)\1/g;
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = italicPattern.exec(text)) !== null) {
+    // 斜体标记前的普通文本
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    // 斜体内容渲染为 <em>
+    parts.push(createElement("em", { key: `em-${match.index}` }, match[2]));
+    lastIndex = match.index + match[0].length;
+  }
+
+  // 剩余普通文本
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts;
 }
