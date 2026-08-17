@@ -22,7 +22,7 @@
  * etymology, wordParts, etymologyZh, examples），全字符串 + 字符串数组；
  * 词表内无任何富化字段的词条不产出记录（运行时按缺失处理）。
  */
-import { createReadStream } from "node:fs";
+import { createReadStream, existsSync } from "node:fs";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { brotliCompressSync, constants as zlibConstants } from "node:zlib";
@@ -349,6 +349,36 @@ function writeJson(file, payload) {
 }
 
 async function main() {
+  // Nit RAY-300：外部数据缺失时显式跳过（exit 0），避免 CI Actions UI 出现 ❌ 观感异常。
+  // 富化构建依赖 kaikki/ipa-dict/OpenEtymology/Tatoeba 四项外部数据（.data/ 目录），
+  // CI 环境若未缓存这些数据，直接跳过并提示，而非抛错靠 continue-on-error 放行。
+  const REQUIRED_DATA_FILES = [
+    { label: "kaikki", path: path.join(DATA_DIR, "kaikki", "kaikki.org-dictionary-English.jsonl") },
+    { label: "ipa-dict en_US", path: path.join(DATA_DIR, "ipa-dict", "en_US.txt") },
+    { label: "ipa-dict en_UK", path: path.join(DATA_DIR, "ipa-dict", "en_UK.txt") },
+    { label: "OpenEtymology", path: path.join(DATA_DIR, "openetymology") },
+    { label: "ecdict", path: path.join(DATA_DIR, "ecdict", "ecdict.csv") },
+    { label: "Tatoeba eng_sentences", path: path.join(DATA_DIR, "tatoeba", "eng_sentences.tsv") },
+    { label: "Tatoeba cmn_sentences", path: path.join(DATA_DIR, "tatoeba", "cmn_sentences.tsv") },
+    { label: "Tatoeba eng-cmn_links", path: path.join(DATA_DIR, "tatoeba", "eng-cmn_links.tsv") },
+    {
+      label: "Tatoeba eng_sentences_CC0",
+      path: path.join(DATA_DIR, "tatoeba", "eng_sentences_CC0.tsv"),
+    },
+    {
+      label: "Tatoeba cmn_sentences_CC0",
+      path: path.join(DATA_DIR, "tatoeba", "cmn_sentences_CC0.tsv"),
+    },
+  ];
+  const missingData = REQUIRED_DATA_FILES.filter((f) => !existsSync(f.path));
+  if (missingData.length > 0) {
+    console.log(
+      `⏭️  跳过富化构建：缺少外部数据文件（${missingData.map((f) => f.label).join("、")}）。\n` +
+        `   富化包为可选产物，需先运行各 fetch-*.mjs 下载数据到 scripts/presets/.data/ 目录。`,
+    );
+    return;
+  }
+
   const t0 = Date.now();
   console.log("读取 Tier 0 词表与计算 Tier 1 词表 …");
   const tier0Terms = readTier0Terms();
