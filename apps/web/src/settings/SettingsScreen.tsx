@@ -23,8 +23,9 @@
  *   与评分档位、发音口音同一 localStorage 持久化模式；方向只影响题目
  *   呈现，不影响评分与 FSRS 调度（见 docs/quiz-fsrs-mapping.md）。
  * - RAY-324 发音源选择：学习分组新增下拉选单二档（系统自带 / 线上发音），
- *   持久化到 localStorage（与发音口音同一模式）；线上源走有道 dictvoice
- *   公开接口，失败时自动回落系统朗读（见 lib/pronunciation.ts）。
+ *   持久化到 localStorage（与发音口音同一模式）；线上源为候选级联
+ *   （Free Dictionary API 真人录音 + Lingva 在线合成，均实测可跨域），
+ *   失败时自动回落系统朗读（见 lib/pronunciation.ts）。
  * - 隐藏开发者面板（RAY-297）：页面底部版本号连点 5 次解锁「开发者」分组
  *   （再次连点 5 次折叠，解锁状态存 localStorage）；分组内为通道切换器 /
  *   构建信息 / 版本回退 / 数据库调试 / FSRS 调试 / Feature flags，
@@ -602,8 +603,8 @@ function SettingsMainView({
           <span>
             发音源
             <span className="mt-1 block text-xs text-text-muted">
-              系统自带：使用浏览器语音合成，离线可用；线上发音：有道词典公开音源（需联网，
-              质量更稳定，但偶发漏字或发音错误；失败时自动回落系统语音）。
+              系统自带：浏览器语音合成，离线可用；线上发音：词典真人录音与在线合成（需联网），
+              发音更标准清晰，失败时自动回落系统语音。
             </span>
           </span>
           <select

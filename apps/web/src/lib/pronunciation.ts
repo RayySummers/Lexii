@@ -1,8 +1,7 @@
 /**
  * 「发音口音」设置与朗读（RAY-265，手机端兼容修复 RAY-277）。
  * 「发音源选择」设置（RAY-324）：系统自带（SpeechSynthesis，离线）
- * 与线上发音（有道词典 dictvoice 公开接口，MP3 音频）二选一；
- * 线上失败时自动回落系统朗读，不阻塞复习。
+ * 与线上发音二选一；线上失败时自动回落系统朗读，不阻塞复习。
  *
  * 发音引擎基线：浏览器语音合成（SpeechSynthesis）——
  * - 离线可用（本地系统语音包），不引入任何新数据源、不联网；
@@ -23,15 +22,32 @@
  *   经 onUnavailable 回调给 UI 一次性提示，绝不静默无反馈。
  *
  * RAY-324 线上发音（用户反馈：系统语音漏字 / 发音错误）：
- * - 线上源走有道词典 dictvoice 公开接口下载 MP3（type=0 美 / type=1 英），
- *   经 HTMLAudioElement 播放；同一 (term, accent) 命中内存缓存，
- *   避免连续朗读同一词时反复下载；
- * - 线上失败（fetch 错误 / 非 2xx 响应 / audio 解码失败 / 播放超时）
- *   自动回落系统朗读，并经 onOnlineFallbackToSystem 通知 UI 一次性
- *   提示「已自动切换到系统语音」；用户切回系统源或再次点击线上
- *   朗读都会重新尝试，绝不静默无反馈。
+ * 线上源按「提供方候选列表」顺序尝试（首个成功者胜出），全部失败才
+ * 回落系统朗读：
+ * 1. Free Dictionary API（api.dictionaryapi.dev）——维基词典真人录音，
+ *    按口音选取 us/uk 变体，音质最佳、口音可控；
+ * 2. Lingva Translate（lingva.ml）——在线合成，任意词均可发音，
+ *    覆盖真人录音缺失的生僻词（无 us/uk 区分）。
+ * 两个端点均实测返回 `Access-Control-Allow-Origin: *`（2026-08-18 验证），
+ * 可在纯 Web 部署（GitHub Pages）直接 fetch；有道 dictvoice 因无 CORS
+ * 响应头已被移除（Oscar RAY-324 复审 blocking 1）。
+ *
+ * 线上音频（Blob → ObjectURL）仅播放成功后写入内存缓存（解码失败的坏
+ * URL 不再污染缓存），缓存按 LRU 上限回收；同一 (term, accent) 命中缓存
+ * 不再重复下载。线上失败（网络 / 非 2xx / 全部候选 null / 解码失败 /
+ * 播放超时 / 播放被自动播放策略拒绝）自动回落系统朗读，并经
+ * onOnlineFallbackToSystem 通知 UI 一次性提示「已自动切换到系统语音」。
  *
  * 存储走 localStorage（与主题 / 每日新卡上限同一持久化模式）。
+ *
+ * 测试接缝（仅测试 / 调试注入，生产路径不感知）：
+ * - __setOnlineProvidersForTesting：替换线上候选提供方列表（默认两候选）；
+ * - __setOnlineFetchForTesting：替换 fetch 实现（默认候选的 URL 构造与
+ *   响应解析单测使用，jsdom 无法真实联网）；
+ * - __setOnlineObjectURLFactoryForTesting：替换 createObjectURL（jsdom 下
+ *   URL 静态方法在异步边界存在重置风险，工厂注入更稳定）；
+ * - __setOnlineAudioCtorForTesting：替换 Audio 构造器（jsdom 无真实
+ *   媒体播放能力，测试注入 FakeAudio 手动驱动事件）。
  */
 export type PronunciationAccent = "us" | "uk";
 
@@ -51,7 +67,7 @@ export const ACCENT_LANG: Readonly<Record<PronunciationAccent, string>> = {
 /**
  * 发音源：
  * - system = 浏览器语音合成（SpeechSynthesis），离线；
- * - online = 线上 TTS（有道 dictvoice MP3），需联网；失败时自动回落系统源。
+ * - online = 线上发音（候选列表见文件头），需联网；失败时自动回落系统源。
  */
 export type PronunciationSource = "system" | "online";
 
@@ -59,12 +75,6 @@ export const PRONUNCIATION_SOURCE_STORAGE_KEY = "lexii:pronunciation-source";
 
 /** 默认发音源：系统（保持 RAY-265 既有行为不变） */
 export const DEFAULT_PRONUNCIATION_SOURCE: PronunciationSource = "system";
-
-/** 口音 → 有道 dictvoice type 参数（0 = 美式 / 1 = 英式） */
-const ONLINE_ACCENT_TYPE: Readonly<Record<PronunciationAccent, 0 | 1>> = {
-  us: 0,
-  uk: 1,
-};
 
 /** 判断 localStorage 原始值是否为合法发音源 */
 export function isPronunciationSource(value: string | null): value is PronunciationSource {
@@ -102,14 +112,66 @@ export function writePronunciationSource(source: PronunciationSource): boolean {
   }
 }
 
+// ─── 线上音频缓存（LRU 上限，RAY-324 Oscar 复审 nit 3）────────────────────────
+
+/** 缓存上限：会话内最多保留的 ObjectURL 数（超出按 LRU 逐出并 revoke） */
+export const ONLINE_AUDIO_CACHE_LIMIT = 200;
+
+interface OnlineAudioCacheEntry {
+  objectUrl: string;
+}
+
+/** key = `${term.toLowerCase()}::${accent}`；Map 迭代顺序即插入顺序（LRU 逐出） */
+const onlineAudioCache = new Map<string, OnlineAudioCacheEntry>();
+
+function revokeObjectUrlSafe(objectUrl: string): void {
+  try {
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    // 静默：URL 已失效不影响清理
+  }
+}
+
+/**
+ * 写入缓存并执行 LRU 上限回收。命中已存在的 key 时先移除旧条目
+ * （含 revoke 旧 ObjectURL，新的对象 URL 会替代它），再重新插入以刷新
+ * 最近使用顺序。
+ */
+function cacheOnlineAudio(key: string, objectUrl: string): void {
+  const existing = onlineAudioCache.get(key);
+  if (existing) {
+    onlineAudioCache.delete(key);
+    if (existing.objectUrl !== objectUrl) {
+      revokeObjectUrlSafe(existing.objectUrl);
+    }
+  }
+  onlineAudioCache.set(key, { objectUrl });
+  while (onlineAudioCache.size > ONLINE_AUDIO_CACHE_LIMIT) {
+    const oldestKey = onlineAudioCache.keys().next().value;
+    if (oldestKey === undefined) {
+      break;
+    }
+    const oldest = onlineAudioCache.get(oldestKey);
+    onlineAudioCache.delete(oldestKey);
+    if (oldest) {
+      revokeObjectUrlSafe(oldest.objectUrl);
+    }
+  }
+}
+
+/** 移除缓存条目并释放其 ObjectURL（播放失败时回收坏条目，RAY-324 suggestion 3） */
+function evictOnlineAudio(key: string, objectUrl: string): void {
+  const existing = onlineAudioCache.get(key);
+  if (existing && existing.objectUrl === objectUrl) {
+    onlineAudioCache.delete(key);
+    revokeObjectUrlSafe(existing.objectUrl);
+  }
+}
+
 /** 清除线上 TTS 音频缓存（设置项变化或手动重置时调用；测试也可使用） */
 export function clearOnlineAudioCache(): void {
   for (const entry of onlineAudioCache.values()) {
-    try {
-      URL.revokeObjectURL(entry.objectUrl);
-    } catch {
-      // 静默：URL 已失效不影响清理
-    }
+    revokeObjectUrlSafe(entry.objectUrl);
   }
   onlineAudioCache.clear();
 }
@@ -134,7 +196,7 @@ export interface SpeakWordOptions {
   /**
    * 发音源（RAY-324：系统 / 线上）。默认 `DEFAULT_PRONUNCIATION_SOURCE`（系统）。
    * - "system" → 浏览器 SpeechSynthesis，离线可用；
-   * - "online" → 有道 dictvoice MP3，失败时自动回落系统源。
+   * - "online" → 线上候选列表（见文件头），失败时自动回落系统源。
    */
   source?: PronunciationSource;
 }
@@ -142,7 +204,7 @@ export interface SpeakWordOptions {
 /** 朗读发起后等待开始的兜底窗口：超时未开始视为静默失败（RAY-277） */
 export const SPEAK_START_TIMEOUT_MS = 2000;
 
-/** 线上 MP3 播放超时（oncanplaythrough / onended 超时视为播放失败） */
+/** 线上 MP3 播放超时：构造 audio 后此窗口内未成功开始播放视为失败（RAY-324） */
 export const ONLINE_PLAY_TIMEOUT_MS = 10_000;
 
 // ─── 系统朗读（SpeechSynthesis，RAY-265 / RAY-277）──────────────────────────
@@ -352,18 +414,191 @@ function speakSystemWord(
   }
 }
 
-// ─── RAY-324 线上朗读（有道 dictvoice MP3）────────────────────────────────────
+// ─── RAY-324 线上朗读（候选提供方级联）────────────────────────────────────────
 
 /**
- * 线上音频内存缓存：key = `${term.toLowerCase()}::${accent}`，
- * value = 已就绪的 ObjectURL（命中即直接播放，不再 fetch）。
- * 仅在当前会话有效；浏览器刷新或清缓存后下次朗读重新下载。
+ * 线上发音提供方：解析并返回单词的发音 Blob；不可用 / 不适用时返回 null。
+ * 单个提供方内部的任何失败（网络、非 2xx、无音频、解析失败）都应吞掉
+ * 为 null——级联逻辑据此尝试下一个候选，全部 null 才回落系统。
  */
-interface OnlineAudioCacheEntry {
-  status: "ready";
-  objectUrl: string;
+export interface OnlineAudioProvider {
+  /** 稳定标识（仅用于调试与测试断言） */
+  id: string;
+  /**
+   * 解析单词发音（返回音频 Blob；null = 该提供方无此词发音 / 请求失败）。
+   * signal 用于取消（主动打断 / 切换卡片）。
+   */
+  resolve(term: string, accent: PronunciationAccent, signal: AbortSignal): Promise<Blob | null>;
 }
-const onlineAudioCache = new Map<string, OnlineAudioCacheEntry>();
+
+/**
+ * 可注入的 fetch 实现（默认走 window.fetch）。默认提供方的 URL 构造与
+ * 响应解析单测经此接缝注入 fake（jsdom 无法真实联网）。
+ */
+type FetchLike = (input: string, init?: { signal?: AbortSignal }) => Promise<Response>;
+
+let fetchImpl: FetchLike | null = null;
+
+export function __setOnlineFetchForTesting(implementation: FetchLike | null): void {
+  fetchImpl = implementation;
+}
+
+function resolveFetch(): FetchLike {
+  if (fetchImpl) {
+    return fetchImpl;
+  }
+  if (typeof window === "undefined" || typeof window.fetch !== "function") {
+    throw new Error("当前环境不支持网络请求，无法使用线上发音");
+  }
+  return window.fetch.bind(window);
+}
+
+/** Free Dictionary API 词条响应（仅使用 phonetics[].audio 字段） */
+interface DictionaryApiEntry {
+  phonetics?: { audio?: string }[];
+}
+
+/**
+ * 候选 1：Free Dictionary API（api.dictionaryapi.dev）——维基词典真人录音。
+ * - 先请求词条 JSON（`GET /api/v2/entries/en/{term}`），收集全部非空 audio；
+ * - 按口音偏好选取：URL 含 `-us`（美式）/ `-uk`（英式）后缀者优先，
+ *   无口音匹配时退回任意可用录音；
+ * - 再下载选中的 MP3 为 Blob。
+ * 端点返回 `Access-Control-Allow-Origin: *`，可在浏览器直接 fetch。
+ */
+export function createDictionaryApiProvider(fetchFn?: FetchLike): OnlineAudioProvider {
+  const fetchForProvider = fetchFn ?? resolveFetch();
+  return {
+    id: "dictionaryapi",
+    async resolve(term, accent, signal) {
+      const entriesUrl = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(term)}`;
+      let audioUrls: string[];
+      try {
+        const entriesResponse = await fetchForProvider(entriesUrl, { signal });
+        if (!entriesResponse.ok) {
+          return null;
+        }
+        const entries = (await entriesResponse.json()) as DictionaryApiEntry[];
+        audioUrls = (entries ?? [])
+          .flatMap((entry) => entry.phonetics ?? [])
+          .map((phonetic) => phonetic.audio)
+          .filter((audio): audio is string => typeof audio === "string" && audio.length > 0);
+      } catch {
+        return null;
+      }
+      if (audioUrls.length === 0) {
+        return null;
+      }
+      const accentSuffix = accent === "us" ? "-us" : "-uk";
+      const accentMatch = audioUrls.filter((audio) => audio.toLowerCase().includes(accentSuffix));
+      const ordered = [...accentMatch, ...audioUrls];
+      for (const audioUrl of ordered) {
+        try {
+          const audioResponse = await fetchForProvider(audioUrl, { signal });
+          if (audioResponse.ok) {
+            return await audioResponse.blob();
+          }
+        } catch {
+          // 尝试下一个候选录音
+        }
+      }
+      return null;
+    },
+  };
+}
+
+/** Lingva Translate 音频响应（合成音频以字节数组返回） */
+interface LingvaAudioResponse {
+  audio?: number[];
+}
+
+/**
+ * 候选 2：Lingva Translate（lingva.ml）——在线合成，任意词均可发音，
+ * 覆盖真人录音缺失的生僻词。响应为 `{"audio":[bytes]}`（MP3 字节数组），
+ * 无 us/uk 区分（合成音为通用英语发音）。
+ * 端点返回 `Access-Control-Allow-Origin: *`，可在浏览器直接 fetch。
+ */
+export function createLingvaProvider(fetchFn?: FetchLike): OnlineAudioProvider {
+  const fetchForProvider = fetchFn ?? resolveFetch();
+  return {
+    id: "lingva",
+    async resolve(term, accent, signal) {
+      // accent 仅供签名一致：合成音无区域变体
+      void accent;
+      const url = `https://lingva.ml/api/v1/audio/en/${encodeURIComponent(term)}`;
+      try {
+        const response = await fetchForProvider(url, { signal });
+        if (!response.ok) {
+          return null;
+        }
+        const payload = (await response.json()) as LingvaAudioResponse;
+        if (!Array.isArray(payload.audio) || payload.audio.length === 0) {
+          return null;
+        }
+        return new Blob([new Uint8Array(payload.audio)], { type: "audio/mpeg" });
+      } catch {
+        return null;
+      }
+    },
+  };
+}
+
+/** 默认线上候选列表（按序尝试，首个成功者胜出） */
+const DEFAULT_ONLINE_PROVIDERS: readonly OnlineAudioProvider[] = [
+  createDictionaryApiProvider(),
+  createLingvaProvider(),
+];
+
+let onlineProviders: readonly OnlineAudioProvider[] = DEFAULT_ONLINE_PROVIDERS;
+
+/** 测试 / 调试：替换线上候选提供方列表（null 恢复默认） */
+export function __setOnlineProvidersForTesting(
+  providers: readonly OnlineAudioProvider[] | null,
+): void {
+  onlineProviders = providers ?? DEFAULT_ONLINE_PROVIDERS;
+}
+
+/**
+ * 可注入的 createObjectURL 实现（默认走 URL.createObjectURL）。
+ * jsdom 下 URL 静态方法在异步边界存在重置风险，工厂注入更稳定。
+ */
+type ObjectURLFactory = (blob: Blob) => string;
+
+let objectURLFactory: ObjectURLFactory | null = null;
+
+export function __setOnlineObjectURLFactoryForTesting(factory: ObjectURLFactory | null): void {
+  objectURLFactory = factory;
+}
+
+function resolveCreateObjectURL(blob: Blob): string {
+  if (objectURLFactory) {
+    return objectURLFactory(blob);
+  }
+  return URL.createObjectURL(blob);
+}
+
+/**
+ * 可注入的 Audio 构造器（默认 window.Audio）。jsdom 无真实媒体播放能力，
+ * 测试注入 FakeAudio 手动驱动事件。
+ */
+type AudioCtor = new (src?: string) => HTMLAudioElement;
+
+let audioCtorOverride: AudioCtor | null = null;
+
+/** 测试 / 调试：替换线上 Audio 构造器（生产环境无需调用） */
+export function __setOnlineAudioCtorForTesting(ctor: AudioCtor | null): void {
+  audioCtorOverride = ctor;
+}
+
+function resolveAudioCtor(): AudioCtor {
+  if (audioCtorOverride) {
+    return audioCtorOverride;
+  }
+  if (typeof window === "undefined" || typeof window.Audio !== "function") {
+    throw new Error("当前环境不支持 HTMLAudioElement，无法播放线上发音");
+  }
+  return window.Audio;
+}
 
 /**
  * 取消当前进行中的线上朗读（用于切换卡片 / 重新点击时打断上次播放）。
@@ -390,101 +625,15 @@ function cancelActiveOnlinePlayback(): void {
   }
 }
 
-/** 在测试与浏览器之间安全地构造 URL（允许测试注入构造器） */
-type UrlFactory = (parts: { pathname: string; query: URLSearchParams }) => string;
-
-/** 默认 URL 构造：dictvoice 公开接口，type=0 美 / type=1 英 */
-function defaultBuildOnlineAudioUrl(parts: {
-  pathname: string;
-  query: URLSearchParams;
-}): string {
-  const search = parts.query.toString();
-  return `https://dict.youdao.com${parts.pathname}?${search}`;
-}
-
-/** 可注入的 URL 构造器（默认走有道 dictvoice） */
-let urlFactory: UrlFactory = defaultBuildOnlineAudioUrl;
-
-/** 仅供测试 / 调试使用：替换线上 URL 构造器（生产环境无需调用） */
-export function __setOnlineUrlFactoryForTesting(factory: UrlFactory | null): void {
-  urlFactory = factory ?? defaultBuildOnlineAudioUrl;
-}
-
 /**
- * 可注入的 fetch 实现（默认走 window.fetch）。便于 jsdom 环境验证
- * URL、请求参数与错误分支；浏览器环境无需设置。
- */
-type FetchLike = (input: string, init?: { signal?: AbortSignal }) => Promise<Response>;
-
-let fetchImpl: FetchLike | null = null;
-
-export function __setOnlineFetchForTesting(implementation: FetchLike | null): void {
-  fetchImpl = implementation;
-}
-
-function resolveFetch(): FetchLike {
-  if (fetchImpl) {
-    return fetchImpl;
-  }
-  if (typeof window === "undefined" || typeof window.fetch !== "function") {
-    throw new Error("当前环境不支持网络请求，无法使用线上发音");
-  }
-  return window.fetch.bind(window);
-}
-
-/**
- * 可注入的 createObjectURL / revokeObjectURL 实现（默认走 URL 的静态方法）。
- * 测试可注入 fake，避免 jsdom 下 URL 静态属性在异步边界被重置的兼容问题。
- */
-type ObjectURLFactory = (blob: Blob) => string;
-
-let objectURLFactory: ObjectURLFactory | null = null;
-
-export function __setOnlineObjectURLFactoryForTesting(
-  factory: ObjectURLFactory | null,
-): void {
-  objectURLFactory = factory;
-}
-
-function resolveCreateObjectURL(blob: Blob): string {
-  if (objectURLFactory) {
-    return objectURLFactory(blob);
-  }
-  return URL.createObjectURL(blob);
-}
-
-/**
- * 解析当前可用的 Audio 构造器：优先使用测试注入（便于 jsdom 替换），
- * 否则回落到全局 Audio；浏览器环境应取到 window.Audio。
- */
-type AudioCtor = new (src?: string) => HTMLAudioElement;
-
-let audioCtorOverride: AudioCtor | null = null;
-
-/** 仅供测试 / 调试使用：替换线上 Audio 构造器（生产环境无需调用） */
-export function __setOnlineAudioCtorForTesting(ctor: AudioCtor | null): void {
-  audioCtorOverride = ctor;
-}
-
-function resolveAudioCtor(): AudioCtor {
-  if (audioCtorOverride) {
-    return audioCtorOverride;
-  }
-  if (typeof window === "undefined" || typeof window.Audio !== "function") {
-    throw new Error("当前环境不支持 HTMLAudioElement，无法播放线上发音");
-  }
-  return window.Audio;
-}
-
-/**
- * 线上朗读（有道 dictvoice MP3，联网）：
+ * 线上朗读（候选提供方级联，联网）：
  * - 同一 (term, accent) 命中内存缓存则直接播放；
- * - 否则 fetch 下载 → Blob → ObjectURL → HTMLAudioElement 播放；
- * - 任意阶段失败（网络 / 非 2xx / 解码 / 播放超时）→ 自动回落系统朗读
- *   并经 options.onOnlineFallbackToSystem 回调通知 UI。
+ * - 否则按候选列表依次 resolve → Blob → ObjectURL → HTMLAudioElement 播放；
+ * - 全部候选失败或播放失败（网络 / 解码 / 超时 / 自动播放策略拒绝）→
+ *   自动回落系统朗读并经 options.onOnlineFallbackToSystem 回调通知 UI。
  *
  * 返回是否成功发起播放（含「成功发起但实际播放失败」的乐观值）：
- * - false = 环境完全不可用（无 fetch / 无 window），同步层即失败；
+ * - false = 环境完全不可用（无 window），同步层即失败；
  * - true = 已发起线上播放（异步失败会自动回落系统）。
  */
 function speakOnlineWord(
@@ -504,26 +653,19 @@ function speakOnlineWord(
 
   const cacheKey = `${term.toLowerCase()}::${accent}`;
 
-  // 异步执行：命中缓存 / fetch → blob → 播放 → 失败回落系统
+  // 异步执行：命中缓存 / 候选级联 → blob → 播放 → 失败回落系统
   void playOnlineAudio(term, accent, cacheKey, controller.signal)
-    .then(() => {
-      // 线上播放成功：无需任何回调（成功即用户预期的结果）
-    })
     .catch((err: unknown) => {
       if (controller.signal.aborted) {
         return;
       }
-      // 线上失败：尝试系统朗读兜底，并在系统朗读成功发起时通知 UI
+      // 线上失败：尝试系统朗读兜底。系统朗读失败时的 onUnavailable 已由
+      // speakSystemWord 内部回调（保证一次），此处不再重复调用
       const fallbackStarted = speakSystemWord(term, accent, options);
       if (fallbackStarted) {
         options?.onOnlineFallbackToSystem?.();
-      } else {
-        // 系统朗读也失败（环境不支持或同步抛错）：onUnavailable 已由
-        // speakSystemWord 内部回调，此处无需重复
-        options?.onUnavailable?.("unavailable");
       }
       // 记录原始错误，便于调试；不向用户暴露
-      // eslint-disable-next-line no-console
       console.warn("线上朗读失败，已回落系统朗读：", err);
     })
     .finally(() => {
@@ -537,7 +679,7 @@ function speakOnlineWord(
 }
 
 /**
- * 实际播放线上 MP3：命中缓存走 ObjectURL；未命中走 fetch → Blob。
+ * 实际播放线上音频：命中缓存走 ObjectURL；未命中走候选级联 → Blob。
  * 任意失败抛错给上层自动回落系统。
  */
 async function playOnlineAudio(
@@ -546,36 +688,71 @@ async function playOnlineAudio(
   cacheKey: string,
   signal: AbortSignal,
 ): Promise<void> {
-  let objectUrl: string | null = null;
+  let objectUrl = onlineAudioCache.get(cacheKey)?.objectUrl ?? null;
 
-  const cached = onlineAudioCache.get(cacheKey);
-  if (cached) {
-    objectUrl = cached.objectUrl;
-  } else {
-    const query = new URLSearchParams({
-      audio: term,
-      type: String(ONLINE_ACCENT_TYPE[accent]),
-    });
-    const url = urlFactory({ pathname: "/dictvoice", query });
-
-    const response = await resolveFetch()(url, { signal });
-    if (!response.ok) {
-      throw new Error(`线上发音下载失败：HTTP ${response.status}`);
+  if (objectUrl === null) {
+    let blob: Blob | null = null;
+    for (const provider of onlineProviders) {
+      if (signal.aborted) {
+        return;
+      }
+      // 单个提供方抛错等同 null（防御性兜底；契约上提供方应自吞错误），
+      // 级联继续尝试下一候选
+      try {
+        blob = await provider.resolve(term, accent, signal);
+      } catch {
+        blob = null;
+      }
+      if (blob !== null) {
+        break;
+      }
     }
-    const blob = await response.blob();
+    if (blob === null) {
+      throw new Error("线上发音源均不可用");
+    }
     objectUrl = resolveCreateObjectURL(blob);
-    onlineAudioCache.set(cacheKey, { status: "ready", objectUrl });
   }
 
   if (signal.aborted) {
     return;
   }
 
-  await playObjectUrl(objectUrl, signal);
+  await playObjectUrl(objectUrl, signal, {
+    // 仅播放成功开始后写入缓存：解码失败的坏 URL 不再污染缓存
+    // （Oscar 复审 suggestion 3）
+    onStarted: () => {
+      cacheOnlineAudio(cacheKey, objectUrl);
+    },
+    // 播放失败（含取消 / 解码失败 / 超时）时回收刚写入的缓存条目，
+    // 避免坏 URL 无限复用
+    onFailed: () => {
+      evictOnlineAudio(cacheKey, objectUrl);
+    },
+  });
 }
 
-/** 在 HTMLAudioElement 上播放指定 ObjectURL；超时 / 解码失败抛错 */
-function playObjectUrl(objectUrl: string, signal: AbortSignal): Promise<void> {
+/** 播放生命周期回调（playObjectUrl 内部使用，测试无需直接关注） */
+interface PlaybackHooks {
+  /** 音频成功开始播放（play() resolve）后回调一次 */
+  onStarted?(): void;
+  /** 任意失败（含取消）后回调一次 */
+  onFailed?(): void;
+}
+
+/**
+ * 在 HTMLAudioElement 上播放指定 ObjectURL。
+ * - 解码失败（onerror）/ 播放超时（构造后 ONLINE_PLAY_TIMEOUT_MS 内未开始）/
+ *   取消（abort）→ 抛错；
+ * - play() 成功 resolve 后清除超时看门狗（弱网下缓冲接近 10s 时不再误判
+ *   失败，Oscar 复审 suggestion 2）；
+ * - 老 Safari 的 play() 可能返回 undefined，统一经 Promise.resolve 包裹
+ *   （Oscar 复审 nit 6）。
+ */
+function playObjectUrl(
+  objectUrl: string,
+  signal: AbortSignal,
+  hooks?: PlaybackHooks,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const AudioCtor = resolveAudioCtor();
     const audio = new AudioCtor(objectUrl);
@@ -610,13 +787,24 @@ function playObjectUrl(objectUrl: string, signal: AbortSignal): Promise<void> {
       }
       settled = true;
       cleanup();
+      hooks?.onFailed?.();
       reject(new Error(reason));
     };
 
     audio.oncanplaythrough = () => {
-      audio.play().catch((err: unknown) => {
-        fail(`线上发音播放失败：${err instanceof Error ? err.message : String(err)}`);
-      });
+      Promise.resolve(audio.play())
+        .then(() => {
+          // 播放已开始：超时看门狗使命完成（弱网缓冲接近超时窗口时
+          // 不再误判），后续失败由 onerror / onended 覆盖
+          if (watchdog !== undefined) {
+            window.clearTimeout(watchdog);
+            watchdog = undefined;
+          }
+          hooks?.onStarted?.();
+        })
+        .catch((err: unknown) => {
+          fail(`线上发音播放失败：${err instanceof Error ? err.message : String(err)}`);
+        });
     };
     audio.onended = () => {
       succeed();
@@ -646,7 +834,7 @@ function playObjectUrl(objectUrl: string, signal: AbortSignal): Promise<void> {
  *
  * - 未指定 source → 走默认系统源（SpeechSynthesis，离线可用，保持
  *   RAY-265 / RAY-277 既有行为不变）；
- * - source="online" → 走有道 dictvoice MP3，需联网；线上失败自动回落
+ * - source="online" → 走线上候选级联，需联网；线上失败自动回落
  *   系统朗读并回调 onOnlineFallbackToSystem 一次。
  *
  * 任何路径下朗读不可用均经 options.onUnavailable 兜底（一次性），与

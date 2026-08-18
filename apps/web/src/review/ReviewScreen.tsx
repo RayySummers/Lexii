@@ -31,7 +31,12 @@ import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexii/core";
 import type { ReviewRating, StudyMode } from "@lexii/core";
 import { BackArrowIcon, CheckIcon, PlusIcon, SpeakerIcon, UndoIcon } from "../components/icons";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
-import { primeSpeechEngine, readPronunciationAccent, readPronunciationSource, speakWord } from "../lib/pronunciation";
+import {
+  primeSpeechEngine,
+  readPronunciationAccent,
+  readPronunciationSource,
+  speakWord,
+} from "../lib/pronunciation";
 import { readRatingTierMode } from "../lib/ratingTiers";
 import type { RatingTierMode } from "../lib/ratingTiers";
 import { quotaExhaustedCopy } from "./quotaCopy";
