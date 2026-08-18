@@ -1,0 +1,178 @@
+# RAY-337 — agent namespace 校验
+#
+# 短期防御，落地 RAY-335（0.9.0 必做清单）：对每个 PR 校验 head branch 的
+# namespace `agent/<name>/<session>` 与该分支 head commit author 对应的
+# agent 一致；不匹配则检查失败并自动挂 `merge_block` label，强制 owner
+# 复核后才可合并。
+#
+# 平台层根因（RAY-328）：daemon 在初始化 task context 时把 agent_id 串成
+# 上一个活跃任务的 agent，导致多 agent push 跨染。workspace 改不动 daemon
+# / CLI，只能在 CI 这一层做兜底拦截。
+#
+# 触发：仅 PR。push 事件不在此处拦截 —— 直接推到 main 由 RAY-309 等既有
+# 流程兜底（人工合入），agent push 跨入 main 路径不在本 mitigation 范围。
+#
+# 兼容约定（基于仓库现状统计）：
+# - branch 形如 `agent/<name>/<session>`：`<name>` 是小写 slug，`<session>`
+#   是任意非空字符；HEAD commit author 应能解析出对应 agent。
+# - author email `<agent>@multica.local`：旧约定，agent 名 = email local-part。
+# - author email `hunde@example.com` 或 `multica-agent@users.noreply.github.com`：
+#   daemon / 平台身份，不在 commit metadata 中编码 agent —— 此种情况无法在
+#   CI 层判定「作者 agent」，按通过处理（信息性提示）。真正的跨 agent 串号
+#   若已发生在此层也无法识别，由平台 daemon 层负责修。
+# - author email `106456682+RayySummers@users.noreply.github.com`：仓库
+#   所有者本人直推，按通过处理。
+# - 其它身份：视为未知，触发 merge_block（保守兜底）。
+#
+# 人工复核放行路径：失败 PR 自动挂 `merge_block` label 并附说明 comment；
+# owner 确认后手动移除 label 即可正常合并（无需 workflow 改动）。
+
+name: Check agent namespace
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: check-agent-namespace-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check-agent-namespace:
+    name: Verify PR head branch namespace matches commit author agent
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # PR 来自 fork 时，默认 token 无权读取 PR head ref；显式指定 PR SHA。
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Check branch ↔ commit author agent namespace
+        id: check
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          AGENT_BRANCH_REGEX: '^agent/([a-z][a-z0-9_-]{0,63})/[^/]+$'
+          MULTICA_LOCAL_REGEX: '^([a-z][a-z0-9_-]{0,63})@multica\.local$'
+          PLATFORM_IDENTITY_EMAILS: 'hunde@example.com multica-agent@users.noreply.github.com'
+          OWNER_EMAIL: '106456682+RayySummers@users.noreply.github.com'
+        run: |
+          set -euo pipefail
+
+          head_ref="$HEAD_REF"
+          head_sha="$HEAD_SHA"
+
+          echo "::group::PR context"
+          echo "PR head ref: $head_ref"
+          echo "PR head SHA: $head_sha"
+          echo "::endgroup::"
+
+          author_name="$(git log -1 --format='%an' "$head_sha")"
+          author_email="$(git log -1 --format='%ae' "$head_sha")"
+          echo "Head commit author: ${author_name} <${author_email}>"
+
+          # 1. 非 agent 分支：跳过校验（人类 feat/fix/docs/... 分支不受此规则约束）。
+          if [[ ! "$head_ref" =~ $AGENT_BRANCH_REGEX ]]; then
+            echo "Head ref '$head_ref' 不是 agent 分支 —— 跳过 namespace 校验。"
+            {
+              echo "namespace_status=skipped"
+              echo "branch_agent="
+              echo "claimed_agent="
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          branch_agent="${BASH_REMATCH[1]}"
+          echo "Branch claims agent: $branch_agent"
+
+          # 2. 解析 author 声称的 agent。
+          claimed_agent=""
+          status=""
+
+          if [[ "$author_email" =~ $MULTICA_LOCAL_REGEX ]]; then
+            claimed_agent="${BASH_REMATCH[1]}"
+            status="checked"
+          elif [[ " $PLATFORM_IDENTITY_EMAILS " == *" $author_email "* ]]; then
+            echo "Author email '$author_email' 是 daemon / 平台身份，commit metadata 未编码 agent —— 视为通过（信息性提示）。"
+            status="platform_identity"
+          elif [[ "$author_email" == "$OWNER_EMAIL" ]]; then
+            echo "Author 是仓库所有者本人 —— 绕过 agent namespace 校验。"
+            status="human_owner"
+          else
+            echo "::warning::无法识别的 commit author 身份：$author_email"
+            status="unknown_author"
+          fi
+
+          echo "Commit author claimed agent: ${claimed_agent:-<none>}"
+
+          # 3. 比对分支声明的 agent 与 commit author 声明的 agent。
+          mismatch="false"
+          if [[ "$status" == "checked" && "$claimed_agent" != "$branch_agent" ]]; then
+            mismatch="true"
+            echo "::error::Agent namespace 不匹配：分支 '$head_ref' 声明 agent '$branch_agent'，但 commit author 是 '$claimed_agent'"
+          fi
+
+          {
+            echo "namespace_status=$status"
+            echo "branch_agent=$branch_agent"
+            echo "claimed_agent=$claimed_agent"
+            echo "mismatch=$mismatch"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Attach merge_block label on mismatch
+        if: steps.check.outputs.mismatch == 'true' || steps.check.outputs.namespace_status == 'unknown_author'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branchAgent = '${{ steps.check.outputs.branch_agent }}';
+            const claimedAgent = '${{ steps.check.outputs.claimed_agent }}';
+            const status = '${{ steps.check.outputs.namespace_status }}';
+            const headRef = '${{ github.head_ref }}';
+            const headSha = '${{ github.event.pull_request.head.sha }}';
+
+            const lines = [
+              '## ⛔ merge_block（agent namespace 校验失败 — RAY-337）',
+              '',
+              `PR head 分支 \`${headRef}\` 的 namespace 与 head commit author \`${headSha.slice(0, 7)}\` 不一致。`,
+              ''
+            ];
+            if (branchAgent) lines.push(`- 分支声明的 agent: \`${branchAgent}\``);
+            if (claimedAgent) lines.push(`- commit author 声明的 agent: \`${claimedAgent}\``);
+            if (!claimedAgent && status === 'unknown_author') {
+              lines.push('- commit author 未匹配已知 agent / 平台 / owner 身份模板');
+            }
+            lines.push(
+              '',
+              '### 放行路径',
+              '',
+              '1. owner 复核：确认该 PR 是否存在跨 agent 串号（RAY-328 平台根因）。',
+              '2. 如确认是误报：手动移除 `merge_block` label 即可继续合入；无需改 workflow。',
+              '3. 如确认是真实串号：拒合并入，回 issue 修复平台层 agent_id 传递。',
+              '',
+              '平台层根因见 RAY-328；本 mitigation 是 RAY-335（0.9.0 必做清单）的短期 CI 兜底。'
+            );
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['merge_block']
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: lines.join('\n')
+            });
+
+      - name: Fail job on mismatch
+        if: steps.check.outputs.mismatch == 'true' || steps.check.outputs.namespace_status == 'unknown_author'
+        run: |
+          echo "::error::Agent namespace 不匹配，PR 已被自动挂上 merge_block label。请按上面的放行路径处理。"
+          exit 1
