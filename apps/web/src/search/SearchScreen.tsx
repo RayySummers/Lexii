@@ -21,15 +21,20 @@
  *   （与统计页同一模式），不直接透出内部实现细节；
  * - RAY-284 生词本加词入口：每条结果行带「加词」按钮（已在生词本的行
  *   显示「已在生词本」标记），幂等加词、反馈加词结果；生词本标记在
- *   进入页面时读一次（本页移出生词本后回到本页时以重新进入为准）；
+ *   进入页面时读一次（本页移出生词本后回到本页时以重新进入为准）。
+ *   RAY-325：每条结果行额外提供「添加到列表」按钮，打开对话框把词
+ *   加入用户自定义列表（多对一；列表不参与学习调度）。
  * - 全部颜色走 design tokens（浅色/深色自动生效），不硬编码颜色。
  *
  * 文案：Vega 产出（RAY-326）。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { SenseId } from "@lexii/core";
+import type { Sense, SenseId } from "@lexii/core";
 import { ScreenHeader } from "../components/ScreenHeader";
-import { CheckIcon, CloseIcon, PlusIcon, SearchIcon } from "../components/icons";
+import { CheckIcon, CloseIcon, ListIcon, PlusIcon, SearchIcon } from "../components/icons";
+import { AddToListsDialog } from "../customLists/AddToListsDialog";
+import { NOOP_ADD_TO_LISTS_PROVIDER } from "../customLists/data";
+import type { AddToListsDataProvider } from "../customLists/types";
 import {
   loadSearchHistory,
   recordSearchHistory,
@@ -45,11 +50,18 @@ export interface SearchScreenProps {
   provider: SearchDataProvider;
   /** 返回首页 */
   onExit(): void;
+  /** RAY-319：跳转设置页安装扩展词包 */
+  onNavigateToSettings?(): void;
   /**
    * 搜词历史存储（测试注入内存 storage；默认 window.localStorage）。
    * 仅本地读写，绝不上传。
    */
   historyStorage?: SearchHistoryStorage;
+  /**
+   * 「添加到列表」对话框数据源工厂（RAY-325；按需惰性创建）。
+   * 旧测试 / 旧调用方未传时退回 no-op 工厂，避免破坏既有测试。
+   */
+  getAddToListsProvider?: () => AddToListsDataProvider;
 }
 
 /** 数据源错误 → 原始错误信息（仅供「错误详情」折叠区展示） */
@@ -68,7 +80,13 @@ function resolveHistoryStorage(storage?: SearchHistoryStorage): SearchHistorySto
   return window.localStorage;
 }
 
-export function SearchScreen({ provider, onExit, historyStorage }: SearchScreenProps) {
+export function SearchScreen({
+  provider,
+  onExit,
+  onNavigateToSettings,
+  historyStorage,
+  getAddToListsProvider = () => NOOP_ADD_TO_LISTS_PROVIDER,
+}: SearchScreenProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -79,6 +97,14 @@ export function SearchScreen({ provider, onExit, historyStorage }: SearchScreenP
   );
   // 生词本覆盖的义项 id 集合（RAY-284：结果行「已在生词本」标记；进入页面读一次）
   const [notebookSenseIds, setNotebookSenseIds] = useState<ReadonlySet<string> | null>(null);
+  // RAY-325: 「添加到列表」对话框（null = 关闭）。sense 与 provider 成对
+  // 创建 / 清空：provider 只在打开时创建一次并存 state，避免 JSX 内联工厂
+  // 每次渲染新建 provider → 对话框 refresh 身份变化 → 勾选状态被重置
+  // （Oscar RAY-325 评审 blocking 2）。
+  const [addToListsDialog, setAddToListsDialog] = useState<{
+    sense: Sense;
+    provider: AddToListsDataProvider;
+  } | null>(null);
   // 请求序号：只采纳最新一次检索的响应，过期响应丢弃
   const requestSeqRef = useRef(0);
   // 输入框引用：点选历史词条后焦点回到输入框（历史列表随输入卸载，避免焦点丢失）
@@ -213,6 +239,18 @@ export function SearchScreen({ provider, onExit, historyStorage }: SearchScreenP
     [provider, notebookSenseIds],
   );
 
+  // RAY-325: 打开「添加到列表」对话框（provider 打开时创建一次）
+  const handleOpenAddToLists = useCallback(
+    (sense: Sense) => {
+      setAddToListsDialog({ sense, provider: getAddToListsProvider() });
+    },
+    [getAddToListsProvider],
+  );
+
+  const handleCloseAddToLists = useCallback(() => {
+    setAddToListsDialog(null);
+  }, []);
+
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
       <ScreenHeader title="搜词" onBack={onExit} />
@@ -245,7 +283,16 @@ export function SearchScreen({ provider, onExit, historyStorage }: SearchScreenP
         onSelectHistory={handleHistorySelect}
         onRemoveHistory={handleHistoryRemove}
         onToggleNotebook={handleToggleNotebook}
+        onNavigateToSettings={onNavigateToSettings}
+        onOpenAddToLists={handleOpenAddToLists}
       />
+      {addToListsDialog ? (
+        <AddToListsDialog
+          provider={addToListsDialog.provider}
+          sense={addToListsDialog.sense}
+          onClose={handleCloseAddToLists}
+        />
+      ) : null}
     </main>
   );
 }
@@ -264,6 +311,10 @@ interface SearchContentProps {
   onSelectHistory(term: string): void;
   onRemoveHistory(term: string): void;
   onToggleNotebook(senseId: SenseId): void;
+  /** RAY-319：跳转设置页安装扩展词包 */
+  onNavigateToSettings?(): void;
+  /** RAY-325：打开「添加到列表」对话框 */
+  onOpenAddToLists(sense: Sense): void;
 }
 
 /** 按状态渲染检索区内容（独立于容器，便于逐状态阅读与测试） */
@@ -278,6 +329,8 @@ function SearchContent({
   onSelectHistory,
   onRemoveHistory,
   onToggleNotebook,
+  onNavigateToSettings,
+  onOpenAddToLists,
 }: SearchContentProps) {
   if (error) {
     // 友好文案 + 原始信息折叠（与统计页同一模式，Oscar 评审 nit 1）：
@@ -340,12 +393,21 @@ function SearchContent({
   }
   if (results !== null && results.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface p-8 text-center">
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-8 text-center">
         <h2 className="text-xl font-semibold">库内无此词</h2>
         <p className="max-w-sm text-sm text-text-muted">
           词库里没有与「{query}」匹配的词条，可以导入自建词库再搜——到设置页导入 CSV
           词表，或到词书库安装更多词书，之后再试一次。
         </p>
+        {onNavigateToSettings ? (
+          <button
+            type="button"
+            onClick={onNavigateToSettings}
+            className="mt-1 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            前往设置安装扩展词包
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -364,6 +426,7 @@ function SearchContent({
             result={result}
             inNotebook={notebookSenseIds?.has(result.sense.id) ?? false}
             onToggleNotebook={onToggleNotebook}
+            onOpenAddToLists={onOpenAddToLists}
           />
         ))}
       </ul>
@@ -414,16 +477,19 @@ function SearchHistoryList({ history, onSelect, onRemove }: SearchHistoryListPro
   );
 }
 
-/** 单条结果：词条 + 词性/音标 + 释义 + 加词入口（RAY-284，RAY-302 可撤销） */
+/** 单条结果：词条 + 词性/音标 + 释义 + 加词入口（RAY-284，RAY-302 可撤销）+ 添加到列表（RAY-325） */
 function SearchResultRow({
   result,
   inNotebook,
   onToggleNotebook,
+  onOpenAddToLists,
 }: {
   result: SearchResult;
   /** 该义项是否已在生词本（标记集合加载完成前按 false 处理） */
   inNotebook: boolean;
   onToggleNotebook(senseId: SenseId): void;
+  /** RAY-325：打开「添加到列表」对话框 */
+  onOpenAddToLists(sense: Sense): void;
 }) {
   const { sense } = result;
   return (
@@ -439,7 +505,16 @@ function SearchResultRow({
         ) : null}
       </span>
       <p className="text-sm leading-relaxed text-text-muted">{sense.definitions.join("；")}</p>
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => onOpenAddToLists(sense)}
+          aria-label={`把「${sense.term}」添加到列表`}
+          className="flex items-center gap-1 rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium text-text-muted transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        >
+          <ListIcon className="h-3.5 w-3.5" />
+          添加到列表
+        </button>
         <button
           type="button"
           onClick={() => onToggleNotebook(sense.id)}

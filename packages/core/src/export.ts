@@ -2,10 +2,12 @@
  * 数据导出 / 导入（完整可恢复 JSON）。
  *
  * 对应 docs/domain-model.md §11：
- * - 导出产物含 items / senses / memoryStates / events / notebookEntries 五张表
- *   + schema 版本号，能被 importLexiiData() 原样导回（JSON round-trip
- *   测试保证）。notebookEntries 为 RAY-284 新增：格式版本不变（v1），
- *   旧备份（无该字段）导入时按空生词本处理，绝不因此拒绝恢复。
+ * - 导出产物含 items / senses / memoryStates / events / notebookEntries /
+ *   customLists / customListEntries 七张表 + schema 版本号，能被
+ *   importLexiiData() 原样导回（JSON round-trip 测试保证）。
+ *   notebookEntries 为 RAY-284 新增；customLists / customListEntries 为
+ *   RAY-325 新增。三个表字段在格式版本不变（v1）的前提下追加——
+ *   旧备份（缺这些字段）按空数组导入，绝不因此拒绝恢复。
  * - 导入时同 id 冲突按「导入覆盖」处理；schema 版本不兼容时明确报错，
  *   绝不静默清库、绝不写半份数据（单事务）。
  */
@@ -13,6 +15,7 @@ import type { IsoDate, LearningItem, Sense } from "./domain";
 import type { Event } from "./events";
 import type { MemoryState } from "./memory";
 import type { NotebookEntry } from "./notebook";
+import type { CustomList, CustomListEntry } from "./customList";
 import { DB_SCHEMA_VERSION, EXPORT_FORMAT_VERSION } from "./constants";
 import type { LexiiDatabase } from "./persistence";
 
@@ -29,22 +32,32 @@ export interface LexiiExportData {
   events: Event[];
   /** 生词本条目（RAY-284；旧备份缺失时按空数组导入） */
   notebookEntries: NotebookEntry[];
+  /** 自定义单词列表（RAY-325；旧备份缺失时按空数组导入） */
+  customLists: CustomList[];
+  /** 自定义列表条目（RAY-325；旧备份缺失时按空数组导入） */
+  customListEntries: CustomListEntry[];
 }
 
 /**
  * 导出全部学习数据（单读事务快照）。
  *
- * 五张表在同一个只读事务内读取：与并发写入（评分、导入、加词等）串行化，
+ * 七张表在同一个只读事务内读取：与并发写入（评分、导入、加词等）串行化，
  * 不会拍到「items 已写、memoryStates 未写」这类跨表中间态（评审建议 C2）。
  */
 export async function exportLexiiData(db: LexiiDatabase, now: IsoDate): Promise<LexiiExportData> {
-  const [items, senses, memoryStates, events, notebookEntries] = await db.transaction(
+  // Dexie 4 的 transaction 重载只支持到 5 张表，超过时改用数组形式：
+  // db.transaction(mode, [t1, t2, ...], callback) — 同一事务，参数形式不同。
+  const result = await db.transaction(
     "r",
-    db.items,
-    db.senses,
-    db.memoryStates,
-    db.events,
-    db.notebookEntries,
+    [
+      db.items,
+      db.senses,
+      db.memoryStates,
+      db.events,
+      db.notebookEntries,
+      db.customLists,
+      db.customListEntries,
+    ],
     async () =>
       Promise.all([
         db.items.toArray(),
@@ -52,8 +65,12 @@ export async function exportLexiiData(db: LexiiDatabase, now: IsoDate): Promise<
         db.memoryStates.toArray(),
         db.events.toArray(),
         db.notebookEntries.toArray(),
+        db.customLists.toArray(),
+        db.customListEntries.toArray(),
       ]),
   );
+  const [items, senses, memoryStates, events, notebookEntries, customLists, customListEntries] =
+    result;
   return {
     format: "lexii",
     exportFormatVersion: EXPORT_FORMAT_VERSION,
@@ -64,6 +81,8 @@ export async function exportLexiiData(db: LexiiDatabase, now: IsoDate): Promise<
     memoryStates,
     events,
     notebookEntries,
+    customLists,
+    customListEntries,
   };
 }
 
@@ -90,11 +109,15 @@ export async function importLexiiData(db: LexiiDatabase, data: LexiiExportData):
   }
   await db.transaction(
     "rw",
-    db.items,
-    db.senses,
-    db.memoryStates,
-    db.events,
-    db.notebookEntries,
+    [
+      db.items,
+      db.senses,
+      db.memoryStates,
+      db.events,
+      db.notebookEntries,
+      db.customLists,
+      db.customListEntries,
+    ],
     async () => {
       for (const item of data.items) {
         await db.items.put(item);
@@ -110,6 +133,12 @@ export async function importLexiiData(db: LexiiDatabase, data: LexiiExportData):
       }
       for (const entry of data.notebookEntries) {
         await db.notebookEntries.put(entry);
+      }
+      for (const list of data.customLists) {
+        await db.customLists.put(list);
+      }
+      for (const entry of data.customListEntries) {
+        await db.customListEntries.put(entry);
       }
     },
   );
@@ -145,6 +174,7 @@ function assertArrayOfPlainObjects(
  *
  * notebookEntries（RAY-284）缺失时按空数组处理——旧备份（本字段引入前
  * 导出）可原样导入，绝不因备份格式升级拒绝恢复。
+ * customLists / customListEntries（RAY-325）同上：缺则按空数组导入。
  *
  * 改名兼容（RAY-306）：Lexilexi 时代的备份 format 为 "lexilexi"，解析时
  * 同样接受并归一化为 "lexii"，保证旧备份文件可正常恢复。
@@ -177,9 +207,17 @@ export function parseLexiiExport(json: string): LexiiExportData {
   if (raw.notebookEntries !== undefined) {
     assertArrayOfPlainObjects(raw.notebookEntries, "notebookEntries");
   }
+  if (raw.customLists !== undefined) {
+    assertArrayOfPlainObjects(raw.customLists, "customLists");
+  }
+  if (raw.customListEntries !== undefined) {
+    assertArrayOfPlainObjects(raw.customListEntries, "customListEntries");
+  }
   return {
     ...raw,
     format: "lexii",
     notebookEntries: raw.notebookEntries ?? [],
+    customLists: raw.customLists ?? [],
+    customListEntries: raw.customListEntries ?? [],
   } as unknown as LexiiExportData;
 }

@@ -26,9 +26,16 @@
  * RAY-284：header 新增「生词本」入口（查看/移出已加词条；加词入口在
  * 搜词页结果行与复习卡页工具栏）；生词本工厂与其余工厂一样惰性创建。
  */
-import { useCallback, useState } from "react";
-import type { StudyMode } from "@lexii/core";
-import { BookmarkIcon } from "./components/icons";
+import { useCallback, useEffect, useState } from "react";
+import type { CustomListId, StudyMode } from "@lexii/core";
+import { BookmarkIcon, ListIcon } from "./components/icons";
+import { CustomListDetailScreen } from "./customLists/CustomListDetailScreen";
+import { CustomListsScreen } from "./customLists/CustomListsScreen";
+import {
+  createDefaultAddToListsDataProvider,
+  createDefaultCustomListsDataProvider,
+} from "./customLists/data";
+import type { AddToListsDataProvider, CustomListsDataProvider } from "./customLists/types";
 import { FirstOpenDialog } from "./components/FirstOpenDialog";
 import { HomeScreen, type StudyFormat } from "./HomeScreen";
 import { useHashRoute } from "./hooks/useHashRoute";
@@ -63,6 +70,10 @@ export interface AppProps {
   searchProviderFactory?: () => SearchDataProvider;
   /** 生词本页数据源工厂（测试注入 mock；默认浏览器 IndexedDB） */
   notebookProviderFactory?: () => NotebookDataProvider;
+  /** 自定义词单页数据源工厂（RAY-325；测试注入 mock；默认浏览器 IndexedDB） */
+  customListsProviderFactory?: () => CustomListsDataProvider;
+  /** 「添加到列表」对话框数据源工厂（RAY-325；默认浏览器 IndexedDB） */
+  addToListsProviderFactory?: () => AddToListsDataProvider;
 }
 
 export function App({
@@ -71,6 +82,8 @@ export function App({
   statsProviderFactory = createDefaultStatsDataProvider,
   searchProviderFactory = createDefaultSearchDataProvider,
   notebookProviderFactory = createDefaultNotebookDataProvider,
+  customListsProviderFactory = createDefaultCustomListsDataProvider,
+  addToListsProviderFactory = createDefaultAddToListsDataProvider,
 }: AppProps) {
   const { preference, setPreference } = useTheme();
   // RAY-315: Hash-based routing so refresh preserves the current view.
@@ -89,6 +102,35 @@ export function App({
   const [notebookProvider, setNotebookProvider] = useState<NotebookDataProvider | null>(() =>
     view === "notebook" ? notebookProviderFactory() : null,
   );
+  // RAY-325: 自定义词单数据源惰性创建；详情页 listId 由 URL search 段携带
+  const [customListsProvider, setCustomListsProvider] = useState<CustomListsDataProvider | null>(
+    () => (view === "custom-lists" || view === "custom-list" ? customListsProviderFactory() : null),
+  );
+  const [selectedListId, setSelectedListId] = useState<CustomListId | null>(() => {
+    if (view !== "custom-list") return null;
+    const params = new URLSearchParams(window.location.hash.split("?")[1] ?? "");
+    return (params.get("id") as CustomListId | null) ?? null;
+  });
+
+  // RAY-325 评审 suggestion 1：浏览器前进 / 后退时从 hash 同步详情页 id。
+  // selectedListId 只在挂载时读一次 URL——用户从详情页返回列表后按「前进」
+  // 回到 #/custom-list?id=X 时，view 是 custom-list 但 selectedListId 为
+  // null，会误渲染 HomeScreen。这里与 useHashRoute 的 popstate 同源同步：
+  // 每次 popstate 重新解析 hash，非 custom-list 视图时清空 id。
+  useEffect(() => {
+    function syncListIdFromHash() {
+      const raw = window.location.hash.replace(/^#\/?/, "");
+      const [pathPart, queryPart] = raw.split("?");
+      if (pathPart !== "custom-list") {
+        setSelectedListId(null);
+        return;
+      }
+      const params = new URLSearchParams(queryPart ?? "");
+      setSelectedListId((params.get("id") as CustomListId | null) ?? null);
+    }
+    window.addEventListener("popstate", syncListIdFromHash);
+    return () => window.removeEventListener("popstate", syncListIdFromHash);
+  }, []);
   const statsProvider = useStatsProvider(statsProviderFactory);
   const [reviewMode, setReviewMode] = useState<StudyMode>("review");
   const [studyFormat, setStudyFormat] = useState<StudyFormat>("card");
@@ -125,6 +167,26 @@ export function App({
     navigate("notebook");
   }, [notebookProviderFactory, navigate]);
 
+  // RAY-325: 自定义词单列表管理
+  const openCustomLists = useCallback(() => {
+    setCustomListsProvider((current) => current ?? customListsProviderFactory());
+    setSelectedListId(null);
+    navigate("custom-lists");
+  }, [customListsProviderFactory, navigate]);
+
+  // RAY-325: 进入列表详情（携带 id）
+  const openCustomList = useCallback(
+    (id: CustomListId) => {
+      setCustomListsProvider((current) => current ?? customListsProviderFactory());
+      setSelectedListId(id);
+      navigate("custom-list");
+      // 详情页携带列表 id：用 history.replaceState 单独写入 URL（不破坏 hash view 解析）
+      const url = `#/custom-list?id=${encodeURIComponent(id)}`;
+      history.replaceState(null, "", url);
+    },
+    [customListsProviderFactory, navigate],
+  );
+
   const openStats = useCallback(() => {
     navigate("stats");
   }, [navigate]);
@@ -133,14 +195,25 @@ export function App({
     navigate("home");
   }, [navigate]);
 
+  // RAY-325: 复习 / 搜词页所需的「添加到列表」对话框 provider 惰性获取
+  const getAddToListsProvider = useCallback(
+    (): AddToListsDataProvider => addToListsProviderFactory(),
+    [addToListsProviderFactory],
+  );
+
   return (
     <div className="min-h-screen bg-bg text-text transition-colors">
-      <header className="mx-auto flex w-full max-w-3xl items-center justify-end gap-2 px-6 py-6">
+      {/* RAY-325 回改：header 五个按钮在 390px 移动视口下必须单行不换行——
+          RAY-291「整页一屏」契约的 OFFSET 按 86px 单行头推算，换行会把卡片
+          撑出视口（E2E docScrollHeight 694 > 665）。移动端收紧 padding 与
+          间距（sm: 恢复原值），入口文案用短标签「词单」（可达名仍为
+          自定义词单）。 */}
+      <header className="mx-auto flex w-full max-w-3xl items-center justify-end gap-1.5 px-4 py-6 sm:gap-2 sm:px-6">
         <button
           type="button"
           onClick={openSearch}
           aria-pressed={view === "search"}
-          className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
         >
           搜词
         </button>
@@ -149,16 +222,26 @@ export function App({
           onClick={openNotebook}
           aria-pressed={view === "notebook"}
           aria-label="生词本"
-          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
         >
           <BookmarkIcon className="h-4 w-4" />
           生词本
         </button>
         <button
           type="button"
+          onClick={openCustomLists}
+          aria-pressed={view === "custom-lists" || view === "custom-list"}
+          aria-label="自定义词单"
+          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
+        >
+          <ListIcon className="h-4 w-4" />
+          词单
+        </button>
+        <button
+          type="button"
           onClick={openStats}
           aria-pressed={view === "stats"}
-          className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
         >
           统计
         </button>
@@ -166,7 +249,7 @@ export function App({
           type="button"
           onClick={openSettings}
           aria-pressed={view === "settings"}
-          className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
         >
           设置
         </button>
@@ -176,12 +259,34 @@ export function App({
         studyFormat === "quiz" ? (
           <QuizScreen provider={reviewProvider} mode={reviewMode} onExit={goHome} />
         ) : (
-          <ReviewScreen provider={reviewProvider} mode={reviewMode} onExit={goHome} />
+          <ReviewScreen
+            provider={reviewProvider}
+            mode={reviewMode}
+            onExit={goHome}
+            getAddToListsProvider={getAddToListsProvider}
+          />
         )
       ) : view === "search" && searchProvider ? (
-        <SearchScreen provider={searchProvider} onExit={goHome} />
+        <SearchScreen
+          provider={searchProvider}
+          onExit={goHome}
+          onNavigateToSettings={openSettings}
+          getAddToListsProvider={getAddToListsProvider}
+        />
       ) : view === "notebook" && notebookProvider ? (
         <NotebookScreen provider={notebookProvider} onExit={goHome} />
+      ) : view === "custom-lists" && customListsProvider ? (
+        <CustomListsScreen
+          provider={customListsProvider}
+          onExit={goHome}
+          onOpenList={openCustomList}
+        />
+      ) : view === "custom-list" && customListsProvider && selectedListId ? (
+        <CustomListDetailScreen
+          provider={customListsProvider}
+          onExit={openCustomLists}
+          listId={selectedListId}
+        />
       ) : view === "settings" && settingsProvider ? (
         <SettingsScreen
           provider={settingsProvider}
