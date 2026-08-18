@@ -203,12 +203,17 @@ export function App({
 
   return (
     <div className="min-h-screen bg-bg text-text transition-colors">
-      <header className="mx-auto flex w-full max-w-3xl items-center justify-end gap-2 px-6 py-6">
+      {/* RAY-325 回改：header 五个按钮在 390px 移动视口下必须单行不换行——
+          RAY-291「整页一屏」契约的 OFFSET 按 86px 单行头推算，换行会把卡片
+          撑出视口（E2E docScrollHeight 694 > 665）。移动端收紧 padding 与
+          间距（sm: 恢复原值），入口文案用短标签「词单」（可达名仍为
+          自定义词单）。 */}
+      <header className="mx-auto flex w-full max-w-3xl items-center justify-end gap-1.5 px-4 py-6 sm:gap-2 sm:px-6">
         <button
           type="button"
           onClick={openSearch}
           aria-pressed={view === "search"}
-          className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
         >
           搜词
         </button>
@@ -217,7 +222,7 @@ export function App({
           onClick={openNotebook}
           aria-pressed={view === "notebook"}
           aria-label="生词本"
-          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
         >
           <BookmarkIcon className="h-4 w-4" />
           生词本
@@ -227,16 +232,16 @@ export function App({
           onClick={openCustomLists}
           aria-pressed={view === "custom-lists" || view === "custom-list"}
           aria-label="自定义词单"
-          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
         >
           <ListIcon className="h-4 w-4" />
-          自定义词单
+          词单
         </button>
         <button
           type="button"
           onClick={openStats}
           aria-pressed={view === "stats"}
-          className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
         >
           统计
         </button>
@@ -244,7 +249,7 @@ export function App({
           type="button"
           onClick={openSettings}
           aria-pressed={view === "settings"}
-          className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
         >
           设置
         </button>
