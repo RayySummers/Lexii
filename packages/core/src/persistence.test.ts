@@ -242,9 +242,9 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
     await legacy.table("events").put(makeReviewEvent(legacyItem.id, legacyItem.senseId));
     legacy.close();
 
-    // 2. 用当前版本打开同一数据库 → Dexie 自动执行 v2/v3/v4/v5 升级
+    // 2. 用当前版本打开同一数据库 → Dexie 自动执行 v2/v3/v4/v5/v6/v7 升级
     const upgraded = openDatabase(options);
-    expect(upgraded.verno).toBe(6);
+    expect(upgraded.verno).toBe(7);
     expect(await upgraded.senses.count()).toBe(1);
     expect(await upgraded.items.count()).toBe(1);
     expect(await upgraded.memoryStates.count()).toBe(1);
@@ -285,9 +285,9 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
     await v2.table("meta").put({ key: "preset:test:progress", value: "7" });
     v2.close();
 
-    // 2. 当前版本打开 → 升级到 v4（memoryStates 增加 fields.due 索引）
+    // 2. 当前版本打开 → 升级到 v7（memoryStates 增加 fields.due 索引）
     const upgraded = openDatabase(options);
-    expect(upgraded.verno).toBe(6);
+    expect(upgraded.verno).toBe(7);
     expect(await upgraded.items.get(legacyItem.id)).toEqual(legacyItem);
     expect(await upgraded.memoryStates.get(legacyItem.id)).toEqual(state);
     expect((await upgraded.meta.get("preset:test:progress"))?.value).toBe("7");
@@ -301,9 +301,9 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
     await upgraded.delete();
   });
 
-  it("全新库直接以 v5 创建（含 meta 表、fields.due / senses.term / notebookEntries 索引）", async () => {
+  it("全新库直接以 v7 创建（含 meta 表、fields.due / senses.term / notebookEntries / customLists / customListEntries 索引）", async () => {
     const database = freshDatabase();
-    expect(database.verno).toBe(6);
+    expect(database.verno).toBe(7);
     expect(await database.meta.count()).toBe(0);
     // fields.due 索引可用（空库查询不报错即证明索引已建）
     const dueIds = await database.memoryStates
@@ -321,6 +321,18 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
     ).toHaveLength(0);
     expect(
       await database.notebookEntries.where("status").equals("active").primaryKeys(),
+    ).toHaveLength(0);
+    // customLists / customListEntries 表及其索引可用（RAY-325 自定义列表依赖）
+    expect(await database.customLists.count()).toBe(0);
+    expect(await database.customLists.where("status").equals("active").primaryKeys()).toHaveLength(
+      0,
+    );
+    expect(await database.customListEntries.count()).toBe(0);
+    expect(
+      await database.customListEntries.where("listId").equals("cl_x").primaryKeys(),
+    ).toHaveLength(0);
+    expect(
+      await database.customListEntries.where("senseId").equals("sense_x").primaryKeys(),
     ).toHaveLength(0);
   });
 
@@ -356,9 +368,9 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
     await v3.table("meta").put({ key: "preset:test:done", value: "1.0.0" });
     v3.close();
 
-    // 2. 当前版本打开 → 升级到 v4（senses 增加 term 索引），存量数据原样保留
+    // 2. 当前版本打开 → 升级到 v7（senses 增加 term 索引），存量数据原样保留
     const upgraded = openDatabase(options);
-    expect(upgraded.verno).toBe(6);
+    expect(upgraded.verno).toBe(7);
     expect(await upgraded.senses.get(sense.id)).toEqual(sense);
     expect((await upgraded.meta.get("preset:test:done"))?.value).toBe("1.0.0");
 
@@ -409,9 +421,9 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
     await v4.table("meta").put({ key: "preset:test:done", value: "1.0.0" });
     v4.close();
 
-    // 2. 当前版本打开 → 升级到 v5（新增 notebookEntries 表），存量数据原样保留
+    // 2. 当前版本打开 → 升级到 v7（新增 notebookEntries + customLists + customListEntries 表），存量数据原样保留
     const upgraded = openDatabase(options);
-    expect(upgraded.verno).toBe(6);
+    expect(upgraded.verno).toBe(7);
     expect(await upgraded.items.get(legacyItem.id)).toEqual(legacyItem);
     expect(await upgraded.memoryStates.get(legacyItem.id)).toBeDefined();
     expect((await upgraded.meta.get("preset:test:done"))?.value).toBe("1.0.0");
@@ -428,6 +440,9 @@ describe("schema 版本迁移（v1 → v2 → v3 → v4 → v5，存量数据保
       removedAt: null,
     });
     expect(await upgraded.notebookEntries.get(toNotebookEntryId("nb_test"))).toBeDefined();
+    // 4. customLists / customListEntries 表可用（RAY-325 纯新增表，无数据迁移）
+    expect(await upgraded.customLists.count()).toBe(0);
+    expect(await upgraded.customListEntries.count()).toBe(0);
     await upgraded.delete();
   });
 });

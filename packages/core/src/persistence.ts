@@ -19,6 +19,7 @@ import type { IsoDate, LearningItem, Sense } from "./domain";
 import type { Event } from "./events";
 import type { MemoryState } from "./memory";
 import type { NotebookEntry } from "./notebook";
+import type { CustomList, CustomListEntry } from "./customList";
 import { DB_SCHEMA_VERSION } from "./constants";
 import { createId, toEventId } from "./id";
 
@@ -71,6 +72,10 @@ export function createLexiiDatabase(
  * 无数据迁移，存量数据原样保留；版本与 P0 数据任务错开（红线）。
  * v6（RAY-294）：新增 dictionarySenses 表（词典检索层）。纯新增表，
  *   无数据迁移，存量数据原样保留。
+ * v7（RAY-325）：新增 customLists 与 customListEntries 两表（用户自定义
+ *   单词列表——列表元数据 + 词条归类记录）。纯新增表，无数据迁移，
+ *   存量数据原样保留。复合索引 [listId+senseId] 供幂等加入（同一列表内
+ *   同一义项不重复）。
  */
 export function openLexiiDatabase(db: Dexie): void {
   if (db.isOpen()) {
@@ -119,6 +124,8 @@ export function openLexiiDatabase(db: Dexie): void {
     meta: "key",
     notebookEntries: "id, senseId, status",
     dictionarySenses: "id, term, source",
+    customLists: "id, status",
+    customListEntries: "id, listId, senseId, status, [listId+senseId]",
   });
 }
 
@@ -136,6 +143,8 @@ export interface LexiiTables {
   meta: Table<MetaRecord, string>;
   notebookEntries: Table<NotebookEntry, string>;
   dictionarySenses: Table<DictionarySense, string>;
+  customLists: Table<CustomList, string>;
+  customListEntries: Table<CustomListEntry, string>;
 }
 
 export interface LexiiDatabase extends Dexie {
@@ -146,6 +155,8 @@ export interface LexiiDatabase extends Dexie {
   meta: Table<MetaRecord, string>;
   notebookEntries: Table<NotebookEntry, string>;
   dictionarySenses: Table<DictionarySense, string>;
+  customLists: Table<CustomList, string>;
+  customListEntries: Table<CustomListEntry, string>;
 }
 
 /**

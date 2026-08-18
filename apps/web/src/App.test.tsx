@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toEventId } from "@lexii/core";
 import type { LexiiExportData, StudyMode } from "@lexii/core";
@@ -9,6 +9,7 @@ import type { SearchDataProvider } from "./search/types";
 import type { NotebookDataProvider } from "./notebook/types";
 import type { SettingsDataProvider } from "./settings/types";
 import type { StatsDataProvider } from "./stats/types";
+import type { CustomListsDataProvider } from "./customLists/types";
 import {
   FIRST_OPEN_DIALOG_DISMISSED_VALUE,
   FIRST_OPEN_DIALOG_STORAGE_KEY,
@@ -24,6 +25,8 @@ const EMPTY_EXPORT: LexiiExportData = {
   memoryStates: [],
   events: [],
   notebookEntries: [],
+  customLists: [],
+  customListEntries: [],
 };
 
 /** 测试接缝：注入 mock 复习数据源工厂，避免渲染时触碰浏览器 IndexedDB */
@@ -40,9 +43,6 @@ function makeReviewProviderFactory(queue: ReviewCard[] = [makeCard()]) {
     undoGrade: vi.fn().mockResolvedValue(undefined),
     hasAnyItems: vi.fn().mockResolvedValue(queue.length > 0),
     importSampleWordlist: vi.fn().mockResolvedValue(14),
-    addToNotebook: vi.fn().mockResolvedValue("added"),
-    getNotebookSenseIds: vi.fn().mockResolvedValue([]),
-    removeFromNotebookBySenseId: vi.fn().mockResolvedValue(undefined),
   };
   return { provider, factory: vi.fn().mockReturnValue(provider) };
 }
@@ -83,6 +83,20 @@ function makeNotebookProviderFactory() {
   const provider: NotebookDataProvider = {
     loadEntries: vi.fn().mockResolvedValue([]),
     removeWord: vi.fn().mockResolvedValue(undefined),
+  };
+  return { provider, factory: vi.fn().mockReturnValue(provider) };
+}
+
+/** 测试接缝：注入 mock 自定义词单数据源工厂（RAY-325） */
+function makeCustomListsProviderFactory() {
+  const provider: CustomListsDataProvider = {
+    loadSummaries: vi.fn().mockResolvedValue([]),
+    createList: vi.fn(),
+    updateList: vi.fn(),
+    deleteList: vi.fn().mockResolvedValue(undefined),
+    getList: vi.fn().mockResolvedValue(undefined),
+    loadListEntries: vi.fn().mockResolvedValue([]),
+    removeWordFromList: vi.fn().mockResolvedValue(undefined),
   };
   return { provider, factory: vi.fn().mockReturnValue(provider) };
 }
@@ -382,5 +396,76 @@ describe("App 生词本入口（RAY-284）", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "返回首页" }));
     expect(screen.getByRole("button", { name: "学习" })).toBeInTheDocument();
+  });
+});
+
+describe("App 自定义词单入口（RAY-325）", () => {
+  const originalMatchMedia = window.matchMedia;
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem(FIRST_OPEN_DIALOG_STORAGE_KEY, FIRST_OPEN_DIALOG_DISMISSED_VALUE);
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    window.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }) as unknown as typeof matchMedia;
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+    delete document.documentElement.dataset.theme;
+  });
+
+  it("点击自定义词单进入列表管理页（惰性创建数据源），返回首页退出", async () => {
+    const { factory } = makeCustomListsProviderFactory();
+    render(
+      <App
+        reviewProviderFactory={makeReviewProviderFactory().factory}
+        customListsProviderFactory={factory}
+      />,
+    );
+
+    expect(factory).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "自定义词单" }));
+    expect(await screen.findByRole("heading", { name: "自定义词单" })).toBeInTheDocument();
+    expect(factory).toHaveBeenCalledTimes(1);
+  });
+
+  it("浏览器前进 / 后退时从 hash 同步详情页列表 id（RAY-325 评审 suggestion 1）", async () => {
+    const { factory } = makeCustomListsProviderFactory();
+    render(
+      <App
+        reviewProviderFactory={makeReviewProviderFactory().factory}
+        customListsProviderFactory={factory}
+      />,
+    );
+
+    // 进入列表管理页（创建数据源，与真实用户路径一致）
+    fireEvent.click(screen.getByRole("button", { name: "自定义词单" }));
+    await screen.findByRole("heading", { name: "自定义词单" });
+
+    // 1. 模拟进入详情页（replaceState 写入带 id 的 hash 后按前进）
+    history.pushState(null, "", "#/custom-list?id=cl_test");
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    await screen.findByRole("heading", { name: "列表详情" });
+
+    // 2. 后退到列表管理页（selectedListId 应清空）
+    history.pushState(null, "", "#/custom-lists");
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    await screen.findByRole("heading", { name: "自定义词单" });
+
+    // 3. 再次前进回到详情页：从 hash 重新解析 id，渲染详情而不是首页
+    history.pushState(null, "", "#/custom-list?id=cl_test");
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(await screen.findByRole("heading", { name: "列表详情" })).toBeInTheDocument();
   });
 });

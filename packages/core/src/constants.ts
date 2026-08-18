@@ -33,8 +33,11 @@ export const EVENT_SCHEMA_VERSION = 0;
  * v6（RAY-294）：新增 dictionarySenses 表（词典检索层：id 主键、
  *   term 索引供检索、source 索引供增量替换删除检测）——
  *   纯新增表，无数据迁移，存量数据原样保留。
+ * v7（RAY-325）：新增 customLists 与 customListEntries 表（用户自定义
+ *   单词列表——列表元数据 + 词条归类记录）。纯新增表，无数据迁移，
+ *   存量数据原样保留；[listId+senseId] 复合索引供幂等加入。
  */
-export const DB_SCHEMA_VERSION = 6;
+export const DB_SCHEMA_VERSION = 7;
 
 /** 导出文件（完整可恢复 JSON）的格式版本 */
 export const EXPORT_FORMAT_VERSION = 1;

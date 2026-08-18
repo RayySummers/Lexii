@@ -20,7 +20,6 @@ import {
   SAMPLE_WORDLIST_CSV,
   generateOptions,
   generateTermOptions,
-  getActiveNotebookItemIds,
   getStudyQueueItemIds,
   gradeReview,
   importCsvWordlist,
@@ -37,15 +36,12 @@ import type {
   MemoryState,
   ReviewEvent,
   ReviewRating,
-  SenseId,
   StudyMode,
 } from "@lexii/core";
 import { computeLearnedTodayCount, localDayBounds } from "@lexii/stats";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { readIncludeNotebook } from "../lib/notebookPreference";
 import { readQuizDirectionPreference, resolveQuizDirection } from "../lib/quizDirection";
-import { addWordToNotebook, removeWordBySenseId } from "../notebook/data";
-import type { AddToNotebookResult } from "../notebook/types";
 import type { MultipleChoiceQuestion } from "./MultipleChoiceCard";
 import { buildReviewQueue } from "./queue";
 import type {
@@ -285,28 +281,6 @@ export function createIndexedDbReviewDataProvider(db: LexiiDatabase): ReviewData
     async importSampleWordlist(): Promise<number> {
       const result = await importCsvWordlist(db, SAMPLE_WORDLIST_CSV, { source: SAMPLE_SOURCE });
       return result.importedCount;
-    },
-
-    async addToNotebook(senseId: SenseId): Promise<AddToNotebookResult> {
-      // 复习卡页加词入口（RAY-284）：幂等加词，生词进入现有 FSRS 调度
-      return addWordToNotebook(db, senseId);
-    },
-
-    async getNotebookSenseIds(): Promise<readonly SenseId[]> {
-      // 复习卡页加词状态查询（RAY-302）：生词本条目 itemId → items → senseId
-      const itemIds = await getActiveNotebookItemIds(db);
-      if (itemIds.length === 0) {
-        return [];
-      }
-      const items = await db.items.bulkGet(itemIds);
-      return items
-        .filter((item): item is NonNullable<typeof item> => item !== undefined)
-        .map((item) => item.senseId);
-    },
-
-    async removeFromNotebookBySenseId(senseId: SenseId): Promise<void> {
-      // 复习卡页撤销加词入口（RAY-302）：按 senseId 查找 active 条目并移出
-      return removeWordBySenseId(db, senseId);
     },
   };
 }

@@ -51,9 +51,6 @@ function makeHarness(options: { queue?: ReviewCard[] } = {}): ProviderHarness {
     undoGrade: vi.fn().mockResolvedValue(undefined),
     hasAnyItems,
     importSampleWordlist,
-    addToNotebook: vi.fn().mockResolvedValue("added"),
-    getNotebookSenseIds: vi.fn().mockResolvedValue([]),
-    removeFromNotebookBySenseId: vi.fn().mockResolvedValue(undefined),
   };
   return {
     provider,
