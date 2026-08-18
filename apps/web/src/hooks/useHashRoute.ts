@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 
-export type HashView = "home" | "review" | "search" | "notebook" | "settings" | "stats";
+export type HashView =
+  "home" | "review" | "search" | "notebook" | "custom-lists" | "custom-list" | "settings" | "stats";
 
 const VALID_VIEWS: readonly HashView[] = [
   "home",
   "review",
   "search",
   "notebook",
+  "custom-lists",
+  "custom-list",
   "settings",
   "stats",
 ];

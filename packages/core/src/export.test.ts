@@ -196,6 +196,8 @@ describe("exportLexiiData / importLexiiData", () => {
       memoryStates: [],
       events: [],
       notebookEntries: [],
+      customLists: [],
+      customListEntries: [],
     };
     await expect(importLexiiData(target, future)).rejects.toThrow("版本不兼容");
     await expect(

@@ -9,7 +9,15 @@ describe("parseHash", () => {
     history.replaceState(null, "", originalHash);
   });
 
-  it.each(["review", "search", "notebook", "settings", "stats"] as const)("#/%s → %s", (view) => {
+  it.each([
+    "review",
+    "search",
+    "notebook",
+    "custom-lists",
+    "custom-list",
+    "settings",
+    "stats",
+  ] as const)("#/%s → %s", (view) => {
     history.replaceState(null, "", `#/${view}`);
     expect(parseHash()).toBe(view);
   });

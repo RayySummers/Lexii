@@ -19,14 +19,18 @@
  * RAY-280：导出备份入口已从本页移到设置页（真机反馈），本页不再提供
  * 导出按钮，导出功能本身不变（设置页仍导出完整可恢复 JSON）。
  *
- * RAY-284：工具栏新增「加词」——把当前卡的词加入生词本（幂等：已在
- * 生词本时提示「已在生词本中」）；生词本词条进入现有 FSRS 调度
- * （加入即到期），是否进入学习列表由首页开关控制。
+ * RAY-284 → RAY-325：复习界面不再提供「加词」（生词本）按钮——背的都是
+ * 词书或生词本里已有的词。改为「添加到列表」按钮，打开对话框把当前卡
+ * 的词加入用户创建的自定义列表（多对一；列表不参与学习调度，仅作词条
+ * 收藏 / 组织）。生词本加入路径仍可由搜词页 + 已加入即到期的语义覆盖。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SAMPLE_WORDLIST_ROW_COUNT } from "@lexii/core";
 import type { ReviewRating, StudyMode } from "@lexii/core";
-import { BackArrowIcon, CheckIcon, PlusIcon, SpeakerIcon, UndoIcon } from "../components/icons";
+import { AddToListsDialog } from "../customLists/AddToListsDialog";
+import { NOOP_ADD_TO_LISTS_PROVIDER } from "../customLists/data";
+import type { AddToListsDataProvider } from "../customLists/types";
+import { BackArrowIcon, ListIcon, SpeakerIcon, UndoIcon } from "../components/icons";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import { primeSpeechEngine, readPronunciationAccent, speakWord } from "../lib/pronunciation";
 import { readRatingTierMode } from "../lib/ratingTiers";
@@ -43,6 +47,11 @@ export interface ReviewScreenProps {
   /** 学习模式（学习 / 复习 / 混合），决定队列与空状态文案 */
   mode: StudyMode;
   onExit(): void;
+  /**
+   * 「添加到列表」对话框数据源工厂（RAY-325；按需惰性创建）。
+   * 旧测试 / 旧调用方未传时退回 no-op 工厂，避免破坏既有测试。
+   */
+  getAddToListsProvider?: () => AddToListsDataProvider;
 }
 
 /** 队列为空（有词但当前模式无可复习内容）时的按模式文案 */
@@ -91,14 +100,29 @@ function isScrollableRegion(element: HTMLElement): boolean {
   return allowsScroll && element.scrollHeight > element.clientHeight;
 }
 
-export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
+export function ReviewScreen({
+  provider,
+  mode,
+  onExit,
+  getAddToListsProvider = () => NOOP_ADD_TO_LISTS_PROVIDER,
+}: ReviewScreenProps) {
   const session = useReviewSession(provider, mode);
   const dueLabels = session.current ? computeDueLabels(session.current) : null;
   // 评分档位（RAY-265）：会话内固定读取一次；改设置后下次进入复习生效
   const [tierMode] = useState<RatingTierMode>(() => readRatingTierMode());
   const [speakNotice, setSpeakNotice] = useState<string | null>(null);
-  // 生词本覆盖的义项 id 集合（RAY-302：加词按钮切换 +/✓ 状态；进入页面读一次）
-  const [notebookSenseIds, setNotebookSenseIds] = useState<ReadonlySet<string>>(new Set());
+  // RAY-325: 「添加到列表」对话框（null = 关闭）。dialog sense 与 provider
+  // 成对创建 / 清空：provider 只在打开时创建一次并存 state，避免 JSX 内联
+  // 工厂在每次渲染新建 provider → 对话框 refresh 身份变化 → 勾选状态被重置
+  // （Oscar RAY-325 评审 blocking 2）。
+  const [addToListsDialog, setAddToListsDialog] = useState<{
+    sense: NonNullable<typeof session.current>["sense"];
+    provider: AddToListsDataProvider;
+  } | null>(null);
+  // 对话框开关的 ref 镜像：keydown 监听器绑定一次（空依赖），对话框状态
+  // 经 ref 读取（评分键 1–4 / A / H / G / E 在对话框打开时短路，避免在
+  // 「新建列表」输入框里打字误触评分推进复习流）。
+  const addToListsOpenRef = useRef(false);
   // 朗读目标经 ref 读取（session 每次渲染换身份，useCallback 依赖其字段会
   // 让回调每次重建；ref 与提交同步即可保证点击时读到当前卡）
   const currentCardRef = useRef(session.current);
@@ -121,49 +145,20 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
     });
   }, []);
 
-  // 生词本义项集合（RAY-302：加词按钮 +/✓ 状态；进入页面读一次）
-  useEffect(() => {
-    let cancelled = false;
-    void provider
-      .getNotebookSenseIds()
-      .then((ids) => {
-        if (!cancelled) {
-          setNotebookSenseIds(new Set(ids));
-        }
-      })
-      .catch(() => {
-        // 静默：按钮默认显示 +，不影响复习主流程
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [provider]);
-
-  /** 把当前卡加入 / 移出生词本（RAY-284 + RAY-302）：可撤销切换 */
-  const handleToggleNotebook = useCallback(async () => {
+  /** RAY-325：打开「添加到列表」对话框（provider 打开时创建一次） */
+  const handleOpenAddToLists = useCallback(() => {
     const card = currentCardRef.current;
     if (!card) {
       return;
     }
-    const senseId = card.sense.id;
-    const inNotebook = notebookSenseIds.has(senseId);
-    try {
-      if (inNotebook) {
-        await provider.removeFromNotebookBySenseId(senseId);
-        setNotebookSenseIds((previous) => {
-          const next = new Set(previous);
-          next.delete(senseId);
-          return next;
-        });
-      } else {
-        await provider.addToNotebook(senseId);
-        setNotebookSenseIds((previous) => new Set([...previous, senseId]));
-      }
-    } catch (err) {
-      // 静默：按钮状态不变，用户可重试
-      console.warn("生词本操作失败", err);
-    }
-  }, [provider, notebookSenseIds]);
+    setAddToListsDialog({ sense: card.sense, provider: getAddToListsProvider() });
+    addToListsOpenRef.current = true;
+  }, [getAddToListsProvider]);
+
+  const handleCloseAddToLists = useCallback(() => {
+    setAddToListsDialog(null);
+    addToListsOpenRef.current = false;
+  }, []);
 
   // 键盘监听：监听器生命周期与组件绑定（空依赖），阶段与回调经 ref 读取。
   // 之前依赖 [phase] 会在阶段切换时移除/重挂监听——重挂窗口内（或闭包
@@ -197,6 +192,11 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
+      // RAY-325 评审 blocking 2：对话框打开时评分键 / 空格 / 回车全部短路，
+      // 「新建列表」输入框里打字（1–4、a/h/g/e 等）不得穿透到复习评分。
+      if (addToListsOpenRef.current) {
         return;
       }
       const target = event.target;
@@ -261,10 +261,16 @@ export function ReviewScreen({ provider, mode, onExit }: ReviewScreenProps) {
         tierMode={tierMode}
         onSpeak={handleSpeak}
         speakNotice={speakNotice}
-        notebookSenseIds={notebookSenseIds}
-        onToggleNotebook={handleToggleNotebook}
+        onOpenAddToLists={handleOpenAddToLists}
         onExit={onExit}
       />
+      {addToListsDialog ? (
+        <AddToListsDialog
+          provider={addToListsDialog.provider}
+          sense={addToListsDialog.sense}
+          onClose={handleCloseAddToLists}
+        />
+      ) : null}
     </main>
   );
 }
@@ -280,10 +286,8 @@ interface PhaseContentProps {
   onSpeak(): void;
   /** 发音不可用的提示（null = 无提示） */
   speakNotice: string | null;
-  /** 生词本覆盖的义项 id 集合（RAY-302：加词按钮 +/✓ 状态） */
-  notebookSenseIds: ReadonlySet<string>;
-  /** 切换当前卡加入 / 移出生词本（RAY-302） */
-  onToggleNotebook(): void;
+  /** RAY-325：打开「添加到列表」对话框 */
+  onOpenAddToLists(): void;
   onExit(): void;
 }
 
@@ -295,8 +299,7 @@ function PhaseContent({
   tierMode,
   onSpeak,
   speakNotice,
-  notebookSenseIds,
-  onToggleNotebook,
+  onOpenAddToLists,
   onExit,
 }: PhaseContentProps) {
   switch (session.phase) {
@@ -414,29 +417,12 @@ function PhaseContent({
             </button>
             <button
               type="button"
-              onClick={onToggleNotebook}
-              aria-label={
-                notebookSenseIds.has(session.current.sense.id)
-                  ? `把「${session.current.sense.term}」移出生词本`
-                  : `把「${session.current.sense.term}」加入生词本`
-              }
-              className={`flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
-                notebookSenseIds.has(session.current.sense.id)
-                  ? "border-success/40 bg-success/10 text-success hover:border-danger/40 hover:bg-danger/10 hover:text-danger"
-                  : "border-border bg-surface text-text-muted hover:border-primary hover:text-primary"
-              }`}
+              onClick={onOpenAddToLists}
+              aria-label={`把「${session.current.sense.term}」添加到列表`}
+              className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text-muted transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
             >
-              {notebookSenseIds.has(session.current.sense.id) ? (
-                <>
-                  <CheckIcon className="h-4 w-4" />
-                  已加
-                </>
-              ) : (
-                <>
-                  <PlusIcon className="h-4 w-4" />
-                  加词
-                </>
-              )}
+              <ListIcon className="h-4 w-4" />
+              添加到列表
             </button>
           </div>
           <RatingButtons

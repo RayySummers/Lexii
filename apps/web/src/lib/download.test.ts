@@ -70,6 +70,8 @@ describe("serializeBackup", () => {
       memoryStates: [],
       events: [],
       notebookEntries: [],
+      customLists: [],
+      customListEntries: [],
     };
     expect(serializeBackup(data)).toBe(JSON.stringify(data, null, 2));
     expect(serializeBackup(data).startsWith('{\n  "format"')).toBe(true);

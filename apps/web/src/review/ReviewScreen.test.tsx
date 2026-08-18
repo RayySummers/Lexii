@@ -8,8 +8,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { toEventId } from "@lexii/core";
-import type { ReviewRating, SenseId, StudyMode } from "@lexii/core";
-import type { AddToNotebookResult } from "../notebook/types";
+import type { ReviewRating, StudyMode } from "@lexii/core";
 import { RATING_TIER_STORAGE_KEY } from "../lib/ratingTiers";
 import { ReviewScreen } from "./ReviewScreen";
 import { makeCard } from "./testFixtures";
@@ -24,9 +23,6 @@ interface ProviderHarness {
   undoGrade: ReturnType<typeof vi.fn>;
   hasAnyItems: ReturnType<typeof vi.fn>;
   importSampleWordlist: ReturnType<typeof vi.fn>;
-  addToNotebook: ReturnType<typeof vi.fn>;
-  getNotebookSenseIds: ReturnType<typeof vi.fn>;
-  removeFromNotebookBySenseId: ReturnType<typeof vi.fn>;
 }
 
 afterEach(() => {
@@ -81,11 +77,6 @@ function makeHarness(
     .mockResolvedValue(undefined);
   const hasAnyItems = vi.fn<() => Promise<boolean>>().mockResolvedValue(hasItems);
   const importSampleWordlist = vi.fn<() => Promise<number>>().mockResolvedValue(14);
-  const addToNotebook = vi
-    .fn<(senseId: SenseId) => Promise<AddToNotebookResult>>()
-    .mockResolvedValue("added");
-  const getNotebookSenseIds = vi.fn<() => Promise<readonly SenseId[]>>().mockResolvedValue([]);
-  const removeFromNotebookBySenseId = vi.fn().mockResolvedValue(undefined);
   const provider: ReviewDataProvider = {
     loadQueue,
     loadMultipleChoiceQueue,
@@ -94,9 +85,6 @@ function makeHarness(
     undoGrade,
     hasAnyItems,
     importSampleWordlist,
-    addToNotebook,
-    getNotebookSenseIds,
-    removeFromNotebookBySenseId,
   };
   return {
     provider,
@@ -107,9 +95,6 @@ function makeHarness(
     undoGrade,
     hasAnyItems,
     importSampleWordlist,
-    addToNotebook,
-    getNotebookSenseIds,
-    removeFromNotebookBySenseId,
   };
 }
 
@@ -607,79 +592,61 @@ describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
   });
 });
 
-describe("ReviewScreen 生词本加词入口（RAY-284 + RAY-302 可撤销）", () => {
-  it("点「加词」：以当前卡义项调用 addToNotebook，按钮切换为「已加」✓ 状态", async () => {
+describe("ReviewScreen 添加入口（RAY-325：取代 RAY-284 生词本加词入口）", () => {
+  it("工具栏显示「添加到列表」按钮（取代原「加词」/「已加」按钮）", async () => {
     const harness = makeHarness();
     const card = makeCard();
     harness.loadQueue.mockResolvedValue([card]);
     render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
 
     await expectCardShown(card.sense.term);
-    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` }));
-
-    expect(harness.addToNotebook).toHaveBeenCalledWith(card.sense.id);
-    // 按钮切换为 ✓ 状态
+    // 新按钮就位
     expect(
-      await screen.findByRole("button", { name: `把「${card.sense.term}」移出生词本` }),
+      screen.getByRole("button", { name: `把「${card.sense.term}」添加到列表` }),
     ).toBeInTheDocument();
+    // 旧生词本入口已移除（RAY-325 描述）
     expect(
       screen.queryByRole("button", { name: `把「${card.sense.term}」加入生词本` }),
     ).not.toBeInTheDocument();
-  });
-
-  it("已在生词本的卡直接显示「已加」✓ 按钮（进入页面读一次）", async () => {
-    const harness = makeHarness();
-    const card = makeCard();
-    harness.loadQueue.mockResolvedValue([card]);
-    harness.getNotebookSenseIds.mockResolvedValue([card.sense.id]);
-    render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
-
-    await expectCardShown(card.sense.term);
     expect(
-      screen.getByRole("button", { name: `把「${card.sense.term}」移出生词本` }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: `把「${card.sense.term}」加入生词本` }),
+      screen.queryByRole("button", { name: `把「${card.sense.term}」移出生词本` }),
     ).not.toBeInTheDocument();
   });
 
-  it("已加词后再次点击「已加」按钮：调用 removeFromNotebookBySenseId，按钮恢复为「加词」", async () => {
+  it("点击「添加到列表」按钮：打开对话框（对话框可达名包含「添加到列表」）", async () => {
     const harness = makeHarness();
     const card = makeCard();
     harness.loadQueue.mockResolvedValue([card]);
     render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
 
     await expectCardShown(card.sense.term);
-    // 先加词
-    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` }));
-    expect(
-      await screen.findByRole("button", { name: `把「${card.sense.term}」移出生词本` }),
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」添加到列表` }));
 
-    // 再次点击撤销
-    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」移出生词本` }));
-
-    expect(harness.removeFromNotebookBySenseId).toHaveBeenCalledWith(card.sense.id);
-    expect(
-      await screen.findByRole("button", { name: `把「${card.sense.term}」加入生词本` }),
-    ).toBeInTheDocument();
+    // 对话框出现（由 getAddToListsProvider noop provider 提供空列表）
+    expect(await screen.findByRole("dialog", { name: /添加到列表/ })).toBeInTheDocument();
   });
 
-  it("加词失败时按钮保持原状态（静默，不阻塞复习）", async () => {
+  it("对话框打开时评分键 / 空格不穿透到复习（RAY-325 评审 blocking 2）", async () => {
     const harness = makeHarness();
     const card = makeCard();
     harness.loadQueue.mockResolvedValue([card]);
-    harness.addToNotebook.mockRejectedValue(new Error("义项不存在"));
     render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
 
     await expectCardShown(card.sense.term);
-    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` }));
+    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」添加到列表` }));
+    await screen.findByRole("dialog", { name: /添加到列表/ });
 
-    // 按钮保持原样（加词失败，不切换状态）
-    expect(
-      screen.getByRole("button", { name: `把「${card.sense.term}」加入生词本` }),
-    ).toBeInTheDocument();
-    // 评分仍可用：失败不阻塞继续复习
-    expect(screen.getByRole("button", { name: /评分：认识/ })).toBeInTheDocument();
+    // 对话框内按评分键（1–3）与空格：不得触发评分 / 翻面
+    fireEvent.keyDown(window, { key: "1" });
+    fireEvent.keyDown(window, { key: "2" });
+    fireEvent.keyDown(window, { key: "3" });
+    fireEvent.keyDown(window, { key: " " });
+
+    expect(harness.grade).not.toHaveBeenCalled();
+    // 卡片仍未被翻面（评分键未推进队列，翻面按钮仍在）
+    expect(screen.getByRole("button", { name: `显示 ${card.sense.term} 的释义` })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
   });
 });

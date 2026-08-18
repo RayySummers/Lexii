@@ -7,6 +7,7 @@
  */
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import {
+  addToNotebook,
   importCsvWordlist,
   isReviewEvent,
   openDatabase,
@@ -524,13 +525,14 @@ describe("生词本开关（RAY-284，数据源集成）", () => {
     const imported = await provider.importSampleWordlist();
     expect(imported).toBe(SAMPLE_WORDLIST_ROW_COUNT);
 
-    // 从示例词表中取第一个义项加入生词本（独立调度实例）
+    // 从示例词表中取第一个义项加入生词本（独立调度实例）。
+    // RAY-325：复习数据源不再提供生词本加词入口，直接经 @lexii/core 落库。
     const learnQueue = await provider.loadQueue("learn");
     const firstCard = learnQueue[0];
     if (!firstCard) {
       throw new Error("学习队列应非空");
     }
-    await provider.addToNotebook(firstCard.sense.id);
+    await addToNotebook(db!, { senseId: firstCard.sense.id });
 
     // 默认（未设置偏好）：生词本条目包含在学习队列中
     const withNotebook = await provider.loadQueue("learn");
@@ -553,19 +555,5 @@ describe("生词本开关（RAY-284，数据源集成）", () => {
     expect(withoutNotebook.filter((card) => !notebookItemIds.has(card.item.id))).toHaveLength(
       SAMPLE_WORDLIST_ROW_COUNT,
     );
-  });
-
-  it("addToNotebook 幂等：重复加同一义项返回 already", async () => {
-    const provider = createIndexedDbReviewDataProvider(db!);
-    await provider.importSampleWordlist();
-    const learnQueue = await provider.loadQueue("learn");
-    const card = learnQueue[0];
-    if (!card) {
-      throw new Error("学习队列应非空");
-    }
-
-    expect(await provider.addToNotebook(card.sense.id)).toBe("added");
-    expect(await provider.addToNotebook(card.sense.id)).toBe("already");
-    expect(await db!.notebookEntries.count()).toBe(1);
   });
 });

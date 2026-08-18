@@ -18,8 +18,25 @@ export {
   EVENT_SCHEMA_VERSION,
   EXPORT_FORMAT_VERSION,
 } from "./constants";
-export { createId, hasIdPrefix, toEventId, toItemId, toNotebookEntryId, toSenseId } from "./id";
-export type { EventId, IdPrefix, ItemId, NotebookEntryId, SenseId } from "./id";
+export {
+  createId,
+  hasIdPrefix,
+  toCustomListEntryId,
+  toCustomListId,
+  toEventId,
+  toItemId,
+  toNotebookEntryId,
+  toSenseId,
+} from "./id";
+export type {
+  CustomListEntryId,
+  CustomListId,
+  EventId,
+  IdPrefix,
+  ItemId,
+  NotebookEntryId,
+  SenseId,
+} from "./id";
 export type {
   ExampleSentence,
   IsoDate,
@@ -164,6 +181,35 @@ export type {
   NotebookEntryStatus,
   RemoveFromNotebookInput,
 } from "./notebook";
+export {
+  addWordToCustomList,
+  createCustomList,
+  CUSTOM_LIST_DESCRIPTION_MAX,
+  CUSTOM_LIST_NAME_MAX,
+  CUSTOM_LIST_NAME_MIN,
+  deleteCustomList,
+  getCustomList,
+  getCustomListsContainingSense,
+  listCustomListEntries,
+  listCustomLists,
+  listCustomListsWithSummary,
+  removeWordFromCustomList,
+  updateCustomList,
+  validateCustomListDescription,
+  validateCustomListName,
+} from "./customList";
+export type {
+  AddWordToCustomListInput,
+  CreateCustomListInput,
+  CustomList,
+  CustomListEntry,
+  CustomListEntryStatus,
+  CustomListStatus,
+  CustomListSummary,
+  DeleteCustomListInput,
+  RemoveWordFromCustomListInput,
+  UpdateCustomListInput,
+} from "./customList";
 export {
   editDistance,
   generateOptions,
