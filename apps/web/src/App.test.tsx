@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toEventId } from "@lexii/core";
 import type { LexiiExportData, StudyMode } from "@lexii/core";
@@ -467,5 +467,65 @@ describe("App 自定义词单入口（RAY-325）", () => {
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
     expect(await screen.findByRole("heading", { name: "列表详情" })).toBeInTheDocument();
+  });
+});
+
+describe("App 卡片字体（RAY-323）", () => {
+  const originalMatchMedia = window.matchMedia;
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem(FIRST_OPEN_DIALOG_STORAGE_KEY, FIRST_OPEN_DIALOG_DISMISSED_VALUE);
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    window.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }) as unknown as typeof matchMedia;
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+    delete document.documentElement.dataset.theme;
+    delete document.documentElement.dataset.cardFont;
+  });
+
+  it("挂载即同步默认档位（inter）到 <html data-card-font>", () => {
+    render(<App reviewProviderFactory={makeReviewProviderFactory().factory} />);
+    expect(document.documentElement.dataset.cardFont).toBe("inter");
+  });
+
+  it("挂载时若 localStorage 已存档位（如 newsreader），<html> 立即同步", () => {
+    window.localStorage.setItem("lexii:card-font", "newsreader");
+    render(<App reviewProviderFactory={makeReviewProviderFactory().factory} />);
+    expect(document.documentElement.dataset.cardFont).toBe("newsreader");
+  });
+
+  it("设置页切档：写 localStorage + 同步 <html data-card-font>，复习卡立即生效", async () => {
+    const card = makeCard();
+    card.sense.term = "vocabulary";
+    const { factory } = makeReviewProviderFactory([card]);
+    const { factory: settingsFactory } = makeSettingsProviderFactory();
+    render(<App reviewProviderFactory={factory} settingsProviderFactory={settingsFactory} />);
+
+    // 进入设置页
+    fireEvent.click(screen.getByRole("button", { name: "设置" }));
+    const group = await screen.findByRole("radiogroup", { name: "卡片字体" });
+
+    // 切到「手写温润」：原生 radio 受控，模拟 label 关联的 input change
+    const playpenRadio = within(group).getByDisplayValue("playpen") as HTMLInputElement;
+    fireEvent.click(playpenRadio);
+    expect(window.localStorage.getItem("lexii:card-font")).toBe("playpen");
+    expect(document.documentElement.dataset.cardFont).toBe("playpen");
+
+    // 返回首页 → 进入复习：词条 term 通过 CSS 变量 --lex-card-font 应用字体
+    fireEvent.click(screen.getByRole("button", { name: "返回首页" }));
+    fireEvent.click(screen.getByRole("button", { name: "复习" }));
+    // 词条在卡片正反两面各渲染一次（结构上 CardFace 一份），用 getAllByText
+    // 取首项（正面那张）即可；用 findByText 会被"Found multiple"拒收
+    const terms = await screen.findAllByText("vocabulary");
+    expect(terms.length).toBeGreaterThan(0);
+    // 内联 style 引用 var(--lex-card-font)（与 CSS tokens.css 单点切换配套）
+    expect(terms[0]!.getAttribute("style") ?? "").toContain("var(--lex-card-font)");
   });
 });
