@@ -42,12 +42,17 @@
       减少设置页/复习卡首次切档时的字体回退闪烁（FOIT / FOUT）；
       `font-display: swap` 在 url() 串中已声明，字体到达前会先以
       系统等线字体渲染，下载完成后平滑替换。
+      字重与 src/lib/cardFont.ts 的 CARD_FONT_OPTIONS.fontWeight 严格一致
+      （Oscar 评审 suggestion 2）：inter 800 / 其余 600——不加载的字重会
+      被浏览器合成导致字面失真。改动任一档字重必须三处同步：本 URL、
+      CARD_FONT_OPTIONS.fontWeight、tokens.css 的 --lex-card-font-weight
+      （以及 public/sw.js 的 CARD_FONT_CSS_URL，离线预缓存同一 URL）。
     -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@800&family=Newsreader:wght@600&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@800&family=Newsreader:wght@600&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&display=swap"
     />
     <title>乐希 Lexii</title>
   </head>

@@ -2,7 +2,7 @@
  * 卡片字体选择（RAY-323）。
  *
  * 4 档卡片以 2×2 网格呈现（移动端单列、桌面端两列），每张卡片：
- * - 顶部一行：中文短名 + 已选时右侧显示对勾徽标（role="img" aria-label）；
+ * - 顶部一行：中文短名 + 已选时右侧「已选」徽标；
  * - 中部：示例单词（用对应字体渲染，让用户在选择前就看清字面特征）；
  * - 底部一句：副描述（与短名一起形成 "字体名 + 一句定位" 的两行信息层）。
  *
@@ -12,9 +12,11 @@
  * 两套自动生效。
  *
  * 可访问性：
- * - 每张卡片是 role="radio"，整组在父级 <div role="radiogroup"> 内
- *   （见 SettingsScreen.tsx），配合 aria-checked 让读屏清晰播报档位与选中态；
- * - 键盘：原生单选组支持 Tab 进入 + 方向键切换（实施到外层容器）；
+ * - 每张卡片是原生 radio（input[type=radio] 包在 <label> 内），整组在
+ *   父级 <div role="radiogroup"> 内（见 SettingsScreen.tsx）——点击、键盘
+ *   （Tab 进入 + 方向键切换）、读屏（checked 播报）由浏览器原生提供；
+ * - 「已选」徽标 aria-hidden：radio 的 checked 状态已表达选中，徽标纯视觉，
+ *   不再叠加 role="img" / aria-label（Oscar 评审 nit：与 checked 播报重复）；
  * - 示例文本走 span（非 button 子节点），避免嵌套交互元素。
  */
 import { CARD_FONT_OPTIONS, type CardFont } from "../lib/cardFont";
@@ -60,8 +62,7 @@ export function FontPicker({ value, onChange, groupLabel }: FontPickerProps) {
               <span>{option.label}</span>
               {selected ? (
                 <span
-                  role="img"
-                  aria-label="已选中"
+                  aria-hidden="true"
                   className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-contrast"
                 >
                   已选
@@ -69,8 +70,8 @@ export function FontPicker({ value, onChange, groupLabel }: FontPickerProps) {
               ) : null}
             </span>
             <span
-              className="text-2xl font-bold leading-tight sm:text-3xl"
-              style={{ fontFamily: option.fontFamily }}
+              className="text-2xl leading-tight sm:text-3xl"
+              style={{ fontFamily: option.fontFamily, fontWeight: option.fontWeight }}
               lang="en"
             >
               {option.sampleText}

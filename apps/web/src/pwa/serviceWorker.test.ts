@@ -11,7 +11,13 @@
  * - activate 清理旧版本缓存并接管页面；
  * - 导航请求离线时回退到缓存的 index.html（验收点「离线可打开应用」）；
  * - 静态资源未命中缓存时走网络并回填缓存（stale-while-revalidate）；
- * - 非 GET 与跨域请求不拦截。
+ * - 非 GET 与跨域请求不拦截（Google Fonts 白名单除外，RAY-323）。
+ *
+ * RAY-323（Oscar 评审 suggestion 3）新增覆盖：
+ * - install 预缓存 Google Fonts CSS + 从 @font-face src 解析出的字体文件；
+ * - 字体文件离线时缓存优先命中；未命中走网络并回填缓存；
+ * - 字体 CSS 网络优先，离线回退预缓存副本；
+ * - sw.js 的 CARD_FONT_CSS_URL 与 index.html 的 <link href> 漂移校验。
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -20,6 +26,7 @@ import vm from "node:vm";
 import { describe, expect, it, vi } from "vitest";
 
 const SW_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../public/sw.js");
+const INDEX_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../index.html");
 
 /** 模拟生产构建产物：index.html 引用了带 hash 的 js/css（Vite base "./" 的相对产物） */
 const INDEX_HTML = `<!doctype html>
@@ -34,6 +41,36 @@ const INDEX_HTML = `<!doctype html>
 </html>`;
 
 const SW_SOURCE = readFileSync(SW_PATH, "utf8");
+
+/** 从 sw.js 源提取 CARD_FONT_CSS_URL 常量值（字体预缓存测试与漂移校验共用） */
+function extractCardFontCssUrl(): string {
+  const match = SW_SOURCE.match(/CARD_FONT_CSS_URL\s*=\s*"([^"]+)"/);
+  if (!match) {
+    throw new Error("sw.js 中未找到 CARD_FONT_CSS_URL 常量");
+  }
+  return match[1]!;
+}
+
+const CARD_FONT_CSS_URL = extractCardFontCssUrl();
+
+/** 模拟 Google Fonts CSS 响应：两个 @font-face，各自引用一个 gstatic 字体文件 */
+const FONT_CSS = `@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 800;
+  src: url(https://fonts.gstatic.com/s/inter/v20/inter-800.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Playpen Sans';
+  font-style: normal;
+  font-weight: 600;
+  src: url(https://fonts.gstatic.com/s/playpensans/v22/playpen-600.woff2) format('woff2');
+}`;
+
+const FONT_FILE_URLS = [
+  "https://fonts.gstatic.com/s/inter/v20/inter-800.woff2",
+  "https://fonts.gstatic.com/s/playpensans/v22/playpen-600.woff2",
+];
 
 interface FakeRequest {
   method: string;
@@ -110,11 +147,14 @@ interface SwHarness {
   claim: ReturnType<typeof vi.fn>;
 }
 
-/** 默认网络：index.html 返回文档，其余资源返回 200 占位内容 */
+/** 默认网络：index.html 返回文档，字体 CSS 返回 FONT_CSS 夹具，其余资源返回 200 占位内容 */
 function defaultFetch(input: string | FakeRequest): Promise<Response> {
   const url = typeof input === "string" ? input : input.url;
   if (url === "/index.html" || url.endsWith("/index.html")) {
     return Promise.resolve(new Response(INDEX_HTML, { status: 200 }));
+  }
+  if (url === CARD_FONT_CSS_URL) {
+    return Promise.resolve(new Response(FONT_CSS, { status: 200 }));
   }
   return Promise.resolve(new Response(`content of ${url}`, { status: 200 }));
 }
@@ -238,7 +278,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     const harness = loadServiceWorker();
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexii-shell-v1");
+    const cache = harness.cachesByName.get("lexii-shell-v2");
     expect(cache).toBeDefined();
     for (const shellUrl of [
       "http://localhost/",
@@ -263,7 +303,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     });
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexii-shell-v1");
+    const cache = harness.cachesByName.get("lexii-shell-v2");
     expect(cache!.entries.has("http://localhost/")).toBe(false);
     expect(cache!.entries.has("http://localhost/index.html")).toBe(true);
     expect(cache!.entries.has("http://localhost/assets/index-abc123.js")).toBe(true);
@@ -277,7 +317,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     await runActivate(harness);
 
     expect(harness.cachesByName.has("lexii-shell-v0")).toBe(false);
-    expect(harness.cachesByName.has("lexii-shell-v1")).toBe(true);
+    expect(harness.cachesByName.has("lexii-shell-v2")).toBe(true);
     expect(harness.claim).toHaveBeenCalledTimes(1);
   });
 
@@ -292,7 +332,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
 
     expect(harness.cachesByName.has("lexilexi-shell-v0")).toBe(false);
     expect(harness.cachesByName.has("lexilexi-shell-v1")).toBe(false);
-    expect(harness.cachesByName.has("lexii-shell-v1")).toBe(true);
+    expect(harness.cachesByName.has("lexii-shell-v2")).toBe(true);
     expect(harness.claim).toHaveBeenCalledTimes(1);
   });
 
@@ -336,7 +376,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
   it("静态资源未命中缓存时走网络并回填缓存（stale-while-revalidate）", async () => {
     const harness = loadServiceWorker();
     await runInstall(harness);
-    const cache = harness.cachesByName.get("lexii-shell-v1")!;
+    const cache = harness.cachesByName.get("lexii-shell-v2")!;
 
     const response = await dispatchFetch(harness, {
       method: "GET",
@@ -364,7 +404,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     expect(postResponse).toBeUndefined();
     expect(sandboxFetch).not.toHaveBeenCalled();
 
-    // 跨域 GET：直接放行，不缓存
+    // 跨域 GET：直接放行，不缓存（Google Fonts 白名单之外的跨域）
     const crossOriginResponse = await dispatchFetch(harness, {
       method: "GET",
       url: "http://cdn.example.com/font.woff2",
@@ -374,12 +414,125 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     expect(sandboxFetch).not.toHaveBeenCalled();
   });
 
+  it("install 预缓存卡片字体：Google Fonts CSS + 从 @font-face src 解析出的字体文件（RAY-323）", async () => {
+    const harness = loadServiceWorker();
+    await runInstall(harness);
+
+    const cache = harness.cachesByName.get("lexii-shell-v2");
+    expect(cache).toBeDefined();
+    // CSS 本体按页面 <link> 的 URL 缓存（离线回退用）
+    expect(cache!.entries.has(CARD_FONT_CSS_URL)).toBe(true);
+    // 字体文件从 CSS 的 src 解析并预缓存（URL 不写死，跟随 Google 版本号）
+    for (const fontUrl of FONT_FILE_URLS) {
+      expect(cache!.entries.has(fontUrl)).toBe(true);
+    }
+  });
+
+  it("字体 CSS 离线：网络失败时回退 install 预缓存副本（网络优先策略）", async () => {
+    const harness = loadServiceWorker();
+    await runInstall(harness);
+
+    sandboxFetch = () => Promise.reject(new TypeError("Failed to fetch"));
+    const response = await dispatchFetch(harness, {
+      method: "GET",
+      url: CARD_FONT_CSS_URL,
+      mode: "no-cors",
+    });
+
+    expect(response).toBeDefined();
+    expect(await response!.text()).toContain("font-family: 'Inter'");
+  });
+
+  it("字体 CSS 在线：网络优先，不命中缓存副本（UA 匹配优先）", async () => {
+    const harness = loadServiceWorker();
+    await runInstall(harness);
+
+    // 网络返回与缓存不同的 CSS（模拟不同 UA 形态）
+    const uaSpecificCss =
+      "@font-face { font-family: 'Inter'; src: url(https://ua-specific.woff2); }";
+    sandboxFetch = (input) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url === CARD_FONT_CSS_URL) {
+        return Promise.resolve(new Response(uaSpecificCss, { status: 200 }));
+      }
+      return Promise.reject(new TypeError("unexpected fetch"));
+    };
+    const response = await dispatchFetch(harness, {
+      method: "GET",
+      url: CARD_FONT_CSS_URL,
+      mode: "no-cors",
+    });
+
+    expect(response).toBeDefined();
+    expect(await response!.text()).toBe(uaSpecificCss);
+  });
+
+  it("字体文件离线：缓存优先命中预缓存条目", async () => {
+    const harness = loadServiceWorker();
+    await runInstall(harness);
+
+    sandboxFetch = () => Promise.reject(new TypeError("Failed to fetch"));
+    const response = await dispatchFetch(harness, {
+      method: "GET",
+      url: FONT_FILE_URLS[0]!,
+      mode: "no-cors",
+    });
+
+    expect(response).toBeDefined();
+    expect(response!.ok).toBe(true);
+  });
+
+  it("字体文件未缓存：走网络并在成功时回填缓存（stale-while-revalidate 同款）", async () => {
+    const harness = loadServiceWorker();
+    await runInstall(harness);
+    const cache = harness.cachesByName.get("lexii-shell-v2")!;
+
+    // 页面 UA 请求了一个安装时未预缓存的 gstatic 文件（CSS 随 UA 变化）
+    const extraFontUrl = "https://fonts.gstatic.com/s/inter/v20/inter-800-latin-ext.woff2";
+    const response = await dispatchFetch(harness, {
+      method: "GET",
+      url: extraFontUrl,
+      mode: "no-cors",
+    });
+
+    expect(response).toBeDefined();
+    expect(await response!.text()).toBe(`content of ${extraFontUrl}`);
+    await flushMicrotasks();
+    expect(cache.entries.has(extraFontUrl)).toBe(true);
+  });
+
+  it("字体预缓存失败（离线安装 / 网络不可达）不阻断安装（RAY-323 降级）", async () => {
+    // 仅字体 CSS 请求失败，其余正常
+    const harness = loadServiceWorker((input) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url === CARD_FONT_CSS_URL) {
+        return Promise.reject(new TypeError("Failed to fetch"));
+      }
+      return defaultFetch(input);
+    });
+    await runInstall(harness);
+
+    const cache = harness.cachesByName.get("lexii-shell-v2");
+    expect(cache).toBeDefined();
+    expect(cache!.entries.has(CARD_FONT_CSS_URL)).toBe(false);
+    // 外壳与构建产物不受影响
+    expect(cache!.entries.has("http://localhost/index.html")).toBe(true);
+    expect(cache!.entries.has("http://localhost/assets/index-abc123.js")).toBe(true);
+  });
+
+  it("sw.js 的 CARD_FONT_CSS_URL 与 index.html 的 Google Fonts <link href> 一致（漂移校验）", () => {
+    const indexSource = readFileSync(INDEX_PATH, "utf8");
+    const hrefMatch = indexSource.match(/href="(https:\/\/fonts\.googleapis\.com\/css2[^"]+)"/);
+    expect(hrefMatch).not.toBeNull();
+    expect(CARD_FONT_CSS_URL).toBe(hrefMatch![1]);
+  });
+
   it("子路径部署（GitHub Pages /Lexii/）：外壳与构建产物按 SW 位置解析缓存键（RAY-241 回归锁定）", async () => {
     const SW_HREF = "https://rayysummers.github.io/Lexii/sw.js";
     const harness = loadServiceWorker(defaultFetch, SW_HREF);
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexii-shell-v1");
+    const cache = harness.cachesByName.get("lexii-shell-v2");
     expect(cache).toBeDefined();
     for (const shellUrl of [
       "https://rayysummers.github.io/Lexii/",

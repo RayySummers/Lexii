@@ -80,6 +80,10 @@ export function writeCardFont(font: CardFont): boolean {
  * - `fontFamily`：卡片本体与设置示例都引用的 CSS font-family 值；
  *   Google Sans Flex 在 Google Fonts 的官方名为单段字符串，需带引号避免
  *   包含空格被误解析；其他三档名称无空格可省略引号但统一加引号保持稳定
+ * - `fontWeight`：该档的字重，与 index.html 的 Google Fonts URL 中加载的
+ *   字重严格一致（Oscar 评审 suggestion 2）：inter 800（ExtraBold）/
+ *   其余 600（SemiBold）——不加载的字重会被浏览器合成，导致字面失真；
+ *   tokens.css 的 --lex-card-font-weight 与本字段按同一口径取值
  */
 export interface CardFontOption {
   id: CardFont;
@@ -87,6 +91,7 @@ export interface CardFontOption {
   description: string;
   sampleText: string;
   fontFamily: string;
+  fontWeight: number;
 }
 
 export const CARD_FONT_OPTIONS: ReadonlyArray<CardFontOption> = [
@@ -96,6 +101,7 @@ export const CARD_FONT_OPTIONS: ReadonlyArray<CardFontOption> = [
     description: "Inter Display ExtraBold，笔触硬朗、信息密度高。",
     sampleText: "vocabulary",
     fontFamily: '"Inter", "Inter Display", system-ui, sans-serif',
+    fontWeight: 800,
   },
   {
     id: "google-sans",
@@ -103,6 +109,7 @@ export const CARD_FONT_OPTIONS: ReadonlyArray<CardFontOption> = [
     description: "Google Sans Flex，柔性字怀、几何感。",
     sampleText: "vocabulary",
     fontFamily: '"Google Sans Flex", system-ui, sans-serif',
+    fontWeight: 600,
   },
   {
     id: "playpen",
@@ -110,6 +117,7 @@ export const CARD_FONT_OPTIONS: ReadonlyArray<CardFontOption> = [
     description: "Playpen Sans SemiBold，笔画柔和。",
     sampleText: "vocabulary",
     fontFamily: '"Playpen Sans", "Comic Sans MS", cursive',
+    fontWeight: 600,
   },
   {
     id: "newsreader",
@@ -117,5 +125,6 @@ export const CARD_FONT_OPTIONS: ReadonlyArray<CardFontOption> = [
     description: "Newsreader SemiBold，衬线端正、阅读稳重。",
     sampleText: "vocabulary",
     fontFamily: '"Newsreader", Georgia, "Times New Roman", serif',
+    fontWeight: 600,
   },
 ];

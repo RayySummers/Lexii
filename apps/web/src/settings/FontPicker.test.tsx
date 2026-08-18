@@ -5,6 +5,10 @@
  * 中文短名 + 示例文案 + 一句副描述、当前档位有「已选」徽标且边框走
  * 主色、点击其他档位回调 onChange(目标 id)、整组 role="radiogroup"，
  * 单卡为原生 radio（受控、name 一致、键盘可访问由浏览器内置）。
+ *
+ * Oscar 评审 suggestion 2 / nit：示例文案按档位应用 fontFamily 与
+ * fontWeight（与 Google Fonts 加载字重一致）；「已选」徽标 aria-hidden
+ * （radio 的 checked 已播报选中态，不再叠加 role="img"）。
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -32,9 +36,11 @@ describe("FontPicker 卡片字体选择（RAY-323）", () => {
     const { container } = render(
       <FontPicker value="playpen" onChange={() => {}} groupLabel="卡片字体" />,
     );
-    // playpen 卡片有「已选」徽标（role="img" aria-label="已选中"）
-    const selectedBadge = screen.getByLabelText("已选中");
+    // playpen 卡片有「已选」徽标；徽标 aria-hidden（Oscar 评审 nit：
+    // radio checked 已播报选中态，徽标纯视觉，不叠加 role="img"）
+    const selectedBadge = screen.getByText("已选");
     expect(selectedBadge).toBeInTheDocument();
+    expect(selectedBadge).toHaveAttribute("aria-hidden", "true");
     // 选中卡片：边框走主色（class 含 border-primary）
     const selectedLabel = selectedBadge.closest("label");
     expect(selectedLabel).not.toBeNull();
@@ -52,7 +58,7 @@ describe("FontPicker 卡片字体选择（RAY-323）", () => {
       expect(otherRadio!.checked).toBe(false);
     }
     // 徽标总数：只一处「已选」
-    expect(screen.getAllByLabelText("已选中")).toHaveLength(1);
+    expect(screen.getAllByText("已选")).toHaveLength(1);
     // 桌面端 2 列网格 + 移动端单列（grid-cols-1 sm:grid-cols-2）
     const group = container.querySelector('[role="radiogroup"]');
     expect(group?.className).toMatch(/grid-cols-1/);
@@ -72,18 +78,19 @@ describe("FontPicker 卡片字体选择（RAY-323）", () => {
     expect(onChange).toHaveBeenCalledTimes(targets.length);
   });
 
-  it("示例文案用对应字体渲染（fontFamily 内联 style 引用 CARD_FONT_OPTIONS）", () => {
+  it("示例文案按档位渲染 fontFamily 与 fontWeight（与 CARD_FONT_OPTIONS 一致，suggestion 2）", () => {
     const { container } = render(
       <FontPicker value="inter" onChange={() => {}} groupLabel="卡片字体" />,
     );
     // 4 张卡片都用同一个 sampleText；用容器内 raw HTML 反查
-    // 「style 包含该档 fontFamily」的 sample 节点必须恰好 1 个
+    // 「style 含该档 fontFamily 且 fontWeight 匹配」的 sample 节点必须恰好 1 个
     const allSamples = Array.from(container.querySelectorAll<HTMLElement>("span"));
     for (const option of CARD_FONT_OPTIONS) {
       const matches = allSamples.filter(
         (el) =>
           el.textContent === option.sampleText &&
-          (el.getAttribute("style") ?? "").includes(option.fontFamily),
+          (el.getAttribute("style") ?? "").includes(option.fontFamily) &&
+          (el.getAttribute("style") ?? "").includes(`font-weight: ${option.fontWeight}`),
       );
       expect(matches).toHaveLength(1);
     }

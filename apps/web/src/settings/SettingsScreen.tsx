@@ -282,11 +282,11 @@ export function SettingsScreen({
   /**
    * 卡片字体切换（RAY-323）：选档只产出合法值（FontPicker 的 onChange 来自
    *  CARD_FONT_OPTIONS，类型已收敛）；与主题（RAY-261）同一模式——App 级
-   *  useCardFont 单一数据源持有状态与持久化、DOM 同步，本页只透传回调。
+   *  useCardFont 单一数据源持有状态与持久化、DOM 同步，本页只透传回调
+   *  onCardFontChange（Oscar 评审 nit：不再包一层无意义别名）。
    *  持久化与 <html data-card-font> 同步由 useCardFont 统一处理，避免两处
    *  state 漂移（评审 C-12 可维护性）。
    */
-  const handleCardFontChange = onCardFontChange;
 
   /** 版本号连点（RAY-297）：累计 N 次翻转解锁状态并持久化；未到阈值只计数。
    *  Oscar 评审 nit 1：localStorage 写入放在 updater 外（updater 保持纯函数）。 */
@@ -355,7 +355,7 @@ export function SettingsScreen({
       includeNotebook={includeNotebook}
       onIncludeNotebookToggle={handleIncludeNotebookToggle}
       cardFont={cardFont}
-      onCardFontChange={handleCardFontChange}
+      onCardFontChange={onCardFontChange}
       themePreference={themePreference}
       onThemePreferenceChange={onThemePreferenceChange}
       devPanelUnlocked={devPanelTapState.unlocked}

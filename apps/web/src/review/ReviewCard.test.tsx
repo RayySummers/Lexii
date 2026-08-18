@@ -292,13 +292,17 @@ describe("ReviewCard 固定高度与卡片内部滚动（RAY-291）", () => {
 });
 
 describe("ReviewCard 卡片字体（RAY-323）", () => {
-  it("正反面 term 都通过内联 style 引用 var(--lex-card-font)（CSS 变量单点切换）", () => {
+  it("正反面 term 通过 CSS 变量应用字体与字重（单点切换，suggestion 2）", () => {
     render(<Harness sense={makeSense({ term: "vocabulary" })} />);
     // 词条在正反两面各渲染一次（CardFace 一份）；CSS 变量统一由 tokens.css 提供
     const terms = screen.getAllByText("vocabulary");
     expect(terms.length).toBeGreaterThan(0);
     for (const term of terms) {
-      expect(term.getAttribute("style") ?? "").toContain("var(--lex-card-font)");
+      const style = term.getAttribute("style") ?? "";
+      expect(style).toContain("var(--lex-card-font)");
+      // 字重按档位走变量，不写死 font-bold（700）——未加载字重会被浏览器合成
+      expect(style).toContain("var(--lex-card-font-weight)");
+      expect(term.className).not.toContain("font-bold");
     }
   });
 });

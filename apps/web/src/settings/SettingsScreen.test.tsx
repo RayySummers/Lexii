@@ -643,12 +643,12 @@ describe("RAY-323 外观：卡片字体 2×2 选择器", () => {
     renderSettings();
     await screen.findByText("外观");
 
-    expect(screen.getByLabelText("已选中")).toBeInTheDocument();
-    const selectedLabel = screen.getByLabelText("已选中").closest("label");
+    expect(screen.getByText("已选")).toBeInTheDocument();
+    const selectedLabel = screen.getByText("已选").closest("label");
     expect(selectedLabel).not.toBeNull();
     expect(selectedLabel!.className).toContain("border-primary");
     // 4 档中只有 1 个「已选」徽标
-    expect(screen.getAllByLabelText("已选中")).toHaveLength(1);
+    expect(screen.getAllByText("已选")).toHaveLength(1);
   });
 
   it("切换字体：回调 onCardFontChange(目标 id)；本页只透传、不自行持久化（与主题同模式）", async () => {
@@ -678,7 +678,7 @@ describe("RAY-323 外观：卡片字体 2×2 选择器", () => {
     renderSettings({ cardFont: "playpen" });
     await screen.findByText("外观");
 
-    const selectedLabel = screen.getByLabelText("已选中").closest("label");
+    const selectedLabel = screen.getByText("已选").closest("label");
     expect(selectedLabel).toHaveTextContent("手写温润");
     const playpenRadio = screen.getByDisplayValue("playpen") as HTMLInputElement;
     expect(playpenRadio.checked).toBe(true);
@@ -688,7 +688,7 @@ describe("RAY-323 外观：卡片字体 2×2 选择器", () => {
     renderSettings({ cardFont: "newsreader" });
     await screen.findByText("外观");
 
-    const selectedLabel = screen.getByLabelText("已选中").closest("label");
+    const selectedLabel = screen.getByText("已选").closest("label");
     expect(selectedLabel).toHaveTextContent("优雅衬线");
   });
 });

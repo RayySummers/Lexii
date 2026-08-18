@@ -17,8 +17,11 @@
  * 时重建、滚动位置不跨卡残留。
  *
  * RAY-323：正反面词本体（sense.term）应用用户选择的卡片字体
- * （见 src/lib/cardFont），4 档字体经 CSS 变量 --lex-card-font
- * 单点切换；本组件只引用变量，不在多处硬编码字体名，也不在多档
+ * （见 src/lib/cardFont），4 档字体与字重分别经 CSS 变量
+ * --lex-card-font / --lex-card-font-weight 单点切换；字重不写死
+ * font-bold（700），按档位取已加载字重（inter 800 / 其余 600，
+ * Oscar 评审 suggestion 2：未加载字重会被浏览器合成伪粗体导致
+ * 字面失真）。本组件只引用变量，不在多处硬编码字体名，也不在多档
  * 各自定义一套样式（评审 C-12 可维护性）。
  *
  * 可访问性：
@@ -106,8 +109,11 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardPro
           >
             <div className="m-auto flex flex-col items-center justify-center gap-3">
               <span
-                className="text-4xl font-bold tracking-tight sm:text-5xl"
-                style={{ fontFamily: "var(--lex-card-font)" }}
+                className="text-4xl tracking-tight sm:text-5xl"
+                style={{
+                  fontFamily: "var(--lex-card-font)",
+                  fontWeight: "var(--lex-card-font-weight)",
+                }}
               >
                 {sense.term}
               </span>
@@ -148,8 +154,11 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardPro
             <span className="flex flex-wrap items-baseline justify-between gap-3">
               <span className="flex items-center gap-2">
                 <span
-                  className="text-2xl font-bold tracking-tight"
-                  style={{ fontFamily: "var(--lex-card-font)" }}
+                  className="text-2xl tracking-tight"
+                  style={{
+                    fontFamily: "var(--lex-card-font)",
+                    fontWeight: "var(--lex-card-font-weight)",
+                  }}
                 >
                   {sense.term}
                 </span>

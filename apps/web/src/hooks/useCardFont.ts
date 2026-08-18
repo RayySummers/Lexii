@@ -20,10 +20,16 @@
  * 状态联动导致不必要的 effect 重跑）。
  */
 import { useCallback, useEffect, useState } from "react";
-import { DEFAULT_CARD_FONT, isCardFont, readCardFont, writeCardFont } from "../lib/cardFont";
+import {
+  CARD_FONT_STORAGE_KEY,
+  DEFAULT_CARD_FONT,
+  isCardFont,
+  readCardFont,
+  writeCardFont,
+} from "../lib/cardFont";
 import type { CardFont } from "../lib/cardFont";
 
-export { CARD_FONT_STORAGE_KEY, CARD_FONT_OPTIONS } from "../lib/cardFont";
+export { CARD_FONT_OPTIONS } from "../lib/cardFont";
 export type { CardFont } from "../lib/cardFont";
 
 export interface UseCardFontResult {
@@ -76,7 +82,7 @@ export function useCardFont(): UseCardFontResult {
         setFontState(DEFAULT_CARD_FONT);
         return;
       }
-      if (event.key !== "lexii:card-font") {
+      if (event.key !== CARD_FONT_STORAGE_KEY) {
         return;
       }
       if (isCardFont(event.newValue)) {
