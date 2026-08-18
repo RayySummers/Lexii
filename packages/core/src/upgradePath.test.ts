@@ -162,11 +162,11 @@ describe("alpha.2（schema v1）→ 当前（v4）升级不丢数据", () => {
     }
     legacy.close();
 
-    // 当前代码打开：执行 v1→v6 迁移链（v2 meta、v3 fields.due 索引、v4 term 索引、v5 notebookEntries、v6 dictionarySenses）
+    // 当前代码打开：执行 v1→v7 迁移链（v2 meta、v3 fields.due 索引、v4 term 索引、v5 notebookEntries、v6 dictionarySenses、v7 customLists/customListEntries）
     db = openDatabase(makeOptions(factory));
     await db.open();
 
-    expect(db.verno).toBe(6);
+    expect(db.verno).toBe(7);
     expect(await db.items.count()).toBe(220);
     expect(await db.senses.count()).toBe(220);
     expect(await db.memoryStates.count()).toBe(220);

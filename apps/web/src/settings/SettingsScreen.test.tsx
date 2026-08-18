@@ -34,6 +34,8 @@ const EMPTY_EXPORT: LexiiExportData = {
   memoryStates: [],
   events: [],
   notebookEntries: [],
+  customLists: [],
+  customListEntries: [],
 };
 
 const DEFAULT_PRESET_SUMMARIES: PresetSummary[] = [

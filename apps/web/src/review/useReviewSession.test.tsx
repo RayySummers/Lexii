@@ -65,9 +65,6 @@ function makeHarness(
     undoGrade,
     hasAnyItems,
     importSampleWordlist: vi.fn().mockResolvedValue(14),
-    addToNotebook: vi.fn().mockResolvedValue("added"),
-    getNotebookSenseIds: vi.fn().mockResolvedValue([]),
-    removeFromNotebookBySenseId: vi.fn().mockResolvedValue(undefined),
   };
   return { provider, loadQueue, grade, markMastered, undoGrade, hasAnyItems };
 }
@@ -161,9 +158,6 @@ describe("useReviewSession 时序边界", () => {
       undoGrade: vi.fn().mockResolvedValue(undefined),
       hasAnyItems: vi.fn().mockResolvedValue(true),
       importSampleWordlist: vi.fn().mockResolvedValue(14),
-      addToNotebook: vi.fn().mockResolvedValue("added"),
-      getNotebookSenseIds: vi.fn().mockResolvedValue([]),
-      removeFromNotebookBySenseId: vi.fn().mockResolvedValue(undefined),
     };
     const { result } = renderHook(() => useReviewSession(provider, "review"));
 
@@ -192,9 +186,6 @@ describe("useReviewSession 时序边界", () => {
       undoGrade: vi.fn().mockResolvedValue(undefined),
       hasAnyItems: vi.fn().mockResolvedValue(false),
       importSampleWordlist,
-      addToNotebook: vi.fn().mockResolvedValue("added"),
-      getNotebookSenseIds: vi.fn().mockResolvedValue([]),
-      removeFromNotebookBySenseId: vi.fn().mockResolvedValue(undefined),
     };
     const { result } = renderHook(() => useReviewSession(provider, "review"));
     await waitFor(() => expect(result.current.phase).toBe("empty"));

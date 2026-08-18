@@ -1,8 +1,9 @@
 /**
  * 领域实体 id：nanoid 字符串，带类型前缀，便于在事件流与日志中区分实体。
  *
- * 前缀约定：item（学习条目）、sense（义项）、evt（事件）、nb（生词本条目）。
- * 条目与义项的 id 不校验实体存在性（可能先出现在事件里）。
+ * 前缀约定：item（学习条目）、sense（义项）、evt（事件）、nb（生词本条目）、
+ * cl（自定义列表）、cle（自定义列表条目）。条目与义项的 id 不校验实体存在性
+ * （可能先出现在事件里）。
  */
 
 /** 学习条目 id */
@@ -17,8 +18,14 @@ export type EventId = string & { readonly __eventId: unique symbol };
 /** 生词本条目 id */
 export type NotebookEntryId = string & { readonly __notebookEntryId: unique symbol };
 
+/** 自定义列表 id（RAY-325） */
+export type CustomListId = string & { readonly __customListId: unique symbol };
+
+/** 自定义列表条目 id（RAY-325） */
+export type CustomListEntryId = string & { readonly __customListEntryId: unique symbol };
+
 /** id 类型的字母前缀 */
-export type IdPrefix = "item" | "sense" | "evt" | "nb";
+export type IdPrefix = "item" | "sense" | "evt" | "nb" | "cl" | "cle";
 
 /** 随机串字母表（去除易混淆的 l/1/O/0） */
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -55,6 +62,16 @@ export function toEventId(id: string): EventId {
 /** 从任意字符串转成 NotebookEntryId */
 export function toNotebookEntryId(id: string): NotebookEntryId {
   return id as NotebookEntryId;
+}
+
+/** 从任意字符串转成 CustomListId（RAY-325） */
+export function toCustomListId(id: string): CustomListId {
+  return id as CustomListId;
+}
+
+/** 从任意字符串转成 CustomListEntryId（RAY-325） */
+export function toCustomListEntryId(id: string): CustomListEntryId {
+  return id as CustomListEntryId;
 }
 
 /** 判断字符串是否带指定类型前缀 */

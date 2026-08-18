@@ -16,10 +16,8 @@ import type {
   MemoryState,
   ReviewRating,
   Sense,
-  SenseId,
   StudyMode,
 } from "@lexii/core";
-import type { AddToNotebookResult } from "../notebook/types";
 import type { MultipleChoiceQuestion } from "./MultipleChoiceCard";
 
 /** 复习队列中的一张卡 */
@@ -132,21 +130,4 @@ export interface ReviewDataProvider {
   hasAnyItems(): Promise<boolean>;
   /** 导入内置示例词表（空状态一键体验），返回导入条数 */
   importSampleWordlist(): Promise<number>;
-  /**
-   * 把当前复习卡的义项加入生词本（RAY-284，复习卡页加词入口）。
-   *
-   * 幂等：同义项已在生词本时返回 "already"；加词创建独立的生词本学习
-   * 条目（复用同一义项），进入现有 FSRS 调度（加入即到期）。
-   */
-  addToNotebook(senseId: SenseId): Promise<AddToNotebookResult>;
-  /**
-   * 当前生词本（active 条目）覆盖的义项 id 列表（RAY-302）：
-   * 复习卡页加词按钮据此切换「+」/「✓」状态，进入页面读一次。
-   */
-  getNotebookSenseIds(): Promise<readonly SenseId[]>;
-  /**
-   * 把义项移出生词本（RAY-302，复习卡页撤销加词入口）。
-   * 通过 senseId 查找对应的 active 生词本条目并移出；条目不存在时静默跳过。
-   */
-  removeFromNotebookBySenseId(senseId: SenseId): Promise<void>;
 }
