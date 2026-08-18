@@ -553,6 +553,54 @@ describe("RAY-265 学习设置：评分档位与发音口音", () => {
   });
 });
 
+describe("RAY-324 学习设置：发音源选择（系统自带 / 线上发音）", () => {
+  // 「发音口音」label 内的辅助文本含有「发音源」字样，与本测试目标 label 同名，
+  // 通过 id 直接取元素避免歧义（也避免暴露给 testing-library 匹配策略）。
+  function getSourceSelect(): HTMLSelectElement {
+    return document.getElementById("pronunciation-source") as HTMLSelectElement;
+  }
+
+  it("发音源默认系统自带；切换线上发音即时持久化到 localStorage", async () => {
+    renderSettings();
+    await screen.findByText("学习");
+
+    const select = getSourceSelect();
+    expect(select).toHaveValue("system");
+    expect(window.localStorage.getItem("lexii:pronunciation-source")).toBeNull(); // 未显式设置
+
+    fireEvent.change(select, { target: { value: "online" } });
+    expect(select).toHaveValue("online");
+    expect(window.localStorage.getItem("lexii:pronunciation-source")).toBe("online");
+
+    // 切回系统
+    fireEvent.change(select, { target: { value: "system" } });
+    expect(select).toHaveValue("system");
+    expect(window.localStorage.getItem("lexii:pronunciation-source")).toBe("system");
+  });
+
+  it("发音源读取已存储的线上发音", async () => {
+    window.localStorage.setItem("lexii:pronunciation-source", "online");
+    renderSettings();
+    await screen.findByText("学习");
+    expect(getSourceSelect()).toHaveValue("online");
+  });
+
+  it("发音源二档可选（系统自带 / 线上发音）", async () => {
+    renderSettings();
+    await screen.findByText("学习");
+
+    const select = getSourceSelect();
+    const options = Array.from(select.querySelectorAll("option")).map((option) => option.value);
+    expect(options).toEqual(["system", "online"]);
+  });
+
+  it("发音源说明文案展示「线上失败时自动回落系统」口径", async () => {
+    renderSettings();
+    await screen.findByText("学习");
+    expect(screen.getByText(/失败时自动回落系统语音/)).toBeInTheDocument();
+  });
+});
+
 describe("RAY-293 学习设置：选择题出题方向", () => {
   it("选择题出题方向默认英译中；切换中译英即时持久化到 localStorage", async () => {
     renderSettings();
