@@ -104,7 +104,7 @@ jobs:
       - name: 解析最新 v* tag（无 tag 时回退 main，保证首发前站点可用）
         shell: bash
         run: |
-          tag="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+          tag="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
           if [ -n "$tag" ]; then
             git checkout "$tag"
             echo "BUILD_BRANCH=$tag" >> "$GITHUB_ENV"
@@ -113,9 +113,21 @@ jobs:
             echo "BUILD_BRANCH=main" >> "$GITHUB_ENV"
           fi
 
+      # RAY-333 Bug A 修复：旧 tag（如 v0.1.0-alpha.8.1）切到的 commit 包名是
+      # `@lexilexi/web`（typo，已被 PR #71 修正），`pnpm --filter @lexii/web build`
+      # 会返回 "No projects matched" 但 pnpm 静默 0 退出（filter 无匹配视为软失败），
+      # 后续 `cp` 把上一步遗留的 dev 构建复制到根路径，根路径被 dev 通道污染。
+      # 修复：先校验 apps/web/package.json 的 name 字段是预期的 @lexii/web，
+      # 不匹配则 ::error:: 硬失败，避免坏 artifact 进入 Pages。
       - name: 构建稳定版快照（根路径）
+        shell: bash
         run: |
           pnpm install --frozen-lockfile
+          pkg_name="$(node -p "try { require('./apps/web/package.json').name } catch (e) { '' }" 2>/dev/null || echo "")"
+          if [ "$pkg_name" != "@lexii/web" ]; then
+            echo "::error::@lexii/web 工作区在 ref $BUILD_BRANCH 不存在或 package 名错误（实际：'${pkg_name}'）。常见原因：BUILD_BRANCH 解析到了一个旧 tag（其 apps/web/package.json 的 name 是 @lexilexi/web 等历史拼写），或工作区结构与当前不兼容。请确认 BUILD_BRANCH 解析正确后再重试。" >&2
+            exit 1
+          fi
           pnpm --filter @lexii/web build
           cp -a apps/web/dist/. site/
         env:

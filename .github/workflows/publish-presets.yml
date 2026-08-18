@@ -38,12 +38,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      # RAY-333 Bug B 修复：git describe 加 --match 'v*'，避免误拾
+      # `presets-v0.8.2-alpha` 等词包 tag。
       - name: 解析构建目标
         shell: bash
         run: |
           ref="${{ github.event.inputs.ref }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -z "$ref" ]; then
-            ref="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+            ref="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
           fi
           if [ -n "$ref" ]; then
             git checkout "$ref"
