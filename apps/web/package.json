@@ -1,6 +1,6 @@
 {
   "name": "@lexii/web",
-  "version": "0.1.0-alpha.8",
+  "version": "0.8.2-alpha",
   "private": true,
   "type": "module",
   "description": "Lexii Web / PWA 应用",
