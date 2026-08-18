@@ -10,11 +10,14 @@
  *
  * RAY-324 覆盖：
  * - 发音源类型 / 持久化（默认值 / 读写 / 隐私模式回落）；
- * - 默认候选提供方单测：Free Dictionary API 的 URL 构造、口音变体选择
- *   （us→-us / uk→-uk）、音频下载；Lingva 的 URL 构造与字节数组解析；
+ * - 默认候选提供方单测：Free Dictionary API 的 URL 构造、口音变体排序
+ *   （us→-us / uk→-uk；精确缺失时另一主要口音优先于第三口音）；
+ *   Wikimedia Commons 的前缀查询、口音前缀回落、音频下载；Lingva 的
+ *   URL 构造与字节数组解析；
  * - 候选级联：首个成功者胜出，全部 null 才回落系统；
  * - 内存缓存：同一 (term, accent) 命中不再重复解析；仅播放成功后入缓存
- *   （解码失败不污染缓存）；失败时回收坏条目；LRU 上限逐出；
+ *   （解码失败不污染缓存）；真实失败回收坏条目、主动取消保留缓存；
+ *   LRU 上限逐出；
  * - 失败回落：网络错误 / 非 2xx / audio 解码失败 / 播放超时 / play() 拒绝
  *   全部走系统朗读并回调 onOnlineFallbackToSystem 一次；
  * - 主动取消：再次调用 / 切换卡片时 abort 上一次线上朗读。
@@ -36,6 +39,7 @@ import {
   clearOnlineAudioCache,
   createDictionaryApiProvider,
   createLingvaProvider,
+  createWikimediaProvider,
   isPronunciationSource,
   parsePronunciationAccent,
   parsePronunciationSource,
@@ -634,7 +638,7 @@ describe("createDictionaryApiProvider（默认候选 1：真人录音）", () =>
     expect(String(audioUrl)).toContain("apple-us.mp3");
   });
 
-  it("英式口音选择 uk 变体；无口音匹配时退回任意录音", async () => {
+  it("英式口音选择 uk 变体；精确缺失时另一主要口音优先于第三口音（Oscar 观察 2）", async () => {
     const audioUrls: string[] = [];
     const fetchMock = vi.fn<TestFetch>(async (input) => {
       const url = String(input);
@@ -661,7 +665,7 @@ describe("createDictionaryApiProvider（默认候选 1：真人录音）", () =>
     await provider.resolve("banana", "uk", signal);
     expect(audioUrls[0]).toContain("banana-uk.mp3");
 
-    // 只有美式录音时，英式请求退回任意可用录音
+    // 无精确 uk 匹配：另一主要口音（us）优先于第三口音（au）
     const fetchMock2 = vi.fn<TestFetch>(async (input) => {
       const url = String(input);
       if (url.includes("/api/v2/entries/en/")) {
@@ -670,6 +674,7 @@ describe("createDictionaryApiProvider（默认候选 1：真人录音）", () =>
           json: async () => [
             {
               phonetics: [
+                { audio: "https://api.dictionaryapi.dev/media/pronunciations/en/kiwi-au.mp3" },
                 { audio: "https://api.dictionaryapi.dev/media/pronunciations/en/kiwi-us.mp3" },
               ],
             },
@@ -683,6 +688,38 @@ describe("createDictionaryApiProvider（默认候选 1：真人录音）", () =>
     expect(blob).not.toBeNull();
     const [audioUrl] = fetchMock2.mock.calls[1]!;
     expect(String(audioUrl)).toContain("kiwi-us.mp3");
+  });
+
+  it("下载音频失败时按排序尝试下一候选录音（首个可下载者胜出）", async () => {
+    const audioUrls: string[] = [];
+    const fetchMock = vi.fn<TestFetch>(async (input) => {
+      const url = String(input);
+      if (url.includes("/api/v2/entries/en/")) {
+        return makeFakeResponse({
+          ok: true,
+          json: async () => [
+            {
+              phonetics: [
+                { audio: "https://api.dictionaryapi.dev/media/pronunciations/en/plum-us.mp3" },
+                { audio: "https://api.dictionaryapi.dev/media/pronunciations/en/plum-us-2.mp3" },
+              ],
+            },
+          ],
+        });
+      }
+      audioUrls.push(url);
+      // 第一个 us 变体下载失败，第二个成功
+      if (audioUrls.length === 1) {
+        return makeFakeResponse({ ok: false });
+      }
+      return makeFakeResponse({ ok: true, blob: async () => new Blob(["audio"]) });
+    });
+
+    const provider = createDictionaryApiProvider(fetchMock);
+    const blob = await provider.resolve("plum", "us", new AbortController().signal);
+    expect(blob).not.toBeNull();
+    expect(audioUrls).toHaveLength(2);
+    expect(audioUrls[1]).toContain("plum-us-2.mp3");
   });
 
   it("词条不存在（404）/ 无 audio 字段 / 网络错误 → 返回 null（吞错交给级联）", async () => {
@@ -705,7 +742,147 @@ describe("createDictionaryApiProvider（默认候选 1：真人录音）", () =>
   });
 });
 
-describe("createLingvaProvider（默认候选 2：在线合成）", () => {
+describe("createWikimediaProvider（默认候选 2：维基词典录音上游）", () => {
+  afterEach(() => {
+    __setOnlineFetchForTesting(null);
+  });
+
+  it("按口音前缀查询 allimages 并下载最短文件名录音（Oscar 观察 1 的带口音候选）", async () => {
+    const fetchMock = vi.fn<TestFetch>(async (input) => {
+      const url = String(input);
+      if (url.includes("commons.wikimedia.org/w/api.php")) {
+        return makeFakeResponse({
+          ok: true,
+          json: async () => ({
+            query: {
+              allimages: [
+                {
+                  name: "En-us-apple.ogg",
+                  url: "https://upload.wikimedia.org/wikipedia/commons/9/9a/En-us-apple.ogg?utm_source=api",
+                },
+                {
+                  name: "En-us-apple-2.ogg",
+                  url: "https://upload.wikimedia.org/wikipedia/commons/9/9a/En-us-apple-2.ogg?utm_source=api",
+                },
+              ],
+            },
+          }),
+        });
+      }
+      return makeFakeResponse({ ok: true, blob: async () => new Blob(["ogg-audio"]) });
+    });
+
+    const provider = createWikimediaProvider(fetchMock);
+    const signal = new AbortController().signal;
+    const blob = await provider.resolve("apple", "us", signal);
+
+    expect(blob).not.toBeNull();
+    expect(await blob!.text()).toBe("ogg-audio");
+    // 第一次请求：MediaWiki API（前缀 En-us-apple，origin=*，含 AbortSignal）
+    const [apiUrl, apiInit] = fetchMock.mock.calls[0]!;
+    expect(String(apiUrl)).toContain("commons.wikimedia.org/w/api.php");
+    expect(String(apiUrl)).toContain("aiprefix=En-us-apple");
+    expect(String(apiUrl)).toContain("origin=*");
+    expect((apiInit as { signal?: AbortSignal }).signal).toBe(signal);
+    // 第二次请求：最短文件名（En-us-apple.ogg）且剥离 utm 参数
+    const [audioUrl] = fetchMock.mock.calls[1]!;
+    expect(String(audioUrl)).toBe(
+      "https://upload.wikimedia.org/wikipedia/commons/9/9a/En-us-apple.ogg",
+    );
+  });
+
+  it("请求口音无结果时退回另一主要口音前缀；全部无结果返回 null", async () => {
+    const signal = new AbortController().signal;
+
+    // 英式前缀无文件 → 退美式前缀命中
+    const fetchMock = vi.fn<TestFetch>(async (input) => {
+      const url = String(input);
+      if (url.includes("aiprefix=En-uk-kiwi")) {
+        return makeFakeResponse({ ok: true, json: async () => ({ query: { allimages: [] } }) });
+      }
+      if (url.includes("aiprefix=En-us-kiwi")) {
+        return makeFakeResponse({
+          ok: true,
+          json: async () => ({
+            query: {
+              allimages: [
+                {
+                  name: "En-us-kiwi.ogg",
+                  url: "https://upload.wikimedia.org/wikipedia/commons/9/9a/En-us-kiwi.ogg",
+                },
+              ],
+            },
+          }),
+        });
+      }
+      return makeFakeResponse({ ok: true, blob: async () => new Blob(["ogg-audio"]) });
+    });
+    const blob = await createWikimediaProvider(fetchMock).resolve("kiwi", "uk", signal);
+    expect(blob).not.toBeNull();
+    const prefixes = fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes("aiprefix="));
+    expect(prefixes).toEqual([
+      expect.stringContaining("aiprefix=En-uk-kiwi"),
+      expect.stringContaining("aiprefix=En-us-kiwi"),
+    ]);
+
+    // 两个前缀都无结果 → null
+    const emptyMock = vi.fn<TestFetch>(async () =>
+      makeFakeResponse({ ok: true, json: async () => ({ query: { allimages: [] } }) }),
+    );
+    expect(await createWikimediaProvider(emptyMock).resolve("zzzz", "us", signal)).toBeNull();
+
+    // 网络错误 → null
+    const networkError = vi.fn<TestFetch>(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    expect(await createWikimediaProvider(networkError).resolve("apple", "us", signal)).toBeNull();
+  });
+
+  it("多词 term 空格转下划线；音频下载失败后尝试下一前缀", async () => {
+    const audioFetchUrls: string[] = [];
+    const fetchMock = vi.fn<TestFetch>(async (input) => {
+      const url = String(input);
+      if (url.includes("commons.wikimedia.org/w/api.php")) {
+        // 前缀感知：仅 us 前缀有文件，uk 前缀无文件
+        if (url.includes("aiprefix=En-us-ice_cream")) {
+          return makeFakeResponse({
+            ok: true,
+            json: async () => ({
+              query: {
+                allimages: [
+                  {
+                    name: "En-us-ice_cream.ogg",
+                    url: "https://upload.wikimedia.org/wikipedia/commons/9/9a/En-us-ice_cream.ogg",
+                  },
+                ],
+              },
+            }),
+          });
+        }
+        return makeFakeResponse({ ok: true, json: async () => ({ query: { allimages: [] } }) });
+      }
+      audioFetchUrls.push(url);
+      // us 前缀的音频下载失败（HTTP 500）→ 退回 uk 前缀 → 无文件 → null
+      return makeFakeResponse({ ok: false });
+    });
+
+    const provider = createWikimediaProvider(fetchMock);
+    const signal = new AbortController().signal;
+    const blob = await provider.resolve("ice cream", "us", signal);
+
+    expect(blob).toBeNull();
+    const apiCalls = fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes("aiprefix="));
+    expect(apiCalls[0]).toContain("aiprefix=En-us-ice_cream");
+    expect(apiCalls[1]).toContain("aiprefix=En-uk-ice_cream");
+    expect(audioFetchUrls).toHaveLength(1);
+  });
+});
+
+describe("createLingvaProvider（默认候选 3：在线合成）", () => {
   afterEach(() => {
     __setOnlineFetchForTesting(null);
   });
@@ -1017,23 +1194,34 @@ describe("speakWord 发音源分发（RAY-324）", () => {
     }
   });
 
-  it("source=online：再次调用主动取消前一次线上朗读（不触发回落）", async () => {
+  it("source=online：再次调用主动取消前一次线上朗读（不触发回落，且保留已缓存条目，Oscar 观察 3）", async () => {
     const env = installOnlineStubs();
     try {
       speakWord("apple", "us", { source: "online" });
       await flushMicrotasks();
       expect(env.audioInstances).toHaveLength(1);
       const firstAudio = env.audioInstances[0]!;
-      expect(firstAudio.src).toMatch(/^blob:fake-\d+$/);
+      const firstUrl = firstAudio.src;
+      expect(firstUrl).toMatch(/^blob:fake-\d+$/);
+      // 播放开始 → apple 的 ObjectURL 入缓存
+      firstAudio.emit("canplaythrough");
+      await flushMicrotasks();
+      expect(firstAudio.play).toHaveBeenCalledTimes(1);
 
-      // 切到下一个词：应取消前一次
+      // 切到下一个词：取消前一次播放
       speakWord("banana", "us", { source: "online" });
       await flushMicrotasks();
-
       expect(firstAudio.pause).toHaveBeenCalledTimes(1);
       expect(firstAudio.src).toBe("");
       expect(env.providerResolveMocks[0]).toHaveBeenCalledTimes(2);
       expect(env.audioInstances).toHaveLength(2);
+
+      // 再次朗读 apple：主动取消不回收缓存 → 复用缓存的 ObjectURL，不重新解析
+      speakWord("apple", "us", { source: "online" });
+      await flushMicrotasks();
+      expect(env.providerResolveMocks[0]).toHaveBeenCalledTimes(2); // 仍 2 次
+      const replayAudio = env.audioInstances[env.audioInstances.length - 1]!;
+      expect(replayAudio.src).toBe(firstUrl);
     } finally {
       env.restore();
     }

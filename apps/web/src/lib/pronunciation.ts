@@ -26,9 +26,12 @@
  * 回落系统朗读：
  * 1. Free Dictionary API（api.dictionaryapi.dev）——维基词典真人录音，
  *    按口音选取 us/uk 变体，音质最佳、口音可控；
- * 2. Lingva Translate（lingva.ml）——在线合成，任意词均可发音，
+ * 2. Wikimedia Commons（commons.wikimedia.org）——同一批维基词典录音的
+ *    上游存储，同样按口音选 us/uk 变体；当 dictionaryapi 的媒体 CDN
+ *    抖动时（Oscar 复审观察 1）仍能提供带口音区分的真人录音；
+ * 3. Lingva Translate（lingva.ml）——在线合成，任意词均可发音，
  *    覆盖真人录音缺失的生僻词（无 us/uk 区分）。
- * 两个端点均实测返回 `Access-Control-Allow-Origin: *`（2026-08-18 验证），
+ * 三个端点均实测返回 `Access-Control-Allow-Origin: *`（2026-08-18 验证），
  * 可在纯 Web 部署（GitHub Pages）直接 fetch；有道 dictvoice 因无 CORS
  * 响应头已被移除（Oscar RAY-324 复审 blocking 1）。
  *
@@ -36,12 +39,14 @@
  * URL 不再污染缓存），缓存按 LRU 上限回收；同一 (term, accent) 命中缓存
  * 不再重复下载。线上失败（网络 / 非 2xx / 全部候选 null / 解码失败 /
  * 播放超时 / 播放被自动播放策略拒绝）自动回落系统朗读，并经
- * onOnlineFallbackToSystem 通知 UI 一次性提示「已自动切换到系统语音」。
+ * onOnlineFallbackToSystem 通知 UI 一次性提示「已自动切换到系统语音」；
+ * 主动取消（切换卡片 / 重新点击）不视为失败，不回收已缓存条目
+ * （Oscar 复审观察 3）。
  *
  * 存储走 localStorage（与主题 / 每日新卡上限同一持久化模式）。
  *
  * 测试接缝（仅测试 / 调试注入，生产路径不感知）：
- * - __setOnlineProvidersForTesting：替换线上候选提供方列表（默认两候选）；
+ * - __setOnlineProvidersForTesting：替换线上候选提供方列表（默认三候选）；
  * - __setOnlineFetchForTesting：替换 fetch 实现（默认候选的 URL 构造与
  *   响应解析单测使用，jsdom 无法真实联网）；
  * - __setOnlineObjectURLFactoryForTesting：替换 createObjectURL（jsdom 下
@@ -461,9 +466,10 @@ interface DictionaryApiEntry {
 /**
  * 候选 1：Free Dictionary API（api.dictionaryapi.dev）——维基词典真人录音。
  * - 先请求词条 JSON（`GET /api/v2/entries/en/{term}`），收集全部非空 audio；
- * - 按口音偏好选取：URL 含 `-us`（美式）/ `-uk`（英式）后缀者优先，
- *   无口音匹配时退回任意可用录音；
- * - 再下载选中的 MP3 为 Blob。
+ * - 按口音偏好排序：URL 含 `-us`（美式）/ `-uk`（英式）后缀者优先；
+ *   无精确匹配时按「另一主要口音优先于第三口音」排序（如请求英式却只有
+ *   美式与澳式时取美式，Oscar 复审观察 2）；
+ * - 再按序下载 MP3，首个成功的为 Blob。
  * 端点返回 `Access-Control-Allow-Origin: *`，可在浏览器直接 fetch。
  */
 export function createDictionaryApiProvider(fetchFn?: FetchLike): OnlineAudioProvider {
@@ -489,9 +495,7 @@ export function createDictionaryApiProvider(fetchFn?: FetchLike): OnlineAudioPro
       if (audioUrls.length === 0) {
         return null;
       }
-      const accentSuffix = accent === "us" ? "-us" : "-uk";
-      const accentMatch = audioUrls.filter((audio) => audio.toLowerCase().includes(accentSuffix));
-      const ordered = [...accentMatch, ...audioUrls];
+      const ordered = orderAudioUrlsByAccent(audioUrls, accent);
       for (const audioUrl of ordered) {
         try {
           const audioResponse = await fetchForProvider(audioUrl, { signal });
@@ -507,13 +511,105 @@ export function createDictionaryApiProvider(fetchFn?: FetchLike): OnlineAudioPro
   };
 }
 
+/**
+ * 按口音偏好对录音 URL 排序（Oscar 复审观察 2）：
+ * 1. 请求口音的精确变体（us→`-us` / uk→`-uk`）；
+ * 2. 另一主要口音变体（避免退回 `-au` 等第三口音）；
+ * 3. 其余录音（第三口音 / 无标记）。
+ */
+function orderAudioUrlsByAccent(audioUrls: string[], accent: PronunciationAccent): string[] {
+  const primarySuffix = accent === "us" ? "-us" : "-uk";
+  const otherSuffix = accent === "us" ? "-uk" : "-us";
+  const includes = (audio: string, suffix: string) => audio.toLowerCase().includes(suffix);
+  const primaryMatches = audioUrls.filter((audio) => includes(audio, primarySuffix));
+  const otherMatches = audioUrls.filter(
+    (audio) => !includes(audio, primarySuffix) && includes(audio, otherSuffix),
+  );
+  const rest = audioUrls.filter(
+    (audio) => !includes(audio, primarySuffix) && !includes(audio, otherSuffix),
+  );
+  return [...primaryMatches, ...otherMatches, ...rest];
+}
+
+/** Wikimedia Commons allimages 查询响应（仅使用 name / url 字段） */
+interface WikimediaAllimagesResponse {
+  query?: {
+    allimages?: { name: string; url?: string }[];
+  };
+}
+
+/**
+ * 候选 2：Wikimedia Commons（commons.wikimedia.org）——维基词典真人录音
+ * 的上游存储，与候选 1 同源、同样按口音选 us/uk 变体。当 dictionaryapi
+ * 媒体 CDN 抖动时仍能提供带口音区分的真人录音（Oscar 复审观察 1）。
+ * - 经 MediaWiki API 前缀查询文件：`En-us-{term}.ogg` / `En-uk-{term}.ogg`
+ *   （term 小写、空格转下划线）；
+ * - 首选请求口音的前缀；无结果时退回另一主要口音前缀；
+ * - 同名多文件时取名字最短者（最接近精确发音文件）；
+ * - 再下载音频（OGG）为 Blob。
+ * API 需带 `origin=*` 参数返回 `Access-Control-Allow-Origin: *`；
+ * upload.wikimedia.org 媒体文件同样返回 `access-control-allow-origin: *`。
+ */
+export function createWikimediaProvider(fetchFn?: FetchLike): OnlineAudioProvider {
+  const fetchForProvider = fetchFn ?? resolveFetch();
+  return {
+    id: "wikimedia",
+    async resolve(term, accent, signal) {
+      const fileStem = `En-${accent}-${term.toLowerCase().trim().replace(/\s+/g, "_")}`;
+      const otherFileStem = `En-${accent === "us" ? "uk" : "us"}-${term.toLowerCase().trim().replace(/\s+/g, "_")}`;
+      for (const stem of [fileStem, otherFileStem]) {
+        try {
+          const apiUrl =
+            `https://commons.wikimedia.org/w/api.php?action=query&format=json` +
+            `&list=allimages&aiprefix=${encodeURIComponent(stem)}&ailimit=5&origin=*`;
+          const apiResponse = await fetchForProvider(apiUrl, { signal });
+          if (!apiResponse.ok) {
+            continue;
+          }
+          const payload = (await apiResponse.json()) as WikimediaAllimagesResponse;
+          const files = (payload.query?.allimages ?? []).filter(
+            (file): file is { name: string; url: string } =>
+              typeof file.url === "string" && file.url.length > 0,
+          );
+          if (files.length === 0) {
+            continue;
+          }
+          // 取名字最短的文件（最接近精确发音文件，避免 -2/-3 等变体）
+          const best = files.reduce((shortest, file) =>
+            file.name.length < shortest.name.length ? file : shortest,
+          );
+          const audioUrl = stripUtmParameters(best.url);
+          const audioResponse = await fetchForProvider(audioUrl, { signal });
+          if (audioResponse.ok) {
+            return await audioResponse.blob();
+          }
+        } catch {
+          // 尝试下一前缀 / 交给级联下一候选
+        }
+      }
+      return null;
+    },
+  };
+}
+
+/** 去掉 allimages 返回 URL 上的统计参数（utm_*），保留纯媒体地址 */
+function stripUtmParameters(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl);
+    url.search = "";
+    return url.href;
+  } catch {
+    return rawUrl;
+  }
+}
+
 /** Lingva Translate 音频响应（合成音频以字节数组返回） */
 interface LingvaAudioResponse {
   audio?: number[];
 }
 
 /**
- * 候选 2：Lingva Translate（lingva.ml）——在线合成，任意词均可发音，
+ * 候选 3：Lingva Translate（lingva.ml）——在线合成，任意词均可发音，
  * 覆盖真人录音缺失的生僻词。响应为 `{"audio":[bytes]}`（MP3 字节数组），
  * 无 us/uk 区分（合成音为通用英语发音）。
  * 端点返回 `Access-Control-Allow-Origin: *`，可在浏览器直接 fetch。
@@ -546,6 +642,7 @@ export function createLingvaProvider(fetchFn?: FetchLike): OnlineAudioProvider {
 /** 默认线上候选列表（按序尝试，首个成功者胜出） */
 const DEFAULT_ONLINE_PROVIDERS: readonly OnlineAudioProvider[] = [
   createDictionaryApiProvider(),
+  createWikimediaProvider(),
   createLingvaProvider(),
 ];
 
@@ -723,20 +820,26 @@ async function playOnlineAudio(
     onStarted: () => {
       cacheOnlineAudio(cacheKey, objectUrl);
     },
-    // 播放失败（含取消 / 解码失败 / 超时）时回收刚写入的缓存条目，
-    // 避免坏 URL 无限复用
-    onFailed: () => {
-      evictOnlineAudio(cacheKey, objectUrl);
+    // 真实失败（解码 / 超时 / 播放被拒）时回收缓存条目，避免坏 URL 无限复用；
+    // 主动取消（切换卡片 / 重新点击）保留已缓存条目，下次朗读直接复用
+    // （Oscar 复审观察 3）
+    onFailed: (reason) => {
+      if (reason !== "canceled") {
+        evictOnlineAudio(cacheKey, objectUrl);
+      }
     },
   });
 }
+
+/** 播放失败原因（onFailed 回调参数） */
+export type PlaybackFailureReason = "canceled" | "failed";
 
 /** 播放生命周期回调（playObjectUrl 内部使用，测试无需直接关注） */
 interface PlaybackHooks {
   /** 音频成功开始播放（play() resolve）后回调一次 */
   onStarted?(): void;
-  /** 任意失败（含取消）后回调一次 */
-  onFailed?(): void;
+  /** 任意失败后回调一次，携带失败原因（主动取消 vs 真实失败） */
+  onFailed?(reason: PlaybackFailureReason): void;
 }
 
 /**
@@ -781,14 +884,14 @@ function playObjectUrl(
       cleanup();
       resolve();
     };
-    const fail = (reason: string) => {
+    const fail = (message: string, hookReason: PlaybackFailureReason) => {
       if (settled) {
         return;
       }
       settled = true;
       cleanup();
-      hooks?.onFailed?.();
-      reject(new Error(reason));
+      hooks?.onFailed?.(hookReason);
+      reject(new Error(message));
     };
 
     audio.oncanplaythrough = () => {
@@ -803,24 +906,26 @@ function playObjectUrl(
           hooks?.onStarted?.();
         })
         .catch((err: unknown) => {
-          fail(`线上发音播放失败：${err instanceof Error ? err.message : String(err)}`);
+          fail(`线上发音播放失败：${err instanceof Error ? err.message : String(err)}`, "failed");
         });
     };
     audio.onended = () => {
       succeed();
     };
     audio.onerror = () => {
-      fail("线上音频解码失败");
+      fail("线上音频解码失败", "failed");
     };
 
     watchdog = window.setTimeout(() => {
-      fail("线上发音播放超时");
+      fail("线上发音播放超时", "failed");
     }, ONLINE_PLAY_TIMEOUT_MS);
 
     signal.addEventListener(
       "abort",
       () => {
-        fail("线上朗读已被取消");
+        // 主动取消（切换卡片 / 重新点击）：不视为失败，回调 canceled
+        // 供缓存层保留已缓存条目（Oscar 复审观察 3）
+        fail("线上朗读已被取消", "canceled");
       },
       { once: true },
     );
