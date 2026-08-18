@@ -12,6 +12,7 @@
 ```bash
 pnpm install      # 安装依赖（Node.js >= 20，pnpm 10）
 pnpm dev          # 启动 dev server（apps/web）
+pnpm -r typecheck # 递归扫全 6 个 workspace 的 tsc（见下方「PR 前自检」）
 pnpm test         # Vitest 全量测试
 pnpm build        # 全量构建
 pnpm lint         # ESLint + Prettier 检查
@@ -25,7 +26,7 @@ Monorepo 分层与各包职责见 [README.md](./README.md) 与 `packages/` 下�
 
 1. **构建与测试**：`pnpm build` 无报错；`pnpm test` 全绿；新增代码必须带测试。
 2. **FSRS-7 正确性**：对照官方参考实现的验证用例必须全部通过（`fsrs-verify` 标记，CI 单独跑）。
-3. **TypeScript 严格模式**：`tsc --noEmit` 零错误；禁止 `any`（除非有书面理由）；核心数据模型必须有类型定义。
+3. **TypeScript 严格模式**：`pnpm -r typecheck` 零错误（覆盖全 6 个 workspace；见下方「PR 前自检」第 1 条）；禁止 `any`（除非有书面理由）；核心数据模型必须有类型定义。
 4. **数据安全**：IndexedDB 改动不得破坏数据迁移路径（schema 升级必须走版本迁移，禁止清库重来）；导出功能必须导出完整可恢复数据（JSON 能原样导回）。
 5. **local-first 红线**：不得引入任何必须联网才能用的功能；AI 相关代码只允许在 `packages/ai` 内。
 6. **隐私红线**：不得把学习数据发送到任何外部服务；不得埋点上报（连匿名统计都不行）。
@@ -77,8 +78,13 @@ docs/roadmap         # 文档
 提交 PR 前，确保本地通过：
 
 ```bash
-pnpm typecheck && pnpm build && pnpm test && pnpm lint
+pnpm -r typecheck && pnpm build && pnpm test && pnpm lint
 ```
+
+1. **`pnpm -r typecheck`**：递归扫全 6 个 workspace（`apps/web` + `packages/{core,fsrs,eval,stats,ai}`）。本仓库是 pnpm monorepo，每个 workspace 自带一份 `tsconfig.json`；单跑 `apps/web` 的 `tsc --noEmit` 只覆盖 `apps/web` 这一个项目，**任何对 `packages/*` 的类型改动（尤其是手写 type literal 漏字段）都不会被本地 typecheck 抓到**，只能等 CI `Build & Test`（执行 `pnpm typecheck`，根脚本本身就走 `-r`）扫全仓库时才报错。跨包 PR 必跑；为避免流程口子，**任何** PR 都应跑一次。
+2. **`pnpm build`**：全量构建。
+3. **`pnpm test`**：Vitest 全量测试；新增代码必须带测试。
+4. **`pnpm lint`**：ESLint + Prettier 检查。
 
 涉及 `packages/fsrs` 的改动，请额外确认 `fsrs-verify` 用例全部通过（CI 中单独运行，对照官方参考实现逐字段验证）。
 
@@ -106,7 +112,7 @@ PR 描述使用下方模板，并自行对照「13 条评审标准」在描述�
 
 - [ ] 1. `pnpm build` 无报错；`pnpm test` 全绿；新增代码带测试
 - [ ] 2. FSRS-7：`fsrs-verify` 用例全部通过（涉及 `packages/fsrs` 时）
-- [ ] 3. TypeScript：`tsc --noEmit` 零错误；无 `any`；数据模型有类型定义
+- [ ] 3. TypeScript：`pnpm -r typecheck` 零错误（覆盖全 6 个 workspace）；无 `any`；数据模型有类型定义
 - [ ] 4. 数据安全：IndexedDB 改动走版本迁移；导出可原样导回
 - [ ] 5. local-first：无必须联网功能；AI 代码仅在 `packages/ai`
 - [ ] 6. 隐私：不发送学习数据；无埋点上报

@@ -31,13 +31,24 @@ Lexii 是一款本地优先的词汇学习应用：数据只存在你自己的�
 
 ```bash
 pnpm install
-pnpm dev        # 启动 dev server（apps/web）
-pnpm test       # Vitest 全量测试
-pnpm build      # 全量构建
-pnpm lint       # ESLint + Prettier 检查
+pnpm dev              # 启动 dev server（apps/web）
+pnpm typecheck        # 递归跑全 6 个 workspace 的 tsc（见下方「PR 前自检」）
+pnpm test             # Vitest 全量测试
+pnpm build            # 全量构建
+pnpm lint             # ESLint + Prettier 检查
 ```
 
 环境要求：Node.js ≥ 20、pnpm 10。
+
+### PR 前自检
+
+提交 PR 前至少在本地跑一遍 `pnpm -r typecheck`：
+
+```bash
+pnpm -r typecheck    # 递归扫全 6 个 workspace：apps/web + packages/{core,fsrs,eval,stats,ai}
+```
+
+**为什么必须 `-r`**：本仓库是 pnpm monorepo，每个 workspace 自带一份 `tsconfig.json`。单跑 `apps/web` 的 `tsc --noEmit` 只覆盖 `apps/web` 这一个项目，**任何对 `packages/*` 的类型改动（尤其是手写 type literal 漏字段）都不会被本地 typecheck 抓到**，只能等到 CI `Build & Test` 用 `pnpm -r typecheck` 递归扫全 6 个 workspace（`apps/web` + `packages/{core,fsrs,eval,stats,ai}`）时才报错，徒增一轮 CI red。跨包 PR 必须把这条纳入自检。完整 PR 流程与 13 条评审标准见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
 ## 技术栈
 
