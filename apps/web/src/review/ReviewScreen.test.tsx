@@ -593,7 +593,7 @@ describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
 });
 
 describe("ReviewScreen 添加入口（RAY-325：取代 RAY-284 生词本加词入口）", () => {
-  it("工具栏显示「添加到列表」按钮（取代原「加词」/「已加」按钮）", async () => {
+  it("工具栏显示「添加到词单」按钮（取代原「加词」/「已加」按钮）", async () => {
     const harness = makeHarness();
     const card = makeCard();
     harness.loadQueue.mockResolvedValue([card]);
@@ -602,7 +602,7 @@ describe("ReviewScreen 添加入口（RAY-325：取代 RAY-284 生词本加词�
     await expectCardShown(card.sense.term);
     // 新按钮就位
     expect(
-      screen.getByRole("button", { name: `把「${card.sense.term}」添加到列表` }),
+      screen.getByRole("button", { name: `把「${card.sense.term}」添加到词单` }),
     ).toBeInTheDocument();
     // 旧生词本入口已移除（RAY-325 描述）
     expect(
@@ -620,10 +620,10 @@ describe("ReviewScreen 添加入口（RAY-325：取代 RAY-284 生词本加词�
     render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
 
     await expectCardShown(card.sense.term);
-    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」添加到列表` }));
+    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」添加到词单` }));
 
     // 对话框出现（由 getAddToListsProvider noop provider 提供空列表）
-    expect(await screen.findByRole("dialog", { name: /添加到列表/ })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: /添加到词单/ })).toBeInTheDocument();
   });
 
   it("对话框打开时评分键 / 空格不穿透到复习（RAY-325 评审 blocking 2）", async () => {
@@ -633,8 +633,8 @@ describe("ReviewScreen 添加入口（RAY-325：取代 RAY-284 生词本加词�
     render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
 
     await expectCardShown(card.sense.term);
-    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」添加到列表` }));
-    await screen.findByRole("dialog", { name: /添加到列表/ });
+    fireEvent.click(screen.getByRole("button", { name: `把「${card.sense.term}」添加到词单` }));
+    await screen.findByRole("dialog", { name: /添加到词单/ });
 
     // 对话框内按评分键（1–3）与空格：不得触发评分 / 翻面
     fireEvent.keyDown(window, { key: "1" });

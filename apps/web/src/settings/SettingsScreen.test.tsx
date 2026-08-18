@@ -643,7 +643,7 @@ describe("RAY-303 学习设置：学习列表包含生词本开关（从首页�
     renderSettings();
     await screen.findByText("学习");
 
-    const toggle = screen.getByRole("switch", { name: "学习列表是否包含生词本" });
+    const toggle = screen.getByRole("switch", { name: "学习队列是否包含生词本" });
     expect(toggle).toHaveAttribute("aria-checked", "true");
 
     fireEvent.click(toggle);
@@ -659,7 +659,7 @@ describe("RAY-303 学习设置：学习列表包含生词本开关（从首页�
     window.localStorage.setItem("lexii:include-notebook", "0");
     renderSettings();
     await screen.findByText("学习");
-    expect(screen.getByRole("switch", { name: "学习列表是否包含生词本" })).toHaveAttribute(
+    expect(screen.getByRole("switch", { name: "学习队列是否包含生词本" })).toHaveAttribute(
       "aria-checked",
       "false",
     );
@@ -668,7 +668,7 @@ describe("RAY-303 学习设置：学习列表包含生词本开关（从首页�
   it("开关说明文案展示「词书不受影响」口径", async () => {
     renderSettings();
     await screen.findByText("学习");
-    expect(screen.getByText("学习列表包含生词本")).toBeInTheDocument();
+    expect(screen.getByText("学习队列包含生词本")).toBeInTheDocument();
     expect(screen.getByText(/词书不受影响/)).toBeInTheDocument();
   });
 });

@@ -452,7 +452,7 @@ describe("App 自定义词单入口（RAY-325）", () => {
     act(() => {
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
-    await screen.findByRole("heading", { name: "列表详情" });
+    await screen.findByRole("heading", { name: "词单详情" });
 
     // 2. 后退到列表管理页（selectedListId 应清空）
     history.pushState(null, "", "#/custom-lists");
@@ -466,7 +466,7 @@ describe("App 自定义词单入口（RAY-325）", () => {
     act(() => {
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
-    expect(await screen.findByRole("heading", { name: "列表详情" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "词单详情" })).toBeInTheDocument();
   });
 });
 

@@ -680,7 +680,7 @@ function SettingsMainView({
         {/* 生词本开关（RAY-284 / RAY-303）：从首页移至设置页学习分组；N1 用 label 包裹保持一致 */}
         <label className="flex items-start justify-between gap-4">
           <span>
-            <span className="text-sm font-semibold">学习列表包含生词本</span>
+            <span className="text-sm font-semibold">学习队列包含生词本</span>
             <span className="mt-1 block text-xs text-text-muted">
               关闭后，生词本的词不再进入学习 / 复习 / 混合队列，词书不受影响。
             </span>
@@ -689,7 +689,7 @@ function SettingsMainView({
             type="button"
             role="switch"
             aria-checked={includeNotebook}
-            aria-label="学习列表是否包含生词本"
+            aria-label="学习队列是否包含生词本"
             onClick={onIncludeNotebookToggle}
             className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
               includeNotebook ? "border-primary bg-primary" : "border-border bg-surface-raised"
