@@ -1,0 +1,153 @@
+# RAY-337 — agent namespace 校验
+#
+# 短期防御，落地 RAY-335（0.9.0 必做清单）：对每个 PR 校验 head branch 的
+# namespace `agent/<name>/<session>` 与该分支 head commit author 对应的
+# agent 一致；不匹配则检查失败并自动挂 `merge_block` label，强制 owner
+# 复核后才可合并。
+#
+# 平台层根因（RAY-328）：daemon 在初始化 task context 时把 agent_id 串成
+# 上一个活跃任务的 agent，导致多 agent push 跨染。workspace 改不动 daemon
+# / CLI，只能在 CI 这一层做兜底拦截。
+#
+# 触发：仅 PR。push 事件不在此处拦截 —— 直接推到 main 由 RAY-309 等既有
+# 流程兜底（人工合入），agent push 跨入 main 路径不在本 mitigation 范围。
+#
+# 实现：核心判定逻辑落在 scripts/check-agent-namespace.mjs（评审 S1 落地，
+# 消除 workflow 与测试脚本之间的逻辑双份维护），workflow 仅做参数转发与
+# label / comment 副作用。测试脚本 scripts/test-check-agent-namespace.mjs
+# 与实现脚本共享同一份 regex / 身份清单常量（评审 S1 闭环）。
+#
+# fork PR 限制（评审 S5）：本 workflow 写入 `merge_block` label 需要
+# `pull-requests: write`；fork PR 默认降级为 read-only，label / comment
+# 步骤会失败（fail-closed —— check 仍 fail，merge 仍挡）。当前仓库无
+# fork 协作场景，故仅在此声明限制，不另作兜底。
+#
+# 修复后 label 处理（评审 S4）：本 check 通过（mismatch=false 且非
+# unknown_author）时主动移除 `merge_block` label，避免修复后 label 残留
+# 阻挡 PR 合入。人工复核放行路径：失败 PR 自动挂 `merge_block` label +
+# 说明 comment，owner 复核后只需等待下次 push 通过校验即自动清理（无需手
+# 动移除）。
+
+name: Check agent namespace
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: check-agent-namespace-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check-agent-namespace:
+    name: Verify PR head branch namespace matches commit author agent
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          # PR 来自 fork 时，默认 token 无权读取 PR head ref；显式指定 PR SHA。
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Check branch ↔ commit author agent namespace
+        id: check
+        # continue-on-error: true 让失败 case 的 outputs 仍可被下游步骤读
+        # 取 —— 否则 mismatch=true 的 PR 会跳过 Attach label / Fail job 步
+        # 骤，导致 label 不挂、check 不红。真正的 fail 由最末的 'Fail job
+        # on mismatch' 步骤承担（评审 B3 实测修复）。
+        continue-on-error: true
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/check-agent-namespace.mjs "$HEAD_REF" "$HEAD_SHA" "${{ github.workspace }}"
+
+      # 通过 / 修复后：主动清理遗留 merge_block（评审 S4 落地）。
+      - name: Remove merge_block label on pass
+        if: steps.check.outputs.mismatch == 'false' && steps.check.outputs.namespace_status != 'unknown_author'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'merge_block'
+              });
+              core.info('merge_block label removed (check passed).');
+            } catch (e) {
+              // 404 = label 不存在，按幂等成功处理。
+              if (e.status !== 404) throw e;
+            }
+
+      # 不匹配 / 未知身份：挂 label + 解释 comment + 让 check 失败。
+      - name: Attach merge_block label on mismatch
+        if: steps.check.outputs.mismatch == 'true' || steps.check.outputs.namespace_status == 'unknown_author'
+        uses: actions/github-script@v7
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BRANCH_AGENT: ${{ steps.check.outputs.branch_agent }}
+          CLAIMED_AGENT: ${{ steps.check.outputs.claimed_agent }}
+          AUTHOR_NAME: ${{ steps.check.outputs.author_name }}
+          AUTHOR_EMAIL: ${{ steps.check.outputs.author_email }}
+          NAMESPACE_STATUS: ${{ steps.check.outputs.namespace_status }}
+        with:
+          script: |
+            const env = process.env;
+            const headRef = env.HEAD_REF;
+            const headSha = env.HEAD_SHA.slice(0, 7);
+            const branchAgent = env.BRANCH_AGENT;
+            const claimedAgent = env.CLAIMED_AGENT;
+            const authorName = env.AUTHOR_NAME;
+            const authorEmail = env.AUTHOR_EMAIL;
+            const status = env.NAMESPACE_STATUS;
+
+            const lines = [
+              '## ⛔ merge_block（agent namespace 校验失败 — RAY-337）',
+              '',
+              `PR head 分支 \`${headRef}\` 的 namespace 与 head commit \`${headSha}\` 不一致。`,
+              `- commit author: \`${authorName} <${authorEmail}>\``,
+              `- namespace_status: \`${status}\``,
+              ''
+            ];
+            if (branchAgent) lines.push(`- 分支声明的 agent: \`${branchAgent}\``);
+            if (claimedAgent) lines.push(`- commit author 声明的 agent: \`${claimedAgent}\``);
+            if (!claimedAgent && status === 'unknown_author') {
+              lines.push('- commit author 未匹配已知 agent / 平台 / owner 身份模板');
+            }
+            lines.push(
+              '',
+              '### 放行路径',
+              '',
+              '1. owner 复核：确认该 PR 是否存在跨 agent 串号（RAY-328 平台根因）。',
+              '2. 如确认是误报：推送新 commit 触发本 check 重跑，通过后会自动移除 `merge_block` label。',
+              '3. 如确认是真实串号：拒合并入，回 issue 修复平台层 agent_id 传递。',
+              '',
+              '平台层根因见 RAY-328；本 mitigation 是 RAY-335（0.9.0 必做清单）的短期 CI 兜底。'
+            );
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['merge_block']
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: lines.join('\n')
+            });
+
+      - name: Fail job on mismatch
+        if: steps.check.outputs.mismatch == 'true' || steps.check.outputs.namespace_status == 'unknown_author'
+        run: |
+          echo "::error::Agent namespace 不匹配，PR 已被自动挂上 merge_block label。请按上面的放行路径处理。"
+          exit 1
