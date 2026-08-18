@@ -38,7 +38,7 @@ jobs:
       - name: Test
         run: pnpm test
 
-      # RAY-346 / RAY-338 round 2：富化 preset 繁简统一回归（韩语/CJK 上下文）。
+      # RAY-346 / RAY-338 round 3：富化 preset 繁简统一回归。
       # 失败时 exit 1 → 阻止后续 lint / e2e 等。
       - name: Lint presets (繁简回归)
         run: pnpm lint:presets
