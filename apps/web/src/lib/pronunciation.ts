@@ -28,7 +28,9 @@
  *    按口音选取 us/uk 变体，音质最佳、口音可控；
  * 2. Wikimedia Commons（commons.wikimedia.org）——同一批维基词典录音的
  *    上游存储，同样按口音选 us/uk 变体；当 dictionaryapi 的媒体 CDN
- *    抖动时（Oscar 复审观察 1）仍能提供带口音区分的真人录音；
+ *    抖动时（Oscar 复审观察 1）仍能提供带口音区分的真人录音；前缀
+ *    无命中时额外退回 Lingua Libre 真人录音（`LL-Q1860`，无口音区分，
+ *    仍优于合成音——Oscar 复审「供未来参考」项）；
  * 3. Lingva Translate（lingva.ml）——在线合成，任意词均可发音，
  *    覆盖真人录音缺失的生僻词（无 us/uk 区分）。
  * 三个端点均实测返回 `Access-Control-Allow-Origin: *`（2026-08-18 验证），
@@ -545,8 +547,11 @@ interface WikimediaAllimagesResponse {
  * - 经 MediaWiki API 前缀查询文件：`En-us-{term}.ogg` / `En-uk-{term}.ogg`
  *   （term 小写、空格转下划线）；
  * - 首选请求口音的前缀；无结果时退回另一主要口音前缀；
+ * - 两个前缀都无结果时，退回 Lingua Libre 录音
+ *   （`LL-Q1860 (eng)-{speaker}-{term}.wav`，近年新增的真人录音，
+ *   无 us/uk 区分——Oscar 复审「供未来参考」项）；
  * - 同名多文件时取名字最短者（最接近精确发音文件）；
- * - 再下载音频（OGG）为 Blob。
+ * - 再下载音频（OGG / WAV）为 Blob。
  * API 需带 `origin=*` 参数返回 `Access-Control-Allow-Origin: *`；
  * upload.wikimedia.org 媒体文件同样返回 `access-control-allow-origin: *`。
  */
@@ -587,9 +592,83 @@ export function createWikimediaProvider(fetchFn?: FetchLike): OnlineAudioProvide
           // 尝试下一前缀 / 交给级联下一候选
         }
       }
+      // 第三层：Lingua Libre 真人录音（无口音区分；早于合成音兜底）
+      try {
+        const linguaLibreBlob = await resolveLinguaLibreAudio(term, signal, fetchForProvider);
+        if (linguaLibreBlob !== null) {
+          return linguaLibreBlob;
+        }
+      } catch {
+        // 交给级联下一候选
+      }
       return null;
     },
   };
+}
+
+/** Lingua Libre 搜索响应（generator=search + prop=imageinfo） */
+interface WikimediaSearchResponse {
+  query?: {
+    pages?: Record<string, { title?: string; imageinfo?: { url?: string }[] }>;
+  };
+}
+
+/**
+ * 在 Wikimedia Commons 搜索 Lingua Libre 英语真人录音：
+ * `LL-Q1860 (eng)-{speaker}-{term}.{ext}`（Oscar 复审「供未来参考」项）。
+ * 搜索词 `intitle:LL-Q1860 intitle:"{term}"`（namespace 6），并过滤出
+ * 词部分与 term 精确相等的文件（排除 "apple tree" / "bone apple tea"
+ * 这类包含关系），再下载音频为 Blob。
+ */
+async function resolveLinguaLibreAudio(
+  term: string,
+  signal: AbortSignal,
+  fetchForProvider: FetchLike,
+): Promise<Blob | null> {
+  const normalizedTerm = normalizeWikimediaTerm(term);
+  const search = `intitle:LL-Q1860 intitle:"${normalizedTerm}"`;
+  const apiUrl =
+    `https://commons.wikimedia.org/w/api.php?action=query&format=json` +
+    `&generator=search&gsrsearch=${encodeURIComponent(search)}` +
+    `&gsrnamespace=6&gsrlimit=10&prop=imageinfo&iiprop=url&origin=*`;
+  const apiResponse = await fetchForProvider(apiUrl, { signal });
+  if (!apiResponse.ok) {
+    return null;
+  }
+  const payload = (await apiResponse.json()) as WikimediaSearchResponse;
+  const candidates = Object.values(payload.query?.pages ?? {})
+    .map((page) => ({
+      title: page.title ?? "",
+      url: page.imageinfo?.[0]?.url ?? "",
+    }))
+    .filter(
+      (candidate) =>
+        candidate.url.length > 0 && isLinguaLibreWordMatch(candidate.title, normalizedTerm),
+    );
+  if (candidates.length === 0) {
+    return null;
+  }
+  const best = candidates.reduce((shortest, candidate) =>
+    candidate.title.length < shortest.title.length ? candidate : shortest,
+  );
+  const audioResponse = await fetchForProvider(stripUtmParameters(best.url), { signal });
+  return audioResponse.ok ? await audioResponse.blob() : null;
+}
+
+/** term 归一化：小写、下划线转空格、连续空白折叠（与文件命名对比用） */
+function normalizeWikimediaTerm(raw: string): string {
+  return raw.toLowerCase().replace(/_/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * 判断 Lingua Libre 文件名是否精确对应目标词：
+ * 去掉 `File:` 前缀与扩展名后，标题以 `-{term}` 结尾
+ * （speaker 名与词之间以最后一个连字符为界）。
+ */
+function isLinguaLibreWordMatch(title: string, normalizedTerm: string): boolean {
+  const withoutPrefix = title.replace(/^File:/i, "");
+  const withoutExtension = withoutPrefix.replace(/\.[a-z0-9]{2,4}$/i, "");
+  return normalizeWikimediaTerm(withoutExtension).endsWith(`-${normalizedTerm}`);
 }
 
 /** 去掉 allimages 返回 URL 上的统计参数（utm_*），保留纯媒体地址 */

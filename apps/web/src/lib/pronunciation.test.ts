@@ -880,6 +880,147 @@ describe("createWikimediaProvider（默认候选 2：维基词典录音上游）
     expect(apiCalls[1]).toContain("aiprefix=En-uk-ice_cream");
     expect(audioFetchUrls).toHaveLength(1);
   });
+
+  it("前缀无命中时退回 Lingua Libre 录音并过滤包含关系（Oscar「供未来参考」项）", async () => {
+    const fetchMock = vi.fn<TestFetch>(async (input) => {
+      const url = String(input);
+      if (url.includes("aiprefix=")) {
+        return makeFakeResponse({ ok: true, json: async () => ({ query: { allimages: [] } }) });
+      }
+      if (url.includes("generator=search")) {
+        return makeFakeResponse({
+          ok: true,
+          json: async () => ({
+            query: {
+              pages: {
+                1: {
+                  title: "File:LL-Q1860 (eng)-Jjamesryan-apple tree.wav",
+                  imageinfo: [
+                    {
+                      url: "https://upload.wikimedia.org/wikipedia/commons/9/90/LL-Q1860_%28eng%29-Jjamesryan-apple_tree.wav?utm_source=api",
+                    },
+                  ],
+                },
+                2: {
+                  title: "File:LL-Q1860 (eng)-Boredcookie-apple.wav",
+                  imageinfo: [
+                    {
+                      url: "https://upload.wikimedia.org/wikipedia/commons/9/9e/LL-Q1860_%28eng%29-Boredcookie-apple.wav?utm_source=api",
+                    },
+                  ],
+                },
+                3: {
+                  title: "File:LL-Q1860 (eng)-Vealhurl-apple pie.wav",
+                  imageinfo: [
+                    {
+                      url: "https://upload.wikimedia.org/wikipedia/commons/e/e7/LL-Q1860_%28eng%29-Vealhurl-apple_pie.wav?utm_source=api",
+                    },
+                  ],
+                },
+              },
+            },
+          }),
+        });
+      }
+      return makeFakeResponse({ ok: true, blob: async () => new Blob(["wav-audio"]) });
+    });
+
+    const provider = createWikimediaProvider(fetchMock);
+    const signal = new AbortController().signal;
+    const blob = await provider.resolve("apple", "us", signal);
+
+    expect(blob).not.toBeNull();
+    expect(await blob!.text()).toBe("wav-audio");
+    // 搜索请求：generator=search + gsrsearch（intitle:LL-Q1860 + 引号 term）+ origin=*
+    const searchCalls = fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes("generator=search"));
+    expect(searchCalls).toHaveLength(1);
+    expect(searchCalls[0]).toContain("gsrnamespace=6");
+    expect(searchCalls[0]).toContain("gsrsearch=intitle%3ALL-Q1860%20intitle%3A%22apple%22");
+    expect(searchCalls[0]).toContain("origin=*");
+    // 仅下载精确匹配（apple），排除 apple tree / apple pie；且剥离 utm 参数
+    const downloadCalls = fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes("upload.wikimedia.org"));
+    expect(downloadCalls).toEqual([
+      "https://upload.wikimedia.org/wikipedia/commons/9/9e/LL-Q1860_%28eng%29-Boredcookie-apple.wav",
+    ]);
+  });
+
+  it("Lingua Libre 多词 term 精确匹配（排除前缀包含关系）", async () => {
+    const fetchMock = vi.fn<TestFetch>(async (input) => {
+      const url = String(input);
+      if (url.includes("aiprefix=")) {
+        return makeFakeResponse({ ok: true, json: async () => ({ query: { allimages: [] } }) });
+      }
+      if (url.includes("generator=search")) {
+        return makeFakeResponse({
+          ok: true,
+          json: async () => ({
+            query: {
+              pages: {
+                1: {
+                  title: "File:LL-Q1860 (eng)-Boredcookie-apple.wav",
+                  imageinfo: [
+                    {
+                      url: "https://upload.wikimedia.org/wikipedia/commons/9/9e/LL-Q1860_%28eng%29-Boredcookie-apple.wav",
+                    },
+                  ],
+                },
+                2: {
+                  title: "File:LL-Q1860 (eng)-Jjamesryan-apple tree.wav",
+                  imageinfo: [
+                    {
+                      url: "https://upload.wikimedia.org/wikipedia/commons/9/90/LL-Q1860_%28eng%29-Jjamesryan-apple_tree.wav",
+                    },
+                  ],
+                },
+                3: {
+                  title: "File:LL-Q1860 (eng)-Persent101-apple tree blossoms.wav",
+                  imageinfo: [
+                    {
+                      url: "https://upload.wikimedia.org/wikipedia/commons/e/e2/LL-Q1860_%28eng%29-Persent101-apple_tree_blossoms.wav",
+                    },
+                  ],
+                },
+              },
+            },
+          }),
+        });
+      }
+      return makeFakeResponse({ ok: true, blob: async () => new Blob(["wav-audio"]) });
+    });
+
+    const provider = createWikimediaProvider(fetchMock);
+    const blob = await provider.resolve("apple tree", "uk", new AbortController().signal);
+
+    expect(blob).not.toBeNull();
+    const downloadCalls = fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes("upload.wikimedia.org"));
+    expect(downloadCalls).toEqual([
+      "https://upload.wikimedia.org/wikipedia/commons/9/90/LL-Q1860_%28eng%29-Jjamesryan-apple_tree.wav",
+    ]);
+  });
+
+  it("Lingua Libre 搜索无结果或网络错误 → null（交给级联）", async () => {
+    const signal = new AbortController().signal;
+
+    const emptyMock = vi.fn<TestFetch>(async (input) => {
+      const url = String(input);
+      if (url.includes("aiprefix=")) {
+        return makeFakeResponse({ ok: true, json: async () => ({ query: { allimages: [] } }) });
+      }
+      return makeFakeResponse({ ok: true, json: async () => ({ query: { pages: {} } }) });
+    });
+    expect(await createWikimediaProvider(emptyMock).resolve("zzzz", "us", signal)).toBeNull();
+
+    const networkError = vi.fn<TestFetch>(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    expect(await createWikimediaProvider(networkError).resolve("apple", "us", signal)).toBeNull();
+  });
 });
 
 describe("createLingvaProvider（默认候选 3：在线合成）", () => {
