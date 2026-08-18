@@ -115,9 +115,9 @@ describe("CustomListsScreen", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("还没有自定义列表")).toBeInTheDocument();
+      expect(screen.getByText("还没有自定义词单")).toBeInTheDocument();
     });
-    expect(screen.getByRole("button", { name: /创建列表/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /创建词单/ })).toBeInTheDocument();
   });
 
   it("加载概览：列表总数 / 词条总数", async () => {
@@ -177,7 +177,7 @@ describe("CustomListsScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("工作常用")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole("button", { name: `打开列表「${list.name}」` }));
+    fireEvent.click(screen.getByRole("button", { name: `打开词单「${list.name}」` }));
     expect(onOpenList).toHaveBeenCalledWith(list.id);
   });
 
@@ -188,9 +188,9 @@ describe("CustomListsScreen", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("还没有自定义列表")).toBeInTheDocument();
+      expect(screen.getByText("还没有自定义词单")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole("button", { name: /创建列表/ }));
+    fireEvent.click(screen.getByRole("button", { name: /创建词单/ }));
 
     const nameInput = await screen.findByPlaceholderText(/如：阅读常见词/);
     fireEvent.change(nameInput, { target: { value: "  工作常用  " } });
@@ -212,16 +212,16 @@ describe("CustomListsScreen", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("还没有自定义列表")).toBeInTheDocument();
+      expect(screen.getByText("还没有自定义词单")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole("button", { name: /创建列表/ }));
+    fireEvent.click(screen.getByRole("button", { name: /创建词单/ }));
 
     const nameInput = await screen.findByPlaceholderText(/如：阅读常见词/);
     fireEvent.change(nameInput, { target: { value: "   " } });
     fireEvent.click(screen.getByRole("button", { name: /^创建$/ }));
 
     expect(harness.createList).not.toHaveBeenCalled();
-    expect(await screen.findByText("列表名称不能为空")).toBeInTheDocument();
+    expect(await screen.findByText("词单名称不能为空")).toBeInTheDocument();
   });
 
   it("编辑流程：点铅笔 → 改名称 → 保存", async () => {
@@ -235,7 +235,7 @@ describe("CustomListsScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("原名")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole("button", { name: `编辑列表「${list.name}」` }));
+    fireEvent.click(screen.getByRole("button", { name: `编辑词单「${list.name}」` }));
 
     const nameInput = await screen.findByDisplayValue("原名");
     fireEvent.change(nameInput, { target: { value: "新名" } });
@@ -261,10 +261,10 @@ describe("CustomListsScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("工作常用")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole("button", { name: `删除列表「${list.name}」` }));
+    fireEvent.click(screen.getByRole("button", { name: `删除词单「${list.name}」` }));
 
     // 二次确认对话框
-    const dialog = await screen.findByRole("dialog", { name: /确认删除列表/ });
+    const dialog = await screen.findByRole("dialog", { name: /确认删除词单/ });
     expect(dialog).toHaveTextContent("工作常用");
     expect(dialog).toHaveTextContent(/归类记录将被移除/);
 
@@ -286,7 +286,7 @@ describe("CustomListsScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("工作常用")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole("button", { name: `删除列表「${list.name}」` }));
+    fireEvent.click(screen.getByRole("button", { name: `删除词单「${list.name}」` }));
 
     await screen.findByRole("dialog");
     fireEvent.click(screen.getByRole("button", { name: /^取消$/ }));
@@ -301,7 +301,7 @@ describe("CustomListsScreen", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("列表暂时无法加载，请稍后重试。")).toBeInTheDocument();
+      expect(screen.getByText("词单暂时无法加载，请稍后重试。")).toBeInTheDocument();
     });
     expect(screen.getByText("重试")).toBeInTheDocument();
   });

@@ -136,7 +136,7 @@ describe("CustomListDetailScreen", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("这个列表还是空的")).toBeInTheDocument();
+      expect(screen.getByText("这个词单还是空的")).toBeInTheDocument();
     });
   });
 
@@ -151,7 +151,7 @@ describe("CustomListDetailScreen", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("列表不存在或已被删除")).toBeInTheDocument();
+      expect(screen.getByText("词单不存在或已被删除")).toBeInTheDocument();
     });
   });
 
@@ -175,7 +175,7 @@ describe("CustomListDetailScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("abandon")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole("button", { name: /把「abandon」移出此列表/ }));
+    fireEvent.click(screen.getByRole("button", { name: /把「abandon」移出此词单/ }));
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /^确认移出$/ })).toBeInTheDocument();
@@ -201,7 +201,7 @@ describe("CustomListDetailScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("abandon")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole("button", { name: /把「abandon」移出此列表/ }));
+    fireEvent.click(screen.getByRole("button", { name: /把「abandon」移出此词单/ }));
 
     await screen.findByRole("button", { name: /^确认移出$/ });
     fireEvent.click(screen.getByRole("button", { name: /^取消$/ }));

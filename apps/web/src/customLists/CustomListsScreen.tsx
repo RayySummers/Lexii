@@ -112,15 +112,15 @@ export function CustomListsScreen({ provider, onExit, onOpenList }: CustomListsS
     const name = newName.trim();
     const description = newDescription.trim();
     if (name.length === 0) {
-      setCreateError("列表名称不能为空");
+      setCreateError("词单名称不能为空");
       return;
     }
     if (name.length > 60) {
-      setCreateError("列表名称不能超过 60 个字符");
+      setCreateError("词单名称不能超过 60 个字符");
       return;
     }
     if (description.length > 200) {
-      setCreateError("列表描述不能超过 200 个字符");
+      setCreateError("词单描述不能超过 200 个字符");
       return;
     }
     setCreateForm("submitting");
@@ -130,7 +130,7 @@ export function CustomListsScreen({ provider, onExit, onOpenList }: CustomListsS
       setCreateForm("hidden");
       setNewName("");
       setNewDescription("");
-      setNotice("已创建列表。");
+      setNotice("已创建词单。");
       await refresh();
     } catch (err: unknown) {
       setCreateError(toErrorMessage(err));
@@ -159,15 +159,15 @@ export function CustomListsScreen({ provider, onExit, onOpenList }: CustomListsS
     const name = editName.trim();
     const description = editDescription.trim();
     if (name.length === 0) {
-      setEditError("列表名称不能为空");
+      setEditError("词单名称不能为空");
       return;
     }
     if (name.length > 60) {
-      setEditError("列表名称不能超过 60 个字符");
+      setEditError("词单名称不能超过 60 个字符");
       return;
     }
     if (description.length > 200) {
-      setEditError("列表描述不能超过 200 个字符");
+      setEditError("词单描述不能超过 200 个字符");
       return;
     }
     setSavingEdit(true);
@@ -175,7 +175,7 @@ export function CustomListsScreen({ provider, onExit, onOpenList }: CustomListsS
     try {
       await provider.updateList({ id: editingId, name, description });
       setEditingId(null);
-      setNotice("已更新列表。");
+      setNotice("已更新词单。");
       await refresh();
     } catch (err: unknown) {
       setEditError(toErrorMessage(err));
@@ -194,7 +194,7 @@ export function CustomListsScreen({ provider, onExit, onOpenList }: CustomListsS
     try {
       await provider.deleteList(id);
       setConfirmDelete(null);
-      setNotice("列表已删除。词条记录保留为历史。");
+      setNotice("词单已删除。词条记录保留为历史。");
       await refresh();
     } catch (err: unknown) {
       setError(`删除失败：${toErrorMessage(err)}`);
@@ -213,12 +213,12 @@ export function CustomListsScreen({ provider, onExit, onOpenList }: CustomListsS
 
       <p className="text-sm text-text-muted">
         创建你自己的词单，把散落的词条按主题归类（如「工作中常用」「阅读里遇过」）。
-        同一个词可以归入多个列表；列表不参与学习调度，仅作词条的收藏与组织。
+        同一个词可以归入多个词单；词单不参与学习调度，仅作词条的收藏与组织。
       </p>
 
-      <section aria-label="我的列表概览" className="grid grid-cols-2 gap-3">
+      <section aria-label="我的词单概览" className="grid grid-cols-2 gap-3">
         <div className="rounded-xl border border-border bg-surface p-4">
-          <p className="text-xs text-text-muted">列表总数</p>
+          <p className="text-xs text-text-muted">词单总数</p>
           <p className="mt-1 text-xl font-semibold tabular-nums">
             {phase === "ready" ? `${totalLists} 个` : "…"}
           </p>
@@ -233,12 +233,12 @@ export function CustomListsScreen({ provider, onExit, onOpenList }: CustomListsS
 
       {phase === "loading" ? (
         <div role="status" className="py-16 text-center text-sm text-text-muted">
-          正在加载列表…
+          正在加载词单…
         </div>
       ) : phase === "error" ? (
         <div className="flex flex-col items-start gap-3 rounded-2xl border border-danger/40 bg-surface p-6">
           <p role="alert" className="text-sm">
-            列表暂时无法加载，请稍后重试。
+            词单暂时无法加载，请稍后重试。
           </p>
           <details className="text-xs text-text-muted">
             <summary>错误详情</summary>
@@ -267,10 +267,10 @@ export function CustomListsScreen({ provider, onExit, onOpenList }: CustomListsS
             />
           ) : summaries.length === 0 ? (
             <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-8 text-center">
-              <h2 className="text-xl font-semibold">还没有自定义列表</h2>
+              <h2 className="text-xl font-semibold">还没有自定义词单</h2>
               <p className="max-w-sm text-sm text-text-muted">
-                创建第一个列表，把零散的词条按你的主题归类。
-                在复习卡或搜词页点「添加到列表」就能往里收词。
+                创建第一个词单，把零散的词条按你的主题归类。
+                在复习卡或搜词页点「添加到词单」就能往里收词。
               </p>
               <button
                 type="button"
@@ -278,7 +278,7 @@ export function CustomListsScreen({ provider, onExit, onOpenList }: CustomListsS
                 className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
               >
                 <PlusIcon className="h-4 w-4" />
-                创建列表
+                创建词单
               </button>
             </div>
           ) : (
@@ -316,7 +316,7 @@ export function CustomListsScreen({ provider, onExit, onOpenList }: CustomListsS
               className="inline-flex w-fit items-center gap-1.5 self-start rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
             >
               <PlusIcon className="h-4 w-4" />
-              新建列表
+              新建词单
             </button>
           ) : null}
         </>
@@ -367,7 +367,7 @@ function ListCard({ summary, onOpen, onEdit, onDelete }: ListCardProps) {
       <button
         type="button"
         onClick={onOpen}
-        aria-label={`打开列表「${list.name}」`}
+        aria-label={`打开词单「${list.name}」`}
         className="flex w-full items-start justify-between gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
       >
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -389,7 +389,7 @@ function ListCard({ summary, onOpen, onEdit, onDelete }: ListCardProps) {
         <button
           type="button"
           onClick={onEdit}
-          aria-label={`编辑列表「${list.name}」`}
+          aria-label={`编辑词单「${list.name}」`}
           className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-text-muted transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
         >
           <EditIcon className="h-4 w-4" />
@@ -397,7 +397,7 @@ function ListCard({ summary, onOpen, onEdit, onDelete }: ListCardProps) {
         <button
           type="button"
           onClick={onDelete}
-          aria-label={`删除列表「${list.name}」`}
+          aria-label={`删除词单「${list.name}」`}
           className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-text-muted transition-colors hover:border-danger hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
         >
           <TrashIcon className="h-4 w-4" />
@@ -436,7 +436,7 @@ function CreateForm({
       }}
       className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4"
     >
-      <span className="text-sm font-semibold">新建列表</span>
+      <span className="text-sm font-semibold">新建词单</span>
       <label className="flex flex-col gap-1">
         <span className="text-xs text-text-muted">名称（必填，1–60 字）</span>
         <input
@@ -455,7 +455,7 @@ function CreateForm({
           value={description}
           maxLength={200}
           onChange={(event) => onDescriptionChange(event.target.value)}
-          placeholder="说明列表的主题 / 场景"
+          placeholder="说明词单的主题 / 场景"
           rows={2}
           className="resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-muted transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
         />
@@ -514,7 +514,7 @@ function EditForm({
       }}
       className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4"
     >
-      <span className="text-sm font-semibold">编辑列表</span>
+      <span className="text-sm font-semibold">编辑词单</span>
       <label className="flex flex-col gap-1">
         <span className="text-xs text-text-muted">名称</span>
         <input
@@ -592,18 +592,18 @@ function ConfirmDeleteDialog({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="确认删除列表"
+      aria-label="确认删除词单"
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
     >
       <div className="absolute inset-0 bg-black/40" onClick={onCancel} aria-hidden="true" />
       <div className="relative flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-surface p-6 shadow-lg">
-        <h3 className="text-base font-semibold">确认删除列表</h3>
+        <h3 className="text-base font-semibold">确认删除词单</h3>
         <p className="text-sm text-text-muted">
-          确定要删除「{listName}」吗？该列表当前包含 {entryCount} 个词。
+          确定要删除「{listName}」吗？该词单当前包含 {entryCount} 个词。
         </p>
         <div className="rounded-xl border border-warning/40 bg-warning/10 p-3">
           <p className="text-sm font-medium text-warning">
-            列表与词条的归类记录将被移除，但词条本身不会被删除，仍在词库中可搜可用。
+            词单与词条的归类记录将被移除，但词条本身不会被删除，仍在词库中可搜可用。
           </p>
         </div>
         <div className="flex justify-end gap-3">

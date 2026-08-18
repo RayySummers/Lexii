@@ -113,8 +113,8 @@ describe("AddToListsDialog", () => {
     await waitFor(() => {
       expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
-    const checkboxA = screen.getByLabelText("列表「A」") as HTMLInputElement;
-    const checkboxB = screen.getByLabelText("列表「B」") as HTMLInputElement;
+    const checkboxA = screen.getByLabelText("词单「A」") as HTMLInputElement;
+    const checkboxB = screen.getByLabelText("词单「B」") as HTMLInputElement;
     expect(checkboxA.checked).toBe(true);
     expect(checkboxB.checked).toBe(false);
   });
@@ -133,9 +133,9 @@ describe("AddToListsDialog", () => {
       expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
     // 取消 A 勾选 → 应触发 remove
-    fireEvent.click(screen.getByLabelText("列表「A」"));
+    fireEvent.click(screen.getByLabelText("词单「A」"));
     // 勾选 B → 应触发 add
-    fireEvent.click(screen.getByLabelText("列表「B」"));
+    fireEvent.click(screen.getByLabelText("词单「B」"));
     fireEvent.click(screen.getByRole("button", { name: /^保存$/ }));
 
     await waitFor(() => {
@@ -150,7 +150,7 @@ describe("AddToListsDialog", () => {
     render(<AddToListsDialog provider={harness.provider} sense={makeSense()} onClose={() => {}} />);
 
     await waitFor(() => {
-      expect(screen.getByText("还没有自定义列表，先创建一个吧。")).toBeInTheDocument();
+      expect(screen.getByText("还没有自定义词单，先创建一个吧。")).toBeInTheDocument();
     });
   });
 
@@ -163,9 +163,9 @@ describe("AddToListsDialog", () => {
     await waitFor(() => {
       expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole("button", { name: /新建列表/ }));
+    fireEvent.click(screen.getByRole("button", { name: /新建词单/ }));
 
-    const input = await screen.findByPlaceholderText("列表名称");
+    const input = await screen.findByPlaceholderText("词单名称");
     fireEvent.change(input, { target: { value: "新列表" } });
     fireEvent.click(screen.getByRole("button", { name: /创建并加入/ }));
 
