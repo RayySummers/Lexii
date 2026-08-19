@@ -119,12 +119,20 @@ function toTuple(entry, ngslSet) {
   if (ngslSet.has(entry.term.toLowerCase()) && !tags.includes("高频")) {
     tags.push("高频");
   }
+  // 第 6 位 posByDefinition（RAY-349）：与 definitions 逐条对齐的词性，
+  // 同样以换行连接（该段无词性标记时为空串）。pos 汇总串按出现顺序去重，
+  // 对齐信息在去重时丢失（"n. 能力\nn. 才能" → "n."），卡片只能给释义
+  // 编号；本字段把逐条词性带到运行时，卡片才能按词性标注释义。
+  // 全空（该词无任何段首词性标记）时写空串，装载侧按字段缺失处理。
+  const posByDefinition = entry.posByDefinition ?? [];
+  const defPos = posByDefinition.some((p) => p !== "") ? posByDefinition.join("\n") : "";
   return [
     entry.term,
     entry.definitions.join("\n"),
     entry.pos ?? "",
     entry.ipa ?? "",
     tags.join(" "),
+    defPos,
   ];
 }
 

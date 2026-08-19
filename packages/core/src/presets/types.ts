@@ -16,6 +16,13 @@ export interface PresetWordEntry {
   definitions: string[];
   /** 词性（可选），如 "n." / "vt." */
   pos?: string;
+  /**
+   * 逐条词性（可选，RAY-349）：与 definitions 等长，第 i 项为第 i 条释义的
+   * 词性，该条无词性标记时为空串。pos 是去重汇总串（"n. 能力\nn. 才能" →
+   * "n."），去重后无法还原到具体释义；本字段保留对齐关系，供卡片按词性
+   * 标注每条释义（而非只给序号）。
+   */
+  posByDefinition?: string[];
   /** 音标（可选，ECDICT 提供） */
   ipa?: string;
   /** 标签，如 ["四级", "高频"] */

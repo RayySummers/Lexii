@@ -306,3 +306,63 @@ describe("ReviewCard 卡片字体（RAY-323）", () => {
     }
   });
 });
+
+/** 背面释义行文本（词性/序号前缀 + 释义，按渲染顺序） */
+function definitionLines(): string[] {
+  return [...document.querySelectorAll("span.text-base.leading-relaxed")].map(
+    (node) => node.textContent ?? "",
+  );
+}
+
+describe("ReviewCard 释义词性（RAY-349）", () => {
+  it("按对齐数组给每条释义标词性，替代序号", () => {
+    render(
+      <Harness
+        sense={makeSense({
+          term: "abandon",
+          definitions: ["放弃, 抛弃", "放任, 无拘束"],
+          pos: "vt.；n.",
+          posByDefinition: ["vt.", "n."],
+        })}
+      />,
+    );
+    flipCard();
+
+    const lines = definitionLines();
+    expect(lines).toEqual(["vt.放弃, 抛弃", "n.放任, 无拘束"]);
+    // 词性取代序号：不再出现 "2. " 这类编号前缀
+    expect(lines[1]).not.toContain("2.");
+  });
+
+  it("存量数据（无对齐数组）：词性数与释义数相等时按 pos 汇总串标注", () => {
+    render(
+      <Harness
+        sense={makeSense({
+          term: "abandon",
+          definitions: ["放弃, 抛弃", "放任, 无拘束"],
+          pos: "vt.；n.",
+        })}
+      />,
+    );
+    flipCard();
+
+    expect(definitionLines()).toEqual(["vt.放弃, 抛弃", "n.放任, 无拘束"]);
+  });
+
+  it("词性无法确定时退回序号（不猜测错误词性）", () => {
+    render(
+      <Harness
+        sense={makeSense({
+          term: "abandon",
+          definitions: ["一", "二", "三", "四", "五", "六"],
+          pos: "a.；n.；vt.",
+        })}
+      />,
+    );
+    flipCard();
+
+    const lines = definitionLines();
+    expect(lines[0]).toBe("一");
+    expect(lines[1]).toBe("2. 二");
+  });
+});

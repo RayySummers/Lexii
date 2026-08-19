@@ -49,6 +49,7 @@ interface Sense {
   term: string; // 词条原文
   definitions: string[]; // 中文释义，≥1 条（第一条为主释义）
   pos?: string; // 词性，如 "n." / "v."（导入词库通常有）
+  posByDefinition?: string[]; // 逐条词性，与 definitions 等长（RAY-349；缺项为空串）
   ipa?: string; // 音标
   ipaUs?: string; // 美式音标（富化数据；UI 优先展示双音标，缺省回退 ipa）
   ipaUk?: string; // 英式音标（富化数据）

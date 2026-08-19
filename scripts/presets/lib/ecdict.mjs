@@ -87,14 +87,23 @@ function stripLeadingDomainTags(text) {
  * 词性提取口径与 RAY-258 旧实现完全一致（段首 `[a-z]{1,6}.` + 空白、
  * 大小写归一、按出现顺序去重并入 pos 字段），不破坏现有词性提取。
  *
+ * RAY-349：除去重后的 pos 汇总串外，另返回与释义逐条对齐的词性数组
+ * （posByDefinition[i] 是 definitions[i] 段首剥下的词性，无标记为 ""）。
+ * 汇总串会去重（"n. 能力\nn. 才能" → "n."），对齐信息在去重时丢失，
+ * 卡片因此只能给释义编号（1. 2. 3.）而非标注词性——对齐数组是补回
+ * 这一信息的唯一来源，口径与汇总串完全一致（同一次剥离的产物）。
+ *
  * @param {string[]} definitions 已按「；」切分的原始释义段
- * @returns {{ definitions: string[], pos: string }} 剥离后的释义与按出现顺序去重的词性串
+ * @returns {{ definitions: string[], pos: string, posByDefinition: string[] }}
+ *   剥离后的释义、按出现顺序去重的词性串、与释义等长的逐条词性数组
  */
 export function stripPrefixMarkers(definitions) {
   const posList = [];
   const stripped = [];
+  const posByDefinition = [];
   for (const def of definitions) {
     let rest = def;
+    let defPos = "";
     for (;;) {
       let didStrip = false;
       const withoutTags = stripLeadingDomainTags(rest);
@@ -108,6 +117,10 @@ export function stripPrefixMarkers(definitions) {
         if (!posList.includes(marker)) {
           posList.push(marker);
         }
+        // 同一段出现多个词性标记（"vt. vi. 停留"）时取首个作为该段词性
+        if (defPos === "") {
+          defPos = marker;
+        }
         rest = rest.slice(match[0].length).trimStart();
         didStrip = true;
       }
@@ -118,9 +131,10 @@ export function stripPrefixMarkers(definitions) {
     rest = rest.trim();
     if (rest !== "") {
       stripped.push(rest);
+      posByDefinition.push(defPos);
     }
   }
-  return { definitions: stripped, pos: posList.join("；") };
+  return { definitions: stripped, pos: posList.join("；"), posByDefinition };
 }
 
 /** Tier 0 内置核心：中考/高考/四级/六级（RAY-258 口径，Jack 拍板） */
@@ -255,11 +269,13 @@ export function cleanEcdictRow(row) {
   }
   // 领域标记 + 词性标记交替剥离（RAY-260 suggestion 1；"[医] n. 解剖" 与
   // "n. [医] 解剖" 两种形态都能剥净，词性提取口径不变）
-  const { definitions, pos: extractedPos } = stripPrefixMarkers(rawDefinitions);
+  const { definitions, pos: extractedPos, posByDefinition } = stripPrefixMarkers(rawDefinitions);
   if (definitions.length === 0) {
     return { reason: "empty-translation" };
   }
   const pos = extractedPos !== "" ? extractedPos : row.pos;
+  // 逐条词性（RAY-349）：全空（该词无段首词性标记）时不带出该字段
+  const hasDefPos = posByDefinition.some((p) => p !== "");
   const tags = row.tag
     .split(/\s+/)
     .map((t) => t.trim())
@@ -270,6 +286,7 @@ export function cleanEcdictRow(row) {
       term: row.word,
       definitions,
       ...(pos ? { pos } : {}),
+      ...(hasDefPos ? { posByDefinition } : {}),
       ...(row.phonetic ? { ipa: row.phonetic } : {}),
       tags,
       collins: row.collins,
