@@ -1,5 +1,5 @@
 /**
- * 「添加到列表」对话框（RAY-325）：复习页 / 搜词页共用。
+ * 「添加到词单」对话框（RAY-325）：复习页 / 搜词页共用。
  *
  * 设计要点：
  * - 取代原有「加词」按钮（背的都是词书或生词本里已有的词；改为多列表选择）；
@@ -178,14 +178,15 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
             </div>
           ) : allLists.length === 0 && !creating ? (
             <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-surface-raised p-6 text-center">
-              <p className="text-sm text-text-muted">还没有自定义词单，先创建一个吧。</p>
+              {/* RAY-338 A4：空词单状态显示「暂无词单」并提供「去创建」入口 */}
+              <p className="text-sm text-text-muted">暂无词单</p>
               <button
                 type="button"
                 onClick={() => setCreating(true)}
                 className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
               >
                 <PlusIcon className="h-4 w-4" />
-                新建词单
+                去创建
               </button>
             </div>
           ) : (
