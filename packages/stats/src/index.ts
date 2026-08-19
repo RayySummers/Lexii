@@ -446,5 +446,24 @@ function localDayOrdinal(ms: number): number {
   return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS;
 }
 
+/**
+ * 某时刻的本地日历日键值，YYYY-MM-DD（与本包内私有的 `dayOrdinal(now)` 同
+ * 源，但用字符串而不是数字——便于跨日比较与持久化：定长 10 字节的字
+ * 符串字典序与日历日升序一致，不需要先做 Date 比较或时区换算）。
+ *
+ * 与本包内私有 helper `dayOrdinal(now)` / `localDayOrdinal(ms)`（均未导
+ * 出）的差异：后者返回「从 epoch 起累计过了多少个本地日历日」的无符号
+ * 整数，用于内部 ordinal 序数比较（参考 useStats 的 `loadedAtDateRef` 不
+ * 取 ordinal 改取字符串：跨日比较只需一次字符串 `!==` 即可，无须转 ordinal）。
+ * `localDateKey` 是「今天是哪一天」的字符串标签，用于跨日比较与持久化。两
+ * 边都用 `Date.getFullYear/Month/Date` 的本地分量构造，与夏令时无关。
+ */
+export function localDateKey(now: Date = new Date()): string {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 /** 包名（保留原骨架导出的兼容） */
 export const PACKAGE_NAME = "@lexii/stats";
