@@ -13,7 +13,7 @@
  * 检测器（共享库：`scripts/presets/lib/traditional-classify.mjs`）：
  *   1. **OpenCC t2s 主检测**（通用 profile = "t" → "cn"），与
  *      `scripts/presets/lib/tatoeba.mjs` 与 `packages/core/src/presets/toSimplified.test.ts`
- *      同口径。覆盖：舖→铺、歐→欧、餐→餐 等。
+ *      同口径。覆盖：舖→铺、歐→欧、髮→发 等传统字。
  *   2. **词级白名单 + 字符邻居 + 动词前缀**三重校验（覆盖 t2s 不转换的字符）：
  *      - 「著」按词典 + 上下文三态判定（保留合法简化词、替换动词后缀）。
  *      - 「妳」无条件 → 「你」（t2s / tw2s 均漏）。
