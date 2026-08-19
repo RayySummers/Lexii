@@ -171,13 +171,24 @@ export async function bootstrapCoreWordbooks(
  * 共享池覆盖 10 本词书的全部词条，按 term 一次回填即可覆盖用户装过的
  * 任意词书；新装路径词条落库时已带 posByDefinition，只写完成标记。
  *
+ * freshInstall 信号由 `bootstrapCoreWordbooks` 的结果数组直接派生
+ * （Oscar R1 nit 1）：本函数只认「结果里出现 installed」这一语义条件，
+ * 调用方不再把「已安装词书数」这类 numeric 信号折成 bool 传进来。
+ * 依据仍是同一条互斥契约（全新库才装、老用户全跳，见调用处注释）；
+ * 契约若放宽到混合态，判定留在本函数内一处调整即可，不会因为调用方
+ * 传错 bool 而静默走上错误分支。
+ *
  * @param db 已打开的数据库
- * @param freshInstall 本次是否是全新安装（true → 只写完成标记，跳过全量扫描）
+ * @param wordbookResults `bootstrapCoreWordbooks` 的返回值（与其入参等长）
  */
 export async function bootstrapWordbookDefinitionPos(
   db: LexiiDatabase,
-  freshInstall: boolean,
+  wordbookResults: readonly BootstrapOutcome[],
 ): Promise<void> {
+  // 全新安装：词条落库时已带 posByDefinition（随预设数据分发），只写完成
+  // 标记；其余情形（老用户全跳 / 已安装 / 出错）走存量回填，回填幂等，
+  // 多跑一次只是零写入的全量扫描，不会写坏数据。
+  const freshInstall = wordbookResults.some((result) => result.status === "installed");
   const { WORDBOOK_DATA_VERSION, WORDBOOK_POOL } = await import("@lexii/core/presets/books");
   const source = {
     id: "wordbook-pool",
@@ -274,7 +285,7 @@ export function bootstrapTier0Preset(db?: LexiiDatabase): void {
       }
       // RAY-349：词书词条的释义词性回填（新装路径已内联带上，只写标记）
       try {
-        await bootstrapWordbookDefinitionPos(database, installedBooks.length > 0);
+        await bootstrapWordbookDefinitionPos(database, wordbookResults);
       } catch (err) {
         console.error("[presets] 词书释义词性回填失败：", err);
       }
