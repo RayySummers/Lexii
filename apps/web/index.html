@@ -47,6 +47,9 @@
       被浏览器合成导致字面失真。改动任一档字重必须三处同步：本 URL、
       CARD_FONT_OPTIONS.fontWeight、tokens.css 的 --lex-card-font-weight
       （以及 public/sw.js 的 CARD_FONT_CSS_URL，离线预缓存同一 URL）。
+      RAY-338 A1：「现代简约」的主字体为自托管 Inter Display ExtraBold
+      （下方 ./fonts/inter-display.css；Google Fonts 无 Inter Display），
+      本 URL 中的 Inter 800 仅为回退（unicode-range 子集化，正常不下载）。
     -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -54,6 +57,8 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@800&family=Newsreader:wght@600&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&display=swap"
     />
+    <!-- RAY-338 A1：Inter Display ExtraBold 自托管（同源部署、子路径安全、离线预缓存） -->
+    <link rel="stylesheet" href="./fonts/inter-display.css" />
     <title>乐希 Lexii</title>
   </head>
   <body>

@@ -64,16 +64,19 @@
  *   浏览器合成（伪粗体）导致字面失真，故字重不写死 font-bold(700)，
  *   由本变量按档位取值。改动任一档字重必须三处同步：本文件、
  *   CARD_FONT_OPTIONS.fontWeight、index.html 的 Google Fonts URL。
- * - 字体降级栈：每档在 Google Fonts 失败 / 离线时退回系统字体
+ * - RAY-338 A1：inter 档主字体为 Inter Display（自托管 ExtraBold，
+ *   见 public/fonts/inter-display.css 与同目录 OFL 许可证；Google Fonts
+ *   无 Inter Display），排在栈首；Google Fonts 的 Inter 800 仅为回退。
+ * - 字体降级栈：每档在字体加载失败 / 离线时退回系统字体
  *   （无衬线 / 衬线 / 手写体），卡片仍可读，绝不出现空字形。
  */
 :root {
-  --lex-card-font: "Inter", "Inter Display", system-ui, sans-serif;
+  --lex-card-font: "Inter Display", "Inter", system-ui, sans-serif;
   --lex-card-font-weight: 800;
 }
 
 [data-card-font="inter"] {
-  --lex-card-font: "Inter", "Inter Display", system-ui, sans-serif;
+  --lex-card-font: "Inter Display", "Inter", system-ui, sans-serif;
   --lex-card-font-weight: 800;
 }
 

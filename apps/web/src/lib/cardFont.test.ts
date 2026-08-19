@@ -165,9 +165,40 @@ describe("CARD_FONT_OPTIONS 与 index.html 的 Google Fonts URL 同步（漂移�
     const loadedWeights = loadFontWeightsFromIndexHtml();
     expect(loadedWeights.size).toBe(CARD_FONT_OPTIONS.length);
     for (const option of CARD_FONT_OPTIONS) {
-      const name = fontNameOf(option.fontFamily);
-      expect(loadedWeights.has(name)).toBe(true);
-      expect(loadedWeights.get(name)).toBe(option.fontWeight);
+      // RAY-338 A1：inter 档主字体 Inter Display 为自托管（public/fonts/，
+      // @font-face 800），Google Fonts 只加载其回退字体 Inter 800
+      const loadedName = option.id === "inter" ? "Inter" : fontNameOf(option.fontFamily);
+      expect(loadedWeights.has(loadedName)).toBe(true);
+      expect(loadedWeights.get(loadedName)).toBe(option.fontWeight);
     }
+  });
+
+  it("inter 档主字体为自托管 Inter Display（RAY-338 A1），Inter 仅为栈内回退", () => {
+    const inter = CARD_FONT_OPTIONS.find((option) => option.id === "inter")!;
+    expect(fontNameOf(inter.fontFamily)).toBe("Inter Display");
+    expect(inter.fontWeight).toBe(800);
+  });
+});
+
+describe("tokens.css 的 inter 档字体栈与 CARD_FONT_OPTIONS 同步（RAY-338 A1 漂移校验）", () => {
+  const TOKENS_PATH = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../styles/tokens.css",
+  );
+
+  it(':root 与 [data-card-font="inter"] 的字体栈都以 Inter Display 打头', () => {
+    const source = readFileSync(TOKENS_PATH, "utf8");
+    // tokens.css 中前两条 --lex-card-font 定义即 :root 与 [data-card-font="inter"]
+    const stacks = [...source.matchAll(/--lex-card-font:\s*([^;]+);/g)].map((match) =>
+      match[1]!.trim(),
+    );
+    expect(stacks.length).toBeGreaterThanOrEqual(2);
+    for (const stack of stacks.slice(0, 2)) {
+      expect(stack.startsWith('"Inter Display"')).toBe(true);
+    }
+    // 与 CARD_FONT_OPTIONS 的 inter 档栈首一致（单点来源漂移防线）
+    const inter = CARD_FONT_OPTIONS.find((option) => option.id === "inter")!;
+    expect(stacks[0]).toBe(inter.fontFamily);
+    expect(stacks[1]).toBe(inter.fontFamily);
   });
 });

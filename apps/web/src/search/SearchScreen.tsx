@@ -24,6 +24,8 @@
  *   进入页面时读一次（本页移出生词本后回到本页时以重新进入为准）。
  *   RAY-325：每条结果行额外提供「添加到列表」按钮，打开对话框把词
  *   加入用户自定义列表（多对一；列表不参与学习调度）。
+ * - RAY-338 A1：结果行词条本体（sense.term）应用设置里的卡片字体
+ *   （CSS 变量 --lex-card-font / --lex-card-font-weight，与复习卡同口径）。
  * - 全部颜色走 design tokens（浅色/深色自动生效），不硬编码颜色。
  *
  * 文案：Vega 产出（RAY-326）。
@@ -495,7 +497,15 @@ function SearchResultRow({
   return (
     <li className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface p-4">
       <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-lg font-semibold">{sense.term}</span>
+        <span
+          className="text-lg"
+          style={{
+            fontFamily: "var(--lex-card-font)",
+            fontWeight: "var(--lex-card-font-weight)",
+          }}
+        >
+          {sense.term}
+        </span>
         {sense.pos ? <span className="text-xs text-text-muted">{sense.pos}</span> : null}
         {sense.ipa ? <span className="text-xs text-text-muted">/{sense.ipa}/</span> : null}
         {result.source === "dictionary" ? (

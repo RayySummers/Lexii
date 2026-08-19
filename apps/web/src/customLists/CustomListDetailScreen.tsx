@@ -6,6 +6,8 @@
  * - 移出：两步确认（移出 → 确认移出）——移出会软删除该词在列表中的
  *   归类条目（不可逆，记录保留为历史），列表中的其他词与其他列表不受影响；
  * - 状态机：加载中 → 列表 → 空（引导去复习/搜词页加词）→ 错误；
+ * - RAY-338 A1：词条本体（sense.term）应用设置里的卡片字体（CSS 变量
+ *   --lex-card-font / --lex-card-font-weight，与复习卡同口径）；
  * - 全部颜色走 design tokens（浅色 / 深色自动生效），不硬编码颜色。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -129,7 +131,15 @@ export function CustomListDetailScreen({ provider, onExit, listId }: CustomListD
                 className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface p-4"
               >
                 <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                  <span className="text-lg font-semibold">{sense.term}</span>
+                  <span
+                    className="text-lg"
+                    style={{
+                      fontFamily: "var(--lex-card-font)",
+                      fontWeight: "var(--lex-card-font-weight)",
+                    }}
+                  >
+                    {sense.term}
+                  </span>
                   {sense.pos ? <span className="text-xs text-text-muted">{sense.pos}</span> : null}
                   {sense.ipa ? (
                     <span className="text-xs text-text-muted">/{sense.ipa}/</span>

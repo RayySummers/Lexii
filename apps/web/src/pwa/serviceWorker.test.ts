@@ -33,6 +33,7 @@ const INDEX_HTML = `<!doctype html>
 <html lang="zh-CN">
   <head>
     <link rel="stylesheet" href="./assets/index-def456.css" />
+    <link rel="stylesheet" href="./fonts/inter-display.css" />
   </head>
   <body>
     <div id="root"></div>
@@ -278,7 +279,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     const harness = loadServiceWorker();
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexii-shell-v2");
+    const cache = harness.cachesByName.get("lexii-shell-v3");
     expect(cache).toBeDefined();
     for (const shellUrl of [
       "http://localhost/",
@@ -291,6 +292,9 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     // 回归核心：构建产物必须从 HTML 解析并预缓存（旧版链式误传会在这里缺项）
     expect(cache!.entries.has("http://localhost/assets/index-abc123.js")).toBe(true);
     expect(cache!.entries.has("http://localhost/assets/index-def456.css")).toBe(true);
+    // RAY-338 A1：自托管 Inter Display 字体随外壳预缓存，其样式表从 index.html 解析预缓存
+    expect(cache!.entries.has("http://localhost/fonts/InterDisplay-ExtraBold.woff2")).toBe(true);
+    expect(cache!.entries.has("http://localhost/fonts/inter-display.css")).toBe(true);
     expect(harness.skipWaiting).toHaveBeenCalledTimes(1);
   });
 
@@ -303,7 +307,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     });
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexii-shell-v2");
+    const cache = harness.cachesByName.get("lexii-shell-v3");
     expect(cache!.entries.has("http://localhost/")).toBe(false);
     expect(cache!.entries.has("http://localhost/index.html")).toBe(true);
     expect(cache!.entries.has("http://localhost/assets/index-abc123.js")).toBe(true);
@@ -317,7 +321,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     await runActivate(harness);
 
     expect(harness.cachesByName.has("lexii-shell-v0")).toBe(false);
-    expect(harness.cachesByName.has("lexii-shell-v2")).toBe(true);
+    expect(harness.cachesByName.has("lexii-shell-v3")).toBe(true);
     expect(harness.claim).toHaveBeenCalledTimes(1);
   });
 
@@ -332,7 +336,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
 
     expect(harness.cachesByName.has("lexilexi-shell-v0")).toBe(false);
     expect(harness.cachesByName.has("lexilexi-shell-v1")).toBe(false);
-    expect(harness.cachesByName.has("lexii-shell-v2")).toBe(true);
+    expect(harness.cachesByName.has("lexii-shell-v3")).toBe(true);
     expect(harness.claim).toHaveBeenCalledTimes(1);
   });
 
@@ -376,7 +380,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
   it("静态资源未命中缓存时走网络并回填缓存（stale-while-revalidate）", async () => {
     const harness = loadServiceWorker();
     await runInstall(harness);
-    const cache = harness.cachesByName.get("lexii-shell-v2")!;
+    const cache = harness.cachesByName.get("lexii-shell-v3")!;
 
     const response = await dispatchFetch(harness, {
       method: "GET",
@@ -418,7 +422,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     const harness = loadServiceWorker();
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexii-shell-v2");
+    const cache = harness.cachesByName.get("lexii-shell-v3");
     expect(cache).toBeDefined();
     // CSS 本体按页面 <link> 的 URL 缓存（离线回退用）
     expect(cache!.entries.has(CARD_FONT_CSS_URL)).toBe(true);
@@ -485,7 +489,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
   it("字体文件未缓存：走网络并在成功时回填缓存（stale-while-revalidate 同款）", async () => {
     const harness = loadServiceWorker();
     await runInstall(harness);
-    const cache = harness.cachesByName.get("lexii-shell-v2")!;
+    const cache = harness.cachesByName.get("lexii-shell-v3")!;
 
     // 页面 UA 请求了一个安装时未预缓存的 gstatic 文件（CSS 随 UA 变化）
     const extraFontUrl = "https://fonts.gstatic.com/s/inter/v20/inter-800-latin-ext.woff2";
@@ -512,7 +516,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     });
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexii-shell-v2");
+    const cache = harness.cachesByName.get("lexii-shell-v3");
     expect(cache).toBeDefined();
     expect(cache!.entries.has(CARD_FONT_CSS_URL)).toBe(false);
     // 外壳与构建产物不受影响
@@ -532,7 +536,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     const harness = loadServiceWorker(defaultFetch, SW_HREF);
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexii-shell-v2");
+    const cache = harness.cachesByName.get("lexii-shell-v3");
     expect(cache).toBeDefined();
     for (const shellUrl of [
       "https://rayysummers.github.io/Lexii/",
@@ -560,5 +564,26 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     expect(response).toBeDefined();
     expect(response!.ok).toBe(true);
     expect(await response!.text()).toContain("./assets/index-abc123.js");
+  });
+
+  it("index.html 引用自托管 Inter Display 样式表（RAY-338 A1 漂移校验）", () => {
+    const indexSource = readFileSync(INDEX_PATH, "utf8");
+    expect(indexSource).toContain('href="./fonts/inter-display.css"');
+  });
+
+  it("自托管 Inter Display 样式表与字体文件一致（RAY-338 A1 漂移校验）", () => {
+    const FONT_DIR = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../../public/fonts",
+    );
+    const cssSource = readFileSync(path.join(FONT_DIR, "inter-display.css"), "utf8");
+    // @font-face 声明 Inter Display ExtraBold（800），src 相对引用同目录 woff2
+    expect(cssSource).toMatch(/font-family:\s*"Inter Display"/);
+    expect(cssSource).toMatch(/font-weight:\s*800/);
+    const srcMatch = cssSource.match(/src:\s*url\("([^"]+\.woff2)"\)/);
+    expect(srcMatch).not.toBeNull();
+    // 引用的字体文件真实存在且为 woff2（防止改名 / 漏提交 / 格式错误）
+    const fontBuffer = readFileSync(path.resolve(FONT_DIR, srcMatch![1]!));
+    expect(fontBuffer.subarray(0, 4).toString("ascii")).toBe("wOF2");
   });
 });

@@ -14,6 +14,10 @@
  *   整个安装失败，与全文件「静默降级」哲学一致（Oscar 评审 C2）。
  *   RAY-323：卡片字体（Google Fonts CSS + 字体文件）同样在 install 预缓存
  *   （见 precacheCardFonts）——离线时复习卡保持所选字面，不退回系统字体。
+ *   RAY-338 A1：inter 档主字体 Inter Display ExtraBold 自托管
+ *   （public/fonts/，同源静态资源），随 APP_SHELL 预缓存；其样式表
+ *   ./fonts/inter-display.css 由 index.html 的 <link href> 经
+ *   precacheAssetsFromHtml 解析预缓存。
  * - activate：清理旧版本缓存，并接管已打开的页面（clients.claim）。
  * - fetch：
  *   · 导航请求：网络优先，失败回退缓存的 index.html（离线打开应用）；
@@ -26,7 +30,7 @@
  * CACHE_NAME 在「缓存结构或预缓存清单变化」时递增；纯内容更新无需改版本。
  * 本文件为纯静态资源（public/ 原样拷贝进产物），不经 Vite 构建。
  */
-const CACHE_NAME = "lexii-shell-v2";
+const CACHE_NAME = "lexii-shell-v3";
 
 /**
  * 卡片字体 CSS 入口（RAY-323）：与 index.html 的 <link href> 完全一致，
@@ -34,6 +38,8 @@ const CACHE_NAME = "lexii-shell-v2";
  * 由下方 precacheCardFonts 在安装时从该 CSS 的 @font-face src 解析，
  * 规避 Google 升版本号后 URL 失效（与从 index.html 解析构建产物的
  * 策略同口径）。
+ * RAY-338 A1：inter 档主字体已改为自托管 Inter Display ExtraBold
+ * （APP_SHELL 预缓存），本 URL 中的 Inter 800 仅为回退（正常不下载）。
  */
 const CARD_FONT_CSS_URL =
   "https://fonts.googleapis.com/css2?family=Inter:wght@800&family=Newsreader:wght@600&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&display=swap";
@@ -55,6 +61,9 @@ const APP_SHELL = [
   "./icons/icon-512.png",
   "./icons/maskable-512.png",
   "./icons/apple-touch-icon.png",
+  // RAY-338 A1：inter 档主字体 Inter Display ExtraBold（自托管；样式表由
+  // index.html 的 <link href> 经 precacheAssetsFromHtml 解析预缓存）
+  "./fonts/InterDisplay-ExtraBold.woff2",
 ].map(resolveUrl);
 
 /** 导航回退与外壳解析使用的入口 URL */
