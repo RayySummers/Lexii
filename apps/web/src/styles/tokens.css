@@ -64,6 +64,11 @@
  *   浏览器合成（伪粗体）导致字面失真，故字重不写死 font-bold(700)，
  *   由本变量按档位取值。改动任一档字重必须三处同步：本文件、
  *   CARD_FONT_OPTIONS.fontWeight、index.html 的 Google Fonts URL。
+ * - 顺序契约（Oscar R3 复审 suggestion 1）：本文件内卡片字体栈定义的
+ *   出现顺序须与 `CARD_FONT_OPTIONS` 数组顺序一致——`cardFont.test.ts`
+ *   的「每档栈字面值与 CARD_FONT_OPTIONS.fontFamily 一致」断言按 index
+ *   对账，重排或插入新档时务必同步两侧顺序。实测防线 + 此处文档级提醒
+ *   形成双层兜底，避免仅依赖 README 类的「未挂代码」约束。
  * - RAY-338 A1：inter 档主字体为 Inter Display（自托管 ExtraBold，
  *   见 public/fonts/inter-display.css 与同目录 OFL 许可证；Google Fonts
  *   无 Inter Display），排在栈首；Google Fonts 的 Inter 800 仅为回退。

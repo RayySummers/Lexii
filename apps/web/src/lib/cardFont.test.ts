@@ -215,6 +215,14 @@ describe("tokens.css 的字体栈与 CARD_FONT_OPTIONS 同步（RAY-338 A1 漂�
   it('首条栈由 :root 与 [data-card-font="inter"] 共享（合并声明，无重复）', () => {
     // 显式锁定合并结构：审阅时一眼看清两处选择器共享同一字面值，
     // 防回归到分写两份（Oscar 复核 suggestion 1）
+    //
+    // 形状锁定有意的（Oscar R3 复审 nit 1，写进代码作为决策记录）：
+    // 正则要求 `:root,` 与 `[data-card-font="inter"]` 必须换行分开 + 共享 `{`。
+    // 未来维护者若把两选择器压缩到同一行（`:root, [data-card-font="inter"] {`）
+    // 以节省纵向空间，本断言会失败——这是预期行为，不是误伤；放宽正则
+    // 会让「两处选择器共享同一字面量」的可视化信号变弱，回归到分写两份
+    // 的风险上升。本断言与 tokens.css 顶部的顺序契约注释配合，构成
+    // 「实测防线 + 文档级提醒」的双层兜底。
     const source = readFileSync(TOKENS_PATH, "utf8");
     expect(source).toMatch(/^:root,\s*\n\s*\[data-card-font="inter"\]\s*\{/m);
   });
