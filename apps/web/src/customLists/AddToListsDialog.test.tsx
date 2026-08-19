@@ -145,13 +145,14 @@ describe("AddToListsDialog", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("空列表引导：提供新建入口", async () => {
+  it("空列表引导：提供「暂无词单」空状态与「去创建」入口", async () => {
     const harness = makeHarness({ lists: [] });
     render(<AddToListsDialog provider={harness.provider} sense={makeSense()} onClose={() => {}} />);
 
     await waitFor(() => {
-      expect(screen.getByText("还没有自定义词单，先创建一个吧。")).toBeInTheDocument();
+      expect(screen.getByText("暂无词单")).toBeInTheDocument();
     });
+    expect(screen.getByRole("button", { name: /去创建/ })).toBeInTheDocument();
   });
 
   it("内联新建：填名称 → 创建并加入 → 自动勾选", async () => {
