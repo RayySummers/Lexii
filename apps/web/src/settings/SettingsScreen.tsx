@@ -563,7 +563,7 @@ function SettingsMainView({
           <div>
             <span className="text-sm font-semibold">卡片字体</span>
             <span className="mt-1 block text-xs text-text-muted">
-              复习卡上单词本体的字体（4 档 Google Fonts，选档立即生效）。
+              复习卡上单词本体的字体（4 档可选，选档立即生效）。
             </span>
           </div>
           <FontPicker value={cardFont} onChange={onCardFontChange} groupLabel="卡片字体" />
