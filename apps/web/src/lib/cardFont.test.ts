@@ -183,9 +183,16 @@ describe("CARD_FONT_OPTIONS 与 index.html 的 Google Fonts URL 同步（漂移�
 /**
  * 从 tokens.css 源码中解析 `--lex-card-font:` 声明栈（按文件顺序，trim 后）。
  *
- * 先剥 CSS 块注释（RAY-339 R4 Oscar 复核 suggestion 1）——避免注释里
+ * 先剥注释再匹配（RAY-339 R4 Oscar 复核 suggestion 1）——避免注释里
  * 写出 `--lex-card-font:` 字面量被漂移校验误匹配；之后按文件顺序
  * 提取每条声明的字面值。
+ *
+ * 注释剥离覆盖两种形态（RAY-339 R5 Oscar 复核 nit）：CSS 块注释
+ * （斜杠星号包裹）与 `//` 行注释——CSS 唯一合法注释为块注释，
+ * 行注释剥离为未来预处理器场景的防御——本函数只解析 tokens.css 的
+ * 变量声明栈、不处理 url()/其他可能含 `//` 的内容。当前 tokens.css
+ * 无 `url(//…)` 形态；如未来加入，需在剥 `//` 后再做「url( 内 //
+ * 还原」的保守处理（本函数 doc 注释同步更新）。
  *
  * 与 `tokens.css` 的顺序契约（顶部 RAY-323 注释段）以及合并形态锁定
  * 决策（详见本测试文件 `首条栈由 :root 与 [data-card-font="inter"]
@@ -193,7 +200,7 @@ describe("CARD_FONT_OPTIONS 与 index.html 的 Google Fonts URL 同步（漂移�
  * `CARD_FONT_OPTIONS` 数组一致，便于按 index 对账。
  */
 function parseCardFontStacks(source: string): string[] {
-  const stripped = source.replace(/\/\*[\s\S]*?\*\//g, "");
+  const stripped = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
   return [...stripped.matchAll(/--lex-card-font:\s*([^;]+);/g)].map((match) => match[1]!.trim());
 }
 
@@ -304,5 +311,34 @@ describe("parseCardFontStacks（CSS 块注释剥除，RAY-339 R4 suggestion 1）
 :root { --lex-card-font: real; }
 `;
     expect(parseCardFontStacks(source)).toEqual(["real"]);
+  });
+
+  it("`//` 行注释里的字面量被剥除，真实 4 条声明仍正常解析（RAY-339 R5 Oscar 复核 nit）", () => {
+    // `//` 在纯 CSS 非法，本行注释剥离覆盖的是未来预处理器场景的防御：
+    // 有人误写 `// --lex-card-font: fake;` 也不得泄入栈对账
+    const source = `
+// --lex-card-font: fake-inter;
+:root, [data-card-font="inter"] {
+  --lex-card-font: stack-inter;
+}
+// another --lex-card-font: fake-google;
+[data-card-font="google-sans"] {
+  --lex-card-font: stack-google;
+}
+// fake-playpen
+[data-card-font="playpen"] {
+  --lex-card-font: stack-playpen;
+}
+// fake-newsreader
+[data-card-font="newsreader"] {
+  --lex-card-font: stack-newsreader;
+}
+`;
+    expect(parseCardFontStacks(source)).toEqual([
+      "stack-inter",
+      "stack-google",
+      "stack-playpen",
+      "stack-newsreader",
+    ]);
   });
 });
