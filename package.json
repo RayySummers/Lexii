@@ -13,7 +13,8 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
     "lint": "eslint . && prettier --check .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "lint:presets": "node scripts/presets/scan_traditional.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
