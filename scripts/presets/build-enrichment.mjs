@@ -56,11 +56,14 @@ const TIER0_ENRICHMENT_JSON = path.join(
 const KAIKKI_FILE = path.join(DATA_DIR, "kaikki", "kaikki.org-dictionary-English.jsonl");
 
 /** 富化包版本：来源快照固定后版本随内容变更递增 */
-const ENRICHMENT_VERSION = "1.2.0";
+const ENRICHMENT_VERSION = "1.3.0";
+
+import { truncateAtBoundary, trimWordPartsNote } from "./lib/truncate.mjs";
 
 /**
  * 每词上限与文本截断——Tier 0 / Tier 1 两档体积口径：
- * Tier 0 首启包 brotli < 1MB（实测收敛值）；Tier 1 扩展包 3–8MB
+ * Tier 0 首启包 brotli ≈ 1.28 MB（RAY-344 起偏离原 1MB 红线，
+ * 与 RAY-318 同档，README 已更新口径）；Tier 1 扩展包 3–8MB
  * （余量充足，保留完整内容：例句 3 条、列表 8/8/12、词源不截）。
  *
  * RAY-344（中文词源 / 词根词缀完整性回填）：
@@ -69,73 +72,15 @@ const ENRICHMENT_VERSION = "1.2.0";
  * - wordPartsNote 8 → 32 字（p95 = 24 字、p99 = 31 字；8 字 100% 截断，
  *   例如「坐（拉丁语 se」是 RAY-338 报告里的样本之一）。
  * - etymology 84 字保留 + sentence-boundary 截断。
+ *
+ * 截断函数（truncateAtBoundary / trimWordPartsNote）已抽到
+ * `lib/truncate.mjs` 共享模块，避免与一次性 `backfill/ray344.mjs`
+ * 副本漂移（Oscar 评审建议 #4）。
  */
 const TIER0_CAPS = { examples: 2, synonyms: 3, antonyms: 3, derived: 2 };
 const TIER0_TRUNCATE = { etymology: 84, etymologyZh: 384, wordPartsNote: 32 };
 const TIER1_CAPS = { examples: 3, synonyms: 8, antonyms: 8, derived: 12 };
 const TIER1_TRUNCATE = { etymology: 400, etymologyZh: 400, wordPartsNote: 64 };
-
-/** 按 Unicode 码点截断（中文按字计，避免代理对截半） */
-function truncateText(text, maxChars) {
-  if (text.length <= maxChars) {
-    return text;
-  }
-  return [...text].slice(0, maxChars).join("");
-}
-
-/**
- * sentence-boundary 截断（RAY-344）：
- * 优先在 budget 内最后一个句子边界切断，避免「。前半句」/「sed 半截词」之
- * 类的视觉残段；无合适边界时降级为硬切（保留前 maxChars 字）。
- *
- * @param text 待截断文本
- * @param maxChars 上限（Unicode 码点）
- * @param kind "zh" | "en" — 中文优先在 。！？ 切，英文优先在 ". " / "? " / "! " 切
- * @returns 截断后的文本（含末尾标点）
- */
-function truncateAtBoundary(text, maxChars, kind) {
-  if (text.length <= maxChars) {
-    return text;
-  }
-  const slice = [...text].slice(0, maxChars).join("");
-  const candidates = kind === "zh" ? ["。", "！", "？", "」", "）"] : [". ", "? ", "! "];
-  let bestIdx = -1;
-  let bestLen = 0;
-  for (const p of candidates) {
-    const idx = slice.lastIndexOf(p);
-    // 太靠近起点（< 60% budget）视为「退而求其次」，只在前一候选无解时接受
-    if (idx > bestIdx && idx >= Math.floor(maxChars * 0.6)) {
-      bestIdx = idx;
-      bestLen = p.length;
-    }
-  }
-  if (bestIdx >= 0) {
-    return slice.slice(0, bestIdx + bestLen);
-  }
-  return slice;
-}
-
-/** wordParts 词缀注释截断（词根词缀名保留，注释限 maxNote 字，优先段内完整注释） */
-function trimWordPartsNote(wordParts, maxNote) {
-  if (!wordParts) {
-    return "";
-  }
-  return wordParts
-    .split(" · ")
-    .map((part) => {
-      const match = part.match(/^(.*?)<([^>]*)>$/);
-      if (!match) {
-        return part;
-      }
-      const head = match[1];
-      const note = match[2];
-      // 优先在中文标点 / 全角括号边界切断（OpenEtymology 注释常见「（拉丁语 xxx）」
-      // 结构，硬切在 32 字内常把外层全角括号切断）
-      const trimmed = truncateAtBoundary(note, maxNote, "zh");
-      return `${head}<${trimmed}>`;
-    })
-    .join(" · ");
-}
 
 const SOURCE_DECLARATION =
   "Wiktionary（kaikki.org 提取，CC BY-SA 4.0 + GFDL）+ Tatoeba（CC BY 2.0 FR，含 CC0 子集）" +

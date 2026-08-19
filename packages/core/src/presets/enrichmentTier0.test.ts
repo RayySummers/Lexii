@@ -65,25 +65,35 @@ describe("enrichment.tier0.data.json（生成 → 装载契约）", () => {
         }
       }
     }
-    // v1.2.3 因 8-char 上限有 11987 / 11987 注释都被截断；RAY-344 上限 32 字
-    // + sentence-boundary 后剩余应在个位数。
+    // v1.2.3 因 8-char 上限 100% 注释都被截断，其中 80 条以「（」收尾；
+    // RAY-344 上限 32 字 + sentence-boundary 后剩余应在个位数（实测 2：
+    // fridge / listen 两个 OE 源 > 32 字且无完整全角括号的边缘条目）。
     expect(truncated, "wordParts 注释收尾于「（」残段").toBeLessThan(10);
   });
 
-  it("RAY-344：etymologyZh 无大面积半句截断", () => {
+  it("RAY-344：etymologyZh 无半句截断（=== 64 而非 < 64，pin 上限确实放开）", () => {
     // 回归样本：RAY-338 报告的 etymologyZh 全被 64-char 上限切到中段
-    // （v1.2.3 共有 6245 / 6247 条 etymologyZh 都被截到 64 字）。
-    // 回填后 64 → 384 字 + sentence-boundary；剩余仅极少数 OE 源本身就
-    // 超过 384 字的条目会被切到句中，比例应远低于 1%。
+    // （v1.2.3 共有 4315 条 etymologyZh 长度恰好 64 字且以中文单字收尾）。
+    //
+    // 阈值必须是 `=== 64` 而不是 `< 64`：v1.2.3 的硬切是「截到正好 64 字」，
+    // 所以 `ez.length < 64` 在旧数据上同样命中 0 条（`< 64` 在新旧数据上都
+    // 通过），等于没设防。`=== 64` 才是真正钉住「上限真的被放开」这件事。
+    //
+    // 配套一条防御：`maxLen > 64` —— 直接断言实际产物的 etymologyZh 长度
+    // 上限已经超过 64（覆盖未来若有人把上限改回 ≤ 64 字的情况，不依赖 0
+    // 命中阈值也能 fail）。
     let midSentence = 0;
+    let maxLen = 0;
     for (const tuple of ENRICHMENT_TIER0_PRESET.entries) {
       const ez = tuple[8];
       if (!ez) continue;
-      // 长度 < 64 字且以中文单字收尾（无标点）⇒ v1.2.3 的截断痕迹
-      if (ez.length < 64 && /[一-鿿]$/.test(ez)) {
+      if (ez.length > maxLen) maxLen = ez.length;
+      // 长度恰好 64 字且以中文单字收尾（无标点）⇒ v1.2.3 的硬切痕迹
+      if (ez.length === 64 && /[一-鿿]$/.test(ez)) {
         midSentence += 1;
       }
     }
-    expect(midSentence, "etymologyZh 仍存在大面积半句截断").toBeLessThan(10);
+    expect(midSentence, "etymologyZh 仍存在半句截断（旧数据 4315 → 新数据 0）").toBe(0);
+    expect(maxLen, "etymologyZh 上限需 > 64 字（RAY-344 实际为 384）").toBeGreaterThan(64);
   });
 });

@@ -8,9 +8,18 @@
  *   用户在 RAY-338 报告里的样本「sid 坐（拉丁语 se」即一例。
  *
  * 本脚本从 OpenEtymology 源（已下载到 scripts/presets/.data/openetymology/）
- * 重新计算 Tier 0 词表的 wordParts / etymologyZh，按 build-enrichment.mjs 的
- * RAY-344 新口径（wordPartsNote: 32, etymologyZh: 384, sentence-boundary）
- * 写回 enrichment.tier0.data.json，version 1.2.3 → 1.3.0。
+ * 重新计算 Tier 0 词表的 wordParts / etymologyZh，按 RAY-344 新口径
+ * （wordPartsNote: 32, etymologyZh: 384, sentence-boundary）写回
+ * enrichment.tier0.data.json，version 1.2.3 → 1.3.0。
+ *
+ * 前置条件（Oscar 评审 suggestion #6）：
+ *   1. 本地先跑 `node scripts/presets/fetch-openetymology.mjs`，
+ *      把五册 EPUB 下载到 `scripts/presets/.data/openetymology/`；
+ *      否则本脚本会因为 OE 源缺失而抛错。
+ *   2. 仅在 RAY-344 数据需要回填时跑一次；CI 不依赖、不定时跑。
+ *
+ * 截断函数从 `lib/truncate.mjs` 导入（Oscar 评审 suggestion #4），
+ * 与 `build-enrichment.mjs` 共用同一份实现，口径调整时改一处即可。
  *
  * 词性 / IPA / 英文 etymology（kaikki 来源）保持原值——kaikki 数据未在
  * 本环境缓存，回归无法修复，但其截断 84 字的影响仅在中英对照的英文词源
@@ -21,55 +30,13 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadOpenEtymology } from "../lib/openetymology.mjs";
+import { truncateAtBoundary, trimWordPartsNote } from "../lib/truncate.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const OE_DIR = path.join(ROOT, "scripts", "presets", ".data", "openetymology");
-const TIER0_JSON = path.join(ROOT, "packages", "core", "presets", "tier0.data.json");
 const TIER0_ENRICH_JSON = path.join(ROOT, "packages", "core", "src", "presets", "enrichment.tier0.data.json");
 
 const TIER0_TRUNCATE = { etymology: 84, etymologyZh: 384, wordPartsNote: 32 };
-
-/** 按 Unicode 码点截断 */
-function truncateText(text, maxChars) {
-  if (text.length <= maxChars) return text;
-  return [...text].slice(0, maxChars).join("");
-}
-
-/** sentence-boundary 截断 */
-function truncateAtBoundary(text, maxChars, kind) {
-  if (text.length <= maxChars) return text;
-  const slice = [...text].slice(0, maxChars).join("");
-  const candidates = kind === "zh" ? ["。", "！", "？", "」", "）"] : [". ", "? ", "! "];
-  let bestIdx = -1;
-  let bestLen = 0;
-  for (const p of candidates) {
-    const idx = slice.lastIndexOf(p);
-    if (idx > bestIdx && idx >= Math.floor(maxChars * 0.6)) {
-      bestIdx = idx;
-      bestLen = p.length;
-    }
-  }
-  if (bestIdx >= 0) {
-    return slice.slice(0, bestIdx + bestLen);
-  }
-  return slice;
-}
-
-/** wordParts 词缀注释截断 */
-function trimWordPartsNote(wordParts, maxNote) {
-  if (!wordParts) return "";
-  return wordParts
-    .split(" · ")
-    .map((part) => {
-      const match = part.match(/^(.*?)<([^>]*)>$/);
-      if (!match) return part;
-      const head = match[1];
-      const note = match[2];
-      const trimmed = truncateAtBoundary(note, maxNote, "zh");
-      return `${head}<${trimmed}>`;
-    })
-    .join(" · ");
-}
 
 console.log("读取 OE 源 + Tier 0 富化包 …");
 const { entries: oeEntries } = loadOpenEtymology(OE_DIR);
@@ -114,7 +81,10 @@ for (const rec of enrich.entries) {
 }
 
 enrich.version = "1.3.0";
-enrich.generatedAt = new Date().toISOString();
+// 一次性回填：固定 generatedAt 让产物可复现（Oscar 评审 nit #5）。
+// 当前值与首次提交 v1.3.0 时的产物对齐；重跑本脚本产物字节不变。
+// 如需"重跑即更新"的语义，把这一行换成 `new Date().toISOString()`。
+enrich.generatedAt = "2026-08-19T14:31:07.309Z";
 
 const outJson = JSON.stringify(enrich);
 writeFileSync(TIER0_ENRICH_JSON, outJson, "utf-8");

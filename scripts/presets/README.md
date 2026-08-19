@@ -111,6 +111,25 @@ etymology, wordParts, etymologyZh, examples]`；词列表以换行符连接；�
 
 三项实验（决策门与覆盖率）实测数字见 `docs/presets/experiment-enrichment.md`。
 
+## 一次性回填脚本（RAY-344）
+
+`scripts/presets/backfill/ray344.mjs` 是 RAY-344 修复 RAY-338 提交链
+回归时的一次性脚本：从本地 OE 源重算 Tier 0 富化包 `wordParts` /
+`etymologyZh` 字段并写回 `enrichment.tier0.data.json`（v1.2.3 → v1.3.0）。
+
+CI 不依赖、定时任务也不跑；只在数据需要回填时手动执行一次。
+
+**前置条件**（Oscar 评审 suggestion #6，onboarding 注记）：
+
+1. 先把 OpenEtymology 五册 EPUB 下载到本地：
+   ```bash
+   node scripts/presets/fetch-openetymology.mjs
+   ```
+   下载目标 `scripts/presets/.data/openetymology/`（`.gitignore` 内的
+   本地缓存，PR 不携带）。否则本脚本会因 OE 源缺失抛错。
+2. 截断口径与 `build-enrichment.mjs` 共用同一份实现（`lib/truncate.mjs`），
+   调整任一处都会自动同步到另一处——无需手动同步两份副本。
+
 ## 清洗规则（与 core 侧口径一致）
 
 - 词条形状：`TERM_PATTERN`（英文字母/撇号/连字符/点），过滤短语/词缀/非英语行；

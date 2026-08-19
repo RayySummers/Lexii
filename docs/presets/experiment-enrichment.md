@@ -1,6 +1,11 @@
 # 富化管线实验报告（RAY-268 批次 A 三项实验）
 
 > 生成时间：2026-08-15（脚本：scripts/presets/build-enrichment.mjs，全流程 ~104s）
+> **2026-08-19 追加（RAY-344 中文词源/词根词缀完整性回填）**：本节"体积口径"
+> 数据已从 RAY-268 初版（Tier 0 brotli 977 KB / etymologyZh 64 字 /
+> wordPartsNote 8 字）迁移到 RAY-344 新版（Tier 0 brotli ≈ 1.28 MB /
+> etymologyZh 384 字 / wordPartsNote 32 字 + sentence-boundary 截断），
+> 详见下方"附：富化数据体积"及后续 RAY-344 行项。
 > 数据来源：kaikki.org 英语词典（CC BY-SA 4.0 + GFDL，快照 Last-Modified 2026-08-12，3.21 GB /
 > 1,487,640 行，SHA256 `34b1929e…`）+ Tatoeba（CC BY 2.0 FR / CC0 子集）+ ipa-dict
 > （en_US MIT / en_UK GPL-3.0，commit 43c3570）+ OpenEtymology（CC BY-SA 4.0，commit 7d89f36）
@@ -99,15 +104,39 @@ cmudict 派生符号，与 Wiktionary IPA 体系直接冲突率低）。
 
 ## 附：富化数据体积
 
-| 指标 | 数值 |
-|---|---|
-| Tier 0 富化包词条数 | 7,182 |
-| Tier 0 富化包 raw / gzip / brotli-11 | 3,589 KB / 1,468 KB / **977 KB**（999,950 字节） |
-| Tier 1 富化包词条数 | 56,206 |
-| Tier 1 富化包 raw / gzip / brotli-11 | 23,903 KB / 8,651 KB / **5,780 KB** |
+| 指标 | RAY-268 初版 (v1.0.0) | RAY-344 修订 (v1.3.0) |
+|---|---|---|
+| Tier 0 富化包词条数 | 7,182 | 7,182 |
+| Tier 0 富化包 raw | 3,589 KB | **4,730 KB** |
+| Tier 0 富化包 gzip | 1,468 KB | — |
+| Tier 0 富化包 brotli-11 | 977 KB（999,950 字节） | **1,280 KB**（1,310,552 字节） |
+| Tier 0 etymologyZh 上限 | 64 字 | **384 字**（sentence-boundary） |
+| Tier 0 wordPartsNote 上限 | 8 字 | **32 字**（sentence-boundary） |
+| Tier 0 etymology 上限 | 84 字 | 84 字（sentence-boundary 复检） |
+| Tier 1 富化包词条数 | 56,206 | 56,206 |
+| Tier 1 富化包 raw / gzip / brotli-11 | 23,903 KB / 8,651 KB / 5,780 KB | 23,903 KB / 8,651 KB / 5,780 KB（未动） |
 
-> 体积目标达成：Tier 0 子集 brotli 977 KB < 1 MB（首启按需加载，余量 ~48 KB）；
-> Tier 1 扩展包 brotli 5.78 MB ∈ 3–8 MB（词书库同量级，走按需加载子路径）。
+> **RAY-344 红线偏移**：原 Tier 0 富化 brotli 977 KB < 1 MB（首启按需加载，
+> 余量 ~48 KB）硬约束已被 RAY-318 一次（64 → 384 字，977 → 1,269 KB）、
+> RAY-344 一次（wordPartsNote 8 → 32 字 + sentence-boundary，1,269 →
+> 1,280 KB）两次突破；当前 Tier 0 富化 brotli ≈ 1.28 MB，超原 1MB 红线
+> 约 256 KB。
+>
+> - **2026-08-19 owner 评审**（待补）：1MB 红线上调到 1.28 MB 需走 owner
+>   评审（Jack 拍板）；Knox 已附 reviewer/owner 确认到 PR 描述后，
+>   README 与本节口径方为终态。
+> - **代价**：首启 Tier 0 富化包下载 +303 KB（brotli 977 → 1,280 KB，
+>   +31%），仍属可控范围（首启 PWA 整体 bundle 远大于此）。
+> - **收益**：wordParts 注释 8 字硬切 100% → sentence-boundary 32 字
+>   （p95 24/p99 31 完全覆盖，全角括号外切残段消除，3711 条恢复）；
+>   etymologyZh 64 字硬切 6245/6247 → sentence-boundary 384 字（覆盖
+>   OE 源 100% 词条，6244 条恢复；剩余 ~3 条 OE 源本身 < 64 字）。
+>
 > Tier 0 收敛参数：例句上限 2 条（无句对词只补 1 条英文兜底）、近/反/派生
-> 3/3/2、词源 84 字符、中文词源 64 字、词缀注释 8 字；Tier 1 保留完整内容
+> 3/3/2、词源 84 字符（sentence-boundary）、中文词源 384 字（sentence-
+> boundary）、词缀注释 32 字（sentence-boundary）；Tier 1 保留完整内容
 > （3 条例句、8/8/12、词源 400 字符）。
+>
+> 截断函数（truncateAtBoundary / trimWordPartsNote）抽到
+> `scripts/presets/lib/truncate.mjs`，build-enrichment.mjs 与
+> backfill/ray344.mjs 共用同一份实现（RAY-344 沉淀口径同步约定）。
