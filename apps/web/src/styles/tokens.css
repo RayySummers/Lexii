@@ -69,6 +69,8 @@
  *   的「每档栈字面值与 CARD_FONT_OPTIONS.fontFamily 一致」断言按 index
  *   对账，重排或插入新档时务必同步两侧顺序。实测防线 + 此处文档级提醒
  *   形成双层兜底，避免仅依赖 README 类的「未挂代码」约束。
+ *   互相交叉指向（RAY-339 R4 复核 nit 1）：如调整本句措辞，请同步
+ *   `cardFont.test.ts` 合并形态决策注释；详见该测试末尾的反向交叉指向。
  * - RAY-338 A1：inter 档主字体为 Inter Display（自托管 ExtraBold，
  *   见 public/fonts/inter-display.css 与同目录 OFL 许可证；Google Fonts
  *   无 Inter Display），排在栈首；Google Fonts 的 Inter 800 仅为回退。
