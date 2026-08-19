@@ -190,9 +190,13 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
             </div>
           ) : (
             <ul
-              className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+              className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-1.5"
               aria-label="候选词单"
             >
+              {/* RAY-338 A2：p-1.5（6px）容纳选中卡片的 focus 描边
+                  （outline-2 + outline-offset-2 = 边框外 4px）。overflow-y-auto 会把
+                  overflow-x 强制为 auto，贴边卡片的外扩描边会被滚动容器裁掉，
+                  只剩底边可见（描边残缺）。留出内边距后描边完整落在裁剪区内。 */}
               {allLists.map((list) => {
                 const checked = selectedIds.has(list.id);
                 return (
