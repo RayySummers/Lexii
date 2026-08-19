@@ -21,6 +21,11 @@
  * 截断函数从 `lib/truncate.mjs` 导入（Oscar 评审 suggestion #4），
  * 与 `build-enrichment.mjs` 共用同一份实现，口径调整时改一处即可。
  *
+ * OE 源本身含少量繁体字符（CE 出版物 13 版校对差异、OCR 残留），
+ * 重写回的字段再做一次 t2s + 分类器 pass（与 RAY-338 繁简统一三轮
+ * 同一管线），避免 CI "Lint presets (繁简回归)" 报错。三个被改动的
+ * 真实样本：negligible / selfish（為→为）、swan（著→着）。
+ *
  * 词性 / IPA / 英文 etymology（kaikki 来源）保持原值——kaikki 数据未在
  * 本环境缓存，回归无法修复，但其截断 84 字的影响仅在中英对照的英文词源
  * 显示，本任务（中文词源/词根词缀）范围之外，留待后续 RAY 修复。
@@ -29,7 +34,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { Converter } from "opencc-js";
 import { loadOpenEtymology } from "../lib/openetymology.mjs";
+import { applyTraditionalFixes } from "../lib/traditional-classify.mjs";
 import { truncateAtBoundary, trimWordPartsNote } from "../lib/truncate.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -37,6 +44,7 @@ const OE_DIR = path.join(ROOT, "scripts", "presets", ".data", "openetymology");
 const TIER0_ENRICH_JSON = path.join(ROOT, "packages", "core", "src", "presets", "enrichment.tier0.data.json");
 
 const TIER0_TRUNCATE = { etymology: 84, etymologyZh: 384, wordPartsNote: 32 };
+const t2s = Converter({ from: "t", to: "cn" });
 
 console.log("读取 OE 源 + Tier 0 富化包 …");
 const { entries: oeEntries } = loadOpenEtymology(OE_DIR);
@@ -50,15 +58,21 @@ let wpRestored = 0;
 let wpTruncated = 0;
 let etyZhRestored = 0;
 let etyZhTruncated = 0;
+let t2sFixed = 0;
 let unchanged = 0;
 
 for (const rec of enrich.entries) {
   const term = rec[0];
   const oe = oeEntries.get(term.toLowerCase());
   if (!oe) continue;
-  // wordParts
+  // wordParts：从 OE 重算 + t2s 兜底（OE 源可能含繁体）
   if (oe.wordParts) {
-    const newWp = trimWordPartsNote(oe.wordParts, TIER0_TRUNCATE.wordPartsNote);
+    let newWp = trimWordPartsNote(oe.wordParts, TIER0_TRUNCATE.wordPartsNote);
+    const t2sResult = applyTraditionalFixes(newWp, t2s);
+    if (t2sResult.hits.length > 0) {
+      newWp = t2sResult.text;
+      t2sFixed += t2sResult.hits.length;
+    }
     if (newWp !== rec[7]) {
       if (newWp.length > rec[7].length) wpRestored += 1;
       else wpTruncated += 1;
@@ -67,9 +81,14 @@ for (const rec of enrich.entries) {
       unchanged += 1;
     }
   }
-  // etymologyZh
+  // etymologyZh：从 OE 重算 + t2s 兜底
   if (oe.etymologyZh) {
-    const newEtyZh = truncateAtBoundary(oe.etymologyZh, TIER0_TRUNCATE.etymologyZh, "zh");
+    let newEtyZh = truncateAtBoundary(oe.etymologyZh, TIER0_TRUNCATE.etymologyZh, "zh");
+    const t2sResult = applyTraditionalFixes(newEtyZh, t2s);
+    if (t2sResult.hits.length > 0) {
+      newEtyZh = t2sResult.text;
+      t2sFixed += t2sResult.hits.length;
+    }
     if (newEtyZh !== rec[8]) {
       if (newEtyZh.length > rec[8].length) etyZhRestored += 1;
       else etyZhTruncated += 1;
@@ -101,6 +120,7 @@ console.log(`  wordParts  恢复（变长）: ${wpRestored}`);
 console.log(`  wordParts  截断（变短）: ${wpTruncated}`);
 console.log(`  etymologyZh 恢复（变长）: ${etyZhRestored}`);
 console.log(`  etymologyZh 截断（变短）: ${etyZhTruncated}`);
+console.log(`  t2s 兜底修正字符: ${t2sFixed}`);
 console.log(`  无变化条目: ${unchanged}`);
 console.log("");
 console.log(`新 version=${enrich.version}, entries=${enrich.entries.length}`);
