@@ -741,6 +741,17 @@ describe("RAY-323 外观：卡片字体 2×2 选择器", () => {
     const selectedLabel = screen.getByText("已选").closest("label");
     expect(selectedLabel).toHaveTextContent("优雅衬线");
   });
+
+  it("RAY-339（Oscar 复核 suggestion 2）：现代简约档附「主字体仅覆盖拉丁字符」提示", async () => {
+    // 非拉丁词条按字体栈自动回退到系统字体（与 tokens.css --lex-card-font
+    // 栈尾 system-ui 一致），不需切档——文案明确告知避免误以为渲染失败。
+    renderSettings();
+    await screen.findByText("外观");
+
+    expect(
+      screen.getByText(/现代简约档的主字体仅覆盖拉丁字符.*非拉丁词条会自动回退到系统字体/),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("RAY-297 隐藏开发者面板", () => {

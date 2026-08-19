@@ -67,14 +67,13 @@
  * - RAY-338 A1：inter 档主字体为 Inter Display（自托管 ExtraBold，
  *   见 public/fonts/inter-display.css 与同目录 OFL 许可证；Google Fonts
  *   无 Inter Display），排在栈首；Google Fonts 的 Inter 800 仅为回退。
+ *   默认档（:root 未挂 data-card-font）与显式 [data-card-font="inter"]
+ *   字面值一致，用逗号选择器合并声明（Oscar 复核 suggestion 1），避免
+ *   字面量双份维护。
  * - 字体降级栈：每档在字体加载失败 / 离线时退回系统字体
  *   （无衬线 / 衬线 / 手写体），卡片仍可读，绝不出现空字形。
  */
-:root {
-  --lex-card-font: "Inter Display", "Inter", system-ui, sans-serif;
-  --lex-card-font-weight: 800;
-}
-
+:root,
 [data-card-font="inter"] {
   --lex-card-font: "Inter Display", "Inter", system-ui, sans-serif;
   --lex-card-font-weight: 800;

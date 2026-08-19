@@ -180,25 +180,42 @@ describe("CARD_FONT_OPTIONS 与 index.html 的 Google Fonts URL 同步（漂移�
   });
 });
 
-describe("tokens.css 的 inter 档字体栈与 CARD_FONT_OPTIONS 同步（RAY-338 A1 漂移校验）", () => {
+describe("tokens.css 的字体栈与 CARD_FONT_OPTIONS 同步（RAY-338 A1 漂移校验）", () => {
   const TOKENS_PATH = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
     "../styles/tokens.css",
   );
 
-  it(':root 与 [data-card-font="inter"] 的字体栈都以 Inter Display 打头', () => {
+  /**
+   * tokens.css 中 `--lex-card-font:` 的字面值按文件顺序：
+   * 第 1 条 = 默认档 / inter（合并的 :root, [data-card-font="inter"] 块，Oscar 复核 suggestion 1）
+   * 第 2–4 条 = google-sans / playpen / newsreader 各自档。
+   * 与 CARD_FONT_OPTIONS 顺序一致，便于按 index 对账。
+   */
+  function loadStacksFromTokensCss(): string[] {
     const source = readFileSync(TOKENS_PATH, "utf8");
-    // tokens.css 中前两条 --lex-card-font 定义即 :root 与 [data-card-font="inter"]
-    const stacks = [...source.matchAll(/--lex-card-font:\s*([^;]+);/g)].map((match) =>
-      match[1]!.trim(),
-    );
-    expect(stacks.length).toBeGreaterThanOrEqual(2);
-    for (const stack of stacks.slice(0, 2)) {
-      expect(stack.startsWith('"Inter Display"')).toBe(true);
+    return [...source.matchAll(/--lex-card-font:\s*([^;]+);/g)].map((match) => match[1]!.trim());
+  }
+
+  it("每档栈字面值与 CARD_FONT_OPTIONS.fontFamily 一致（防字面量漂移）", () => {
+    const stacks = loadStacksFromTokensCss();
+    expect(stacks).toHaveLength(CARD_FONT_OPTIONS.length);
+    for (const [index, option] of CARD_FONT_OPTIONS.entries()) {
+      expect(stacks[index]).toBe(option.fontFamily);
     }
-    // 与 CARD_FONT_OPTIONS 的 inter 档栈首一致（单点来源漂移防线）
-    const inter = CARD_FONT_OPTIONS.find((option) => option.id === "inter")!;
-    expect(stacks[0]).toBe(inter.fontFamily);
-    expect(stacks[1]).toBe(inter.fontFamily);
+  });
+
+  it("inter 档主字体为自托管 Inter Display（RAY-338 A1），Inter 仅为栈内回退", () => {
+    const stacks = loadStacksFromTokensCss();
+    const interStack = stacks[CARD_FONT_OPTIONS.findIndex((option) => option.id === "inter")]!;
+    expect(interStack.startsWith('"Inter Display"')).toBe(true);
+    expect(interStack).toContain('"Inter"');
+  });
+
+  it('首条栈由 :root 与 [data-card-font="inter"] 共享（合并声明，无重复）', () => {
+    // 显式锁定合并结构：审阅时一眼看清两处选择器共享同一字面值，
+    // 防回归到分写两份（Oscar 复核 suggestion 1）
+    const source = readFileSync(TOKENS_PATH, "utf8");
+    expect(source).toMatch(/^:root,\s*\n\s*\[data-card-font="inter"\]\s*\{/m);
   });
 });

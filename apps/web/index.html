@@ -49,7 +49,14 @@
       （以及 public/sw.js 的 CARD_FONT_CSS_URL，离线预缓存同一 URL）。
       RAY-338 A1：「现代简约」的主字体为自托管 Inter Display ExtraBold
       （下方 ./fonts/inter-display.css；Google Fonts 无 Inter Display），
-      本 URL 中的 Inter 800 仅为回退（unicode-range 子集化，正常不下载）。
+      本 URL 中的 Inter 800 仅作安全网回退——unicode-range 子集化让浏览器
+      在自托管命中时不再下载 Inter 字形文件，真实网络代价 ≈ 一个 CSS
+      请求与共享的 preconnect；换来的是自托管 woff2 因部署/缓存未就绪
+      而 404 时卡片仍能渲染 Inter ExtraBold（视觉与 Inter Display 接近）
+      而非系统字体。Oscar 复核 nit 1 已知取舍，本 PR 不删 Inter preconnect
+      与 URL 段；如未来要压到「首次无缓存请求最小」可考虑把 Inter 也改
+      自托管（额外 ~30KB latin subset），但代价是双倍 woff2 体积与不再
+      享受 Google Fonts 的 CDN 分发。
     -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
