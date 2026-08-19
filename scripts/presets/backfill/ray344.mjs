@@ -41,7 +41,14 @@ import { truncateAtBoundary, trimWordPartsNote } from "../lib/truncate.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const OE_DIR = path.join(ROOT, "scripts", "presets", ".data", "openetymology");
-const TIER0_ENRICH_JSON = path.join(ROOT, "packages", "core", "src", "presets", "enrichment.tier0.data.json");
+const TIER0_ENRICH_JSON = path.join(
+  ROOT,
+  "packages",
+  "core",
+  "src",
+  "presets",
+  "enrichment.tier0.data.json",
+);
 
 const TIER0_TRUNCATE = { etymology: 84, etymologyZh: 384, wordPartsNote: 32 };
 const t2s = Converter({ from: "t", to: "cn" });
@@ -124,5 +131,7 @@ console.log(`  t2s 兜底修正字符: ${t2sFixed}`);
 console.log(`  无变化条目: ${unchanged}`);
 console.log("");
 console.log(`新 version=${enrich.version}, entries=${enrich.entries.length}`);
-console.log(`原始字节: ${rawBytes} (${(rawBytes/1024/1024).toFixed(2)} MB)`);
-console.log(`Brotli-11: ${brotliBytes} (${(brotliBytes/1024).toFixed(1)} KB), headroom: ${1024*1024 - brotliBytes} bytes`);
+console.log(`原始字节: ${rawBytes} (${(rawBytes / 1024 / 1024).toFixed(2)} MB)`);
+console.log(
+  `Brotli-11: ${brotliBytes} (${(brotliBytes / 1024).toFixed(1)} KB), headroom: ${1024 * 1024 - brotliBytes} bytes`,
+);
