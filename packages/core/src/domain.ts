@@ -44,6 +44,13 @@ export interface Sense {
   definitions: string[];
   /** 词性（可选，导入词库通常提供），如 "n." / "v." */
   pos?: string;
+  /**
+   * 逐条词性（可选，RAY-349）：与 definitions 等长，第 i 项为第 i 条释义的
+   * 词性（该条无词性标记时为空串）。pos 是整词去重汇总（"a.；n.；vt."），
+   * 无法对应到具体释义；本字段让卡片按词性标注每条释义而非只给序号。
+   * RAY-349 之前安装的义项无此字段，读取侧按 pos 推断（见 definitionPos.ts）。
+   */
+  posByDefinition?: string[];
   /** 音标（可选） */
   ipa?: string;
   /** 美式音标（可选，富化数据提供；UI 优先展示双音标，缺省回退 ipa） */

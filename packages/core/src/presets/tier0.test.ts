@@ -68,6 +68,37 @@ describe("TIER0_PRESET（内置核心词表）", () => {
     }
   });
 
+  it("逐条词性 posByDefinition 与释义等长，取值属预定义词性标记集（RAY-349）", () => {
+    const withDefPos = TIER0_PRESET.entries.filter((entry) => entry.posByDefinition !== undefined);
+    // 绝大多数词条的释义段首带词性标记，逐条词性必须随包分发
+    expect(withDefPos.length).toBeGreaterThan(7000);
+    const markerPattern = /^[a-z]{1,6}\.$/;
+    for (const entry of withDefPos) {
+      expect(entry.posByDefinition!.length, `逐条词性与释义不等长：${entry.term}`).toBe(
+        entry.definitions.length,
+      );
+      for (const pos of entry.posByDefinition!) {
+        if (pos !== "") {
+          expect(markerPattern.test(pos), `词性形态非法：${entry.term} → ${pos}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("逐条词性取值是 pos 汇总串的子集（同一次剥离的产物，口径不漂移）", () => {
+    for (const entry of TIER0_PRESET.entries) {
+      if (!entry.posByDefinition) {
+        continue;
+      }
+      const summary = new Set((entry.pos ?? "").split("；").filter((part) => part !== ""));
+      for (const pos of entry.posByDefinition) {
+        if (pos !== "") {
+          expect(summary.has(pos), `逐条词性不在汇总串内：${entry.term} → ${pos}`).toBe(true);
+        }
+      }
+    }
+  });
+
   it("释义段首不含词性标记（已剥离并入 pos 字段）", () => {
     const markerPattern = /^[a-z]{1,6}\.\s+/;
     for (const entry of TIER0_PRESET.entries) {

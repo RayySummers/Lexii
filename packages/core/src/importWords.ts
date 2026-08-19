@@ -86,6 +86,8 @@ export interface WordEntryContent {
   term: string;
   definitions: string[];
   pos?: string;
+  /** 逐条词性（可选，RAY-349）：与 definitions 等长，见 domain.ts 的 Sense.posByDefinition */
+  posByDefinition?: string[];
   ipa?: string;
   tags?: string[];
   /** 富化字段（可选，见 presets/enrichment.ts 的合并口径） */
@@ -108,6 +110,9 @@ export function toSense(entry: WordEntryContent, lang: LanguageCode): Sense {
     term: entry.term,
     definitions: entry.definitions,
     ...(entry.pos ? { pos: entry.pos } : {}),
+    ...(entry.posByDefinition?.some((item) => item !== "")
+      ? { posByDefinition: entry.posByDefinition }
+      : {}),
     ...(entry.ipa ? { ipa: entry.ipa } : {}),
     ...(entry.ipaUs ? { ipaUs: entry.ipaUs } : {}),
     ...(entry.ipaUk ? { ipaUk: entry.ipaUk } : {}),
