@@ -49,7 +49,6 @@ function makeControllableProvider() {
     reject: (e: Error) => void;
   };
   const pending: Pending[] = [];
-  let i = 0;
   const provider: StatsDataProvider = {
     loadStats: vi.fn(
       () =>
@@ -60,7 +59,6 @@ function makeControllableProvider() {
   };
   return {
     provider,
-    callCount: () => i++,
     // 测试侧用 resolveCall(callIndex, snapshot) 控制第 N 次 load 的结果
     resolveCall: (callIndex: number, snapshot: StatsSnapshot) => {
       pending[callIndex]!.resolve(snapshot);
