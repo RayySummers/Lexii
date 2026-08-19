@@ -1,11 +1,13 @@
 /**
  * RAY-343 B1：useStats 跨午夜兜底
  *
- * 两条路径：
- *   A. 前台 + 跨午夜：应用一直保持前台可见，定时器触发 reload（不依赖
- *      visibilitychange/focus——用户在应用内不动、只是过了一夜）。
- *   B. 后台 → 回前台：定时器在跨过午夜的瞬间已经检测到 reload；用户
- *      切回前台时 stats 已是新值。
+ * 兜底机制（统一为同一路径，不再区分 A/B）：
+ *   - 30s 周期 setInterval 比对当前本地日与 `loadedAtDateRef`：
+ *     ref 缺失（首载失败）或与今日不同 → 触发 reload。
+ *   - load 跨日时使用「开始日」而非「完成日」记 ref（避免在途竞态把 Day 1
+ *     快照错记成 Day 2）。
+ *   - 浏览器对 hidden 标签的 setInterval 节流到 ≥1 次/分钟仍能跨日触发；
+ *     进程被杀 / 路由卸载重挂 → 首次 load 拿当日值。
  *
  * 走 provider mock 路径（不依赖 IndexedDB）：直接给一个被 spy 的
  * StatsDataProvider，观察 loadStats() 调用次数 + 返回值。
@@ -16,7 +18,8 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { localDateKey, useStats } from "./useStats";
+import { localDateKey } from "@lexii/stats";
+import { useStats } from "./useStats";
 import type { StatsDataProvider, StatsSnapshot } from "./types";
 
 /** 一个可 spy 的 provider（按调用顺序返回快照，并记录调用索引） */
@@ -29,6 +32,58 @@ function makeProvider(snapshots: StatsSnapshot[]) {
       calls.push(i);
       i += 1;
       return snapshot;
+    }),
+  };
+  return { provider, calls };
+}
+
+/**
+ * S1 专用：可手动 resolve / reject 的 loadStats——让我们在 load「进行
+ * 中」时把 fake clock 推过午夜、再 resolve，验证 ref 记的是开始日而不是
+ * 完成日。`loadStats` 每次返回的 Promise 的 resolve/reject 在构造时
+ * 闭包绑死，避免共享变量被后续调用覆盖。
+ */
+function makeControllableProvider() {
+  type Pending = {
+    resolve: (v: StatsSnapshot) => void;
+    reject: (e: Error) => void;
+  };
+  const pending: Pending[] = [];
+  let i = 0;
+  const provider: StatsDataProvider = {
+    loadStats: vi.fn(
+      () =>
+        new Promise<StatsSnapshot>((resolve, reject) => {
+          pending.push({ resolve, reject });
+        }),
+    ),
+  };
+  return {
+    provider,
+    callCount: () => i++,
+    // 测试侧用 resolveCall(callIndex, snapshot) 控制第 N 次 load 的结果
+    resolveCall: (callIndex: number, snapshot: StatsSnapshot) => {
+      pending[callIndex]!.resolve(snapshot);
+    },
+    rejectCall: (callIndex: number, err: Error) => {
+      pending[callIndex]!.reject(err);
+    },
+  };
+}
+
+/** S2 专用：前 N 次失败、之后成功的 provider */
+function makeFlakyProvider(failuresBeforeSuccess: number, snapshots: StatsSnapshot[]) {
+  const calls: number[] = [];
+  let i = 0;
+  const provider: StatsDataProvider = {
+    loadStats: vi.fn(async () => {
+      calls.push(i);
+      const idx = i;
+      i += 1;
+      if (idx < failuresBeforeSuccess) {
+        throw new Error(`simulated failure #${idx}`);
+      }
+      return snapshots[idx - failuresBeforeSuccess] ?? snapshots[snapshots.length - 1]!;
     }),
   };
   return { provider, calls };
@@ -102,34 +157,29 @@ describe("localDateKey（本地日历日 YYYY-MM-DD）", () => {
 });
 
 describe("useStats（跨午夜兜底）", () => {
-  it("路径 A：前台 + 跨午夜——挂载后 Day 1 → 跨过本地午夜后定时器自动 reload 到 Day 2", async () => {
+  it("基础：挂载后 Day 1 → 跨过本地午夜后定时器自动 reload 到 Day 2", async () => {
     process.env.TZ = "Asia/Shanghai";
-    // 挂载时刻：Day 1 LOCAL 22:00 Asia/Shanghai
     vi.setSystemTime(new Date(2026, 7, 18, 22, 0, 0, 0));
 
     const { provider, calls } = makeProvider([SNAP_DAY_1, SNAP_DAY_2]);
 
     const { result } = renderHook(() => useStats(provider));
 
-    // 挂载 effect 触发首次 load；推 0 让首次 promise resolve + setStats 完成
     await tick(0);
     expect(calls.length).toBe(1);
     expect(result.current.stats?.todayLearnCount).toBe(20);
     expect(result.current.stats?.newCardsRemainingToday).toBe(0);
 
-    // 时钟前进到 Day 2 LOCAL 09:00（应用一直在前台）
+    // 时钟前进到 Day 2 LOCAL 09:00
     vi.setSystemTime(new Date(2026, 7, 19, 9, 0, 0, 0));
-
-    // 推 31s 让 setInterval 跑一次回调
     await tick(31_000);
 
-    // 定时器检测到本地日变更，触发 reload；stats 已是 Day 2 快照
     expect(calls.length).toBe(2);
     expect(result.current.stats?.todayLearnCount).toBe(0);
     expect(result.current.stats?.newCardsRemainingToday).toBe(20);
   });
 
-  it("路径 A 兜底：跨午夜后仍未跨日的 tick 不触发 reload（避免无谓 IO）", async () => {
+  it("同日兜底：跨午夜后仍未跨日的 tick 不触发 reload（避免无谓 IO）", async () => {
     process.env.TZ = "Asia/Shanghai";
     vi.setSystemTime(new Date(2026, 7, 18, 22, 0, 0, 0));
 
@@ -140,7 +190,7 @@ describe("useStats（跨午夜兜底）", () => {
     expect(calls.length).toBe(1);
     expect(result.current.stats?.todayLearnCount).toBe(20);
 
-    // 仍在 Day 1 内，时钟推 5 分钟 + 推定时器
+    // 仍在 Day 1 内
     vi.setSystemTime(new Date(2026, 7, 18, 22, 5, 0, 0));
     await tick(31_000);
 
@@ -148,26 +198,80 @@ describe("useStats（跨午夜兜底）", () => {
     expect(result.current.stats?.todayLearnCount).toBe(20);
   });
 
-  it("路径 B：后台 → 回前台——挂载 effect load 后，跨日定时器自动 reload；用户回前台时 stats 已是 Day 2", async () => {
+  it("S1 跨午夜在途竞态：load 在 Day 1 23:59 发起、跨日后完成 → ref 记开始日、下一 tick 补发 Day 2 快照", async () => {
+    process.env.TZ = "Asia/Shanghai";
+    // 挂载时刻：Day 1 LOCAL 23:59:00——load 在「跨午夜前」发起
+    vi.setSystemTime(new Date(2026, 7, 18, 23, 59, 0, 0));
+
+    const ctrl = makeControllableProvider();
+    const { provider } = ctrl;
+    const loadStats = provider.loadStats as ReturnType<typeof vi.fn>;
+
+    const { result } = renderHook(() => useStats(provider));
+
+    // 首次 load 已发起，pending 等待 resolve
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(loadStats).toHaveBeenCalledTimes(1);
+    expect(result.current.stats).toBeNull();
+
+    // 时钟跨过午夜到 Day 2 LOCAL 00:00:30；load 仍未 resolve
+    vi.setSystemTime(new Date(2026, 7, 19, 0, 0, 30, 0));
+
+    // 让首载以 Day 1 快照 resolve——注意是「开始日是 Day 1」，ref 应记 Day 1
+    await act(async () => {
+      ctrl.resolveCall(0, SNAP_DAY_1);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(result.current.stats?.todayLearnCount).toBe(20);
+    expect(result.current.stats?.newCardsRemainingToday).toBe(0);
+    // 没有第二次调用（ref 记 Day 1、stats 是 Day 1 一致）
+    expect(loadStats).toHaveBeenCalledTimes(1);
+
+    // 时钟再推 31s 让 interval 跑一次。ref 记 Day 1、today 是 Day 2，触发 reload
+    // 第二次 load 也用 controllable——我们准备 SNAP_DAY_2 给它
+    await act(async () => {
+      // 让第二次 load（index 1）也进入 pending
+      await vi.advanceTimersByTimeAsync(31_000);
+      ctrl.resolveCall(1, SNAP_DAY_2);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(loadStats).toHaveBeenCalledTimes(2);
+    expect(result.current.stats?.todayLearnCount).toBe(0);
+    expect(result.current.stats?.newCardsRemainingToday).toBe(20);
+  });
+
+  it("S2 首载失败后 watchdog 自动重试：连续失败 N 次、下一 tick 仍触发 reload", async () => {
     process.env.TZ = "Asia/Shanghai";
     vi.setSystemTime(new Date(2026, 7, 18, 22, 0, 0, 0));
 
-    const { provider, calls } = makeProvider([SNAP_DAY_1, SNAP_DAY_2]);
+    // 前 2 次失败、第 3 次成功 → interval 兜底必须让 watchdog 持续尝试
+    const { provider, calls } = makeFlakyProvider(2, [SNAP_DAY_1, SNAP_DAY_2]);
+    const loadStats = provider.loadStats as ReturnType<typeof vi.fn>;
 
     const { result } = renderHook(() => useStats(provider));
+
+    // 首次 load 失败；ref 仍为 null
     await tick(0);
     expect(calls.length).toBe(1);
-    expect(result.current.stats?.todayLearnCount).toBe(20);
+    expect(result.current.stats).toBeNull();
+    expect(result.current.error).toMatch(/simulated failure #0/);
 
-    // 模拟「切后台后过夜到 Day 2」。定时器仍跑（应用在 React 树上挂着），
-    // 用户没操作界面。
-    vi.setSystemTime(new Date(2026, 7, 19, 9, 0, 0, 0));
+    // 推 31s 让 interval 跑一次 → 第 2 次 load（仍失败），ref 仍 null
     await tick(31_000);
-
-    // 用户回到前台：定时器已 reload 完成，stats 是 Day 2 值
     expect(calls.length).toBe(2);
-    expect(result.current.stats?.todayLearnCount).toBe(0);
-    expect(result.current.stats?.newCardsRemainingToday).toBe(20);
+    expect(result.current.stats).toBeNull();
+    expect(result.current.error).toMatch(/simulated failure #1/);
+
+    // 再推 31s → 第 3 次 load（成功），ref 写入 Day 1
+    await tick(31_000);
+    expect(calls.length).toBe(3);
+    expect(loadStats).toHaveBeenCalledTimes(3);
+    expect(result.current.stats?.todayLearnCount).toBe(20);
+    expect(result.current.error).toBeNull();
   });
 
   it("reload() 手动调用同样刷新 loadedAtDate，再跨日仍能继续兜底", async () => {
@@ -194,7 +298,7 @@ describe("useStats（跨午夜兜底）", () => {
     expect(result.current.stats?.todayLearnCount).toBe(0);
   });
 
-  it("provider 为 null 时不挂定时器；切到非 null 后挂上并正常工作", async () => {
+  it("provider 由 null 切非 null：定时器重挂 + 首次 load 触发", async () => {
     process.env.TZ = "Asia/Shanghai";
     vi.setSystemTime(new Date(2026, 7, 18, 22, 0, 0, 0));
 
@@ -221,5 +325,59 @@ describe("useStats（跨午夜兜底）", () => {
     await tick(31_000);
     expect(calls.length).toBe(2);
     expect(result.current.stats?.todayLearnCount).toBe(0);
+  });
+
+  it("provider A → B 切换：旧 interval 清理、新 interval 挂载、reload 立刻用新 provider 跑", async () => {
+    process.env.TZ = "Asia/Shanghai";
+    vi.setSystemTime(new Date(2026, 7, 18, 22, 0, 0, 0));
+
+    const providerA = makeProvider([SNAP_DAY_1, SNAP_DAY_1, SNAP_DAY_1]);
+    const providerB = makeProvider([SNAP_DAY_2, SNAP_DAY_2]);
+    const { result, rerender } = renderHook(({ p }: { p: StatsDataProvider }) => useStats(p), {
+      initialProps: { p: providerA.provider },
+    });
+
+    // 用 A 加载 Day 1
+    await tick(0);
+    expect(providerA.calls.length).toBe(1);
+    expect(providerB.calls.length).toBe(0);
+    expect(result.current.stats?.todayLearnCount).toBe(20);
+
+    // 切到 B；新 mount effect 立刻 load（不再走 A 的 interval）
+    rerender({ p: providerB.provider });
+
+    await tick(0);
+    // A 不会被再调用（旧 interval 已清理），B 立刻 load
+    expect(providerA.calls.length).toBe(1);
+    expect(providerB.calls.length).toBe(1);
+    expect(result.current.stats?.todayLearnCount).toBe(0);
+    expect(result.current.stats?.newCardsRemainingToday).toBe(20);
+
+    // 跨日 → B 的 interval 触发 reload
+    vi.setSystemTime(new Date(2026, 7, 19, 9, 0, 0, 0));
+    await tick(31_000);
+    // A.calls 仍为 1（已切走）；B.calls 应为 2（首次 + 跨日 reload）
+    expect(providerA.calls.length).toBe(1);
+    expect(providerB.calls.length).toBe(2);
+  });
+
+  it("unmount 清理：interval 停掉、unmount 后不再触发 load", async () => {
+    process.env.TZ = "Asia/Shanghai";
+    vi.setSystemTime(new Date(2026, 7, 18, 22, 0, 0, 0));
+
+    const { provider, calls } = makeProvider([SNAP_DAY_1, SNAP_DAY_1, SNAP_DAY_1]);
+
+    const { result, unmount } = renderHook(() => useStats(provider));
+    await tick(0);
+    expect(calls.length).toBe(1);
+    expect(result.current.stats?.todayLearnCount).toBe(20);
+
+    // 跨日 + unmount
+    vi.setSystemTime(new Date(2026, 7, 19, 9, 0, 0, 0));
+    unmount();
+
+    // 即便跨日 + 推 31s，unmount 后的 interval 已清理，loadStats 不再被调
+    await tick(31_000);
+    expect(calls.length).toBe(1);
   });
 });

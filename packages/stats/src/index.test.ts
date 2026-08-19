@@ -16,6 +16,7 @@ import {
   countReviews,
   effectiveReviewDurationMs,
   formatStudyDuration,
+  localDateKey,
   localDayBounds,
   MAX_EFFECTIVE_REVIEW_DURATION_MS,
 } from "./index";
@@ -361,6 +362,32 @@ describe("localDayBounds（本地日历日半开区间，时区无关性质断�
 
   it("非法基准时刻抛错", () => {
     expect(() => localDayBounds("not-a-date")).toThrow(RangeError);
+  });
+});
+
+describe("localDateKey（本地日历日 YYYY-MM-DD）", () => {
+  it("Asia/Shanghai：跨过本地午夜后日期变更", () => {
+    process.env.TZ = "Asia/Shanghai";
+    const day1 = new Date(2026, 7, 18, 23, 59, 0, 0);
+    const day2 = new Date(2026, 7, 19, 0, 1, 0, 0);
+    expect(localDateKey(day1)).toBe("2026-08-18");
+    expect(localDateKey(day2)).toBe("2026-08-19");
+  });
+
+  it("UTC：跨过 UTC 午夜后日期变更", () => {
+    process.env.TZ = "UTC";
+    const day1 = new Date(Date.UTC(2026, 7, 18, 23, 59));
+    const day2 = new Date(Date.UTC(2026, 7, 19, 0, 1));
+    expect(localDateKey(day1)).toBe("2026-08-18");
+    expect(localDateKey(day2)).toBe("2026-08-19");
+  });
+
+  it("字符串字典序等价于日历日序（YYYY-MM-DD 自带此性质）", () => {
+    // YYYY-MM-DD 的字典序在「同一时区、同源分量」前提下与日期升序一致。
+    // 这里只断言：localDateKey 字符串可与 ISO 字符串字面子串比较拿日。
+    const a = new Date(2026, 0, 1, 12, 0, 0, 0);
+    const b = new Date(2026, 11, 31, 12, 0, 0, 0);
+    expect(localDateKey(a) < localDateKey(b)).toBe(true);
   });
 });
 

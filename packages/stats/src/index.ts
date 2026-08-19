@@ -446,5 +446,22 @@ function localDayOrdinal(ms: number): number {
   return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS;
 }
 
+/**
+ * 某时刻的本地日历日键值，YYYY-MM-DD（与 `localDayOrdinal` 同源，但用
+ * 字符串而不是数字——便于跨日比较与持久化，O(log n) 字符串字典序也等价
+ * 于日历日序）。
+ *
+ * 与 `dayOrdinal(now)`（`@lexii/core`）的差异：dayOrdinal 算的是
+ * 「从 epoch 起累计过了多少个本地日历日」，是个无符号大数；`localDateKey`
+ * 是「今天是哪一天」的标签。两边都用 `Date.getFullYear/Month/Date` 的
+ * 本地分量构造，与夏令时无关。
+ */
+export function localDateKey(now: Date = new Date()): string {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 /** 包名（保留原骨架导出的兼容） */
 export const PACKAGE_NAME = "@lexii/stats";
