@@ -21,6 +21,9 @@
  * 不动，桌面端（≥640px）一排三个。真实问题在背单词页评分按钮，见
  * review/RatingButtons.tsx。
  *
+ * RAY-352：额度提示在复习队列为空（dueCount === 0）但额度已恢复时也展示——
+ * Day 2 早晨「今日无待学词，休息一下。」不该被误读为「无学习额度」。
+ *
  * - 待学徽标数据经 StatsDataProvider（statsProvider 为 null 时不展示，
  *   如无 IndexedDB 的测试环境）；
  * - 仅承载展示与导航，队列数据一律由 ReviewScreen / QuizScreen 按模式加载；
@@ -61,6 +64,15 @@ const FORMATS = [
 export function HomeScreen({ onStart, statsProvider }: HomeScreenProps) {
   const { stats } = useStats(statsProvider);
   const [format, setFormat] = useState<StudyFormat>("card");
+
+  // RAY-352：额度已恢复（剩余 > 0）时，即使复习队列为空（dueCount === 0）
+  // 也展示额度提示——Day 2 早晨「今日无待学词，休息一下。」不该被误读为
+  // 「无学习额度」。有复习记录（reviewCount > 0）是展示前提，与 DueBadge
+  // 安静文案的展示口径一致；额度已用尽（剩余 === 0）时保持空状态安静。
+  const quotaRemaining =
+    stats !== null ? Math.max(0, readDailyNewCardLimit() - stats.todayLearnCount) : 0;
+  const showQuotaHint =
+    stats !== null && (stats.dueCount > 0 || (stats.reviewCount > 0 && quotaRemaining > 0));
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-16">
@@ -109,21 +121,20 @@ export function HomeScreen({ onStart, statsProvider }: HomeScreenProps) {
         hasReviewed={stats !== null && stats.reviewCount > 0}
       />
 
-      {stats !== null && stats.dueCount > 0 ? (
-        <NewCardQuotaHint learnedToday={stats.todayLearnCount} />
-      ) : null}
+      {showQuotaHint ? <NewCardQuotaHint remaining={quotaRemaining} /> : null}
     </main>
   );
 }
 
 /**
- * 今日新卡额度提示（RAY-260 复评 suggestion 2）：
- * 额度 = 设置上限 − 今日已学新词数（下限 0）。仅在有待学词（dueCount > 0）
- * 时展示——徽标数字是未截断的到期数，与 20/日上限下实际可学的队列存在
- * 数字差，此提示说明二者关系；语义与复习页的实际截取一致（超出顺延）。
+ * 今日新卡额度提示（RAY-260 复评 suggestion 2；RAY-352 扩展展示条件）：
+ * 额度 = 设置上限 − 今日已学新词数（下限 0），由父组件折算后传入。
+ * 待学词存在（dueCount > 0）时展示——徽标数字是未截断的到期数，与 20/日
+ * 上限下实际可学的队列存在数字差，此提示说明二者关系；语义与复习页的
+ * 实际截取一致（超出顺延）。RAY-352 起复习队列为空但额度已恢复（如
+ * Day 2 早晨）时也展示，避免「今日无待学词」被误读为无学习额度。
  */
-function NewCardQuotaHint({ learnedToday }: { learnedToday: number }) {
-  const remaining = Math.max(0, readDailyNewCardLimit() - learnedToday);
+function NewCardQuotaHint({ remaining }: { remaining: number }) {
   return (
     <p className="text-sm text-text-muted">
       今日新卡额度剩余 {remaining} 张，超出部分顺延到之后的日子。

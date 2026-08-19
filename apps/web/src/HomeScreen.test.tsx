@@ -4,6 +4,8 @@
  * RAY-253：三个模式按钮（学习 / 复习 / 混合）+ 今日待学徽标（RAY-254 起，此前为到期徽标）；
  * 品牌名与介绍文案不再渲染（已归档 docs/archive/homepage-intro-v1.md）。
  * RAY-260（Oscar 复评 suggestion 2）：有待学词时展示「今日新卡额度剩余 N 张」。
+ * RAY-352：复习队列为空（dueCount === 0）但额度已恢复时也展示额度提示，
+ * 避免 Day 2 早晨把「今日无待学词，休息一下。」误读为无学习额度。
  * RAY-278（返工裁定）：三模式按钮移动端竖排为期望形态——容器必须是
  * `sm:grid-cols-3`（<640px 单列竖排），不带 base `grid-cols-3`（那会把
  * 移动端挤成一排三个）。
@@ -169,12 +171,49 @@ describe("HomeScreen", () => {
     ).toBeInTheDocument();
   });
 
-  it("无待学词时不显示额度提示（空状态保持简洁）", async () => {
+  it("无待学词但额度已恢复时也显示额度提示（RAY-352：Day 2 早晨不误读为无学习额度）", async () => {
+    render(
+      <HomeScreen
+        onStart={vi.fn()}
+        statsProvider={makeStatsProvider(badgeSnapshot(0, 10, 2, { todayLearnCount: 0 }))}
+      />,
+    );
+
+    // 复习队列为空：安静文案 + 额度已恢复提示并存
+    expect(await screen.findByText("今日无待学词，休息一下。")).toBeInTheDocument();
+    expect(
+      screen.getByText("今日新卡额度剩余 20 张，超出部分顺延到之后的日子。"),
+    ).toBeInTheDocument();
+  });
+
+  it("无待学词且今日已学部分新词时，额度提示按剩余量展示", async () => {
     render(
       <HomeScreen
         onStart={vi.fn()}
         statsProvider={makeStatsProvider(badgeSnapshot(0, 10, 2, { todayLearnCount: 3 }))}
       />,
+    );
+
+    expect(
+      await screen.findByText("今日新卡额度剩余 17 张，超出部分顺延到之后的日子。"),
+    ).toBeInTheDocument();
+  });
+
+  it("无待学词且今日额度已用尽时不显示额度提示（休息状态保持简洁）", async () => {
+    render(
+      <HomeScreen
+        onStart={vi.fn()}
+        statsProvider={makeStatsProvider(badgeSnapshot(0, 10, 2, { todayLearnCount: 20 }))}
+      />,
+    );
+
+    await screen.findByText("今日无待学词，休息一下。");
+    expect(screen.queryByText(/今日新卡额度/)).not.toBeInTheDocument();
+  });
+
+  it("无待学词且无任何学习记录时不显示额度提示", async () => {
+    render(
+      <HomeScreen onStart={vi.fn()} statsProvider={makeStatsProvider(badgeSnapshot(0, 0, 0))} />,
     );
 
     await screen.findByRole("button", { name: "学习" });
