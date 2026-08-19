@@ -104,8 +104,10 @@ node scripts/presets/build-enrichment.mjs
 4. **产物条目**：紧凑元组 `[term, ipaUs, ipaUk, synonyms, antonyms, derived,
 etymology, wordParts, etymologyZh, examples]`；词列表以换行符连接；无任何
    富化字段的词条不产出记录。运行时契约见 `packages/core/src/presets/enrichment.ts`
-   （parse-don't-validate + 回填），体积口径：Tier 0 富化 brotli < 1MB（任务红线，
-   实测 977KB）。
+   （parse-don't-validate + 回填），体积口径：Tier 0 富化 brotli **≈ 1.28 MB**
+   （RAY-344 起偏离原 1MB 红线——wordParts 注释 8 → 32 字 + 中文词源 64 → 384
+   字换回的完整内容质量；与 RAY-318 同档，三项实验数据见
+   `docs/presets/experiment-enrichment.md`）。
 
 三项实验（决策门与覆盖率）实测数字见 `docs/presets/experiment-enrichment.md`。
 
