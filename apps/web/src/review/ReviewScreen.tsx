@@ -431,11 +431,11 @@ function PhaseContent({
             <button
               type="button"
               onClick={onOpenAddToLists}
-              aria-label={`把「${session.current.sense.term}」添加到列表`}
+              aria-label={`把「${session.current.sense.term}」添加到词单`}
               className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text-muted transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
             >
               <ListIcon className="h-4 w-4" />
-              添加到列表
+              添加到词单
             </button>
           </div>
           <RatingButtons

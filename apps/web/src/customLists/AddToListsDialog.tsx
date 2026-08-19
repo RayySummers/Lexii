@@ -75,11 +75,11 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
   const submitCreate = useCallback(async () => {
     const name = newName.trim();
     if (name.length === 0) {
-      setCreateError("列表名称不能为空");
+      setCreateError("词单名称不能为空");
       return;
     }
     if (name.length > 60) {
-      setCreateError("列表名称不能超过 60 个字符");
+      setCreateError("词单名称不能超过 60 个字符");
       return;
     }
     setCreating2(true);
@@ -147,16 +147,16 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`把「${sense.term}」添加到列表`}
+      aria-label={`把「${sense.term}」添加到词单`}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
     >
       <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
       <div className="relative flex max-h-[85dvh] w-full max-w-md flex-col gap-4 overflow-hidden rounded-2xl border border-border bg-surface p-6 shadow-lg">
         <header className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
-            <h3 className="text-base font-semibold">添加到列表</h3>
+            <h3 className="text-base font-semibold">添加到词单</h3>
             <p className="text-xs text-text-muted">
-              勾选目标列表后保存。「{sense.term}」可同时归入多个列表。
+              勾选目标词单后保存。「{sense.term}」可同时归入多个词单。
             </p>
           </div>
           <button
@@ -174,24 +174,24 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
           {phase === "loading" ? (
             <div role="status" className="py-8 text-center text-sm text-text-muted">
-              正在加载列表…
+              正在加载词单…
             </div>
           ) : allLists.length === 0 && !creating ? (
             <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-surface-raised p-6 text-center">
-              <p className="text-sm text-text-muted">还没有自定义列表，先创建一个吧。</p>
+              <p className="text-sm text-text-muted">还没有自定义词单，先创建一个吧。</p>
               <button
                 type="button"
                 onClick={() => setCreating(true)}
                 className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
               >
                 <PlusIcon className="h-4 w-4" />
-                新建列表
+                新建词单
               </button>
             </div>
           ) : (
             <ul
               className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
-              aria-label="候选列表"
+              aria-label="候选词单"
             >
               {allLists.map((list) => {
                 const checked = selectedIds.has(list.id);
@@ -209,7 +209,7 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
                         checked={checked}
                         onChange={() => toggle(list.id)}
                         className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-                        aria-label={`列表「${list.name}」`}
+                        aria-label={`词单「${list.name}」`}
                       />
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span className="truncate text-sm font-medium">{list.name}</span>
@@ -237,13 +237,13 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
               }}
               className="flex flex-col gap-2 rounded-xl border border-border bg-surface-raised p-3"
             >
-              <span className="text-xs font-medium text-text-muted">新建列表</span>
+              <span className="text-xs font-medium text-text-muted">新建词单</span>
               <input
                 type="text"
                 value={newName}
                 maxLength={60}
                 onChange={(event) => setNewName(event.target.value)}
-                placeholder="列表名称"
+                placeholder="词单名称"
                 autoFocus
                 className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
               />
@@ -280,7 +280,7 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
               className="inline-flex w-fit items-center gap-1.5 self-start rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
             >
               <PlusIcon className="h-3.5 w-3.5" />
-              新建列表
+              新建词单
             </button>
           ) : null}
         </div>
@@ -297,8 +297,8 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
         <footer className="flex items-center justify-between gap-2 border-t border-border pt-4">
           <span className="text-xs text-text-muted">
             {allLists.length === 0
-              ? "无列表可勾选"
-              : `已选 ${totalSelected} / ${allLists.length} 个列表`}
+              ? "无可勾选词单"
+              : `已选 ${totalSelected} / ${allLists.length} 个词单`}
           </span>
           <div className="flex gap-2">
             <button

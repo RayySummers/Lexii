@@ -41,7 +41,7 @@ export function CustomListDetailScreen({ provider, onExit, listId }: CustomListD
           return;
         }
         if (!meta) {
-          setError("列表不存在或已被删除");
+          setError("词单不存在或已被删除");
           setPhase("error");
           return;
         }
@@ -85,16 +85,16 @@ export function CustomListDetailScreen({ provider, onExit, listId }: CustomListD
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
-      <ScreenHeader title={list?.name ?? "列表详情"} onBack={onExit} backLabel="返回我的列表" />
+      <ScreenHeader title={list?.name ?? "词单详情"} onBack={onExit} backLabel="返回我的词单" />
 
       {phase === "loading" ? (
         <div role="status" className="py-16 text-center text-sm text-text-muted">
-          正在加载列表…
+          正在加载词单…
         </div>
       ) : phase === "error" ? (
         <div className="flex flex-col items-start gap-3 rounded-2xl border border-danger/40 bg-surface p-6">
           <p role="alert" className="text-sm">
-            列表暂时无法加载，请稍后重试。
+            词单暂时无法加载，请稍后重试。
           </p>
           <details className="text-xs text-text-muted">
             <summary>错误详情</summary>
@@ -110,10 +110,10 @@ export function CustomListDetailScreen({ provider, onExit, listId }: CustomListD
         </div>
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface p-8 text-center">
-          <h2 className="text-xl font-semibold">这个列表还是空的</h2>
+          <h2 className="text-xl font-semibold">这个词单还是空的</h2>
           <p className="max-w-sm text-sm text-text-muted">
-            在复习卡或搜词页点「添加到列表」并勾选本列表，就能往里收词。
-            同一个词可以同时归入多个列表。
+            在复习卡或搜词页点「添加到词单」并勾选本词单，就能往里收词。
+            同一个词可以同时归入多个词单。
           </p>
         </div>
       ) : (
@@ -141,7 +141,7 @@ export function CustomListDetailScreen({ provider, onExit, listId }: CustomListD
                 <div className="flex items-center justify-end gap-2">
                   {confirmingId === entry.id ? (
                     <span className="flex items-center gap-2">
-                      <span className="text-xs text-text-muted">移出后该词不再属于此列表</span>
+                      <span className="text-xs text-text-muted">移出后该词不再属于此词单</span>
                       <button
                         type="button"
                         onClick={() => void handleRemove(entry.id)}
@@ -166,7 +166,7 @@ export function CustomListDetailScreen({ provider, onExit, listId }: CustomListD
                         setRemoveError(null);
                         setConfirmingId(entry.id);
                       }}
-                      aria-label={`把「${sense.term}」移出此列表`}
+                      aria-label={`把「${sense.term}」移出此词单`}
                       className="rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium text-text-muted transition-colors hover:border-danger hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
                     >
                       移出

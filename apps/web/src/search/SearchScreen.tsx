@@ -509,11 +509,11 @@ function SearchResultRow({
         <button
           type="button"
           onClick={() => onOpenAddToLists(sense)}
-          aria-label={`把「${sense.term}」添加到列表`}
+          aria-label={`把「${sense.term}」添加到词单`}
           className="flex items-center gap-1 rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium text-text-muted transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
         >
           <ListIcon className="h-3.5 w-3.5" />
-          添加到列表
+          添加到词单
         </button>
         <button
           type="button"
