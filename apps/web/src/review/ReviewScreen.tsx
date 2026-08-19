@@ -483,12 +483,16 @@ function UndoButton({ onUndo }: { onUndo(): void }) {
 /**
  * 返回按钮（RAY-341）：撤销成功后取代「撤销上一步」出现，点击原样
  * 重放被撤销的评分 / 标熟，回到撤销前所在位置（复盘后反悔撤销）。
+ *
+ * N2 (a11y)：显式 aria-label 与可见文本一致——图标 + 文本组合按钮的最佳
+ * 实践，未来如精简为仅图标，按钮的可达名仍明确为「返回」。
  */
 function ReturnButton({ onReturn }: { onReturn(): void }) {
   return (
     <button
       type="button"
       onClick={onReturn}
+      aria-label="返回"
       className="flex w-fit items-center gap-1.5 self-center rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text-muted transition-colors hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
     >
       <RedoIcon className="h-4 w-4" />
