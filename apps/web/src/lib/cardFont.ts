@@ -98,7 +98,7 @@ export const CARD_FONT_OPTIONS: ReadonlyArray<CardFontOption> = [
   {
     id: "inter",
     label: "现代简约",
-    description: "Inter Display ExtraBold，笔触硬朗、信息密度高。",
+    description: "笔触硬朗、信息密度高。",
     sampleText: "vocabulary",
     fontFamily: '"Inter", "Inter Display", system-ui, sans-serif',
     fontWeight: 800,
@@ -106,7 +106,7 @@ export const CARD_FONT_OPTIONS: ReadonlyArray<CardFontOption> = [
   {
     id: "google-sans",
     label: "现代圆润",
-    description: "Google Sans Flex，柔性字怀、几何感。",
+    description: "柔性字形、几何感。",
     sampleText: "vocabulary",
     fontFamily: '"Google Sans Flex", system-ui, sans-serif',
     fontWeight: 600,
@@ -114,7 +114,7 @@ export const CARD_FONT_OPTIONS: ReadonlyArray<CardFontOption> = [
   {
     id: "playpen",
     label: "手写温润",
-    description: "Playpen Sans SemiBold，笔画柔和。",
+    description: "笔画柔和。",
     sampleText: "vocabulary",
     fontFamily: '"Playpen Sans", "Comic Sans MS", cursive',
     fontWeight: 600,
@@ -122,7 +122,7 @@ export const CARD_FONT_OPTIONS: ReadonlyArray<CardFontOption> = [
   {
     id: "newsreader",
     label: "优雅衬线",
-    description: "Newsreader SemiBold，衬线端正、阅读稳重。",
+    description: "衬线端正、阅读稳重。",
     sampleText: "vocabulary",
     fontFamily: '"Newsreader", Georgia, "Times New Roman", serif',
     fontWeight: 600,

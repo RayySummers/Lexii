@@ -136,7 +136,10 @@ CI 不依赖、定时任务也不跑；只在数据需要回填时手动执行�
   唯一定义在 `packages/core/src/termPattern.js`——core 与打包脚本 import 同一文件，
   无双处维护（RAY-260 评审 nit 1）；
 - 释义：换行与半角 `;` 规范化 → 全角分号分隔；超长按 500 字符在「；」边界截断；
-- 词性：从释义段首剥离词性标记（`n.`/`vt.`/`a.` 等，见 `POS_MARKERS`）并入 `pos` 字段；
+- 词性：从释义段首剥离词性标记（`n.`/`vt.`/`a.` 等，见 `POS_MARKERS`）并入 `pos` 字段
+  （按出现顺序去重），同时保留与释义逐条对齐的 `posByDefinition`（RAY-349，
+  第 i 项对应第 i 条释义，该条无标记时为空串）——`pos` 去重后无法还原到具体
+  释义，卡片按词性标注释义靠的是对齐数组；
 - 领域标记：剥离释义段首的 `[医]`/`[法]`/`[计]` 等 ECDICT 领域标记
   （`^\[[^\]]+\]`，可连续多个；与词性标记交替剥离，「`n. [医] 解剖`」与
   「`[医] n. 解剖`」两种形态都剥净，RAY-260 评审 suggestion 1）；
@@ -145,8 +148,10 @@ CI 不依赖、定时任务也不跑；只在数据需要回填时手动执行�
 ## 产物格式与运行时契约
 
 Tier 0 产物为紧凑元组 JSON：`{ id, version, name, generatedAt, source, entries }`，
-`entries` 为 `[term, definitions, pos, ipa, tags]` 五元组（全字符串）。`definitions`
-以换行符连接多条释义——清洗阶段已保证释义文本内不含换行，换行连接是无损往返
+`entries` 为 `[term, definitions, pos, ipa, tags, posByDefinition]` 六元组（全字符串）。
+`posByDefinition`（RAY-349）与 `definitions` 同样以换行连接、逐条对齐，整串为空
+表示该词无逐条词性；装载侧兼容 RAY-349 之前的五元组（按字段缺失处理）。
+`definitions` 以换行符连接多条释义——清洗阶段已保证释义文本内不含换行，换行连接是无损往返
 （全角分号可能出现在释义文本内，不作连接符，RAY-260 评审 nit 3）。运行时
 `packages/core/src/presets/tier0.ts` 装载时做 parse-don't-validate（结构/词条形状/
 去重校验，损坏立即抛错），并由 `packages/core/src/presets/tier0.test.ts` 锁定
@@ -159,6 +164,9 @@ Tier 0 产物为紧凑元组 JSON：`{ id, version, name, generatedAt, source, e
 `packages/core/src/presets/enrichmentTier0.ts` 装载校验，并由
 `packages/core/src/presets/enrichment.test.ts` 锁定「生成 → 装载」契约。富化字段为
 记录级可选字段，不改 IndexedDB schema（回填见 `backfillEnrichment`，不清库）。
+`posByDefinition` 同为记录级可选字段：存量库由 `backfillDefinitionPos`
+（`packages/core/src/presets/definitionPosBackfill.ts`）按 term 回填，只补缺失字段、
+释义被用户改过的义项不动。
 
 ## 首启导入耗时基准
 

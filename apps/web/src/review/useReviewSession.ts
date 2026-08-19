@@ -15,12 +15,19 @@
  * 事件 id + 评分前状态），可返回上一步撤销这一次操作；连续只能撤销一次
  * ——撤销成功后快照清空，不允许连退。撤销完整回滚调度状态与学习记录
  * （core undoReview 单事务），统计口径随事件删除自然一致。
+ *
+ * RAY-341：撤销成功后快照转为「返回快照」——「撤销上一步」按钮变为
+ * 「返回」，点击重放被撤销的那次评分 / 标熟（原 rating 原样重放，调度
+ * 结果与撤销前一致），回到撤销前所在位置，避免用户忘记上一步选了什么。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { EventId, MemoryState, ReviewRating, StudyMode } from "@lexii/core";
 import type { GradeContext, ReviewCard, ReviewDataProvider } from "../review/types";
 
 export type SessionPhase = "loading" | "empty" | "no-due" | "reviewing" | "done" | "error";
+
+/** 一次评分 / 标熟的动作证据（撤销后「返回」原样重放，RAY-341） */
+export type UndoAction = { kind: "grade"; rating: ReviewRating } | { kind: "mastered" };
 
 /** 一次评分 / 标熟的撤销快照（单步撤销证据） */
 export interface UndoSnapshot {
@@ -34,6 +41,8 @@ export interface UndoSnapshot {
   previousMemoryState: MemoryState;
   /** 评分前的已评数（撤销时恢复，完成页计数不虚增） */
   gradedCountBefore: number;
+  /** 被撤销的操作（「返回」时原样重放，RAY-341） */
+  action: UndoAction;
 }
 
 export interface ReviewSession {
@@ -55,6 +64,8 @@ export interface ReviewSession {
   importing: boolean;
   /** 是否可撤销上一步（每次评分/标熟后为 true，撤销成功或新操作后清空） */
   canUndo: boolean;
+  /** 是否可「返回」撤销前位置（撤销成功后为 true，返回或新操作后清空，RAY-341） */
+  canReturn: boolean;
   /**
    * 队列为空且「每日新卡额度已用完、词库仍有未学新词」（RAY-276 诊断线 3）：
    * 界面据此展示额度耗尽文案，而不是「没有待学习的新词」。
@@ -68,6 +79,8 @@ export interface ReviewSession {
   markMastered(): Promise<void>;
   /** 撤销上一步评分 / 标熟（单步；连续只能撤销一次） */
   undo(): Promise<void>;
+  /** 返回撤销前所在位置（RAY-341）：原样重放被撤销的评分 / 标熟 */
+  redo(): Promise<void>;
   /** 空状态一键导入内置示例词表，成功后直接进入复习 */
   importSample(): Promise<void>;
   /** 数据源失败后重试加载 */
@@ -84,6 +97,8 @@ interface SessionState {
   importing: boolean;
   /** 撤销快照（null = 当前无撤销目标） */
   undoSnapshot: UndoSnapshot | null;
+  /** 返回快照（撤销成功后留存；null = 当前无返回目标，RAY-341） */
+  returnSnapshot: UndoSnapshot | null;
   /** 每日新卡额度耗尽标记（RAY-276 诊断线 3；仅 no-due 阶段有意义） */
   newCardQuotaExhausted: boolean;
 }
@@ -97,6 +112,7 @@ const INITIAL_STATE: SessionState = {
   error: null,
   importing: false,
   undoSnapshot: null,
+  returnSnapshot: null,
   newCardQuotaExhausted: false,
 };
 
@@ -131,6 +147,7 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
         error: null,
         importing: false,
         undoSnapshot: null,
+        returnSnapshot: null,
       });
     },
     [apply],
@@ -145,6 +162,7 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
       index: 0,
       flipped: false,
       undoSnapshot: null,
+      returnSnapshot: null,
       newCardQuotaExhausted: false,
     });
     try {
@@ -199,12 +217,14 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
   }, [apply]);
 
   /**
-   * 提交一次「评分落库 + 队列推进」操作（grade / markMastered 共用路径）。
+   * 提交一次「评分落库 + 队列推进」操作（grade / markMastered / redo 共用路径）。
    * 成功后保存撤销快照（RAY-265）：新快照覆盖旧快照，撤销目标始终是
-   * 「上一步」操作；进入下一张卡或 done。
+   * 「上一步」操作；进入下一张卡或 done。任何新操作同时清空返回快照
+   * （RAY-341：返回路径只对「刚刚撤销的那一步」有效）。
    */
   const commitGrade = useCallback(
     async (
+      action: UndoAction,
       run: (
         card: ReviewCard,
         context: GradeContext,
@@ -245,9 +265,10 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
         eventId: result.reviewEventId,
         previousMemoryState: result.previousMemoryState,
         gradedCountBefore: current.gradedCount,
+        action,
       };
       if (current.index + 1 >= current.cards.length) {
-        apply({ phase: "done", gradedCount, undoSnapshot });
+        apply({ phase: "done", gradedCount, undoSnapshot, returnSnapshot: null });
       } else {
         cardShownAtRef.current = Date.now();
         apply({
@@ -256,6 +277,7 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
           flipped: false,
           gradedCount,
           undoSnapshot,
+          returnSnapshot: null,
         });
       }
     },
@@ -264,16 +286,20 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
 
   const grade = useCallback(
     async (rating: ReviewRating) => {
-      await commitGrade((card, context) => provider.grade(card, rating, context));
+      await commitGrade({ kind: "grade", rating }, (card, context) =>
+        provider.grade(card, rating, context),
+      );
     },
     [provider, commitGrade],
   );
 
   const markMastered = useCallback(async () => {
-    await commitGrade((card, context) => provider.markMastered(card, context));
+    await commitGrade({ kind: "mastered" }, (card, context) =>
+      provider.markMastered(card, context),
+    );
   }, [provider, commitGrade]);
 
-  /** 撤销上一步评分 / 标熟（单步：成功后快照清空，不允许连退） */
+  /** 撤销上一步评分 / 标熟（单步：成功后快照转为返回快照，不允许连退） */
   const undo = useCallback(async () => {
     const current = stateRef.current;
     const snapshot = current.undoSnapshot;
@@ -308,8 +334,29 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
       error: null,
       importing: false,
       undoSnapshot: null,
+      // RAY-341：撤销快照转为返回快照，「撤销上一步」变为「返回」
+      returnSnapshot: snapshot,
     });
   }, [provider, apply]);
+
+  /**
+   * 返回撤销前所在位置（RAY-341）：原样重放被撤销的那次评分 / 标熟。
+   * 记忆状态在撤销时已回退，重放同一 rating 得到与撤销前一致的排期；
+   * 重放走 commitGrade 通用路径（防连按、进入下一张卡或 done），成功后
+   * 重新获得撤销快照——按钮在「撤销上一步」与「返回」之间来回切换。
+   */
+  const redo = useCallback(async () => {
+    const current = stateRef.current;
+    const snapshot = current.returnSnapshot;
+    if (!snapshot || current.phase !== "reviewing") {
+      return;
+    }
+    if (snapshot.action.kind === "grade") {
+      await grade(snapshot.action.rating);
+    } else {
+      await markMastered();
+    }
+  }, [grade, markMastered]);
 
   const importSample = useCallback(async () => {
     apply({ importing: true });
@@ -337,11 +384,13 @@ export function useReviewSession(provider: ReviewDataProvider, mode: StudyMode):
     error: state.error,
     importing: state.importing,
     canUndo: state.undoSnapshot !== null,
+    canReturn: state.returnSnapshot !== null,
     newCardQuotaExhausted: state.newCardQuotaExhausted,
     flip,
     grade,
     markMastered,
     undo,
+    redo,
     importSample,
     retry,
   };

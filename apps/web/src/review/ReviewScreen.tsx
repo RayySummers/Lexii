@@ -16,6 +16,10 @@
  *   （词保留词书、按已熟长间隔调度）；
  * - 每次评分 / 标熟后可单步撤销（连续只能撤销一次，不可连退）。
  *
+ * RAY-341：点击「撤销上一步」后按钮不再消失，而是变为「返回」——
+ * 点击原样重放被撤销的评分 / 标熟，回到撤销前所在位置，让用户能
+ * 复盘上一步选了什么（或反悔撤销）。
+ *
  * RAY-324：发音源选择（系统 / 线上）—— 朗读时按设置分发；线上源失败
  * 自动回落系统朗读，UI 给一次「已自动切换到系统语音」提示。
  *
@@ -33,7 +37,7 @@ import type { ReviewRating, StudyMode } from "@lexii/core";
 import { AddToListsDialog } from "../customLists/AddToListsDialog";
 import { NOOP_ADD_TO_LISTS_PROVIDER } from "../customLists/data";
 import type { AddToListsDataProvider } from "../customLists/types";
-import { BackArrowIcon, ListIcon, SpeakerIcon, UndoIcon } from "../components/icons";
+import { BackArrowIcon, ListIcon, RedoIcon, SpeakerIcon, UndoIcon } from "../components/icons";
 import { readDailyNewCardLimit } from "../lib/dailyNewCardLimit";
 import {
   primeSpeechEngine,
@@ -448,7 +452,11 @@ function PhaseContent({
               {speakNotice}
             </p>
           ) : null}
-          {session.canUndo ? <UndoButton onUndo={() => void session.undo()} /> : null}
+          {session.canUndo ? (
+            <UndoButton onUndo={() => void session.undo()} />
+          ) : session.canReturn ? (
+            <ReturnButton onReturn={() => void session.redo()} />
+          ) : null}
           <p className="text-center text-xs text-text-muted">
             空格翻面 ·{" "}
             {tierMode === "three" ? "数字键 1–3 评分" : "数字键 1–4 或字母 A / H / G / E 评分"}
@@ -468,6 +476,27 @@ function UndoButton({ onUndo }: { onUndo(): void }) {
     >
       <UndoIcon className="h-4 w-4" />
       撤销上一步
+    </button>
+  );
+}
+
+/**
+ * 返回按钮（RAY-341）：撤销成功后取代「撤销上一步」出现，点击原样
+ * 重放被撤销的评分 / 标熟，回到撤销前所在位置（复盘后反悔撤销）。
+ *
+ * N2 (a11y)：显式 aria-label 与可见文本一致——图标 + 文本组合按钮的最佳
+ * 实践，未来如精简为仅图标，按钮的可达名仍明确为「返回」。
+ */
+function ReturnButton({ onReturn }: { onReturn(): void }) {
+  return (
+    <button
+      type="button"
+      onClick={onReturn}
+      aria-label="返回"
+      className="flex w-fit items-center gap-1.5 self-center rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text-muted transition-colors hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+    >
+      <RedoIcon className="h-4 w-4" />
+      返回
     </button>
   );
 }
