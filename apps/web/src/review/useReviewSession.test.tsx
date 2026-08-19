@@ -4,6 +4,8 @@
  *
  * RAY-265：单步撤销（成功可撤销、撤销后不可连退、失败进入 error）与
  * 标熟（按评分同路径推进队列并落撤销快照）。
+ * RAY-341：撤销后保留返回快照（canReturn），「返回」原样重放被撤销的
+ * 评分 / 标熟回到原位置。
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -225,7 +227,7 @@ describe("useReviewSession 时序边界", () => {
 });
 
 describe("RAY-265 单步撤销与标熟", () => {
-  it("评分后 canUndo；撤销回到该卡且快照清空（连续只能撤销一次，不允许连退）", async () => {
+  it("评分后 canUndo；撤销回到该卡且可「返回」重放原评分（不可连退）", async () => {
     const first = makeCard();
     first.sense.term = "apple";
     const second = makeCard();
@@ -238,6 +240,7 @@ describe("RAY-265 单步撤销与标熟", () => {
       await result.current.grade("good");
     });
     expect(result.current.canUndo).toBe(true);
+    expect(result.current.canReturn).toBe(false);
     expect(result.current.index).toBe(1);
 
     await act(async () => {
@@ -253,13 +256,87 @@ describe("RAY-265 单步撤销与标熟", () => {
     expect(result.current.current?.sense.term).toBe("apple");
     expect(result.current.gradedCount).toBe(0);
     expect(result.current.canUndo).toBe(false); // 快照已清空，不允许连退
+    expect(result.current.canReturn).toBe(true); // RAY-341：撤销后保留返回路径
 
-    // 再次评分后重新获得一次撤销机会
+    // 「返回」：原样重放被撤销的评分，回到撤销前所在的下一张卡
+    await act(async () => {
+      await result.current.redo();
+    });
+    expect(result.current.index).toBe(1);
+    expect(result.current.gradedCount).toBe(1);
+    expect(result.current.canUndo).toBe(true); // 重放即一次新评分，重新获得撤销机会
+    expect(result.current.canReturn).toBe(false);
+    expect(harness.grade).toHaveBeenCalledTimes(2);
+    expect(harness.grade).toHaveBeenLastCalledWith(first, "good", expect.anything());
+
+    // 再次撤销：仍可退回（撤销 ↔ 返回 来回切换）
+    await act(async () => {
+      await result.current.undo();
+    });
+    expect(result.current.index).toBe(0);
+    expect(result.current.canReturn).toBe(true);
+  });
+
+  it("撤销后重新评分：新操作清空返回路径（返回只对刚撤销的那一步有效）", async () => {
+    const first = makeCard();
+    const second = makeCard();
+    const harness = makeHarness({ queue: [first, second] });
+    const { result } = renderHook(() => useReviewSession(harness.provider, "review"));
+    await waitFor(() => expect(result.current.phase).toBe("reviewing"));
+
     await act(async () => {
       await result.current.grade("good");
     });
-    expect(result.current.canUndo).toBe(true);
+    await act(async () => {
+      await result.current.undo();
+    });
+    expect(result.current.canReturn).toBe(true);
+
+    await act(async () => {
+      await result.current.grade("again"); // 反悔后改评分
+    });
     expect(result.current.index).toBe(1);
+    expect(result.current.canUndo).toBe(true);
+    expect(result.current.canReturn).toBe(false);
+  });
+
+  // N3 (PR #98 nit)：「返回」快速连按只重放一次。gradingRef 防抖吞掉
+  // 第一次 redo 未落库前的并发 redo，避免同一步被重复重放。
+  it("「返回」快速连按只重放一次（gradingRef 防抖）", async () => {
+    const first = makeCard();
+    const second = makeCard();
+    const harness = makeHarness({ queue: [first, second] });
+    const { result } = renderHook(() => useReviewSession(harness.provider, "review"));
+    await waitFor(() => expect(result.current.phase).toBe("reviewing"));
+
+    await act(async () => {
+      await result.current.grade("good");
+    });
+    await act(async () => {
+      await result.current.undo();
+    });
+    expect(result.current.canReturn).toBe(true);
+    const beforeRedo = harness.grade.mock.calls.length; // 1（首次评分）
+
+    // 第一次 redo：让 provider.grade 挂起，模拟落库延迟
+    let releaseGrade!: () => void;
+    const gradeGate = new Promise<void>((res) => (releaseGrade = res));
+    harness.grade.mockImplementationOnce(async (card) => {
+      await gradeGate;
+      return gradeResultFor(card, "redo_gated");
+    });
+
+    await act(async () => {
+      const p1 = result.current.redo(); // 进入 commitGrade，gradingRef=true，挂在 await provider.grade
+      const p2 = result.current.redo(); // gradingRef 仍为 true，commitGrade 直接 return
+      releaseGrade(); // 放行第一次 redo
+      await Promise.all([p1, p2]);
+    });
+    // provider.grade 仅多调用一次（首次评分 + 重放）；第二次 redo 被吞掉
+    expect(harness.grade.mock.calls.length).toBe(beforeRedo + 1);
+    expect(result.current.index).toBe(1);
+    expect(result.current.canReturn).toBe(false);
+    expect(result.current.canUndo).toBe(true); // 重放成功，留下新撤销快照
   });
 
   it("done 态撤销：回到最后一张卡重新评分，计数不虚增", async () => {
@@ -282,9 +359,19 @@ describe("RAY-265 单步撤销与标熟", () => {
     expect(result.current.index).toBe(0);
     expect(result.current.gradedCount).toBe(0);
     expect(result.current.canUndo).toBe(false);
+    expect(result.current.canReturn).toBe(true);
+
+    // 「返回」重放评分后回到 done 态
+    await act(async () => {
+      await result.current.redo();
+    });
+    expect(result.current.phase).toBe("done");
+    expect(result.current.gradedCount).toBe(1);
+    expect(result.current.canUndo).toBe(true);
+    expect(result.current.canReturn).toBe(false);
   });
 
-  it("标熟：与评分同路径推进队列并留撤销快照，撤销后回到该卡", async () => {
+  it("标熟：与评分同路径推进队列并留撤销快照，撤销后「返回」重放标熟", async () => {
     const first = makeCard();
     const second = makeCard();
     const harness = makeHarness({ queue: [first, second] });
@@ -303,19 +390,34 @@ describe("RAY-265 单步撤销与标熟", () => {
     });
     expect(result.current.index).toBe(0);
     expect(harness.undoGrade).toHaveBeenCalledTimes(1);
+    expect(result.current.canReturn).toBe(true);
+
+    await act(async () => {
+      await result.current.redo();
+    });
+    expect(harness.markMastered).toHaveBeenCalledTimes(2);
+    expect(harness.grade).not.toHaveBeenCalled();
+    expect(result.current.index).toBe(1);
+    expect(result.current.canUndo).toBe(true);
+    expect(result.current.canReturn).toBe(false);
   });
 
-  it("无可撤销快照时 undo 无效；撤销失败进入 error 态", async () => {
+  it("无可撤销快照时 undo / redo 无效；撤销失败进入 error 态", async () => {
     const card = makeCard();
     const harness = makeHarness({ queue: [card] });
     const { result } = renderHook(() => useReviewSession(harness.provider, "review"));
     await waitFor(() => expect(result.current.phase).toBe("reviewing"));
 
     expect(result.current.canUndo).toBe(false);
+    expect(result.current.canReturn).toBe(false);
     await act(async () => {
       await result.current.undo();
     });
+    await act(async () => {
+      await result.current.redo();
+    });
     expect(harness.undoGrade).not.toHaveBeenCalled();
+    expect(harness.grade).not.toHaveBeenCalled();
 
     await act(async () => {
       await result.current.grade("good");
