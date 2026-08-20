@@ -148,10 +148,10 @@ PR 描述使用下方模板，并自行对照「13 条评审标准」在描述�
 应用版本号的唯一来源是 `apps/web/package.json` 的 `version`（构建时经 Vite `define` 注入，设置页底部展示）。发版请按以下顺序执行，**版本号与 tag 必须一致**，否则页面显示的版本会与发布的 tag 漂移：
 
 1. **档案对账**：发版前由 Mell 对账「Release 档案对内版（活文档）」（RAY-285，Mell 维护）与 issue 树，状态不一致先修正档案，再继续发版。
-2. **Bump 版本号**：在发布 PR 中把 `apps/web/package.json` 的 `version` 更新为新版本（如 `0.1.0-alpha.2`）。设置页底部版本号会自动跟随，无需改动任何组件代码。
-3. **合入 main**：版本 bump 与功能变更一起走 PR（禁止绕过 PR 直推 `main`），CI 全绿后合并。
-4. **打 tag**：在包含该版本 bump 的 main 合并提交上打 tag，格式为 `v<版本号>`（与 package.json 完全一致，如 `v0.1.0-alpha.2`），并推送 tag。
-5. **部署验证**（RAY-297 双通道）：推送 tag 自动触发 Release 通道部署（`.github/workflows/deploy-release.yml`，发布到 `rayysummers.github.io/Lexii/` 根路径）；`main` 每次合入自动触发 Dev 通道部署（`.github/workflows/deploy-dev.yml`，发布到 `/Lexii/dev/` 子路径，保留 RAY-241 以来的 main push 预览行为）。两通道每次部署都发布自洽的完整站点（互相携带对方快照），任一通道的部署不会把另一通道冲成 404。部署完成后：在根路径真机确认设置页底部版本号与 tag 一致；在 `/Lexii/dev/` 确认开发预览正常。两个通道均可经 `workflow_dispatch` 手动触发。
+2. **Bump 版本号**：在发布 PR 中把 `apps/web/package.json` 的 `version` 更新为新版本（如 `0.1.0-alpha.2`）。设置页底部版本号会自动跟随，无需改动任何组件代码。本地自检：`node scripts/check-release-version.mjs --version <新版本>`（RAY-368 兜底：tag 与 package.json 必须一致）。
+3. **合入 main**：版本 bump 与功能变更一起走 PR（禁止绕过 PR 直推 `main`），CI 全绿后合并。CI 已内置 `check-release-version` 自检（tag 推送时强校验一致性）。
+4. **打 tag**：在包含该版本 bump 的 main 合并提交上打 tag，格式为 `v<版本号>`（与 package.json 完全一致，如 `v0.1.0-alpha.2`），并推送 tag。打 tag 前本地复核：`node scripts/check-release-version.mjs --tag v<版本号>`。
+5. **部署验证**（RAY-297 双通道）：推送 tag 自动触发 Release 通道部署（`.github/workflows/deploy-release.yml`，发布到 `rayysummers.github.io/Lexii/` 根路径，部署前自动执行 `check-release-version` 一致性门禁，不一致则 fail-fast）；`main` 每次合入自动触发 Dev 通道部署（`.github/workflows/deploy-dev.yml`，发布到 `/Lexii/dev/` 子路径，保留 RAY-241 以来的 main push 预览行为）。两通道每次部署都发布自洽的完整站点（互相携带对方快照），任一通道的部署不会把另一通道冲成 404。部署完成后：在根路径真机确认设置页底部版本号与 tag 一致；在 `/Lexii/dev/` 确认开发预览正常。两个通道均可经 `workflow_dispatch` 手动触发。
 6. **从对内版活文档同步对外版**：从 Mell 维护的「Release 档案对内版（活文档）」（RAY-285，带状态标注的完整版）按「对外版」口径同步到 `docs/archive/release-pipeline-archive.md`——保留版本 / 波次分组、事项标题与父子依赖缩进；去掉状态标注（✅🔵🟡 等）、内部排期备注与 RAY 编号（对外版不带状态）。
 7. **提炼 CHANGELOG**：由 Vega 从对内版活文档（RAY-285）提炼 CHANGELOG，以对外版档案为骨架、按实际合入版本归类，随 GitHub Release 公开。
 
