@@ -8,9 +8,14 @@
  * - 每个富化词条至少携带一个非空字段（装载校验已在 enrichment.ts
  *   parseEnrichmentPreset 中兜底，此处再锁数量底线）。
  */
+// @ts-expect-error - node:zlib types via @types/node
+import { brotliCompressSync, constants as zlibConstants } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { ENRICHMENT_TIER0_ENTRY_COUNT, ENRICHMENT_TIER0_PRESET } from "./enrichmentTier0";
 import { TIER0_PRESET } from "./tier0";
+
+// 与 `scripts/presets/lib/truncate.mjs:ENUM_LIST_RE` 同步（S-3），避免两处漂移
+const ENUM_LIST_RE = /(^|\s)\d+\)\s/g;
 
 describe("enrichment.tier0.data.json（生成 → 装载契约）", () => {
   it("包元数据完整：id/version/name/source 非空，词条非空", () => {
@@ -21,6 +26,22 @@ describe("enrichment.tier0.data.json（生成 → 装载契约）", () => {
     expect(ENRICHMENT_TIER0_PRESET.source).toBeTruthy();
     expect(ENRICHMENT_TIER0_ENTRY_COUNT).toBeGreaterThan(0);
   });
+
+  it('S-1：version === "1.4.0" 且 brotli 体积防回滚/膨胀（1.28MB+5KB）', () => {
+    // 显式 pin 版本，防 1.3.0 数据被误回滚；brotli 阈值防 64→128 等无意膨胀
+    expect(ENRICHMENT_TIER0_PRESET.version).toBe("1.4.0");
+    const json = JSON.stringify(ENRICHMENT_TIER0_PRESET);
+    const brotliBytes = brotliCompressSync(json, {
+      params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11 },
+    }).length;
+    const threshold = 1.28 * 1024 * 1024 + 5 * 1024;
+    expect(
+      brotliBytes,
+      `brotli 体积 ${brotliBytes} bytes 超阈 ${threshold}，防无意膨胀（当前 1.28MB 基线 +5KB）`,
+    ).toBeLessThan(threshold);
+    // 额外 guard：1.4.0 产物已通过 RAY-365 修复，entry 数应与 1.3.0 同量级（不回退）
+    expect(ENRICHMENT_TIER0_ENTRY_COUNT).toBeGreaterThan(7000);
+  }, 15000);
 
   it("富化词条 term 全部来自 Tier 0 词表（大小写不敏感），按 term 排序且无重复", () => {
     // 富化包 term 为打包侧规范化的小写词形（kaikki/ipa-dict/OpenEtymology
@@ -51,6 +72,7 @@ describe("enrichment.tier0.data.json（生成 → 装载契约）", () => {
     // （8-char 上限 + 全角括号未对齐）。回填后 8 → 32 字、sentence-boundary，
     // 应基本消除 8-char 上限带来的「（」收尾；剩余仅为少数 OE 源本就 > 32
     // 字且句中无可对齐全角括号的边缘情况（如 fridge / listen）。
+    // RAY-365 收紧：32 → 64 字 + 括号平衡感知后，应为 0（2026-08-20 实测 309 → 0）。
     let truncated = 0;
     for (const tuple of ENRICHMENT_TIER0_PRESET.entries) {
       const wp = tuple[7];
@@ -68,7 +90,78 @@ describe("enrichment.tier0.data.json（生成 → 装载契约）", () => {
     // v1.2.3 因 8-char 上限 100% 注释都被截断，其中 80 条以「（」收尾；
     // RAY-344 上限 32 字 + sentence-boundary 后剩余应在个位数（实测 2：
     // fridge / listen 两个 OE 源 > 32 字且无完整全角括号的边缘条目）。
-    expect(truncated, "wordParts 注释收尾于「（」残段").toBeLessThan(10);
+    // RAY-365 修复后应为 0（括号平衡 + 上限 64 字）。
+    expect(truncated, "wordParts 注释收尾于「（」残段").toBe(0);
+  });
+
+  it("RAY-365：wordParts/ etymology/ etymologyZh 括号必须平衡（P0 只有左括号无右括号）", () => {
+    // 根因：truncateAtBoundary 在嵌套 `（` 场景下曾选内层 `）` 导致外层未闭合，
+    // 产物出现 309 条 wordParts 注释「只有左括号无右括号」。RAY-365 增加括号平衡感知
+    // 与硬切后补全，此测试直接断言三字段括号深度为 0。
+    // 注意：中文词源中枚举 `1) ` / `2) ` / `10) ` 的 `)` 不计入括号平衡（keen 等词条的 `1) 物理层面的...`），正则与 truncate.mjs 同步
+    let unbalanced = 0;
+    const unbalancedSamples: string[] = [];
+    function depth(text: string): { full: number; half: number } {
+      // 去掉枚举标记 `1) ` / `2) ` / `10) ` 再计数，避免误判（keen 等词条，S-3）
+      const normalized = text.replace(ENUM_LIST_RE, "$1");
+      let full = 0;
+      let half = 0;
+      for (const ch of normalized) {
+        if (ch === "（") full += 1;
+        else if (ch === "）") full -= 1;
+        else if (ch === "(") half += 1;
+        else if (ch === ")") half -= 1;
+      }
+      return { full, half };
+    }
+    for (const tuple of ENRICHMENT_TIER0_PRESET.entries) {
+      const wp = tuple[7] as string;
+      const ez = tuple[8] as string;
+      // P0 只关注中文词源与词根词缀；英文 etymology (kaikki) 的 84 字截断不在本 P0 验收范围
+      // 只检查全角括号，避免 `1) ` 枚举干扰（keen 等）
+      if (ez) {
+        const d = depth(ez);
+        if (d.full !== 0) {
+          unbalanced += 1;
+          if (unbalancedSamples.length < 3)
+            unbalancedSamples.push(`${tuple[0]}.etymologyZh:${JSON.stringify(ez.slice(0, 40))}`);
+        }
+      }
+      if (wp) {
+        for (const part of wp.split(" · ")) {
+          const m = part.match(/^(.*?)<([^>]*)>$/);
+          if (!m) continue;
+          const note = m[2] ?? "";
+          const d = depth(note);
+          if (d.full !== 0) {
+            unbalanced += 1;
+            if (unbalancedSamples.length < 3)
+              unbalancedSamples.push(`${tuple[0]}.wordParts:${JSON.stringify(part.slice(0, 50))}`);
+            break;
+          }
+        }
+      }
+    }
+    expect(unbalanced, `括号不平衡样本: ${unbalancedSamples.join(" | ")}`).toBe(0);
+  });
+
+  it("S-3：枚举正则忽略 `1) ` / `2) ` / `10) `（与 truncate 共用 ENUM_LIST_RE）", () => {
+    // 与 `scripts/presets/lib/truncate.mjs:ENUM_LIST_RE` 同步，覆盖 2) / 10) 场景
+    const samples = ["1) 物理层面的", " 2) 精神层面的", " 10) 测试枚举"];
+    for (const raw of samples) {
+      const normalized = raw.replace(ENUM_LIST_RE, "$1");
+      expect(normalized, `枚举 ${JSON.stringify(raw)} 未被忽略`).not.toContain(")");
+      // 进一步验证 depth 计为平衡（full 0）
+      let full = 0;
+      for (const ch of normalized) {
+        if (ch === "（") full += 1;
+        else if (ch === "）") full -= 1;
+      }
+      expect(full, `枚举 ${JSON.stringify(raw)} 仍计为不平衡`).toBe(0);
+    }
+    // 非枚举的括号不应被忽略
+    expect("a（b）".replace(ENUM_LIST_RE, "$1")).toBe("a（b）");
+    expect("test(1)".replace(ENUM_LIST_RE, "$1")).toBe("test(1)");
   });
 
   it("RAY-344：etymologyZh 无半句截断（=== 64 而非 < 64，pin 上限确实放开）", () => {
