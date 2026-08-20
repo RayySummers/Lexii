@@ -279,7 +279,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     const harness = loadServiceWorker();
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexii-shell-v3");
+    const cache = harness.cachesByName.get("lexii-shell-v4");
     expect(cache).toBeDefined();
     for (const shellUrl of [
       "http://localhost/",
@@ -307,7 +307,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     });
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexii-shell-v3");
+    const cache = harness.cachesByName.get("lexii-shell-v4");
     expect(cache!.entries.has("http://localhost/")).toBe(false);
     expect(cache!.entries.has("http://localhost/index.html")).toBe(true);
     expect(cache!.entries.has("http://localhost/assets/index-abc123.js")).toBe(true);
@@ -321,7 +321,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     await runActivate(harness);
 
     expect(harness.cachesByName.has("lexii-shell-v0")).toBe(false);
-    expect(harness.cachesByName.has("lexii-shell-v3")).toBe(true);
+    expect(harness.cachesByName.has("lexii-shell-v4")).toBe(true);
     expect(harness.claim).toHaveBeenCalledTimes(1);
   });
 
@@ -336,7 +336,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
 
     expect(harness.cachesByName.has("lexilexi-shell-v0")).toBe(false);
     expect(harness.cachesByName.has("lexilexi-shell-v1")).toBe(false);
-    expect(harness.cachesByName.has("lexii-shell-v3")).toBe(true);
+    expect(harness.cachesByName.has("lexii-shell-v4")).toBe(true);
     expect(harness.claim).toHaveBeenCalledTimes(1);
   });
 
@@ -380,7 +380,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
   it("静态资源未命中缓存时走网络并回填缓存（stale-while-revalidate）", async () => {
     const harness = loadServiceWorker();
     await runInstall(harness);
-    const cache = harness.cachesByName.get("lexii-shell-v3")!;
+    const cache = harness.cachesByName.get("lexii-shell-v4")!;
 
     const response = await dispatchFetch(harness, {
       method: "GET",
@@ -422,7 +422,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     const harness = loadServiceWorker();
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexii-shell-v3");
+    const cache = harness.cachesByName.get("lexii-shell-v4");
     expect(cache).toBeDefined();
     // CSS 本体按页面 <link> 的 URL 缓存（离线回退用）
     expect(cache!.entries.has(CARD_FONT_CSS_URL)).toBe(true);
@@ -489,7 +489,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
   it("字体文件未缓存：走网络并在成功时回填缓存（stale-while-revalidate 同款）", async () => {
     const harness = loadServiceWorker();
     await runInstall(harness);
-    const cache = harness.cachesByName.get("lexii-shell-v3")!;
+    const cache = harness.cachesByName.get("lexii-shell-v4")!;
 
     // 页面 UA 请求了一个安装时未预缓存的 gstatic 文件（CSS 随 UA 变化）
     const extraFontUrl = "https://fonts.gstatic.com/s/inter/v20/inter-800-latin-ext.woff2";
@@ -516,7 +516,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     });
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexii-shell-v3");
+    const cache = harness.cachesByName.get("lexii-shell-v4");
     expect(cache).toBeDefined();
     expect(cache!.entries.has(CARD_FONT_CSS_URL)).toBe(false);
     // 外壳与构建产物不受影响
@@ -536,7 +536,7 @@ describe("public/sw.js（vm 沙箱行为测试）", () => {
     const harness = loadServiceWorker(defaultFetch, SW_HREF);
     await runInstall(harness);
 
-    const cache = harness.cachesByName.get("lexii-shell-v3");
+    const cache = harness.cachesByName.get("lexii-shell-v4");
     expect(cache).toBeDefined();
     for (const shellUrl of [
       "https://rayysummers.github.io/Lexii/",

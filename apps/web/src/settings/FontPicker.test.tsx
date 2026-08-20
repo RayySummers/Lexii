@@ -74,7 +74,7 @@ describe("FontPicker 卡片字体选择（RAY-323，RAY-366 扩至 7 档）", ()
     const targets: CardFont[] = [
       "google-sans",
       "playpen",
-      "newsreader",
+      "sentient",
       "geist-mono",
       "nunito",
       "geist-pixel",

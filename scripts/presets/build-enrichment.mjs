@@ -55,8 +55,8 @@ const TIER0_ENRICHMENT_JSON = path.join(
 );
 const KAIKKI_FILE = path.join(DATA_DIR, "kaikki", "kaikki.org-dictionary-English.jsonl");
 
-/** 富化包版本：来源快照固定后版本随内容变更递增 */
-const ENRICHMENT_VERSION = "1.3.0";
+/** 富化包版本：来源快照固定后版本随内容变更递增（RAY-365：1.3.0 → 1.4.0 括号平衡修复） */
+const ENRICHMENT_VERSION = "1.4.0";
 
 import { truncateAtBoundary, trimWordPartsNote } from "./lib/truncate.mjs";
 
@@ -73,12 +73,17 @@ import { truncateAtBoundary, trimWordPartsNote } from "./lib/truncate.mjs";
  *   例如「坐（拉丁语 se」是 RAY-338 报告里的样本之一）。
  * - etymology 84 字保留 + sentence-boundary 截断。
  *
+ * RAY-365（P0 括号截断根因修复）：
+ * - wordPartsNote 32 → 64 字（Tier1 同档，etymologyZh 384 不变已覆盖 100% p99=276，仅追加括号平衡感知），
+ *   配合括号平衡的 sentence-boundary 消除 309 条「只有左括号无右括号」残段，硬切后自动补全缺失右括号，参考 truncate.mjs。
+ * - etymology 84 字保留（etymologyZh 384 不变对比）但追加括号平衡修复（kaikki 英文词源含括号时同理）。
+ *
  * 截断函数（truncateAtBoundary / trimWordPartsNote）已抽到
  * `lib/truncate.mjs` 共享模块，避免与一次性 `backfill/ray344.mjs`
  * 副本漂移（Oscar 评审建议 #4）。
  */
 const TIER0_CAPS = { examples: 2, synonyms: 3, antonyms: 3, derived: 2 };
-const TIER0_TRUNCATE = { etymology: 84, etymologyZh: 384, wordPartsNote: 32 };
+const TIER0_TRUNCATE = { etymology: 84, etymologyZh: 384, wordPartsNote: 64 };
 const TIER1_CAPS = { examples: 3, synonyms: 8, antonyms: 8, derived: 12 };
 const TIER1_TRUNCATE = { etymology: 400, etymologyZh: 400, wordPartsNote: 64 };
 

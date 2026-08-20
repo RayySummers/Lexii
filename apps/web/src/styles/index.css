@@ -27,6 +27,30 @@
 }
 
 /*
+ * 图标系统（RAY-363）：Google Material Symbols Outlined 全局约定。
+ * - 字体由 index.html 的 Google Fonts 样式表提供（display=swap）；
+ * - 图标颜色继承文本色（currentColor），随浅色/深色 token 自动适配；
+ * - 图标尺寸由使用处的 className（h-5/h-4 等）映射为 font-size（见 icons.tsx），
+ *   不在此处硬编码；此处只定义字形渲染所需的可变字体轴与抗锯齿。
+ * - 全部为装饰性图标（aria-hidden），可达名由按钮的 aria-label/文本提供。
+ */
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+}
+
+/*
  * 背词卡片固定高度的 vh 回退（RAY-291，RAY-291 评审 nit 3）：
  * 卡片高度的 dvh 版本由组件内联 style 应用（常量唯一来源，见
  * ReviewCard.tsx 的 cardHeightStyle）；旧浏览器（iOS Safari < 15.4 /

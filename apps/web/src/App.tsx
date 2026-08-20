@@ -28,7 +28,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import type { CustomListId, StudyMode } from "@lexii/core";
-import { BookmarkIcon, ListIcon } from "./components/icons";
+import { BarChartIcon, BookmarkIcon, ListIcon, SearchIcon, SettingsIcon } from "./components/icons";
 import { CustomListDetailScreen } from "./customLists/CustomListDetailScreen";
 import { CustomListsScreen } from "./customLists/CustomListsScreen";
 import {
@@ -53,6 +53,7 @@ import { SearchScreen } from "./search/SearchScreen";
 import { createDefaultSearchDataProvider } from "./search/data";
 import type { SearchDataProvider } from "./search/types";
 import { SettingsScreen } from "./settings/SettingsScreen";
+import { parseSettingsAnchorFromHash } from "./settings/anchors";
 import { createDefaultSettingsDataProvider } from "./settings/data";
 import type { SettingsDataProvider } from "./settings/types";
 import { StatsScreen } from "./stats/StatsScreen";
@@ -93,6 +94,11 @@ export function App({
   const { font: cardFont, setFont: setCardFont } = useCardFont();
   // RAY-315: Hash-based routing so refresh preserves the current view.
   const [view, navigate] = useHashRoute();
+  // RAY-364 可持续锚点：搜词无结果 → 设置页「扩展词包」区块，基于稳定 id/data-anchor。
+  // 初始值从 hash 解析（刷新/直链可持续），点击跳转时由 openSettings 写入。
+  const [settingsAnchor, setSettingsAnchor] = useState<string | null>(() =>
+    typeof window !== "undefined" ? parseSettingsAnchorFromHash(window.location.hash) : null,
+  );
   // RAY-315: Auto-create providers for the initial hash-restored view to avoid
   // a flash of the home screen when the user navigates directly via URL.
   const [reviewProvider, setReviewProvider] = useState<ReviewDataProvider | null>(() =>
@@ -136,6 +142,26 @@ export function App({
     window.addEventListener("popstate", syncListIdFromHash);
     return () => window.removeEventListener("popstate", syncListIdFromHash);
   }, []);
+
+  // RAY-364 可持续锚点：浏览器前进/后退时同步设置页锚点，刷新与直链已在初始化时处理。
+  // 同时处理“在非设置页时通过历史记录回到 #/settings?anchor=...”的惰性 provider 创建。
+  useEffect(() => {
+    function syncAnchorFromHash() {
+      const next =
+        typeof window !== "undefined" ? parseSettingsAnchorFromHash(window.location.hash) : null;
+      setSettingsAnchor(next);
+    }
+    window.addEventListener("popstate", syncAnchorFromHash);
+    return () => window.removeEventListener("popstate", syncAnchorFromHash);
+  }, []);
+
+  // RAY-364 + RAY-315：popstate 切换到 settings 但 provider 仍为 null 时补创建（惰性创建的兜底）。
+  useEffect(() => {
+    if (view === "settings" && !settingsProvider) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 惰性补创建：仅在外部路由同步后补齐 provider，避免闪烁，非级联渲染
+      setSettingsProvider(settingsProviderFactory());
+    }
+  }, [view, settingsProvider, settingsProviderFactory]);
   const statsProvider = useStatsProvider(statsProviderFactory);
   const [reviewMode, setReviewMode] = useState<StudyMode>("review");
   const [studyFormat, setStudyFormat] = useState<StudyFormat>("card");
@@ -157,10 +183,29 @@ export function App({
     [reviewProviderFactory, navigate],
   );
 
-  const openSettings = useCallback(() => {
-    setSettingsProvider((current) => current ?? settingsProviderFactory());
-    navigate("settings");
-  }, [settingsProviderFactory, navigate]);
+  /**
+   * RAY-364 可持续锚点跳转：搜词无结果页「前往设置安装扩展词包」→ 设置页「扩展词包」区块。
+   * @param anchor - 稳定的区块标识（如 extension-packages），基于 id / data-anchor 定位，禁止硬编码索引。
+   *                 不传时为普通“设置”入口（header 按钮），不触发滚动。
+   * 历史语义：`navigate("settings")` 先 `pushState #/settings`（与普通设置入口一致，保证后退回到上一视图），
+   * 随后 `replaceState #/settings?anchor=...` 在同一历史条目上附加锚点，避免产生“空锚点 → 带锚点”的中间条目。
+   * 刷新/分享时 `parseSettingsAnchorFromHash` 从 hash 恢复锚点，定位仍可持续。
+   */
+  const openSettings = useCallback(
+    (anchor?: string) => {
+      setSettingsProvider((current) => current ?? settingsProviderFactory());
+      if (anchor) {
+        setSettingsAnchor(anchor);
+        navigate("settings");
+        // 将锚点持久化到 URL（?anchor=），刷新/分享仍可定位；replace 避免多一次历史记录
+        history.replaceState(null, "", `#/settings?anchor=${encodeURIComponent(anchor)}`);
+      } else {
+        setSettingsAnchor(null);
+        navigate("settings");
+      }
+    },
+    [settingsProviderFactory, navigate],
+  );
 
   const openSearch = useCallback(() => {
     setSearchProvider((current) => current ?? searchProviderFactory());
@@ -208,19 +253,20 @@ export function App({
 
   return (
     <div className="min-h-screen bg-bg text-text transition-colors">
-      {/* RAY-325 回改：header 五个按钮在 390px 移动视口下必须单行不换行——
-          RAY-291「整页一屏」契约的 OFFSET 按 86px 单行头推算，换行会把卡片
-          撑出视口（E2E docScrollHeight 694 > 665）。移动端收紧 padding 与
-          间距（sm: 恢复原值），入口文案用短标签「词单」（可达名仍为
-          自定义词单）。 */}
+      {/* RAY-325 + RAY-360：header 390px 单行不换行契约（OFFSET 86px，docScrollHeight 694>665）。
+           RAY-325 用短标签「词单」（可达名「自定义词单」）；RAY-360 移动端四按钮图标化
+          （搜词 search / 词单 lists / 统计 bar_chart / 设置 settings，sm 断点图标/文字切换，
+           aria-label + aria-hidden + focus-visible 可达，复用 RAY-363 Material Symbols 基线）。桌面端无回归。 */}
       <header className="mx-auto flex w-full max-w-3xl items-center justify-end gap-1.5 px-4 py-6 sm:gap-2 sm:px-6">
         <button
           type="button"
           onClick={openSearch}
+          aria-label="搜词"
           aria-pressed={view === "search"}
-          className="rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
+          className="flex items-center justify-center rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4 sm:py-2"
         >
-          搜词
+          <SearchIcon className="h-5 w-5 sm:hidden" />
+          <span className="hidden text-sm font-medium sm:inline">搜词</span>
         </button>
         <button
           type="button"
@@ -237,26 +283,33 @@ export function App({
           onClick={openCustomLists}
           aria-pressed={view === "custom-lists" || view === "custom-list"}
           aria-label="自定义词单"
-          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
+          className="flex items-center justify-center gap-1.5 rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:gap-1.5 sm:px-4 sm:py-2"
         >
-          <ListIcon className="h-4 w-4" />
-          词单
+          <ListIcon className="h-5 w-5 sm:hidden" />
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium">
+            <ListIcon className="h-4 w-4" />
+            <span>词单</span>
+          </span>
         </button>
         <button
           type="button"
           onClick={openStats}
+          aria-label="统计"
           aria-pressed={view === "stats"}
-          className="rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
+          className="flex items-center justify-center rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4 sm:py-2"
         >
-          统计
+          <BarChartIcon className="h-5 w-5 sm:hidden" />
+          <span className="hidden text-sm font-medium sm:inline">统计</span>
         </button>
         <button
           type="button"
-          onClick={openSettings}
+          onClick={() => openSettings()}
+          aria-label="设置"
           aria-pressed={view === "settings"}
-          className="rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
+          className="flex items-center justify-center rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4 sm:py-2"
         >
-          设置
+          <SettingsIcon className="h-5 w-5 sm:hidden" />
+          <span className="hidden text-sm font-medium sm:inline">设置</span>
         </button>
       </header>
 
@@ -300,6 +353,7 @@ export function App({
           onThemePreferenceChange={setPreference}
           cardFont={cardFont}
           onCardFontChange={setCardFont}
+          initialAnchor={settingsAnchor}
         />
       ) : view === "stats" && statsProvider ? (
         <StatsScreen provider={statsProvider} onExit={goHome} />

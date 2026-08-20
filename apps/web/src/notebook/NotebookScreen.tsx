@@ -150,7 +150,7 @@ export function NotebookScreen({ provider, onExit }: NotebookScreenProps) {
                   </span>
                   {sense.pos ? <span className="text-xs text-text-muted">{sense.pos}</span> : null}
                   {sense.ipa ? (
-                    <span className="text-xs text-text-muted">/{sense.ipa}/</span>
+                    <span className="lex-phonetic text-xs text-text-muted">/{sense.ipa}/</span>
                   ) : null}
                 </span>
                 <p className="text-sm leading-relaxed text-text-muted">

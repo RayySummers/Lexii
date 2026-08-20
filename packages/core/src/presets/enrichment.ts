@@ -71,6 +71,92 @@ function splitList(raw: string): string[] {
 }
 
 /**
+ * RAY-365：括号平衡工具（与打包侧 lib/truncate.mjs / 前端 enrichmentUi 同口径）。
+ * 用于修复存量库中因 32 字截断导致的「只有左括号无右括号」残段。
+ * 枚举 `1) ` / `2) ` / `10) ` 中的 `)` 不计入括号平衡（如 keen 的 `1) 物理层面的...`），
+ * 正则与 `scripts/presets/lib/truncate.mjs:ENUM_LIST_RE` 同步（S-3）。
+ */
+const ENUM_LIST_RE = /(^|\s)\d+\)\s/g;
+function bracketDepth(text: string): { full: number; half: number } {
+  const normalized = text.replace(ENUM_LIST_RE, "$1");
+  let full = 0;
+  let half = 0;
+  for (const ch of normalized) {
+    if (ch === "（") full += 1;
+    else if (ch === "）") full -= 1;
+    else if (ch === "(") half += 1;
+    else if (ch === ")") half -= 1;
+  }
+  return { full, half };
+}
+function isBalancedText(text: string): boolean {
+  const normalized = text.replace(ENUM_LIST_RE, "$1");
+  let full = 0;
+  let half = 0;
+  for (const ch of normalized) {
+    if (ch === "（") full += 1;
+    else if (ch === "）") {
+      full -= 1;
+      if (full < 0) return false;
+    } else if (ch === "(") half += 1;
+    else if (ch === ")") {
+      half -= 1;
+      if (half < 0) return false;
+    }
+  }
+  return full === 0 && half === 0;
+}
+function ensureBalancedText(text: string): string {
+  let t = text;
+  while (t.endsWith("（") || t.endsWith("(")) {
+    t = t.slice(0, -1).trimEnd();
+  }
+  let { full, half } = bracketDepth(t);
+  if ((full > 0 || half > 0) && (t.endsWith("、") || t.endsWith("，") || t.endsWith(","))) {
+    t = t.slice(0, -1).trimEnd();
+  }
+  const after = bracketDepth(t);
+  full = after.full;
+  half = after.half;
+  let result = t;
+  if (full > 0) result += "）".repeat(full);
+  if (half > 0) result += ")".repeat(half);
+  let depth = bracketDepth(result);
+  while (depth.full < 0 && result.endsWith("）")) {
+    result = result.slice(0, -1);
+    depth = bracketDepth(result);
+  }
+  while (depth.half < 0 && result.endsWith(")")) {
+    result = result.slice(0, -1);
+    depth = bracketDepth(result);
+  }
+  return result;
+}
+function isWordPartsUnbalanced(wordParts: string | undefined): boolean {
+  if (!wordParts) return false;
+  for (const part of wordParts.split(" · ")) {
+    const m = part.match(/^(.*?)<([^>]*)>$/);
+    if (!m) continue;
+    const note = m[2] ?? "";
+    if (!isBalancedText(note)) return true;
+  }
+  return false;
+}
+function repairWordPartsBrackets(wordParts: string): string {
+  return wordParts
+    .split(" · ")
+    .map((part) => {
+      const m = part.match(/^(.*?)<([^>]*)>$/);
+      if (!m) return part;
+      const head = m[1];
+      const note = m[2] ?? "";
+      const balanced = ensureBalancedText(note);
+      return `${head}<${balanced}>`;
+    })
+    .join(" · ");
+}
+
+/**
  * 元组 → 类型化富化词条；形状非法立即抛错（生成物损坏在启动即暴露）。
  *
  * @param raw 元组（前 9 项字符串，末项 [英文, 译文] 对数组）
@@ -215,55 +301,163 @@ export function toEnrichmentMap(pkg: EnrichmentPresetPackage): Map<string, Enric
   return map;
 }
 
-/** 富化词条 → 词条内容合并（新装路径；只在目标字段缺失/为空时填充） */
+/** 富化词条 → 词条内容合并（新装路径；只在目标字段缺失/为空时填充，RAY-365 增加括号截断修复） */
 export function mergeEnrichmentIntoContent(
   content: WordEntryContent,
   enrichment: EnrichmentEntry | undefined,
 ): WordEntryContent {
-  if (!enrichment) {
-    return content;
+  // RAY-365：即使无富化，也需修复存量 content 的括号截断（前端防御的后端同口径）
+  // 若富化存在且为已平衡的同词条，优先走“截断覆盖”语义（S-2），避免本地修复后不再覆盖
+  let base: WordEntryContent = content;
+  const wouldOverwriteWordPartsContent =
+    enrichment?.wordParts !== undefined &&
+    !!content.wordParts &&
+    isWordPartsUnbalanced(content.wordParts) &&
+    !isWordPartsUnbalanced(enrichment.wordParts);
+  if (base.wordParts && isWordPartsUnbalanced(base.wordParts) && !wouldOverwriteWordPartsContent) {
+    base = { ...base, wordParts: repairWordPartsBrackets(base.wordParts) };
   }
-  const merged: WordEntryContent = { ...content };
+  const wouldOverwriteZhContent =
+    enrichment?.etymologyZh !== undefined &&
+    !!content.etymologyZh &&
+    !isBalancedText(content.etymologyZh) &&
+    isBalancedText(enrichment.etymologyZh);
+  if (base.etymologyZh && !isBalancedText(base.etymologyZh) && !wouldOverwriteZhContent) {
+    base = { ...base, etymologyZh: ensureBalancedText(base.etymologyZh) };
+  }
+  const wouldOverwriteEtyContent =
+    enrichment?.etymology !== undefined &&
+    !!content.etymology &&
+    !isBalancedText(content.etymology) &&
+    isBalancedText(enrichment.etymology);
+  if (base.etymology && !isBalancedText(base.etymology) && !wouldOverwriteEtyContent) {
+    base = { ...base, etymology: ensureBalancedText(base.etymology) };
+  }
+  if (!enrichment) {
+    return base === content ? content : base;
+  }
+  const merged: WordEntryContent = { ...base };
+  let changed = base !== content;
   if (!merged.ipaUs && enrichment.ipaUs) {
     merged.ipaUs = enrichment.ipaUs;
+    changed = true;
   }
   if (!merged.ipaUk && enrichment.ipaUk) {
     merged.ipaUk = enrichment.ipaUk;
+    changed = true;
   }
   if ((merged.synonyms?.length ?? 0) === 0 && enrichment.synonyms) {
     merged.synonyms = enrichment.synonyms;
+    changed = true;
   }
   if ((merged.antonyms?.length ?? 0) === 0 && enrichment.antonyms) {
     merged.antonyms = enrichment.antonyms;
+    changed = true;
   }
   if ((merged.derived?.length ?? 0) === 0 && enrichment.derived) {
     merged.derived = enrichment.derived;
+    changed = true;
   }
-  if (!merged.etymology && enrichment.etymology) {
-    merged.etymology = enrichment.etymology;
+  // RAY-365 P0 放宽（S-2）：原“只补空缺”改为“空缺或括号不平衡（截断）则覆盖”。
+  // 仅当现有字段因 32 字截断导致 `!isBalanced` / `isWordPartsUnbalanced` 且富化已平衡时覆盖，
+  // 已平衡的用户自定义内容（非截断）绝不覆盖，避免误伤。
+  if (enrichment.etymology) {
+    if (!merged.etymology) {
+      merged.etymology = enrichment.etymology;
+      changed = true;
+    } else if (!isBalancedText(merged.etymology) && isBalancedText(enrichment.etymology)) {
+      merged.etymology = enrichment.etymology;
+      changed = true;
+    }
   }
-  if (!merged.wordParts && enrichment.wordParts) {
-    merged.wordParts = enrichment.wordParts;
+  if (enrichment.wordParts) {
+    if (!merged.wordParts) {
+      merged.wordParts = enrichment.wordParts;
+      changed = true;
+    } else if (
+      isWordPartsUnbalanced(merged.wordParts) &&
+      !isWordPartsUnbalanced(enrichment.wordParts)
+    ) {
+      merged.wordParts = enrichment.wordParts;
+      changed = true;
+    }
   }
-  if (!merged.etymologyZh && enrichment.etymologyZh) {
-    merged.etymologyZh = enrichment.etymologyZh;
+  if (enrichment.etymologyZh) {
+    if (!merged.etymologyZh) {
+      merged.etymologyZh = enrichment.etymologyZh;
+      changed = true;
+    } else if (!isBalancedText(merged.etymologyZh) && isBalancedText(enrichment.etymologyZh)) {
+      merged.etymologyZh = enrichment.etymologyZh;
+      changed = true;
+    }
   }
   if ((merged.examples?.length ?? 0) === 0 && enrichment.examples.length > 0) {
     merged.examples = enrichment.examples;
+    changed = true;
   }
-  return merged;
+  return changed ? merged : content;
 }
 
-/** 富化词条 → Sense 合并（回填路径）；无变化返回原引用，有变化返回新对象 */
+/** 富化词条 → Sense 合并（回填路径）；无变化返回原引用，有变化返回新对象。RAY-365 增加括号截断的覆盖修复 */
 export function mergeEnrichmentIntoSense(
   sense: Sense,
   enrichment: EnrichmentEntry | undefined,
 ): Sense {
-  if (!enrichment) {
-    return sense;
+  // 先做无富化时的括号修复（存量旧数据的兜底，即使 enrichment 缺失也能自愈）
+  // 若富化存在且为已平衡的同词条，优先走“截断覆盖”语义（S-2），避免本地 ensureBalanced 后被判为已平衡而不再覆盖
+  let base = sense;
+  let baseRepaired = false;
+  let repaired: Sense | null = null;
+  function ensureRepaired(): Sense {
+    if (!repaired) {
+      repaired = { ...base };
+    }
+    return repaired;
   }
-  const merged: Sense = { ...sense };
-  let changed = false;
+  const wouldOverwriteWordParts =
+    enrichment?.wordParts !== undefined &&
+    !!sense.wordParts &&
+    isWordPartsUnbalanced(sense.wordParts) &&
+    !isWordPartsUnbalanced(enrichment.wordParts);
+  if (base.wordParts && isWordPartsUnbalanced(base.wordParts) && !wouldOverwriteWordParts) {
+    const fixed = repairWordPartsBrackets(base.wordParts);
+    if (fixed !== base.wordParts) {
+      ensureRepaired().wordParts = fixed;
+      baseRepaired = true;
+    }
+  }
+  const wouldOverwriteZh =
+    enrichment?.etymologyZh !== undefined &&
+    !!sense.etymologyZh &&
+    !isBalancedText(sense.etymologyZh) &&
+    isBalancedText(enrichment.etymologyZh);
+  if (base.etymologyZh && !isBalancedText(base.etymologyZh) && !wouldOverwriteZh) {
+    const fixed = ensureBalancedText(base.etymologyZh);
+    if (fixed !== base.etymologyZh) {
+      ensureRepaired().etymologyZh = fixed;
+      baseRepaired = true;
+    }
+  }
+  const wouldOverwriteEty =
+    enrichment?.etymology !== undefined &&
+    !!sense.etymology &&
+    !isBalancedText(sense.etymology) &&
+    isBalancedText(enrichment.etymology);
+  if (base.etymology && !isBalancedText(base.etymology) && !wouldOverwriteEty) {
+    const fixed = ensureBalancedText(base.etymology);
+    if (fixed !== base.etymology) {
+      ensureRepaired().etymology = fixed;
+      baseRepaired = true;
+    }
+  }
+  if (baseRepaired && repaired) {
+    base = repaired;
+  }
+  if (!enrichment) {
+    return baseRepaired ? base : sense;
+  }
+  const merged: Sense = { ...base };
+  let changed = baseRepaired;
   if (!merged.ipaUs && enrichment.ipaUs) {
     merged.ipaUs = enrichment.ipaUs;
     changed = true;
@@ -284,17 +478,38 @@ export function mergeEnrichmentIntoSense(
     merged.derived = enrichment.derived;
     changed = true;
   }
-  if (!merged.etymology && enrichment.etymology) {
-    merged.etymology = enrichment.etymology;
-    changed = true;
+  // RAY-365 P0 放宽（S-2）：原“只补空缺”改为“空缺或括号不平衡（截断）则覆盖”。
+  // 仅当现有字段因 32 字截断导致 `!isBalanced` / `isWordPartsUnbalanced` 且富化已平衡时覆盖，
+  // 已平衡的用户自定义内容（非截断）绝不覆盖，避免误伤。
+  if (enrichment.etymology) {
+    if (!merged.etymology) {
+      merged.etymology = enrichment.etymology;
+      changed = true;
+    } else if (!isBalancedText(merged.etymology) && isBalancedText(enrichment.etymology)) {
+      merged.etymology = enrichment.etymology;
+      changed = true;
+    }
   }
-  if (!merged.wordParts && enrichment.wordParts) {
-    merged.wordParts = enrichment.wordParts;
-    changed = true;
+  if (enrichment.wordParts) {
+    if (!merged.wordParts) {
+      merged.wordParts = enrichment.wordParts;
+      changed = true;
+    } else if (
+      isWordPartsUnbalanced(merged.wordParts) &&
+      !isWordPartsUnbalanced(enrichment.wordParts)
+    ) {
+      merged.wordParts = enrichment.wordParts;
+      changed = true;
+    }
   }
-  if (!merged.etymologyZh && enrichment.etymologyZh) {
-    merged.etymologyZh = enrichment.etymologyZh;
-    changed = true;
+  if (enrichment.etymologyZh) {
+    if (!merged.etymologyZh) {
+      merged.etymologyZh = enrichment.etymologyZh;
+      changed = true;
+    } else if (!isBalancedText(merged.etymologyZh) && isBalancedText(enrichment.etymologyZh)) {
+      merged.etymologyZh = enrichment.etymologyZh;
+      changed = true;
+    }
   }
   if ((merged.examples?.length ?? 0) === 0 && enrichment.examples.length > 0) {
     merged.examples = enrichment.examples;
@@ -452,6 +667,39 @@ export async function backfillEnrichment(
     cursor = nextCursor;
     filled += filledInChunk;
     await yieldFn();
+  }
+
+  // RAY-365 括号截断扫尾：对未被 enrichment 覆盖但仍截断的词条做本地自愈
+  // 主 chunk 已通过 mergeEnrichmentIntoSense 对 enrichment 命中的词条完成括号修复+富化覆盖；
+  // 扫尾对全库剩余不平衡（如用户导入的旧截断数据）做就地平衡，不依赖 enrichment。
+  const remainingToRepair: Sense[] = [];
+  for (const sense of allSenses) {
+    if (
+      (sense.wordParts && isWordPartsUnbalanced(sense.wordParts)) ||
+      (sense.etymologyZh && !isBalancedText(sense.etymologyZh)) ||
+      (sense.etymology && !isBalancedText(sense.etymology))
+    ) {
+      const repaired = mergeEnrichmentIntoSense(sense, undefined);
+      if (repaired !== sense) {
+        // 去重：若该 sense 已在主 chunk 中被修复，此处 repaired 会与已修复版本一致，
+        // 但 allSenses 仍指向旧对象，故会再次被加入；后续去重由 Map 避免重复 put
+        remainingToRepair.push(repaired);
+      }
+    }
+  }
+  if (remainingToRepair.length > 0) {
+    // 按 term 去重（同一 term 多 sense 需全修，但同一 sense 重复出现需去重）
+    const dedup = new Map<string, Sense>();
+    for (const s of remainingToRepair) {
+      dedup.set(s.id, s);
+    }
+    await db.transaction("rw", db.senses, async () => {
+      for (const s of dedup.values()) {
+        // 最终以 DB 当前值为准：若 chunk 已写入新值，此处 put 会覆盖为同一平衡值（幂等）
+        await db.senses.put(s);
+      }
+    });
+    filled += dedup.size;
   }
 
   await db.transaction("rw", db.meta, async () => {

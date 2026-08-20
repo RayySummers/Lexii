@@ -1,9 +1,11 @@
 /**
- * 卡片字体管理（RAY-323）测试。
+ * 卡片字体管理（RAY-323，RAY-359，RAY-366 扩至 7 档）测试。
  *
  * 覆盖：初始值读 localStorage（无值回落默认 modern）；setFont 写
  * localStorage 并同步到 <html data-card-font>；跨标签页 storage 事件
  * 让本页跟随；localStorage 抛错（隐私模式）不炸。
+ * RAY-359：newsreader → sentient 迁移，旧存量读为 sentient。
+ * RAY-366：新增 geist-mono / nunito / geist-pixel 三档，尾部追加与 sentient 共存。
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -35,18 +37,25 @@ describe("useCardFont（RAY-323）", () => {
     expect(document.documentElement.dataset.cardFont).toBe("inter");
   });
 
-  it("读取已存储的档位（如 newsreader）", () => {
-    window.localStorage.setItem(CARD_FONT_STORAGE_KEY, "newsreader");
+  it("读取已存储的档位（如 sentient）", () => {
+    window.localStorage.setItem(CARD_FONT_STORAGE_KEY, "sentient");
     const { result } = renderHook(() => useCardFont());
-    expect(result.current.font).toBe("newsreader");
-    expect(document.documentElement.dataset.cardFont).toBe("newsreader");
+    expect(result.current.font).toBe("sentient");
+    expect(document.documentElement.dataset.cardFont).toBe("sentient");
   });
 
-  it("setFont 写 localStorage 并同步到 <html data-card-font>，7 档都能切（RAY-366 与 RAY-359 无冲突：尾部 3 档新增）", () => {
+  it("旧存量 newsreader 读取时迁移到 sentient（RAY-359）", () => {
+    window.localStorage.setItem(CARD_FONT_STORAGE_KEY, "newsreader");
+    const { result } = renderHook(() => useCardFont());
+    expect(result.current.font).toBe("sentient");
+    expect(document.documentElement.dataset.cardFont).toBe("sentient");
+  });
+
+  it("setFont 写 localStorage 并同步到 <html data-card-font>，7 档都能切（RAY-366 与 RAY-359 无冲突：尾部 3 档新增，sentient 替换 newsreader）", () => {
     const { result } = renderHook(() => useCardFont());
     const sequence: Array<
-      "inter" | "google-sans" | "playpen" | "newsreader" | "geist-mono" | "nunito" | "geist-pixel"
-    > = ["google-sans", "playpen", "newsreader", "geist-mono", "nunito", "geist-pixel", "inter"];
+      "inter" | "google-sans" | "playpen" | "sentient" | "geist-mono" | "nunito" | "geist-pixel"
+    > = ["google-sans", "playpen", "sentient", "geist-mono", "nunito", "geist-pixel", "inter"];
     for (const next of sequence) {
       act(() => {
         result.current.setFont(next);
@@ -89,9 +98,9 @@ describe("useCardFont（RAY-323）", () => {
   });
 
   it("跨标签页：其他标签页清空（key 为 null）→ 本页回落默认", () => {
-    window.localStorage.setItem(CARD_FONT_STORAGE_KEY, "newsreader");
+    window.localStorage.setItem(CARD_FONT_STORAGE_KEY, "sentient");
     const { result } = renderHook(() => useCardFont());
-    expect(result.current.font).toBe("newsreader");
+    expect(result.current.font).toBe("sentient");
     act(() => {
       // 全清（key === null）时回落默认
       window.dispatchEvent(

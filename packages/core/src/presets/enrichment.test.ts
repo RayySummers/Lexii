@@ -240,6 +240,27 @@ describe("toEnrichmentMap / 合并口径", () => {
     // 无对应富化词条 → 原引用
     expect(mergeEnrichmentIntoSense(bare, undefined)).toBe(bare);
   });
+
+  it("S-2：悬空“（”的存量字段被平衡富化覆盖，已平衡的自定义不覆盖（P0 放宽）", () => {
+    const map = toEnrichmentMap(pkg);
+    const enrichment = map.get("testword")!;
+    // 悬空左括号（截断）+ 平衡富化 → 应覆盖为富化的平衡值
+    const unbalancedSense = toSense({ term: "testword", definitions: ["释义"] }, "en");
+    unbalancedSense.wordParts = "able<能够的（拉丁语 habilis（易掌握的）>"; // 左2右1（带闭合 >，模拟截断产物）
+    unbalancedSense.etymologyZh = "来自拉丁语（测试";
+    const fixed = mergeEnrichmentIntoSense(unbalancedSense, enrichment);
+    expect(fixed.wordParts).toBe("pre<前缀> · testword<词根>");
+    expect(fixed.etymologyZh).toBe("testword 的中文词源。");
+    // 已平衡的自定义 → 不覆盖
+    const balancedSense = toSense({ term: "testword", definitions: ["释义"] }, "en");
+    balancedSense.wordParts = "custom<自定义平衡>";
+    balancedSense.etymologyZh = "自定义平衡的中文词源。";
+    const preserved = mergeEnrichmentIntoSense(balancedSense, enrichment);
+    expect(preserved.wordParts).toBe("custom<自定义平衡>");
+    expect(preserved.etymologyZh).toBe("自定义平衡的中文词源。");
+    expect(preserved).not.toBe(balancedSense); // 仅 ipa 等空缺字段会填充，但 wordParts/etymologyZh 保持
+    expect(preserved.ipaUs).toBe("/uˈes-testword/"); // 空缺的 ipa 仍填充
+  });
 });
 
 describe("backfillEnrichment（存量库回填）", () => {

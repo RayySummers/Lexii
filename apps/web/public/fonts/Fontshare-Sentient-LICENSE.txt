@@ -1,0 +1,25 @@
+Sentient Font — Fontshare License
+===============================
+
+Font: Sentient (Medium, weight 500)
+Designer: Indian Type Foundry / Fontshare
+Source: https://www.fontshare.com/fonts/sentient
+Retrieved via: https://api.fontshare.com/v2/css?f[]=sentient@500&display=swap
+File: Sentient-Medium.woff2 (self-hosted in Lexii for offline/PWA)
+
+License:
+  Sentient is distributed by Fontshare under the Fontshare Free License.
+  It is free for personal and commercial use, including web embedding and
+  self-hosting, provided the font files are not sold on their own and
+  attribution is retained where required.
+
+  Full license terms: https://www.fontshare.com/license
+
+  This file is included to satisfy the "授权/加载/打包" requirement of
+  RAY-359 (Alpha 0.9.2 Card font replacement: Newsreader SemiBold →
+  Sentient Medium). The original Newsreader (Google Fonts, SIL OFL) has
+  been replaced. See also public/fonts/sentient.css for @font-face and
+  app/src/lib/cardFont.ts + styles/tokens.css for usage.
+
+  If Fontshare updates its licensing terms, this notice should be reviewed
+  and the self-hosted file replaced accordingly.

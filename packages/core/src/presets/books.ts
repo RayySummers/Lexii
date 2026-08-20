@@ -13,7 +13,7 @@
 import { TERM_PATTERN } from "../csv";
 import { convertPresetEntry } from "./convertEntry";
 import type { PresetPackage, WordbookCategory, WordbookDefinition } from "./types";
-import booksData from "./books.data.json";
+import booksData from "./books.data.json" with { type: "json" };
 
 /** 生成物原始形态（元组池 + 词书索引；term 索引以 "\n" 连接，无损往返） */
 type RawBooksData = {

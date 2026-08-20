@@ -30,19 +30,27 @@
  * CACHE_NAME 在「缓存结构或预缓存清单变化」时递增；纯内容更新无需改版本。
  * 本文件为纯静态资源（public/ 原样拷贝进产物），不经 Vite 构建。
  */
-const CACHE_NAME = "lexii-shell-v3";
+const CACHE_NAME = "lexii-shell-v4";
 
 /**
- * 卡片字体 CSS 入口（RAY-323）：与 index.html 的 <link href> 完全一致，
- * 否则离线回退的 CSS 缓存键与页面请求对不上。字体文件 URL 不写死——
- * 由下方 precacheCardFonts 在安装时从该 CSS 的 @font-face src 解析，
- * 规避 Google 升版本号后 URL 失效（与从 index.html 解析构建产物的
- * 策略同口径）。
+ * 卡片字体 CSS 入口（RAY-323，RAY-359，RAY-366，RAY-361）：与 index.html 的 Google Fonts
+ * <link href> 完全一致，否则离线回退的 CSS 缓存键与页面请求对不上。
+ * 字体文件 URL 不写死——由下方 precacheCardFonts 在安装时从该 CSS 的
+ * @font-face src 解析，规避 Google 升版本号后 URL 失效（与从 index.html
+ * 解析构建产物的策略同口径）。
  * RAY-338 A1：inter 档主字体已改为自托管 Inter Display ExtraBold
- * （APP_SHELL 预缓存），本 URL 中的 Inter 800 仅为回退（正常不下载）。
+ * （APP_SHELL 预缓存），本 URL 中的 Inter 400;800 中 800 仅为回退（正常 800 不下载，
+ * 400 供音标使用），详见 RAY-361 S1。
+ * RAY-359：优雅衬线档已由 Newsreader（Google Fonts 600）替换为 Sentient
+ * Medium（自托管 ./fonts/sentient.css，500），Google Fonts URL 中已移除
+ * Newsreader，Sentient 随 APP_SHELL + precacheAssetsFromHtml 预缓存。
+ * RAY-361 S1：Inter 追加 400（400;800）供音标常规体（.lex-phonetic 400）使用，
+ * 与 SW 预缓存同步，增量约一个 woff2 子集。
+ * RAY-366：新增 Geist Mono 600 / Nunito 800 / Geist Pixel 400 三档，尾部追加
+ * 至 Google Fonts URL，与 RAY-359 的 Sentient 自托管共存（Sentient 不在 URL 中）。
  */
 const CARD_FONT_CSS_URL =
-  "https://fonts.googleapis.com/css2?family=Inter:wght@800&family=Newsreader:wght@600&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&family=Geist+Mono:wght@600&family=Nunito:wght@800&family=Geist+Pixel:wght@400&display=swap";
+  "https://fonts.googleapis.com/css2?family=Inter:wght@400;800&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&family=Geist+Mono:wght@600&family=Nunito:wght@800&family=Geist+Pixel:wght@400&display=swap";
 
 /** Google Fonts 域名（fetch 处理器放行的唯一跨域白名单） */
 const FONT_HOSTS = new Set(["fonts.googleapis.com", "fonts.gstatic.com"]);
@@ -64,6 +72,9 @@ const APP_SHELL = [
   // RAY-338 A1：inter 档主字体 Inter Display ExtraBold（自托管；样式表由
   // index.html 的 <link href> 经 precacheAssetsFromHtml 解析预缓存）
   "./fonts/InterDisplay-ExtraBold.woff2",
+  // RAY-359：Sentient Medium 自托管（优雅衬线档；样式表由 index.html 的
+  // <link href> 经 precacheAssetsFromHtml 解析预缓存，woff2 显式预缓存离线可用）
+  "./fonts/Sentient-Medium.woff2",
 ].map(resolveUrl);
 
 /** 导航回退与外壳解析使用的入口 URL */

@@ -1,0 +1,29 @@
+/**
+ * Sentient Medium（自托管，RAY-359）。
+ *
+ * 「优雅衬线」卡片字体预设的主字体。Sentient 由 Indian Type Foundry 设计，
+ * 通过 Fontshare（https://www.fontshare.com/fonts/sentient）发布，采用
+ * Fontshare 免费许可（允许 Web 字体自托管与嵌入，见同目录
+ * Fontshare-Sentient-LICENSE.txt）。原卡片字体 Newsreader SemiBold
+ * （Google Fonts，600）由本文件替换为 Sentient Medium（500），保持衬线
+ * 阅读气质的同时与 Fontshare 官方 Medium 字重一致。
+ *
+ * 自托管原因：
+ * - 与 RAY-338 A1 的 Inter Display 自托管口径一致：同源部署、子路径
+ *   安全（相对路径解析，与 public/sw.js 保持一致）、离线预缓存；
+ * - 规避 Fontshare API 的跨域字体 CDN 依赖，字体文件随应用部署，不受
+ *   CDN 版本号变化影响；FOUT 策略由本文件的 font-display: swap 保证；
+ * - Google Fonts 侧原 Newsreader 600 已从 index.html 的 Google Fonts URL
+ *   移除，本文件为优雅衬线档唯一字体源（fallback 栈仍保留 Georgia 系）。
+ *
+ * 路径全部相对本文件位置解析（与 public/sw.js 的子路径部署口径一致）；
+ * 字体文件由 sw.js 的 APP_SHELL 预缓存（离线可用），本 CSS 经 index.html
+ * 的 <link href> 被 sw.js 的 precacheAssetsFromHtml 解析预缓存。
+ */
+@font-face {
+  font-family: "Sentient";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./Sentient-Medium.woff2") format("woff2");
+}

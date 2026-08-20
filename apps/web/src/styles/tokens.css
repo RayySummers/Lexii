@@ -26,6 +26,11 @@
   --lex-danger: #dc2626;
   --lex-success: #16a34a;
   --lex-focus-ring: #6366f1;
+
+  /* 音标字体栈（RAY-361 音标豆腐块修复）：Inter + 系统通用兜底，IPA 缺字时回退系统字体避免新豆腐块 */
+  --lex-phonetic-font:
+    "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
 }
 
 [data-theme="dark"] {
@@ -51,7 +56,7 @@
 }
 
 /*
- * 卡片字体（RAY-323，RAY-366 三档新增）：
+ * 卡片字体（RAY-323，RAY-359，RAY-366，RAY-361）：
  * - 默认值与七种档位在 :root / [data-card-font="..."] 上定义，
  *   复习卡片本体与设置页示例区均引用 var(--lex-card-font)，
  *   字重引用 var(--lex-card-font-weight)。
@@ -59,21 +64,22 @@
  *   档位的 fontFamily、fontWeight 与示例文案），CSS 只负责把"档位"
  *   映射到 "font-family / font-weight"——组件层不感知具体字体名，
  *   也不在多处重复字面量（评审 C-11 性能/可维护性）。
- * - 字重口径与 Google Fonts URL 严格一致（Oscar 评审 suggestion 2）：
- *   inter/nunito 800（ExtraBold）/ google-sans/playpen/newsreader/
- *   geist-mono 600（SemiBold）/ geist-pixel 400（Regular，像素字体
- *   无粗体变体，用常规字重保持像素颗粒清晰）。不加载的字重会被
- *   浏览器合成（伪粗体）导致字面失真，故字重不写死 font-bold(700)，
- *   由本变量按档位取值。改动任一档字重必须三处同步：本文件、
- *   CARD_FONT_OPTIONS.fontWeight、index.html 的 Google Fonts URL。
+ * - 字重口径与加载源严格一致（Oscar 评审 suggestion 2）：
+ *   inter 800（ExtraBold，自托管 Inter Display）/ sentient 500（Medium，
+ *   自托管 Sentient，RAY-359）/ geist-mono 600（SemiBold）/ nunito 800
+ *   （ExtraBold）/ geist-pixel 400（Regular，像素字体）/ google-sans
+ *   playpen 600（Google Fonts SemiBold）。不加载的字重会被浏览器
+ *   合成（伪粗体）导致字面失真，故字重不写死 font-bold(700)，由本变量
+ *   按档位取值。改动任一档字重必须三处同步：本文件、
+ *   CARD_FONT_OPTIONS.fontWeight、index.html 的字体加载 URL（Google Fonts
+ *   URL 或自托管 sentient.css / inter-display.css）。
  * - 顺序契约（Oscar R3 复审 suggestion 1）：本文件内卡片字体栈定义的
  *   出现顺序须与 `CARD_FONT_OPTIONS` 数组顺序一致——`cardFont.test.ts`
  *   的「每档栈字面值与 CARD_FONT_OPTIONS.fontFamily 一致」断言按 index
  *   对账，重排或插入新档时务必同步两侧顺序。实测防线 + 此处文档级提醒
- *   形成双层兜底，避免仅依赖 README 类的「未挂代码」约束。RAY-366：
- *   三档新增置于数组尾部，不重排已有 4 档，与 RAY-359（Sentient 替换
- *   newsreader）无冲突——Sentient 替换仅改动 newsreader 槽位，尾部三档
- *   索引不变。
+ *   形成双层兜底，避免仅依赖 README 类的「未挂代码」约束。RAY-366 三档
+ *   在尾部追加（geist-mono / nunito / geist-pixel），不重排前 4 档
+ *   （inter/google-sans/playpen/sentient），与 RAY-359 无冲突。
  *   互相交叉指向（RAY-339 R4 复核 nit 1）：如调整本句措辞，请同步
  *   `cardFont.test.ts` 合并形态决策注释；详见该测试末尾的反向交叉指向。
  * - RAY-338 A1：inter 档主字体为 Inter Display（自托管 ExtraBold，
@@ -82,6 +88,19 @@
  *   默认档（:root 未挂 data-card-font）与显式 [data-card-font="inter"]
  *   字面值一致，用逗号选择器合并声明（Oscar 复核 suggestion 1），避免
  *   字面量双份维护。
+ * - RAY-359：sentient 档主字体为 Sentient Medium（自托管 500，
+ *   见 public/fonts/sentient.css 与同目录 Fontshare 许可证；原
+ *   Newsreader SemiBold 已移除，Google Fonts URL 中不再加载 Newsreader）。
+ *   RAY-359 补正（Owner fallback 口径）：sentient 档 fallback 栈精确为
+ *   Sentient → Newsreader → Georgia Pro → Georgia → Times New Roman，
+ *   对应 font-family 为 "Sentient", "Newsreader", "Georgia Pro", Georgia,
+ *   "Times New Roman", serif；Newsreader / Georgia Pro 为系统字体栈声明，
+ *   无需额外网络加载（Sentient 自托管已保证首选可用，见下方联动评估）。
+ *   卡片预览与导出共用同一 CSS 变量，字体一致性由变量单点保证；FOUT
+ *   策略由各 @font-face 的 font-display: swap 保证，无回退到系统字体外的异常。
+ * - RAY-366：新增三档 geist-mono 600（等宽秩序）/ nunito 800（圆润可爱）/
+ *   geist-pixel 400（像素风格，fallback 含 Press Start 2P），与 Sentient
+ *   档共存，顺序尾部追加，无索引漂移。
  * - 字体降级栈：每档在字体加载失败 / 离线时退回系统字体
  *   （无衬线 / 衬线 / 手写体 / 等宽 / 像素回退），卡片仍可读，绝不出现空字形。
  */
@@ -101,9 +120,9 @@
   --lex-card-font-weight: 600;
 }
 
-[data-card-font="newsreader"] {
-  --lex-card-font: "Newsreader", Georgia, "Times New Roman", serif;
-  --lex-card-font-weight: 600;
+[data-card-font="sentient"] {
+  --lex-card-font: "Sentient", "Newsreader", "Georgia Pro", Georgia, "Times New Roman", serif;
+  --lex-card-font-weight: 500;
 }
 
 [data-card-font="geist-mono"] {
@@ -119,4 +138,23 @@
 [data-card-font="geist-pixel"] {
   --lex-card-font: "Geist Pixel", "Press Start 2P", ui-monospace, monospace;
   --lex-card-font-weight: 400;
+}
+
+/*
+ * 音标字体（RAY-361 音标豆腐块修复，S1/S2/S3/N1）：
+ * - 音标区域强制使用通用字体 Inter（var(--lex-phonetic-font)）+ 系统兜底，
+ *   不受卡片字体/浏览器字体选择影响；
+ * - S1 字重口径：Inter 400（音标常规体）与 800（卡片 ExtraBold 回退）均经
+ *   Google Fonts 预加载（index.html / public/sw.js CARD_FONT_CSS_URL 同步为
+ *   Inter:wght@400;800），离线时 SW 预缓存副本回退；未加载时仍回退
+ *   system-ui 等系统栈，避免新豆腐块；
+ * - S2 字重隔离：音标区显式 400，避免后续 DOM 结构调整误继承卡片 800/600；
+ * - S3 样式收敛：抽为 .lex-phonetic 类收敛 4 处音标位，取舍如下 —
+ *   卡片词条仍需内联 var(--lex-card-font) 以响应 data-card-font 动态切换，
+ *   音标为静态栈，适合抽类；类内同时固定 font-weight:400，复用成本低且
+ *   便于后续扩展（如 font-feature-settings）；保留 var 单点定义，不硬编码字面量。
+ */
+.lex-phonetic {
+  font-family: var(--lex-phonetic-font);
+  font-weight: 400;
 }
