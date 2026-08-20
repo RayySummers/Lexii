@@ -26,6 +26,11 @@
   --lex-danger: #dc2626;
   --lex-success: #16a34a;
   --lex-focus-ring: #6366f1;
+
+  /* 音标字体栈（RAY-361 音标豆腐块修复）：Inter + 系统通用兜底，IPA 缺字时回退系统字体避免新豆腐块 */
+  --lex-phonetic-font:
+    "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
 }
 
 [data-theme="dark"] {
@@ -102,15 +107,20 @@
 }
 
 /*
- * 音标字体（RAY-361 音标豆腐块修复）：
- * - 音标区域强制使用通用字体 Inter，不受卡片字体/浏览器字体选择影响；
- * - 栈为 Inter + 系统通用兜底（system-ui / -apple-system / Segoe UI / Roboto /
- *   Helvetica Neue / Arial / sans-serif），IPA 符号在 Inter 覆盖不到时
- *   由系统字体兜底，避免引入新的豆腐块；
- * - Google Fonts 已预加载 Inter（index.html），此处不新增字体请求；未加载或
- *   离线时退回系统栈仍可读；
- * - 组件层通过 var(--lex-phonetic-font) 单点引用，不硬编码字面量。
+ * 音标字体（RAY-361 音标豆腐块修复，S1/S2/S3/N1）：
+ * - 音标区域强制使用通用字体 Inter（var(--lex-phonetic-font)）+ 系统兜底，
+ *   不受卡片字体/浏览器字体选择影响；
+ * - S1 字重口径：Inter 400（音标常规体）与 800（卡片 ExtraBold 回退）均经
+ *   Google Fonts 预加载（index.html / public/sw.js CARD_FONT_CSS_URL 同步为
+ *   Inter:wght@400;800），离线时 SW 预缓存副本回退；未加载时仍回退
+ *   system-ui 等系统栈，避免新豆腐块；
+ * - S2 字重隔离：音标区显式 400，避免后续 DOM 结构调整误继承卡片 800/600；
+ * - S3 样式收敛：抽为 .lex-phonetic 类收敛 4 处音标位，取舍如下 —
+ *   卡片词条仍需内联 var(--lex-card-font) 以响应 data-card-font 动态切换，
+ *   音标为静态栈，适合抽类；类内同时固定 font-weight:400，复用成本低且
+ *   便于后续扩展（如 font-feature-settings）；保留 var 单点定义，不硬编码字面量。
  */
-:root {
-  --lex-phonetic-font: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+.lex-phonetic {
+  font-family: var(--lex-phonetic-font);
+  font-weight: 400;
 }
