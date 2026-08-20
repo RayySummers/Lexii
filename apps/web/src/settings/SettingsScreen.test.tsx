@@ -685,7 +685,7 @@ describe("RAY-323 外观：卡片字体 2×2 选择器", () => {
       "inter",
       "google-sans",
       "playpen",
-      "newsreader",
+      "sentient",
     ]);
   });
 
@@ -709,9 +709,9 @@ describe("RAY-323 外观：卡片字体 2×2 选择器", () => {
     const group = screen.getByRole("radiogroup", { name: "卡片字体" });
     // 模拟原生 radio click（受控组件必须 change 才会回调，重复点已选项不触发）；
     // 选「非默认」三档以保证 onChange 必触发，避免点击已选中档导致 change 静默吞掉。
-    const sequence: Array<"playpen" | "newsreader" | "google-sans"> = [
+    const sequence: Array<"playpen" | "sentient" | "google-sans"> = [
       "playpen",
-      "newsreader",
+      "sentient",
       "google-sans",
     ];
     for (const next of sequence) {
@@ -734,8 +734,8 @@ describe("RAY-323 外观：卡片字体 2×2 选择器", () => {
     expect(playpenRadio.checked).toBe(true);
   });
 
-  it("受控 props：父级传 newsreader 时初始 newsreader 卡片显示「已选」", async () => {
-    renderSettings({ cardFont: "newsreader" });
+  it("受控 props：父级传 sentient 时初始 sentient 卡片显示「已选」", async () => {
+    renderSettings({ cardFont: "sentient" });
     await screen.findByText("外观");
 
     const selectedLabel = screen.getByText("已选").closest("label");

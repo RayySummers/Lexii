@@ -1,15 +1,17 @@
 /**
- * 「卡片字体」偏好（RAY-323）。
+ * 「卡片字体」偏好（RAY-323，RAY-359）。
  *
  * 产品口径：用户在设置里为复习卡片上的单词本体（sense.term）选择
  * 一种字体，共 4 档：现代简约（Inter Display ExtraBold）、现代圆润
  * （Google Sans Flex）、手写温润（Playpen Sans SemiBold）、优雅衬线
- * （Newsreader SemiBold）。选择立即应用到当前与未来所有卡片。
+ * （Sentient Medium，RAY-359 由 Newsreader SemiBold 替换而来，见
+ *  public/fonts/sentient.css 与 Fontshare 授权）。选择立即应用到当前与未来所有卡片。
  *
  * 存储走 localStorage（与主题、发音口音、生词本开关等偏好同一持久化
  * 模式）。4 种字体通过 index.html 引入的字体样式表在首帧渲染前到达——
  * 其中 inter 档主字体 Inter Display ExtraBold 自托管（public/fonts/，
- * RAY-338 A1），其余三档走 Google Fonts <link>；CSS 端通过
+ * RAY-338 A1），优雅衬线档 Sentient Medium 自托管（public/fonts/sentient.css，
+ * RAY-359），其余两档走 Google Fonts <link>；CSS 端通过
  * <html data-card-font="..."> 切换到对应的 font-family（见
  * styles/tokens.css），卡片本体用 var(--lex-card-font) 应用字体，
  * 组件层不感知具体字体名。
@@ -19,7 +21,7 @@
  */
 
 /** 4 种卡片字体档位（按 settings 卡片展示顺序） */
-export type CardFont = "inter" | "google-sans" | "playpen" | "newsreader";
+export type CardFont = "inter" | "google-sans" | "playpen" | "sentient";
 
 /** 偏好存储键 */
 export const CARD_FONT_STORAGE_KEY = "lexii:card-font";
@@ -30,19 +32,24 @@ export const DEFAULT_CARD_FONT: CardFont = "inter";
 /** 判断 localStorage 原始值是否为合法档位 */
 export function isCardFont(value: string | null | undefined): value is CardFont {
   return (
-    value === "inter" || value === "google-sans" || value === "playpen" || value === "newsreader"
+    value === "inter" || value === "google-sans" || value === "playpen" || value === "sentient"
   );
 }
 
 /**
  * 解析存储值 → 合法档位（纯函数，供测试与读写复用）：
  * 缺失 / 非法 / 损坏一律回落默认 modern（inter）。
+ * RAY-359 迁移：旧存量 "newsreader"（Newsreader SemiBold）平滑映射到
+ * "sentient"（Sentient Medium），避免已选优雅衬线的用户回落默认。
  */
 export function parseCardFont(raw: string | null | undefined): CardFont {
   if (raw === null || raw === undefined) {
     return DEFAULT_CARD_FONT;
   }
   const trimmed = raw.trim();
+  if (trimmed === "newsreader") {
+    return "sentient";
+  }
   return isCardFont(trimmed) ? trimmed : DEFAULT_CARD_FONT;
 }
 
@@ -85,9 +92,10 @@ export function writeCardFont(font: CardFont): boolean {
  *   RAY-338 A1：inter 档栈首为自托管 Inter Display（ExtraBold，见
  *   public/fonts/inter-display.css；Google Fonts 无 Inter Display，仅提供
  *   文本切 Inter），其后 Inter 为 Google Fonts 加载的回退。
- * - `fontWeight`：该档的字重，与 index.html 的 Google Fonts URL 中加载的
- *   字重严格一致（Oscar 评审 suggestion 2）：inter 800（ExtraBold）/
- *   其余 600（SemiBold）——不加载的字重会被浏览器合成，导致字面失真；
+ * - `fontWeight`：该档的字重，与加载源字重严格一致（Oscar 评审
+ *   suggestion 2）：inter 800（ExtraBold 自托管 Inter Display）/
+ *   sentient 500（Medium 自托管 Sentient，RAY-359）/ 其余 600（Google
+ *   Fonts SemiBold）——不加载的字重会被浏览器合成，导致字面失真；
  *   tokens.css 的 --lex-card-font-weight 与本字段按同一口径取值
  */
 export interface CardFontOption {
@@ -125,11 +133,11 @@ export const CARD_FONT_OPTIONS: ReadonlyArray<CardFontOption> = [
     fontWeight: 600,
   },
   {
-    id: "newsreader",
+    id: "sentient",
     label: "优雅衬线",
     description: "衬线端正、阅读稳重。",
     sampleText: "vocabulary",
-    fontFamily: '"Newsreader", Georgia, "Times New Roman", serif',
-    fontWeight: 600,
+    fontFamily: '"Sentient", "Newsreader", "Georgia Pro", Georgia, "Times New Roman", serif',
+    fontWeight: 500,
   },
 ];
