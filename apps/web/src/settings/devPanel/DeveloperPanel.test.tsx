@@ -99,7 +99,14 @@ describe("DeveloperPanel", () => {
     expect(screen.getByText(APP_VERSION)).toBeInTheDocument();
     expect(screen.getByText(APP_BUILD.sha)).toBeInTheDocument();
     expect(screen.getByText(APP_BUILD.time)).toBeInTheDocument();
-    expect(screen.getByText(APP_BUILD.branch)).toBeInTheDocument();
+    // RAY-368 回归：branch 可能与 releaseTags[0] 同值（v0.9.1-alpha），DOM 会出现两个相同文本
+    // （分支字段的 <dd> + 版本回退的 <a>），用分支字段的 <dt>/<dd> 结构精确定位
+    const branchLabel = screen.getByText("分支 / tag");
+    const branchValueEl = branchLabel.closest("div")?.querySelector("dd");
+    expect(branchValueEl).not.toBeNull();
+    expect(branchValueEl).toHaveTextContent(APP_BUILD.branch);
+    // 兜底：页面上至少有一处分支文本可见（防止未来 DOM 结构调整导致漏测）
+    expect(screen.getAllByText(APP_BUILD.branch).length).toBeGreaterThanOrEqual(1);
   });
 
   it("版本回退：历史 Release 列表渲染为 GitHub Release 外链，当前版本有标记", async () => {
