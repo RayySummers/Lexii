@@ -33,7 +33,12 @@ describe("getSynonymGroups", () => {
     });
     const groups = getSynonymGroups(sense);
     expect(groups).toHaveLength(2);
-    expect(groups[0]).toMatchObject({ definitionIndex: 0, definition: "义1", pos: "vt.", synonyms: ["a", "b"] });
+    expect(groups[0]).toMatchObject({
+      definitionIndex: 0,
+      definition: "义1",
+      pos: "vt.",
+      synonyms: ["a", "b"],
+    });
     expect(groups[1]).toMatchObject({ definitionIndex: 2, synonyms: ["c"] });
   });
 
@@ -112,7 +117,7 @@ describe("getSynonymGroups", () => {
     const sense = makeSense({
       definitions: ["义1", "义2"],
       posByDefinition: ["vt.", "n."],
-      synonymsByDefinition: [[ "a" ], undefined as unknown as string[]],
+      synonymsByDefinition: [["a"], undefined as unknown as string[]],
     });
     const groups = getSynonymGroups(sense);
     expect(groups).toHaveLength(1);

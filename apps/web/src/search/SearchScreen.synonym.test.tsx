@@ -10,7 +10,11 @@ import { describe, expect, it, vi } from "vitest";
 import { pushToStack, SearchScreen } from "./SearchScreen";
 import type { SearchDataProvider, SearchResult } from "./types";
 
-function makeSense(term: string, synonyms: string[], definitions: string[] = [`${term}释义`]): Sense {
+function makeSense(
+  term: string,
+  synonyms: string[],
+  definitions: string[] = [`${term}释义`],
+): Sense {
   return {
     id: toSenseId(`sense_syn_${term}`),
     lang: "en",

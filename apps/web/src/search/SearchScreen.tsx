@@ -358,9 +358,7 @@ export function SearchScreen({
 
       {queryStack.length > 0 ? (
         <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-raised px-4 py-2 text-xs text-text-muted">
-          <span className="truncate">
-            来自「{queryStack[queryStack.length - 1]}」的近义词跳转
-          </span>
+          <span className="truncate">来自「{queryStack[queryStack.length - 1]}」的近义词跳转</span>
           <button
             type="button"
             onClick={handleBack}
