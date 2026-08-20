@@ -495,10 +495,16 @@ describe("App 卡片字体（RAY-323）", () => {
     expect(document.documentElement.dataset.cardFont).toBe("inter");
   });
 
-  it("挂载时若 localStorage 已存档位（如 newsreader），<html> 立即同步", () => {
+  it("挂载时若 localStorage 已存档位（如 sentient），<html> 立即同步", () => {
+    window.localStorage.setItem("lexii:card-font", "sentient");
+    render(<App reviewProviderFactory={makeReviewProviderFactory().factory} />);
+    expect(document.documentElement.dataset.cardFont).toBe("sentient");
+  });
+
+  it("挂载时旧存量 newsreader 平滑迁移到 sentient（RAY-359）", () => {
     window.localStorage.setItem("lexii:card-font", "newsreader");
     render(<App reviewProviderFactory={makeReviewProviderFactory().factory} />);
-    expect(document.documentElement.dataset.cardFont).toBe("newsreader");
+    expect(document.documentElement.dataset.cardFont).toBe("sentient");
   });
 
   it("设置页切档：写 localStorage + 同步 <html data-card-font>，复习卡立即生效", async () => {

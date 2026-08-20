@@ -1,9 +1,10 @@
 /**
- * 卡片字体管理（RAY-323）测试。
+ * 卡片字体管理（RAY-323，RAY-359）测试。
  *
  * 覆盖：初始值读 localStorage（无值回落默认 modern）；setFont 写
  * localStorage 并同步到 <html data-card-font>；跨标签页 storage 事件
  * 让本页跟随；localStorage 抛错（隐私模式）不炸。
+ * RAY-359：newsreader → sentient 迁移，旧存量读为 sentient。
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -35,19 +36,26 @@ describe("useCardFont（RAY-323）", () => {
     expect(document.documentElement.dataset.cardFont).toBe("inter");
   });
 
-  it("读取已存储的档位（如 newsreader）", () => {
+  it("读取已存储的档位（如 sentient）", () => {
+    window.localStorage.setItem(CARD_FONT_STORAGE_KEY, "sentient");
+    const { result } = renderHook(() => useCardFont());
+    expect(result.current.font).toBe("sentient");
+    expect(document.documentElement.dataset.cardFont).toBe("sentient");
+  });
+
+  it("旧存量 newsreader 读取时迁移到 sentient（RAY-359）", () => {
     window.localStorage.setItem(CARD_FONT_STORAGE_KEY, "newsreader");
     const { result } = renderHook(() => useCardFont());
-    expect(result.current.font).toBe("newsreader");
-    expect(document.documentElement.dataset.cardFont).toBe("newsreader");
+    expect(result.current.font).toBe("sentient");
+    expect(document.documentElement.dataset.cardFont).toBe("sentient");
   });
 
   it("setFont 写 localStorage 并同步到 <html data-card-font>，4 档都能切", () => {
     const { result } = renderHook(() => useCardFont());
-    const sequence: Array<"inter" | "google-sans" | "playpen" | "newsreader"> = [
+    const sequence: Array<"inter" | "google-sans" | "playpen" | "sentient"> = [
       "google-sans",
       "playpen",
-      "newsreader",
+      "sentient",
       "inter",
     ];
     for (const next of sequence) {
@@ -92,9 +100,9 @@ describe("useCardFont（RAY-323）", () => {
   });
 
   it("跨标签页：其他标签页清空（key 为 null）→ 本页回落默认", () => {
-    window.localStorage.setItem(CARD_FONT_STORAGE_KEY, "newsreader");
+    window.localStorage.setItem(CARD_FONT_STORAGE_KEY, "sentient");
     const { result } = renderHook(() => useCardFont());
-    expect(result.current.font).toBe("newsreader");
+    expect(result.current.font).toBe("sentient");
     act(() => {
       // 全清（key === null）时回落默认
       window.dispatchEvent(
