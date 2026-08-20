@@ -39,7 +39,7 @@ async function dismissFirstOpen(page: Page): Promise<void> {
 /** 进入学习并等到卡片出现（空库路径自动导入内置示例词表） */
 async function openLearnAndWaitCard(page: Page): Promise<void> {
   await page.getByRole("button", { name: "学习", exact: true }).click();
-  const card = page.locator("button[aria-expanded]");
+  const card = page.locator("[aria-expanded]");
   const importButton = page.getByRole("button", { name: /导入内置示例词表/ });
   // 空库 → 空状态出导入按钮；非空库（Tier0 已装）→ 直接出卡片。
   // 两条路径竞速，先出现谁走谁，最终都落到卡片。
@@ -55,7 +55,7 @@ async function openLearnAndWaitCard(page: Page): Promise<void> {
 /** 卡片布局度量（当前可见面；返回浏览器内的实测数值） */
 async function measureCard(page: Page) {
   return page.evaluate(() => {
-    const btn = document.querySelector("button[aria-expanded]");
+    const btn = document.querySelector("[aria-expanded]");
     if (!btn) {
       throw new Error("未找到卡片按钮");
     }
@@ -97,12 +97,11 @@ test.describe("背词卡片固定高度（RAY-291）", () => {
     expectWithinPx(first.cardHeight, expectedCardHeight(first.dvh), 1);
 
     // 评分推进到下一张卡：高度只由视口决定，不随词条内容变化
-    const firstLabel =
-      (await page.locator("button[aria-expanded]").getAttribute("aria-label")) ?? "";
+    const firstLabel = (await page.locator("[aria-expanded]").getAttribute("aria-label")) ?? "";
     await page.keyboard.press("3");
     await page.waitForFunction(
       (label) => {
-        const btn = document.querySelector("button[aria-expanded]");
+        const btn = document.querySelector("[aria-expanded]");
         return Boolean(
           btn &&
           btn.getAttribute("aria-label") !== label &&
@@ -126,9 +125,9 @@ test.describe("背词卡片固定高度（RAY-291）", () => {
 
   test("超长内容在面内滚动：卡片高度不变、评分提示固定在底栏", async ({ page }) => {
     await openLearnAndWaitCard(page);
-    await page.locator("button[aria-expanded]").click();
+    await page.locator("[aria-expanded]").click();
     await page.waitForFunction(() => {
-      const btn = document.querySelector("button[aria-expanded]");
+      const btn = document.querySelector("[aria-expanded]");
       return btn?.getAttribute("aria-expanded") === "true";
     });
 
@@ -136,7 +135,7 @@ test.describe("背词卡片固定高度（RAY-291）", () => {
     // 注入超长内容：模拟富化字段齐全的超长词条（无需依赖真实词书数据）
     await page.evaluate(() => {
       const region = document.querySelector(
-        'button[aria-expanded] [aria-hidden="false"] .overflow-y-auto',
+        '[aria-expanded] [aria-hidden="false"] .overflow-y-auto',
       );
       if (!region) {
         throw new Error("未找到背面滚动区");
@@ -157,7 +156,7 @@ test.describe("背词卡片固定高度（RAY-291）", () => {
     // 滚到底部：评分提示底栏不随内容滚动，固定在卡片底部
     await page.evaluate(() => {
       const region = document.querySelector(
-        'button[aria-expanded] [aria-hidden="false"] .overflow-y-auto',
+        '[aria-expanded] [aria-hidden="false"] .overflow-y-auto',
       );
       if (!region) {
         throw new Error("未找到背面滚动区");
@@ -165,9 +164,7 @@ test.describe("背词卡片固定高度（RAY-291）", () => {
       region.scrollTop = region.scrollHeight;
     });
     const pinned = await page.evaluate(() => {
-      const face = document.querySelector(
-        'button[aria-expanded] [aria-hidden="false"]',
-      ) as HTMLElement;
+      const face = document.querySelector('[aria-expanded] [aria-hidden="false"]') as HTMLElement;
       const region = face.querySelector(".overflow-y-auto") as HTMLElement;
       // RAY-362：文案“按 1-3 评分”已删除，保留 key icon（svg）；底栏为 span[aria-hidden="true"] 且移动端 hidden（<768px）
       const hint =
@@ -199,9 +196,7 @@ test.describe("背词卡片固定高度（RAY-291）", () => {
     await page.emulateMedia({ colorScheme: "dark" });
     await page.waitForFunction(() => document.documentElement.dataset.theme === "dark");
     const faceBg = await page.evaluate(() => {
-      const face = document.querySelector(
-        'button[aria-expanded] [aria-hidden="false"]',
-      ) as HTMLElement;
+      const face = document.querySelector('[aria-expanded] [aria-hidden="false"]') as HTMLElement;
       return getComputedStyle(face).backgroundColor;
     });
     // 深色 --lex-surface = #1c1917 = rgb(28, 25, 23)；浅色 #ffffff 不会误判
