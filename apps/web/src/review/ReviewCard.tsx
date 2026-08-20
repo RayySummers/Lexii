@@ -40,7 +40,13 @@
 import { useEffect, useRef } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { resolveDefinitionPos, type Sense } from "@lexii/core";
-import { dualPhonetics, parseInlineMarkdown, parseWordParts } from "./enrichmentUi";
+import { KeyboardIcon } from "../components/icons";
+import {
+  dualPhonetics,
+  ensureBalancedText,
+  parseInlineMarkdown,
+  parseWordParts,
+} from "./enrichmentUi";
 import type { PhoneticBadge } from "./enrichmentUi";
 import { getSynonymGroups, isSelfSynonym, truncateDefinition } from "../lib/synonymGroups";
 
@@ -48,8 +54,6 @@ export interface ReviewCardProps {
   sense: Sense;
   flipped: boolean;
   onFlip(): void;
-  /** 背面评分快捷键提示（RAY-265：三档 / 四档文案不同，由界面层传入） */
-  ratingHint: string;
   /** RAY-367：点击近义词跳转搜词页（按义项分组，循环与无结果由搜词页处理） */
   onSynonymSelect?: (term: string) => void;
 }
@@ -76,13 +80,7 @@ export function cardHeightStyle(): CSSProperties {
   };
 }
 
-export function ReviewCard({
-  sense,
-  flipped,
-  onFlip,
-  ratingHint,
-  onSynonymSelect,
-}: ReviewCardProps) {
+<export function ReviewCard({ sense, flipped, onFlip, onSynonymSelect }: ReviewCardProps) {
   const wordParts = parseWordParts(sense.wordParts ?? "");
   // 释义级词性（RAY-349）：口径与解析在 @lexii/core（resolveDefinitionPos），
   // 本组件只做渲染——能确定词性的释义标词性，确定不了的位置退回序号。
@@ -262,7 +260,7 @@ export function ReviewCard({
             </CardSection>
             <CardSection title="中文词源" visible={Boolean(sense.etymologyZh)}>
               <p className="text-sm leading-relaxed text-text-muted">
-                {parseInlineMarkdown(sense.etymologyZh ?? "")}
+                {parseInlineMarkdown(ensureBalancedText(sense.etymologyZh ?? ""))}
               </p>
             </CardSection>
             <CardSection title="近义词" visible={synonymGroups.length > 0}>
@@ -272,8 +270,12 @@ export function ReviewCard({
               <WordChips words={sense.antonyms ?? []} />
             </CardSection>
           </div>
-          <span className="shrink-0 px-6 pb-5 pt-2 text-center text-xs text-text-muted">
-            {ratingHint}
+          {/* RAY-362：文案“按 1-3 评分”已删除，保留 key icon；移动端 <768px 自动隐藏，桌面端保留，纯 CSS 响应式无布局跳动 */}
+          <span
+            className="hidden shrink-0 items-center justify-center px-6 pb-5 pt-2 text-text-muted md:flex"
+            aria-hidden="true"
+          >
+            <KeyboardIcon className="h-3.5 w-3.5" />
           </span>
         </CardFace>
       </div>
@@ -297,14 +299,19 @@ function DefinitionMarker({ pos, index }: { pos: string; index: number }) {
   return null;
 }
 
-/** 美/英双音标行（富化缺省回退词书自带音标；无任何音标数据则不渲染） */
+/** 美/英双音标行（富化缺省回退词书自带音标；无任何音标数据则不渲染）
+ * RAY-361 S1/S2/S3：音标区域强制使用通用字体 Inter（.lex-phonetic 封装
+ * var(--lex-phonetic-font) + 400 字重），不受卡片字体/浏览器字体选择影响，
+ * 避免 Playpen/Newsreader 等字体缺 IPA 字形导致的豆腐块；兜底栈含系统
+ * 通用字体，避免引入新的豆腐块。S2 显式 font-weight:400 隔离 800/600
+ * 继承；S3 收敛为类而非多处内联，见 tokens.css .lex-phonetic 说明。 */
 function PhoneticsRow({ sense, className = "" }: { sense: Sense; className?: string }) {
   const badges = dualPhonetics(sense);
   if (badges.length === 0) {
     return null;
   }
   return (
-    <span className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 ${className}`}>
+    <span className={`lex-phonetic flex flex-wrap items-center gap-x-2 gap-y-0.5 ${className}`}>
       {badges.map((badge, index) => (
         <span
           key={`${index}:${badge.value}`}

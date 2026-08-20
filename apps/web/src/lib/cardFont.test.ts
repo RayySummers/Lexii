@@ -1,11 +1,13 @@
 /**
- * 「卡片字体」偏好（RAY-323）解析/读写测试。
+ * 「卡片字体」偏好（RAY-323，RAY-359）解析/读写测试。
  *
  * 纯函数（parseCardFont / isCardFont）直接测；localStorage 读写用 jsdom
  * 环境验证（损坏值回落默认，隐私模式抛错不炸）；CARD_FONT_OPTIONS 锁定
  * 4 档、id 与 CardFont 类型一一对应、每档都有示例文案与字重；最后一块
  * 校验 CARD_FONT_OPTIONS.fontWeight 与 index.html 的 Google Fonts URL
  * 加载字重严格一致（Oscar 评审 suggestion 2 的漂移防线）。
+ * RAY-359：Newsreader → Sentient Medium（500），Google Fonts 仅加载
+ * 3 档（Inter/Playpen/Google Sans），Sentient 自托管不计入 Google Fonts 漂移。
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -35,7 +37,7 @@ describe("isCardFont（类型守卫）", () => {
     expect(isCardFont("inter")).toBe(true);
     expect(isCardFont("google-sans")).toBe(true);
     expect(isCardFont("playpen")).toBe(true);
-    expect(isCardFont("newsreader")).toBe(true);
+    expect(isCardFont("sentient")).toBe(true);
   });
 
   it("非法值拒绝（含空、含未知名、含大小写错误）", () => {
@@ -45,6 +47,8 @@ describe("isCardFont（类型守卫）", () => {
     expect(isCardFont("Inter")).toBe(false); // 大小写敏感
     expect(isCardFont("roboto")).toBe(false);
     expect(isCardFont("Inter Display")).toBe(false);
+    // RAY-359 迁移：旧值 newsreader 已非合法 CardFont，parseCardFont 会映射到 sentient
+    expect(isCardFont("newsreader")).toBe(false);
   });
 });
 
@@ -61,9 +65,14 @@ describe("parseCardFont（纯函数）", () => {
     expect(parseCardFont("inter")).toBe("inter");
     expect(parseCardFont("google-sans")).toBe("google-sans");
     expect(parseCardFont("playpen")).toBe("playpen");
-    expect(parseCardFont("newsreader")).toBe("newsreader");
+    expect(parseCardFont("sentient")).toBe("sentient");
     // 首尾空白 trim 后通过类型守卫
-    expect(parseCardFont("  newsreader  ")).toBe("newsreader");
+    expect(parseCardFont("  sentient  ")).toBe("sentient");
+  });
+
+  it("旧值 newsreader 平滑迁移到 sentient（RAY-359）", () => {
+    expect(parseCardFont("newsreader")).toBe("sentient");
+    expect(parseCardFont("  newsreader  ")).toBe("sentient");
   });
 
   it("非法值回落默认", () => {
@@ -75,14 +84,19 @@ describe("parseCardFont（纯函数）", () => {
 describe("readCardFont / writeCardFont（localStorage 读写）", () => {
   it("未写入时读默认值；写入后读回写入值", () => {
     expect(readCardFont()).toBe("inter");
-    expect(writeCardFont("newsreader")).toBe(true);
-    expect(window.localStorage.getItem(CARD_FONT_STORAGE_KEY)).toBe("newsreader");
-    expect(readCardFont()).toBe("newsreader");
+    expect(writeCardFont("sentient")).toBe(true);
+    expect(window.localStorage.getItem(CARD_FONT_STORAGE_KEY)).toBe("sentient");
+    expect(readCardFont()).toBe("sentient");
     // 4 档都能写能读
     expect(writeCardFont("playpen")).toBe(true);
     expect(readCardFont()).toBe("playpen");
     expect(writeCardFont("google-sans")).toBe(true);
     expect(readCardFont()).toBe("google-sans");
+  });
+
+  it("旧存量 newsreader 读取时迁移到 sentient（RAY-359）", () => {
+    window.localStorage.setItem(CARD_FONT_STORAGE_KEY, "newsreader");
+    expect(readCardFont()).toBe("sentient");
   });
 
   it("存储值损坏回落默认", () => {
@@ -109,7 +123,7 @@ describe("CARD_FONT_OPTIONS（settings 卡片元数据单点来源）", () => {
       "inter",
       "google-sans",
       "playpen",
-      "newsreader",
+      "sentient",
     ]);
   });
 
@@ -124,10 +138,11 @@ describe("CARD_FONT_OPTIONS（settings 卡片元数据单点来源）", () => {
     }
   });
 
-  it("字重口径（Oscar 评审 suggestion 2）：inter 800（ExtraBold），其余 600（SemiBold）", () => {
+  it("字重口径（RAY-359）：inter 800（ExtraBold），sentient 500（Medium），其余 600（SemiBold）", () => {
     expect(CARD_FONT_OPTIONS.find((option) => option.id === "inter")!.fontWeight).toBe(800);
+    expect(CARD_FONT_OPTIONS.find((option) => option.id === "sentient")!.fontWeight).toBe(500);
     for (const option of CARD_FONT_OPTIONS) {
-      if (option.id === "inter") continue;
+      if (option.id === "inter" || option.id === "sentient") continue;
       expect(option.fontWeight).toBe(600);
     }
   });
@@ -141,16 +156,18 @@ describe("CARD_FONT_OPTIONS（settings 卡片元数据单点来源）", () => {
 describe("CARD_FONT_OPTIONS 与 index.html 的 Google Fonts URL 同步（漂移校验）", () => {
   const INDEX_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../index.html");
 
-  /** index.html 的 <link href> → 字体名 → 加载字重 的映射 */
-  function loadFontWeightsFromIndexHtml(): Map<string, number> {
+  /** index.html 的 <link href> → 字体名 → 加载字重集合 的映射（RAY-361 S1：Inter 400;800） */
+  function loadFontWeightsFromIndexHtml(): Map<string, Set<number>> {
     const source = readFileSync(INDEX_PATH, "utf8");
     const hrefMatch = source.match(/href="(https:\/\/fonts\.googleapis\.com\/css2[^"]+)"/);
     expect(hrefMatch).not.toBeNull();
     const cssUrl = hrefMatch![1]!;
-    const weights = new Map<string, number>();
-    // family=Playpen+Sans:wght@600 —— 字体名中的 + 还原为空格
-    for (const match of cssUrl.matchAll(/family=([^&:]+):wght@(\d+)/g)) {
-      weights.set(match[1]!.replace(/\+/g, " "), Number(match[2]));
+    const weights = new Map<string, Set<number>>();
+    // family=Inter:wght@400;800 或 family=Playpen+Sans:wght@600 —— 字体名中的 + 还原为空格
+    for (const match of cssUrl.matchAll(/family=([^&:]+):wght@([^&]+)/g)) {
+      const name = match[1]!.replace(/\+/g, " ");
+      const raw = match[2]!.split(";").map(Number);
+      weights.set(name, new Set(raw));
     }
     return weights;
   }
@@ -161,15 +178,23 @@ describe("CARD_FONT_OPTIONS 与 index.html 的 Google Fonts URL 同步（漂移�
     return first.replace(/"/g, "");
   }
 
-  it("每档 fontWeight 与 Google Fonts URL 中加载的字重严格一致（未加载字重会被合成）", () => {
+  it("每档 fontWeight 与对应加载源字重严格一致（未加载字重会被合成）", () => {
     const loadedWeights = loadFontWeightsFromIndexHtml();
-    expect(loadedWeights.size).toBe(CARD_FONT_OPTIONS.length);
+    // RAY-359：Sentient 自托管（500）不在 Google Fonts URL 中；Inter 也为自托管但保留 800 回退
+    // 故 Google Fonts 中应有 3 条（Inter 400;800 + Playpen 600 + Google Sans Flex 600）
+    expect(loadedWeights.size).toBe(3);
     for (const option of CARD_FONT_OPTIONS) {
+      if (option.id === "sentient") {
+        // Sentient 自托管，不在 Google Fonts 校验集
+        expect(option.fontWeight).toBe(500);
+        continue;
+      }
       // RAY-338 A1：inter 档主字体 Inter Display 为自托管（public/fonts/，
       // @font-face 800），Google Fonts 只加载其回退字体 Inter 800
+      // RAY-361 S1：音标新增 Inter 400（400;800）与卡片 800 共存，校验改为包含关系
       const loadedName = option.id === "inter" ? "Inter" : fontNameOf(option.fontFamily);
       expect(loadedWeights.has(loadedName)).toBe(true);
-      expect(loadedWeights.get(loadedName)).toBe(option.fontWeight);
+      expect(loadedWeights.get(loadedName)!.has(option.fontWeight)).toBe(true);
     }
   });
 
@@ -177,6 +202,18 @@ describe("CARD_FONT_OPTIONS 与 index.html 的 Google Fonts URL 同步（漂移�
     const inter = CARD_FONT_OPTIONS.find((option) => option.id === "inter")!;
     expect(fontNameOf(inter.fontFamily)).toBe("Inter Display");
     expect(inter.fontWeight).toBe(800);
+  });
+
+  it("sentient 档主字体为自托管 Sentient（RAY-359），字重 500 Medium；fallback 含 Newsreader/Georgia Pro 链", () => {
+    const sentient = CARD_FONT_OPTIONS.find((option) => option.id === "sentient")!;
+    expect(fontNameOf(sentient.fontFamily)).toBe("Sentient");
+    expect(sentient.fontWeight).toBe(500);
+    expect(sentient.fontFamily).toBe(
+      '"Sentient", "Newsreader", "Georgia Pro", Georgia, "Times New Roman", serif',
+    );
+    // fallback 链精确顺序契约（Owner 口径补正）：Sentient → Newsreader → Georgia Pro → Georgia → Times New Roman
+    expect(sentient.fontFamily).toContain('"Newsreader"');
+    expect(sentient.fontFamily).toContain('"Georgia Pro"');
   });
 });
 
@@ -212,7 +249,7 @@ describe("tokens.css 的字体栈与 CARD_FONT_OPTIONS 同步（RAY-338 A1 漂�
   /**
    * tokens.css 中 `--lex-card-font:` 的字面值按文件顺序：
    * 第 1 条 = 默认档 / inter（合并的 :root, [data-card-font="inter"] 块，Oscar 复核 suggestion 1）
-   * 第 2–4 条 = google-sans / playpen / newsreader 各自档。
+   * 第 2–4 条 = google-sans / playpen / sentient 各自档。
    * 与 CARD_FONT_OPTIONS 顺序一致，便于按 index 对账。
    */
   function loadStacksFromTokensCss(): string[] {
@@ -232,6 +269,20 @@ describe("tokens.css 的字体栈与 CARD_FONT_OPTIONS 同步（RAY-338 A1 漂�
     const interStack = stacks[CARD_FONT_OPTIONS.findIndex((option) => option.id === "inter")]!;
     expect(interStack.startsWith('"Inter Display"')).toBe(true);
     expect(interStack).toContain('"Inter"');
+  });
+
+  it("sentient 档主字体为自托管 Sentient（RAY-359），serif 回退 Georgia Pro 链（5 级 fallback）", () => {
+    const stacks = loadStacksFromTokensCss();
+    const sentientStack =
+      stacks[CARD_FONT_OPTIONS.findIndex((option) => option.id === "sentient")]!;
+    expect(sentientStack).toBe(
+      '"Sentient", "Newsreader", "Georgia Pro", Georgia, "Times New Roman", serif',
+    );
+    expect(sentientStack.startsWith('"Sentient"')).toBe(true);
+    expect(sentientStack).toContain('"Newsreader"');
+    expect(sentientStack).toContain('"Georgia Pro"');
+    expect(sentientStack).toContain("Georgia");
+    expect(sentientStack).toContain('"Times New Roman"');
   });
 
   it('首条栈由 :root 与 [data-card-font="inter"] 共享（合并声明，无重复）', () => {
@@ -279,16 +330,16 @@ describe("parseCardFontStacks（CSS 块注释剥除，RAY-339 R4 suggestion 1）
 [data-card-font="playpen"] {
   --lex-card-font: stack-playpen;
 }
-/* trap-newsreader */
-[data-card-font="newsreader"] {
-  --lex-card-font: stack-newsreader;
+/* trap-sentient */
+[data-card-font="sentient"] {
+  --lex-card-font: stack-sentient;
 }
 `;
     expect(parseCardFontStacks(source)).toEqual([
       "stack-inter",
       "stack-google",
       "stack-playpen",
-      "stack-newsreader",
+      "stack-sentient",
     ]);
   });
 
@@ -328,16 +379,16 @@ describe("parseCardFontStacks（CSS 块注释剥除，RAY-339 R4 suggestion 1）
 [data-card-font="playpen"] {
   --lex-card-font: stack-playpen;
 }
-// fake-newsreader
-[data-card-font="newsreader"] {
-  --lex-card-font: stack-newsreader;
+// fake-sentient
+[data-card-font="sentient"] {
+  --lex-card-font: stack-sentient;
 }
 `;
     expect(parseCardFontStacks(source)).toEqual([
       "stack-inter",
       "stack-google",
       "stack-playpen",
-      "stack-newsreader",
+      "stack-sentient",
     ]);
   });
 

@@ -20,14 +20,7 @@ import { makeSense } from "./testFixtures";
 /** 受控翻面容器：点击卡片真实翻转（ReviewCard 的 flipped 由父级持有） */
 function Harness({ sense }: { sense: Sense }) {
   const [flipped, setFlipped] = useState(false);
-  return (
-    <ReviewCard
-      sense={sense}
-      flipped={flipped}
-      onFlip={() => setFlipped((v) => !v)}
-      ratingHint="按 1–3 评分"
-    />
-  );
+  return <ReviewCard sense={sense} flipped={flipped} onFlip={() => setFlipped((v) => !v)} />;
 }
 
 /** 富化字段齐全的词条（形态照真实数据：音标自带斜杠、词根词缀带 <含义>） */
@@ -256,10 +249,20 @@ describe("ReviewCard 固定高度与卡片内部滚动（RAY-291）", () => {
     for (const label of ["例句", "词根词缀", "中文词源", "近义词", "反义词"]) {
       expect(scrollRegion).toContainElement(screen.getByText(label));
     }
-    // 评分提示不在滚动区内：内容滚动时提示恒留在卡片底部
-    const ratingHint = screen.getByText("按 1–3 评分");
-    expect(scrollRegion).not.toContainElement(ratingHint);
-    expect(ratingHint.parentElement).toBe(cardButton().lastElementChild);
+    // RAY-362：文案“按 1–3 评分”已删除，保留 key icon；icon 在底栏（滚动区外）且移动端隐藏（hidden md:flex）
+    expect(screen.queryByText("按 1–3 评分")).not.toBeInTheDocument();
+    expect(screen.queryByText(/按 1–3/)).not.toBeInTheDocument();
+    const backFace = cardButton().lastElementChild as HTMLElement;
+    const hintBar = backFace.lastElementChild as HTMLElement;
+    // 底栏仍在卡片底部（滚动区外）
+    expect(scrollRegion).not.toContainElement(hintBar);
+    expect(hintBar.parentElement).toBe(backFace);
+    // key icon 保留且样式正常（RAY-363 Material Symbols: keyboard），移动端隐藏桌面端保留（hidden md:flex）
+    const icon = hintBar.querySelector(".material-symbols-outlined");
+    expect(icon).not.toBeNull();
+    expect(icon?.textContent).toBe("keyboard");
+    expect(hintBar).toHaveClass("hidden");
+    expect(hintBar).toHaveClass("md:flex");
   });
 
   it("正面词条在面内滚动区内；翻面提示固定在正面底栏", () => {

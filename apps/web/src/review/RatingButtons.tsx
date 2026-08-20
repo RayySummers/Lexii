@@ -7,7 +7,7 @@
  * - 四档（Anki 传统）：Again / Hard / Good / Easy，沿用既有样式与快捷键；
  * - 副文案显示该档评分后的到期时间（previewGradeDueLabels 预览，与真实排期一致）；
  *   分钟级（「X 分钟后复习」类，RAY-279 真机反馈）为 null，不渲染副文案；
- * - 右上角 kbd 提示快捷键（三档 1–3，四档 1–4）；
+ * - 右上角 kbd 提示快捷键（三档 1–3，四档 1–4）；RAY-362 起移动端（<768px）隐藏，桌面端保留（hidden md:block，纯 CSS 无布局跳动）；
  * - 三档（默认）全视口一排三个（RAY-278 返工：手机端此前 2×2 缺右下角）；
  *   四档移动端 2×2、sm 以上一排四个；网格等宽，触控目标 ≥ 48px。
  */
@@ -119,7 +119,7 @@ export function RatingButtons({ dueLabels, onGrade, mode }: RatingButtonsProps) 
           >
             <span className={`text-base font-bold ${config.textClass}`}>{config.label}</span>
             {dueLabel !== null ? <span className="text-xs text-text-muted">{dueLabel}</span> : null}
-            <kbd className="absolute right-2 top-2 rounded border border-border bg-surface-raised px-1.5 py-0.5 text-[10px] font-normal text-text-muted">
+            <kbd className="absolute right-2 top-2 hidden rounded border border-border bg-surface-raised px-1.5 py-0.5 text-[10px] font-normal text-text-muted md:block">
               {config.shortcut}
             </kbd>
           </button>

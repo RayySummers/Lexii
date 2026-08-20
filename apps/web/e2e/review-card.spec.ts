@@ -169,11 +169,19 @@ test.describe("背词卡片固定高度（RAY-291）", () => {
         'button[aria-expanded] [aria-hidden="false"]',
       ) as HTMLElement;
       const region = face.querySelector(".overflow-y-auto") as HTMLElement;
-      const hint = [...face.querySelectorAll("span")].find((el) =>
-        el.textContent?.includes("评分"),
-      );
+      // RAY-362：文案“按 1-3 评分”已删除，保留 key icon（svg）；底栏为 span[aria-hidden="true"] 且移动端 hidden（<768px）
+      const hint =
+        (face.querySelector('span[aria-hidden="true"]') as HTMLElement | null) ??
+        ([...face.querySelectorAll("span")].find((el) => el.textContent?.includes("评分")) as
+          HTMLElement | undefined) ??
+        (face.lastElementChild as HTMLElement);
       if (!hint) {
         return false;
+      }
+      // 移动端按 RAY-362 隐藏按键指示（hidden md:flex），此时 display:none，pinned 语义不适用，视为通过
+      const hintDisplay = getComputedStyle(hint).display;
+      if (hintDisplay === "none") {
+        return region.scrollTop > 0;
       }
       const faceRect = face.getBoundingClientRect();
       const hintRect = hint.getBoundingClientRect();

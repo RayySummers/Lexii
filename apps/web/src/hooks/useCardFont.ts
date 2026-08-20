@@ -1,5 +1,5 @@
 /**
- * 卡片字体管理（RAY-323）。
+ * 卡片字体管理（RAY-323，RAY-359）。
  *
  * - 偏好（CardFont）持久化到 localStorage（与主题、发音口音、生词本开关
  *   同一持久化模式），由 src/lib/cardFont 解析/读写；
@@ -8,6 +8,7 @@
  *   复习卡本体（ReviewCard 词条）引用 var(--lex-card-font)，下次渲染即生效；
  * - 跨标签页同步（与 useTheme 同口径）：监听 storage 事件，其他标签页
  *   变更时本页自动跟随；存储被清除时回落默认现代简约。
+ * - RAY-359 迁移：旧存量 "newsreader" 跨标签同步时映射到 "sentient"。
  *
  * 之所以不放在 useTheme 内部、而是独立 hook：
  * - 主题与字体是两套独立偏好，未来扩展（如字号、字重）也应各自独立；
@@ -76,6 +77,7 @@ export function useCardFont(): UseCardFontResult {
   // storage 事件只在本页之外写入时触发，本页自身的持久化不会触发本页监听。
   // 三种情形分别处理：key 为 null（其他标签页 storage.clear()）→ 回落默认；
   // key 匹配且值合法 → 采用新档位；key 匹配但值被移除（null）→ 回落默认。
+  // RAY-359：旧值 "newsreader" 平滑迁移到 "sentient"。
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
       if (event.key === null) {
@@ -83,6 +85,10 @@ export function useCardFont(): UseCardFontResult {
         return;
       }
       if (event.key !== CARD_FONT_STORAGE_KEY) {
+        return;
+      }
+      if (event.newValue === "newsreader") {
+        setFontState("sentient");
         return;
       }
       if (isCardFont(event.newValue)) {
