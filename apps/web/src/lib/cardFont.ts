@@ -35,13 +35,7 @@
 
 /** 7 种卡片字体档位（按 settings 卡片展示顺序；尾部三档为 RAY-366 新增，sentient 为 RAY-359 替换） */
 export type CardFont =
-  | "inter"
-  | "google-sans"
-  | "playpen"
-  | "sentient"
-  | "geist-mono"
-  | "nunito"
-  | "geist-pixel";
+  "inter" | "google-sans" | "playpen" | "sentient" | "geist-mono" | "nunito" | "geist-pixel";
 
 /** 偏好存储键 */
 export const CARD_FONT_STORAGE_KEY = "lexii:card-font";
