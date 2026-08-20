@@ -666,7 +666,6 @@ export async function backfillEnrichment(
   // RAY-365 括号截断扫尾：对未被 enrichment 覆盖但仍截断的词条做本地自愈
   // 主 chunk 已通过 mergeEnrichmentIntoSense 对 enrichment 命中的词条完成括号修复+富化覆盖；
   // 扫尾对全库剩余不平衡（如用户导入的旧截断数据）做就地平衡，不依赖 enrichment。
-  let sweepRepaired = 0;
   const remainingToRepair: Sense[] = [];
   for (const sense of allSenses) {
     if (
@@ -694,8 +693,7 @@ export async function backfillEnrichment(
         await db.senses.put(s);
       }
     });
-    sweepRepaired = dedup.size;
-    filled += sweepRepaired;
+    filled += dedup.size;
   }
 
   await db.transaction("rw", db.meta, async () => {

@@ -107,7 +107,7 @@ export function ensureBalancedText(text: string): string {
     t = t.slice(0, -1).trimEnd();
   }
   // 重新计算（去掉逗号后 depth 不变，但为防 `（）、` 之类顺序影响，保守重算）
-  let after = depth(t);
+  const after = depth(t);
   full = after.full;
   half = after.half;
   let result = t;

@@ -8,7 +8,7 @@
  * - 每个富化词条至少携带一个非空字段（装载校验已在 enrichment.ts
  *   parseEnrichmentPreset 中兜底，此处再锁数量底线）。
  */
-// @ts-ignore
+// @ts-expect-error - node:zlib types via @types/node
 import { brotliCompressSync, constants as zlibConstants } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { ENRICHMENT_TIER0_ENTRY_COUNT, ENRICHMENT_TIER0_PRESET } from "./enrichmentTier0";
@@ -31,7 +31,7 @@ describe("enrichment.tier0.data.json（生成 → 装载契约）", () => {
     // 显式 pin 版本，防 1.3.0 数据被误回滚；brotli 阈值防 64→128 等无意膨胀
     expect(ENRICHMENT_TIER0_PRESET.version).toBe("1.4.0");
     const json = JSON.stringify(ENRICHMENT_TIER0_PRESET);
-    // @ts-ignore - Buffer global in node, zlib can take string directly
+    // @ts-expect-error - zlib can take string directly, Buffer not needed
     const brotliBytes = brotliCompressSync(json, {
       params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11 },
     }).length;
