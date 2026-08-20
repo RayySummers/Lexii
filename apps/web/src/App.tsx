@@ -28,7 +28,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import type { CustomListId, StudyMode } from "@lexii/core";
-import { BookmarkIcon, ListIcon } from "./components/icons";
+import { BarChartIcon, BookmarkIcon, ListIcon, SearchIcon, SettingsIcon } from "./components/icons";
 import { CustomListDetailScreen } from "./customLists/CustomListDetailScreen";
 import { CustomListsScreen } from "./customLists/CustomListsScreen";
 import {
@@ -253,19 +253,20 @@ export function App({
 
   return (
     <div className="min-h-screen bg-bg text-text transition-colors">
-      {/* RAY-325 回改：header 五个按钮在 390px 移动视口下必须单行不换行——
-          RAY-291「整页一屏」契约的 OFFSET 按 86px 单行头推算，换行会把卡片
-          撑出视口（E2E docScrollHeight 694 > 665）。移动端收紧 padding 与
-          间距（sm: 恢复原值），入口文案用短标签「词单」（可达名仍为
-          自定义词单）。 */}
+      {/* RAY-325 + RAY-360：header 390px 单行不换行契约（OFFSET 86px，docScrollHeight 694>665）。
+           RAY-325 用短标签「词单」（可达名「自定义词单」）；RAY-360 移动端四按钮图标化
+          （搜词 search / 词单 lists / 统计 bar_chart / 设置 settings，sm 断点图标/文字切换，
+           aria-label + aria-hidden + focus-visible 可达，复用 RAY-363 Material Symbols 基线）。桌面端无回归。 */}
       <header className="mx-auto flex w-full max-w-3xl items-center justify-end gap-1.5 px-4 py-6 sm:gap-2 sm:px-6">
         <button
           type="button"
           onClick={openSearch}
+          aria-label="搜词"
           aria-pressed={view === "search"}
-          className="rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
+          className="flex items-center justify-center rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4 sm:py-2"
         >
-          搜词
+          <SearchIcon className="h-5 w-5 sm:hidden" />
+          <span className="hidden text-sm font-medium sm:inline">搜词</span>
         </button>
         <button
           type="button"
@@ -282,26 +283,33 @@ export function App({
           onClick={openCustomLists}
           aria-pressed={view === "custom-lists" || view === "custom-list"}
           aria-label="自定义词单"
-          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
+          className="flex items-center justify-center gap-1.5 rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:gap-1.5 sm:px-4 sm:py-2"
         >
-          <ListIcon className="h-4 w-4" />
-          词单
+          <ListIcon className="h-5 w-5 sm:hidden" />
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium">
+            <ListIcon className="h-4 w-4" />
+            <span>词单</span>
+          </span>
         </button>
         <button
           type="button"
           onClick={openStats}
+          aria-label="统计"
           aria-pressed={view === "stats"}
-          className="rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
+          className="flex items-center justify-center rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4 sm:py-2"
         >
-          统计
+          <BarChartIcon className="h-5 w-5 sm:hidden" />
+          <span className="hidden text-sm font-medium sm:inline">统计</span>
         </button>
         <button
           type="button"
           onClick={() => openSettings()}
+          aria-label="设置"
           aria-pressed={view === "settings"}
-          className="rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
+          className="flex items-center justify-center rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4 sm:py-2"
         >
-          设置
+          <SettingsIcon className="h-5 w-5 sm:hidden" />
+          <span className="hidden text-sm font-medium sm:inline">设置</span>
         </button>
       </header>
 
