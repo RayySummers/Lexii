@@ -48,6 +48,12 @@
   white-space: nowrap;
   word-wrap: normal;
   direction: ltr;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 /*
