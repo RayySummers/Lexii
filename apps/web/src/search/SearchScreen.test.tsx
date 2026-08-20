@@ -97,6 +97,20 @@ describe("SearchScreen", () => {
     expect(provider.search).toHaveBeenCalledWith("app");
   });
 
+  it("结果行词条本体应用设置里的卡片字体（RAY-338 A1，CSS 变量口径与复习卡一致）", async () => {
+    const provider = makeProvider({
+      search: vi.fn().mockResolvedValue([makeResult("apple", ["苹果"])]),
+    });
+    render(<SearchScreen provider={provider} onExit={() => {}} />);
+
+    typeQuery("app");
+
+    const term = await screen.findByText("apple");
+    const style = term.getAttribute("style") ?? "";
+    expect(style).toContain("var(--lex-card-font)");
+    expect(style).toContain("var(--lex-card-font-weight)");
+  });
+
   it("无命中时展示「库内无此词」提示并回显查询词（RAY-292 口径）", async () => {
     render(<SearchScreen provider={makeProvider()} onExit={() => {}} />);
 

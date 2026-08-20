@@ -165,9 +165,188 @@ describe("CARD_FONT_OPTIONS 与 index.html 的 Google Fonts URL 同步（漂移�
     const loadedWeights = loadFontWeightsFromIndexHtml();
     expect(loadedWeights.size).toBe(CARD_FONT_OPTIONS.length);
     for (const option of CARD_FONT_OPTIONS) {
-      const name = fontNameOf(option.fontFamily);
-      expect(loadedWeights.has(name)).toBe(true);
-      expect(loadedWeights.get(name)).toBe(option.fontWeight);
+      // RAY-338 A1：inter 档主字体 Inter Display 为自托管（public/fonts/，
+      // @font-face 800），Google Fonts 只加载其回退字体 Inter 800
+      const loadedName = option.id === "inter" ? "Inter" : fontNameOf(option.fontFamily);
+      expect(loadedWeights.has(loadedName)).toBe(true);
+      expect(loadedWeights.get(loadedName)).toBe(option.fontWeight);
     }
+  });
+
+  it("inter 档主字体为自托管 Inter Display（RAY-338 A1），Inter 仅为栈内回退", () => {
+    const inter = CARD_FONT_OPTIONS.find((option) => option.id === "inter")!;
+    expect(fontNameOf(inter.fontFamily)).toBe("Inter Display");
+    expect(inter.fontWeight).toBe(800);
+  });
+});
+
+/**
+ * 从 tokens.css 源码中解析 `--lex-card-font:` 声明栈（按文件顺序，trim 后）。
+ *
+ * 先剥注释再匹配（RAY-339 R4 Oscar 复核 suggestion 1）——避免注释里
+ * 写出 `--lex-card-font:` 字面量被漂移校验误匹配；之后按文件顺序
+ * 提取每条声明的字面值。
+ *
+ * 注释剥离覆盖两种形态：CSS 块注释（斜杠星号包裹）与行首 `//`
+ * （`^\s*\/\/`）——CSS 唯一合法注释为块注释，行注释剥离为未来预处理
+ * 器场景的防御，行内 `//`（如 `url(//…)`）不剥离，属设计取舍——
+ * 本函数只解析 tokens.css 的变量声明栈。当前 tokens.css 无
+ * `url(//…)` 形态（RAY-339 R5/R6 Oscar 复核 nit）。
+ *
+ * 与 `tokens.css` 的顺序契约（顶部 RAY-323 注释段）以及合并形态锁定
+ * 决策（详见本测试文件 `首条栈由 :root 与 [data-card-font="inter"]
+ * 共享` it()）互锁：tokens.css 内 `--lex-card-font:` 出现顺序须与
+ * `CARD_FONT_OPTIONS` 数组一致，便于按 index 对账。
+ */
+function parseCardFontStacks(source: string): string[] {
+  const stripped = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  return [...stripped.matchAll(/--lex-card-font:\s*([^;]+);/g)].map((match) => match[1]!.trim());
+}
+
+describe("tokens.css 的字体栈与 CARD_FONT_OPTIONS 同步（RAY-338 A1 漂移校验）", () => {
+  const TOKENS_PATH = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../styles/tokens.css",
+  );
+
+  /**
+   * tokens.css 中 `--lex-card-font:` 的字面值按文件顺序：
+   * 第 1 条 = 默认档 / inter（合并的 :root, [data-card-font="inter"] 块，Oscar 复核 suggestion 1）
+   * 第 2–4 条 = google-sans / playpen / newsreader 各自档。
+   * 与 CARD_FONT_OPTIONS 顺序一致，便于按 index 对账。
+   */
+  function loadStacksFromTokensCss(): string[] {
+    return parseCardFontStacks(readFileSync(TOKENS_PATH, "utf8"));
+  }
+
+  it("每档栈字面值与 CARD_FONT_OPTIONS.fontFamily 一致（防字面量漂移）", () => {
+    const stacks = loadStacksFromTokensCss();
+    expect(stacks).toHaveLength(CARD_FONT_OPTIONS.length);
+    for (const [index, option] of CARD_FONT_OPTIONS.entries()) {
+      expect(stacks[index]).toBe(option.fontFamily);
+    }
+  });
+
+  it("inter 档主字体为自托管 Inter Display（RAY-338 A1），Inter 仅为栈内回退", () => {
+    const stacks = loadStacksFromTokensCss();
+    const interStack = stacks[CARD_FONT_OPTIONS.findIndex((option) => option.id === "inter")]!;
+    expect(interStack.startsWith('"Inter Display"')).toBe(true);
+    expect(interStack).toContain('"Inter"');
+  });
+
+  it('首条栈由 :root 与 [data-card-font="inter"] 共享（合并声明，无重复）', () => {
+    // 显式锁定合并结构：审阅时一眼看清两处选择器共享同一字面值，
+    // 防回归到分写两份（Oscar 复核 suggestion 1）
+    //
+    // 形状锁定有意的（Oscar R3 复审 nit 1，写进代码作为决策记录）：
+    // 正则要求 `:root,` 与 `[data-card-font="inter"]` 必须换行分开 + 共享 `{`。
+    // 未来维护者若把两选择器压缩到同一行（`:root, [data-card-font="inter"] {`）
+    // 以节省纵向空间，本断言会失败——这是预期行为，不是误伤；放宽正则
+    // 会让「两处选择器共享同一字面量」的可视化信号变弱，回归到分写两份
+    // 的风险上升。本断言与 tokens.css 顶部的顺序契约注释配合，构成
+    // 「实测防线 + 文档级提醒」的双层兜底。
+    //
+    // 互相交叉指向（RAY-339 R4 复核 nit 1）：如调整本句措辞，请同步
+    // tokens.css 顶部 RAY-323 注释段里的顺序契约条目；详见该条目末尾
+    // 的反向交叉指向。
+    const source = readFileSync(TOKENS_PATH, "utf8");
+    expect(source).toMatch(/^:root,\s*\n\s*\[data-card-font="inter"\]\s*\{/m);
+  });
+});
+
+describe("parseCardFontStacks（CSS 块注释剥除，RAY-339 R4 suggestion 1）", () => {
+  it("剥 /* ... */ 注释后再匹配，注释里的 --lex-card-font: 字面量不会被误匹配", () => {
+    const source = `
+/* 注释里写了 --lex-card-font: fake-stack; 会被剥掉 */
+:root {
+  --lex-card-font: real-stack;
+}
+`;
+    expect(parseCardFontStacks(source)).toEqual(["real-stack"]);
+  });
+
+  it("正常匹配 4 条声明；多个块注释里的字面量都被剥除", () => {
+    const source = `
+/* 这是一个注释，里面提到了 --lex-card-font: trap-inter; */
+:root, [data-card-font="inter"] {
+  --lex-card-font: stack-inter;
+}
+/* another --lex-card-font: trap-google; */
+[data-card-font="google-sans"] {
+  --lex-card-font: stack-google;
+}
+/* trap-playpen */
+[data-card-font="playpen"] {
+  --lex-card-font: stack-playpen;
+}
+/* trap-newsreader */
+[data-card-font="newsreader"] {
+  --lex-card-font: stack-newsreader;
+}
+`;
+    expect(parseCardFontStacks(source)).toEqual([
+      "stack-inter",
+      "stack-google",
+      "stack-playpen",
+      "stack-newsreader",
+    ]);
+  });
+
+  it("非贪婪匹配：相邻块注释各自独立剥除，不会跨注释合并", () => {
+    // 防止有人误把 /* ... */ 改成 /*[\\s\\S]*\\*/ 贪婪匹配导致跨注释吃错
+    const source = `
+/* first --lex-card-font: hidden-1; */
+:root { --lex-card-font: real-1; }
+/* second --lex-card-font: hidden-2; */
+[data-card-font="google-sans"] { --lex-card-font: real-2; }
+`;
+    expect(parseCardFontStacks(source)).toEqual(["real-1", "real-2"]);
+  });
+
+  it("裸 `--lex-card-font` 缺少冒号不匹配（仅 `--lex-card-font:` 才进入漂移校验）", () => {
+    const source = `
+/* 这里裸写变量名无冒号，本就不该匹配 */
+--lex-card-font nope;
+:root { --lex-card-font: real; }
+`;
+    expect(parseCardFontStacks(source)).toEqual(["real"]);
+  });
+
+  it("`//` 行注释里的字面量被剥除，真实 4 条声明仍正常解析（RAY-339 R5 Oscar 复核 nit）", () => {
+    // `//` 在纯 CSS 非法，本行注释剥离覆盖的是未来预处理器场景的防御：
+    // 有人误写 `// --lex-card-font: fake;` 也不得泄入栈对账
+    const source = `
+// --lex-card-font: fake-inter;
+:root, [data-card-font="inter"] {
+  --lex-card-font: stack-inter;
+}
+// another --lex-card-font: fake-google;
+[data-card-font="google-sans"] {
+  --lex-card-font: stack-google;
+}
+// fake-playpen
+[data-card-font="playpen"] {
+  --lex-card-font: stack-playpen;
+}
+// fake-newsreader
+[data-card-font="newsreader"] {
+  --lex-card-font: stack-newsreader;
+}
+`;
+    expect(parseCardFontStacks(source)).toEqual([
+      "stack-inter",
+      "stack-google",
+      "stack-playpen",
+      "stack-newsreader",
+    ]);
+  });
+
+  it("行首 `//` 才剥离，行内 `//`（如 url(//…)) 不被误剥（RAY-339 R6 Oscar 复核 nit）", () => {
+    const source = `
+:root { background: url(//cdn.example.com/x.png); --lex-card-font: real-a; }
+[data-card-font="google-sans"] { --lex-card-font: real-b; }
+`;
+    // `url(//…)` 行内 // 未在行首，收窄后的 `^\\s*//` 不应剥整行
+    expect(parseCardFontStacks(source)).toEqual(["real-a", "real-b"]);
   });
 });

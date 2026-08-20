@@ -7,10 +7,12 @@
  * （Newsreader SemiBold）。选择立即应用到当前与未来所有卡片。
  *
  * 存储走 localStorage（与主题、发音口音、生词本开关等偏好同一持久化
- * 模式）。4 种字体通过 index.html 引入的 Google Fonts <link> 在首帧
- * 渲染前到达；CSS 端通过 <html data-card-font="..."> 切换到对应的
- * font-family（见 styles/tokens.css），卡片本体用 var(--lex-card-font)
- * 应用字体，组件层不感知具体字体名。
+ * 模式）。4 种字体通过 index.html 引入的字体样式表在首帧渲染前到达——
+ * 其中 inter 档主字体 Inter Display ExtraBold 自托管（public/fonts/，
+ * RAY-338 A1），其余三档走 Google Fonts <link>；CSS 端通过
+ * <html data-card-font="..."> 切换到对应的 font-family（见
+ * styles/tokens.css），卡片本体用 var(--lex-card-font) 应用字体，
+ * 组件层不感知具体字体名。
  *
  * 偏好不是学习数据，不随 JSON 备份导出。解析失败 / 存储不可用一律
  * 回落默认值（inter，现代简约），绝不阻塞复习。
@@ -79,7 +81,10 @@ export function writeCardFont(font: CardFont): boolean {
  *   让用户在选择时能直观看出字体的字面特征（粗细、字宽、笔画衬线等）
  * - `fontFamily`：卡片本体与设置示例都引用的 CSS font-family 值；
  *   Google Sans Flex 在 Google Fonts 的官方名为单段字符串，需带引号避免
- *   包含空格被误解析；其他三档名称无空格可省略引号但统一加引号保持稳定
+ *   包含空格被误解析；其他档名称无空格可省略引号但统一加引号保持稳定。
+ *   RAY-338 A1：inter 档栈首为自托管 Inter Display（ExtraBold，见
+ *   public/fonts/inter-display.css；Google Fonts 无 Inter Display，仅提供
+ *   文本切 Inter），其后 Inter 为 Google Fonts 加载的回退。
  * - `fontWeight`：该档的字重，与 index.html 的 Google Fonts URL 中加载的
  *   字重严格一致（Oscar 评审 suggestion 2）：inter 800（ExtraBold）/
  *   其余 600（SemiBold）——不加载的字重会被浏览器合成，导致字面失真；
@@ -100,7 +105,7 @@ export const CARD_FONT_OPTIONS: ReadonlyArray<CardFontOption> = [
     label: "现代简约",
     description: "笔触硬朗、信息密度高。",
     sampleText: "vocabulary",
-    fontFamily: '"Inter", "Inter Display", system-ui, sans-serif',
+    fontFamily: '"Inter Display", "Inter", system-ui, sans-serif',
     fontWeight: 800,
   },
   {

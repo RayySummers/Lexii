@@ -558,7 +558,8 @@ function SettingsMainView({
           </select>
         </label>
         {/* 卡片字体（RAY-323）：2×2 卡片选单，每张以对应字体渲染示例单词，
-            让用户选择前直接看到字面特征；选档立即持久化并同步到复习卡 */}
+            让用户选择前直接看到字面特征；选档立即持久化并同步到复习卡。
+            RAY-339（Oscar 复核 suggestion 2）：提示现代简约档主字体的字符集覆盖范围。 */}
         <div className="flex flex-col gap-2">
           <div>
             <span className="text-sm font-semibold">卡片字体</span>
@@ -567,6 +568,11 @@ function SettingsMainView({
             </span>
           </div>
           <FontPicker value={cardFont} onChange={onCardFontChange} groupLabel="卡片字体" />
+          {/* RAY-339（Oscar 复核 suggestion 2）：现代简约档主字体 Inter Display 仅
+              覆盖拉丁字符；非拉丁词条按字体栈自动回退到系统字体，无需切档。 */}
+          <p className="text-xs text-text-muted">
+            现代简约档的主字体仅覆盖拉丁字符，非拉丁词条会自动回退到系统字体。
+          </p>
         </div>
       </Section>
 

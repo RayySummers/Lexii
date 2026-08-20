@@ -1,0 +1,22 @@
+/**
+ * Inter Display ExtraBold（自托管，RAY-338 A1）。
+ *
+ * 「现代简约」卡片字体预设的主字体。Inter Display 是 Inter v4 起按光学
+ * 尺寸拆分的 Display 版本（24 px 以上的大字按光学尺寸应使用 Display 切），
+ * Google Fonts 只上架了 Inter 文本切（无 Inter Display），故把官方发布包
+ * （rsms/inter v4.1，SIL OFL 1.1，见同目录 OFL-InterDisplay-LICENSE.txt）
+ * 的 ExtraBold woff2 自托管于此。tokens.css 与 src/lib/cardFont.ts 的字体栈
+ * 把 "Inter Display" 排在 "Inter" 之前；Google Fonts URL 中保留的 Inter 800
+ * 仅作本文件加载失败时的回退（unicode-range 子集化，正常情况下不会下载）。
+ *
+ * 路径全部相对本文件位置解析（与 public/sw.js 的子路径部署口径一致）；
+ * 字体文件由 sw.js 的 APP_SHELL 预缓存（离线可用），本 CSS 经 index.html
+ * 的 <link href> 被 sw.js 的 precacheAssetsFromHtml 解析预缓存。
+ */
+@font-face {
+  font-family: "Inter Display";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("./InterDisplay-ExtraBold.woff2") format("woff2");
+}

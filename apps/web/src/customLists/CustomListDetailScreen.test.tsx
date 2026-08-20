@@ -125,6 +125,24 @@ describe("CustomListDetailScreen", () => {
     expect(screen.getByText("共 2 个词")).toBeInTheDocument();
   });
 
+  it("词条本体应用设置里的卡片字体（RAY-338 A1，CSS 变量口径与复习卡一致）", async () => {
+    const harness = makeHarness({ items: [makeDetailItem({ term: "abandon" })] });
+    render(
+      <CustomListDetailScreen
+        provider={harness.provider}
+        onExit={() => {}}
+        listId={"cl_test" as CustomList["id"]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("abandon")).toBeInTheDocument();
+    });
+    const style = screen.getByText("abandon").getAttribute("style") ?? "";
+    expect(style).toContain("var(--lex-card-font)");
+    expect(style).toContain("var(--lex-card-font-weight)");
+  });
+
   it("空列表展示空状态引导", async () => {
     const harness = makeHarness({ items: [] });
     render(

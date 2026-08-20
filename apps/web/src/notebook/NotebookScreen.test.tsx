@@ -68,6 +68,22 @@ describe("NotebookScreen", () => {
     expect(screen.getByText("共 2 个词")).toBeInTheDocument();
   });
 
+  it("词条本体应用设置里的卡片字体（RAY-338 A1，CSS 变量口径与复习卡一致）", async () => {
+    render(
+      <NotebookScreen
+        provider={makeProvider({
+          loadEntries: vi.fn().mockResolvedValue([makeItem("apple", ["苹果"])]),
+        })}
+        onExit={() => {}}
+      />,
+    );
+
+    const term = await screen.findByText("apple");
+    const style = term.getAttribute("style") ?? "";
+    expect(style).toContain("var(--lex-card-font)");
+    expect(style).toContain("var(--lex-card-font-weight)");
+  });
+
   it("移出走两步确认：确认后调用 removeWord 并重新加载", async () => {
     const loadEntries = vi.fn().mockResolvedValue([makeItem("apple", ["苹果"])]);
     const removeWord = vi.fn().mockResolvedValue(undefined);
