@@ -43,11 +43,22 @@ import {
   removeSearchHistory,
   type SearchHistoryStorage,
 } from "../lib/searchHistory";
-import { getSynonymGroups, isSelfSynonym } from "../lib/synonymGroups";
+import { getSynonymGroups, isSelfSynonym, truncateDefinition } from "../lib/synonymGroups";
 import type { SearchDataProvider, SearchResult } from "./types";
 
 /** 输入防抖间隔（毫秒） */
 const DEBOUNCE_MS = 200;
+
+/**
+ * 压栈辅助（RAY-367 S3）：将当前 query 压入返回栈前，先过滤掉已存在的 normalized（大小写不敏感），避免 A→B→A 循环时栈内重复 A；
+ * 上限 20 条，与内部 `handleSynonymSelect` 同口径复用。
+ * 导出仅供测试（S1 栈上限 20 截断单测）。
+ */
+export function pushToStack(prev: string[], curTrim: string, normalized: string): string[] {
+  const filtered = prev.filter((item) => item.toLowerCase() !== normalized.toLowerCase());
+  const next = curTrim.length > 0 ? [...filtered, curTrim] : filtered;
+  return next.slice(-20);
+}
 
 export interface SearchScreenProps {
   provider: SearchDataProvider;
@@ -107,6 +118,11 @@ export function SearchScreen({
   // RAY-367：近义词跳转的返回栈（记录上一跳的 query，供返回按钮逐级回退；上限 20 避免无限增长）
   const [queryStack, setQueryStack] = useState<string[]>(() => []);
   const prevInitialRef = useRef<string | undefined>(initialQuery);
+  // S4：用 ref 镜像 query，避免在 setQuery updater 内触发 setQueryStack 的副作用
+  const queryRef = useRef(query);
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
 
   // 外部 initialQuery 变更（近义词从复习卡或 App 导航）同步到输入框并入栈（循环跳转的进入口）
   useEffect(() => {
@@ -119,14 +135,11 @@ export function SearchScreen({
     }
     prevInitialRef.current = initialQuery;
     const normalized = initialQuery.trim();
-    // 首次进入（prev 为 undefined）不入栈；后续外部跳转把当前 query 压栈
-    setQuery((current) => {
-      const curTrim = current.trim();
-      if (curTrim.length > 0 && curTrim.toLowerCase() !== normalized.toLowerCase()) {
-        setQueryStack((prev) => [...prev, curTrim].slice(-20));
-      }
-      return initialQuery;
-    });
+    const curTrim = queryRef.current.trim();
+    if (curTrim.length > 0 && curTrim.toLowerCase() !== normalized.toLowerCase()) {
+      setQueryStack((prev) => pushToStack(prev, curTrim, normalized));
+    }
+    setQuery(initialQuery);
     setError(null);
     setResults(null);
     setSearching(false);
@@ -287,7 +300,7 @@ export function SearchScreen({
     setAddToListsDialog(null);
   }, []);
 
-  // RAY-367：近义词点击 → 把当前 query 压栈后跳到该近义词（大小写去重，自身循环忽略）
+  // RAY-367：近义词点击 → 把当前 query 压栈后跳到该近义词（大小写去重，自身循环忽略；S3 复用 pushToStack）
   const handleSynonymSelect = useCallback(
     (term: string) => {
       const normalized = term.trim();
@@ -296,15 +309,7 @@ export function SearchScreen({
       if (normalized.toLowerCase() === currentTrim.toLowerCase()) {
         return;
       }
-      // 避免把重复的链路无限推高：若近义词已在栈内出现，先移除旧位置再压栈，避免 A→B→A 时栈里重复 A，且限制栈深
-      setQueryStack((prev) => {
-        const filtered = prev.filter(
-          (item) => item.toLowerCase() !== normalized.toLowerCase(),
-        );
-        const next =
-          currentTrim.length > 0 ? [...filtered, currentTrim] : filtered;
-        return next.slice(-20);
-      });
+      setQueryStack((prev) => pushToStack(prev, currentTrim, normalized));
       setQuery(normalized);
       setError(null);
       setResults(null);
@@ -637,12 +642,14 @@ function SearchResultRow({
                   ) : null}
                   <span className="truncate">
                     释义 {group.definitionIndex + 1}
-                    {group.definition ? ` · ${truncateForSearch(group.definition)}` : ""}
+                    {group.definition ? ` · ${truncateDefinition(group.definition, 16)}` : ""}
                   </span>
                 </span>
                 <ul className="flex flex-wrap gap-1.5">
                   {group.synonyms.map((word, index) => {
                     const isSelf = isSelfSynonym(word, sense.term);
+                    // S5：isLoop 口径为“与当前输入完全相同（大小写/空白归一）”——与 queryStack 去重负责的 A↔B 循环不同，
+                    // 此处仅禁用“已在当前检索框中的同词”避免无意义的同词重搜；isSelf 负责“与本词条同词”的永久禁用，二者边界正交。
                     const isLoop =
                       Boolean(currentQuery) &&
                       word.trim().toLowerCase() === currentQuery?.trim().toLowerCase();
@@ -723,8 +730,4 @@ function SearchResultRow({
   );
 }
 
-function truncateForSearch(text: string, max = 16): string {
-  const t = text.trim();
-  if (t.length <= max) return t;
-  return `${t.slice(0, max)}…`;
-}
+// N1：释义截断复用 lib/synonymGroups.truncateDefinition（卡片 18 / 搜词 16 差异因容器宽度，已在调用处显式传 max）

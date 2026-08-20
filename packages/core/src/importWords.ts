@@ -81,7 +81,11 @@ export async function importCsvWordlist(
   return { importedCount: entries.length, itemIds };
 }
 
-/** 词条内容（CSV 行 / 预设词表条目 / 富化合并共用：义项快照的输入形态） */
+/**
+ * 词条内容（CSV 行 / 预设词表条目 / 富化合并共用：义项快照的输入形态）
+ * RAY-367：`synonymsByDefinition` 与 `definitions` 等长（空数组 = 该义项无近义词）；
+ * 不等长时视为脏数据，`toSense` 将 `console.warn` 并丢弃该字段以保持存量回退语义确定。
+ */
 export interface WordEntryContent {
   term: string;
   definitions: string[];
@@ -94,7 +98,10 @@ export interface WordEntryContent {
   ipaUs?: string;
   ipaUk?: string;
   synonyms?: string[];
-  /** 近义词按义项分组（可选，RAY-367）：与 definitions 等长，优于 flat synonyms */
+  /**
+   * 近义词按义项分组（可选，RAY-367）：与 `definitions` 等长，空数组表示该义项无近义词；
+   * 不等长视为存量回退（`toSense` 丢弃该字段），优于扁平 `synonyms` 的回退路径保留。
+   */
   synonymsByDefinition?: string[][];
   antonyms?: string[];
   derived?: string[];
@@ -106,6 +113,17 @@ export interface WordEntryContent {
 
 /** 词条内容 → Sense（内容快照；释义用全角分号拆分多条） */
 export function toSense(entry: WordEntryContent, lang: LanguageCode): Sense {
+  // RAY-367 S2：synonymsByDefinition 必须与 definitions 等长，否则视为脏数据并丢弃
+  let validSynonymsByDefinition: string[][] | undefined;
+  if (entry.synonymsByDefinition) {
+    if (entry.synonymsByDefinition.length !== entry.definitions.length) {
+      console.warn(
+        `[RAY-367] synonymsByDefinition length ${entry.synonymsByDefinition.length} ≠ definitions length ${entry.definitions.length} for term "${entry.term}"，已丢弃该字段以保持存量回退`,
+      );
+    } else {
+      validSynonymsByDefinition = entry.synonymsByDefinition;
+    }
+  }
   return {
     id: toSenseId(createId("sense")),
     lang,
@@ -119,7 +137,7 @@ export function toSense(entry: WordEntryContent, lang: LanguageCode): Sense {
     ...(entry.ipaUs ? { ipaUs: entry.ipaUs } : {}),
     ...(entry.ipaUk ? { ipaUk: entry.ipaUk } : {}),
     ...(entry.synonyms ? { synonyms: entry.synonyms } : {}),
-    ...(entry.synonymsByDefinition ? { synonymsByDefinition: entry.synonymsByDefinition } : {}),
+    ...(validSynonymsByDefinition ? { synonymsByDefinition: validSynonymsByDefinition } : {}),
     ...(entry.antonyms ? { antonyms: entry.antonyms } : {}),
     ...(entry.derived ? { derived: entry.derived } : {}),
     ...(entry.etymology ? { etymology: entry.etymology } : {}),

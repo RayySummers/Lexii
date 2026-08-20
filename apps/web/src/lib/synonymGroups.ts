@@ -98,3 +98,13 @@ export function getSynonymGroups(sense: Sense): SynonymGroup[] {
 export function isSelfSynonym(synonym: string, term: string): boolean {
   return synonym.trim().toLowerCase() === term.trim().toLowerCase();
 }
+
+/**
+ * 释义文本截断（N1 共用）：卡片宽度略宽默认 18 字符，搜词结果行略窄默认 16 字符；
+ * 差异源于容器宽度（卡片为 max-w 全屏，搜索结果为带边框的列表项），保留阈值可在调用处显式传入。
+ */
+export function truncateDefinition(text: string, max = 18): string {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max)}…`;
+}

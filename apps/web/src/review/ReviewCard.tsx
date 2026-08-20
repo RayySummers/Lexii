@@ -42,7 +42,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { resolveDefinitionPos, type Sense } from "@lexii/core";
 import { dualPhonetics, parseInlineMarkdown, parseWordParts } from "./enrichmentUi";
 import type { PhoneticBadge } from "./enrichmentUi";
-import { getSynonymGroups, isSelfSynonym } from "../lib/synonymGroups";
+import { getSynonymGroups, isSelfSynonym, truncateDefinition } from "../lib/synonymGroups";
 
 export interface ReviewCardProps {
   sense: Sense;
@@ -97,6 +97,36 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint, onSynonymSelect
     return () => cancelAnimationFrame(frame);
   }, [flipped]);
 
+  // B1：外层由 <button> 改为 <div role="button">，避免嵌套 <button> 违反 HTML content model（Oscar 复核 nit）。
+  // 内层近义词 chips 仍为 <button>，点击经 stopPropagation 阻止翻面；键盘路径同样经 stopPropagation/closest 与可滚动容器守卫。
+  // 原生 <button> 的空格键在 keyUp 时合成 click，此处为 <div role="button"> 单独处理 Enter（keyDown）与 Space（keyUp），
+  // 使测试中 fireEvent.keyDown(flipButton, Space) 不立即翻面（与原生按钮一致），真实键盘 Space 仍在 keyUp 时翻面。
+  function isCardScrollableTarget(target: HTMLElement): boolean {
+    const { overflowY } = getComputedStyle(target);
+    const allowsScroll = overflowY === "auto" || overflowY === "scroll";
+    return allowsScroll && target.scrollHeight > target.clientHeight;
+  }
+  const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && (target.closest("button") || isCardScrollableTarget(target))) {
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      onFlip();
+    }
+  };
+  const handleCardKeyUp = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && (target.closest("button") || isCardScrollableTarget(target))) {
+      return;
+    }
+    if (event.key === " ") {
+      event.preventDefault();
+      onFlip();
+    }
+  };
+
   return (
     /*
      * 固定高度双层声明（RAY-291，评审 nit 3）：
@@ -107,9 +137,12 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint, onSynonymSelect
      * 公式口径（卡片外固定内容 ≈ 26rem）的推导见上方常量注释。
      */
     <div className="review-card-height [perspective:1200px]" style={cardHeightStyle()}>
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onFlip}
+        onKeyDown={handleCardKeyDown}
+        onKeyUp={handleCardKeyUp}
         aria-expanded={flipped}
         aria-label={flipped ? `隐藏 ${sense.term} 的释义` : `显示 ${sense.term} 的释义`}
         className="group grid h-full w-full cursor-pointer text-left [transform-style:preserve-3d] transition-transform duration-300 ease-out motion-reduce:transition-none [transform:rotateY(0deg)] aria-expanded:[transform:rotateY(180deg)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
@@ -231,7 +264,7 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint, onSynonymSelect
             {ratingHint}
           </span>
         </CardFace>
-      </button>
+      </div>
     </div>
   );
 }
@@ -379,8 +412,14 @@ function SynonymGroups({
                         event.preventDefault();
                         onSelect?.(word);
                       }}
+                      onKeyDown={(event) => {
+                        // 键盘路径同样阻止冒泡到外层 Card 的翻面处理
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.stopPropagation();
+                        }
+                      }}
                       aria-label={`搜索近义词 ${word}`}
-                      title={isSelf ? `${word}（当前词）` : `搜索「${word}」`}
+                      title={`搜索「${word}」`}
                       className="rounded-full border border-border bg-surface-raised px-2.5 py-0.5 text-sm transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
                     >
                       {word}
@@ -408,11 +447,7 @@ function SynonymGroups({
   );
 }
 
-function truncateDefinition(text: string, max = 18): string {
-  const t = text.trim();
-  if (t.length <= max) return t;
-  return `${t.slice(0, max)}…`;
-}
+// truncateDefinition 已抽至 lib/synonymGroups（N1），此处不再重复定义。
 
 interface CardFaceProps {
   children: ReactNode;

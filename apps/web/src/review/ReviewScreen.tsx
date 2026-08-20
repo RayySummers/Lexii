@@ -226,6 +226,7 @@ export function ReviewScreen({
           target.tagName === "INPUT" ||
           target.tagName === "TEXTAREA" ||
           target.isContentEditable ||
+          target.getAttribute("role") === "button" ||
           // RAY-291 suggestion 1：面内滚动区（Chrome 127+ 可聚焦）同样放行，
           // 空格交给滚动容器的原生滚动行为
           isScrollableRegion(target));

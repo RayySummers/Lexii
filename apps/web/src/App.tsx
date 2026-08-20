@@ -188,7 +188,7 @@ export function App({
   const handleSearchExit = useCallback(() => {
     if (searchReturnToReview) {
       setSearchReturnToReview(false);
-      // 保留 initialQuery 供下次普通进入时清空；但返回复习时不需要保留搜索词
+      setSearchInitialQuery(undefined); // N4：同步清理，避免重进搜词时闪现旧词
       navigate("review");
       return;
     }
