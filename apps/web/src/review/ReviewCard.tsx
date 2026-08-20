@@ -80,7 +80,7 @@ export function cardHeightStyle(): CSSProperties {
   };
 }
 
-<export function ReviewCard({ sense, flipped, onFlip, onSynonymSelect }: ReviewCardProps) {
+export function ReviewCard({ sense, flipped, onFlip, onSynonymSelect }: ReviewCardProps) {
   const wordParts = parseWordParts(sense.wordParts ?? "");
   // 释义级词性（RAY-349）：口径与解析在 @lexii/core（resolveDefinitionPos），
   // 本组件只做渲染——能确定词性的释义标词性，确定不了的位置退回序号。
