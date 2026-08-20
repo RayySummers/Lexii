@@ -7,6 +7,9 @@
 import { createElement, type ReactNode } from "react";
 import type { Sense } from "@lexii/core";
 
+/** 枚举列表标记 `1) ` / `2) ` / `10) `（S-3），与 `scripts/presets/lib/truncate.mjs:ENUM_LIST_RE` 同步 */
+export const ENUM_LIST_RE = /(^|\s)\d+\)\s/g;
+
 /** 双音标展示条目 */
 export interface PhoneticBadge {
   /** 可见标签：美 / 英；回退词书自带 ipa 时为空（无标签） */
@@ -50,7 +53,10 @@ export interface WordPartSegment {
  * 防御性口径：
  * - 无 "<…>" 的段整体视为词素、无含义；
  * - 含义中残留的 ">"（打包侧截断可能留下）一律剥离；
- * - 空段与空白段丢弃。
+ * - 空段与空白段丢弃；
+ * - RAY-365：含义末尾的截断导致「只有左括号无右括号」时，自动补全右括号
+ *   （全角 `）` / 半角 `)`），避免视觉上的内容戛然而止；若末尾为截断枚举逗号
+ *   `、` 且括号未闭合，则先去掉逗号再闭合（如 `（外部、` → `（外部）`）。
  */
 export function parseWordParts(raw: string): WordPartSegment[] {
   return raw
@@ -63,12 +69,66 @@ export function parseWordParts(raw: string): WordPartSegment[] {
         return { part: segment, meaning: "" };
       }
       const part = segment.slice(0, lt).trim();
-      const meaning = segment
+      let meaning = segment
         .slice(lt + 1)
         .replaceAll(">", "")
         .trim();
+      meaning = balanceMeaningBrackets(meaning);
       return { part: part !== "" ? part : segment, meaning };
     });
+}
+
+/**
+ * RAY-365：括号平衡修复（与打包侧 lib/truncate.mjs 的 ensureBalanced 同口径的
+ * 轻量前端兜底）。数据已在 1.4.0 修复，但存量设备回填前的旧数据仍需前端防御。
+ * 导出供 ReviewCard 对 etymologyZh / etymology 做同口径兜底。
+ * 枚举 `1) ` 中的 `)` 不计入括号平衡（如 keen 的 `1) 物理层面的...`）。
+ */
+export function ensureBalancedText(text: string): string {
+  const stripEnum = (s: string) => s.replace(ENUM_LIST_RE, "$1");
+  let t = text;
+  while (t.endsWith("（") || t.endsWith("(")) {
+    t = t.slice(0, -1).trimEnd();
+  }
+  const depth = (s: string) => {
+    const n = stripEnum(s);
+    let full = 0;
+    let half = 0;
+    for (const ch of n) {
+      if (ch === "（") full += 1;
+      else if (ch === "）") full -= 1;
+      else if (ch === "(") half += 1;
+      else if (ch === ")") half -= 1;
+    }
+    return { full, half };
+  };
+  let { full, half } = depth(t);
+  if ((full > 0 || half > 0) && (t.endsWith("、") || t.endsWith("，") || t.endsWith(","))) {
+    t = t.slice(0, -1).trimEnd();
+  }
+  // 重新计算（去掉逗号后 depth 不变，但为防 `（）、` 之类顺序影响，保守重算）
+  let after = depth(t);
+  full = after.full;
+  half = after.half;
+  let result = t;
+  if (full > 0) result += "）".repeat(full);
+  if (half > 0) result += ")".repeat(half);
+  // 防御：右括号多于左括号时去掉多余尾部右括号（异常截断产物）
+  let depthFull = depth(result).full;
+  let depthHalf = depth(result).half;
+  while (depthFull < 0 && result.endsWith("）")) {
+    result = result.slice(0, -1);
+    depthFull = depth(result).full;
+  }
+  while (depthHalf < 0 && result.endsWith(")")) {
+    result = result.slice(0, -1);
+    depthHalf = depth(result).half;
+  }
+  return result;
+}
+
+function balanceMeaningBrackets(meaning: string): string {
+  return ensureBalancedText(meaning);
 }
 
 /**

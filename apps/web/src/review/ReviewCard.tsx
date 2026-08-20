@@ -41,7 +41,7 @@ import { useEffect, useRef } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { resolveDefinitionPos, type Sense } from "@lexii/core";
 import { KeyboardIcon } from "../components/icons";
-import { dualPhonetics, parseInlineMarkdown, parseWordParts } from "./enrichmentUi";
+import { dualPhonetics, ensureBalancedText, parseInlineMarkdown, parseWordParts } from "./enrichmentUi";
 import type { PhoneticBadge } from "./enrichmentUi";
 
 export interface ReviewCardProps {
@@ -212,7 +212,7 @@ export function ReviewCard({ sense, flipped, onFlip }: ReviewCardProps) {
             </CardSection>
             <CardSection title="中文词源" visible={Boolean(sense.etymologyZh)}>
               <p className="text-sm leading-relaxed text-text-muted">
-                {parseInlineMarkdown(sense.etymologyZh ?? "")}
+                {parseInlineMarkdown(ensureBalancedText(sense.etymologyZh ?? ""))}
               </p>
             </CardSection>
             <CardSection title="近义词" visible={(sense.synonyms?.length ?? 0) > 0}>
