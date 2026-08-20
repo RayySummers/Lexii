@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: ["**"]
+    tags: ["v*"]
   pull_request:
 
 concurrency:
@@ -45,6 +46,10 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      # RAY-368 guardrail：tag 推送时强校验一致性；分支/PR 时仅校验 version 格式并提示期望 tag。
+      - name: 校验发版版本一致性（tag vs package.json）
+        run: node scripts/check-release-version.mjs
 
   # RAY-291（评审 nit 1）：移动端背词卡片 e2e（Playwright，iPhone 13 视口）
   # 独立 job：浏览器安装耗时且只服务于界面层断言，不拖慢主链路。

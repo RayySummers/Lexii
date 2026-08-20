@@ -99,6 +99,25 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # RAY-368 guardrail：tag 与 apps/web/package.json version 必须一致，否则 fail-fast。
+      # 避免 v0.9.1-alpha 这类漏 bump 再次导致线上显示旧版本（先例 RAY-332）。
+      - name: 校验发版版本一致性（tag vs package.json）
+        shell: bash
+        run: |
+          ref="${{ github.event.inputs.ref }}"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            ref="${{ github.ref_name }}"
+          fi
+          # workflow_dispatch 留空时 BUILD_BRANCH 已解析为最新 v* tag，校验该 tag
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && { [ -z "$ref" ] || [ "$ref" = "main" ]; }; then
+            ref="$BUILD_BRANCH"
+          fi
+          if [ -z "$ref" ]; then
+            ref="${{ github.ref_name }}"
+          fi
+          echo "校验 tag: $ref vs apps/web/package.json"
+          node scripts/check-release-version.mjs --tag "$ref"
+
       #─── RAY-300：构建 Tier 1/2 扩展词包（并入 Pages 部署） ──────────
       # 使用 composite action 封装 5 步构建块（Nit 1），防口径漂移。
       # 全限定引用 @main：workflow_dispatch 时工作树可能切到旧 ref（无此 action），
