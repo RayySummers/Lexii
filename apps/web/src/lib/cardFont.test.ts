@@ -187,12 +187,11 @@ describe("CARD_FONT_OPTIONS 与 index.html 的 Google Fonts URL 同步（漂移�
  * 写出 `--lex-card-font:` 字面量被漂移校验误匹配；之后按文件顺序
  * 提取每条声明的字面值。
  *
- * 注释剥离覆盖两种形态（RAY-339 R5 Oscar 复核 nit）：CSS 块注释
- * （斜杠星号包裹）与 `//` 行注释——CSS 唯一合法注释为块注释，
- * 行注释剥离为未来预处理器场景的防御——本函数只解析 tokens.css 的
- * 变量声明栈、不处理 url()/其他可能含 `//` 的内容。当前 tokens.css
- * 无 `url(//…)` 形态；如未来加入，需在剥 `//` 后再做「url( 内 //
- * 还原」的保守处理（本函数 doc 注释同步更新）。
+ * 注释剥离覆盖两种形态：CSS 块注释（斜杠星号包裹）与行首 `//`
+ * （`^\s*\/\/`）——CSS 唯一合法注释为块注释，行注释剥离为未来预处理
+ * 器场景的防御，行内 `//`（如 `url(//…)`）不剥离，属设计取舍——
+ * 本函数只解析 tokens.css 的变量声明栈。当前 tokens.css 无
+ * `url(//…)` 形态（RAY-339 R5/R6 Oscar 复核 nit）。
  *
  * 与 `tokens.css` 的顺序契约（顶部 RAY-323 注释段）以及合并形态锁定
  * 决策（详见本测试文件 `首条栈由 :root 与 [data-card-font="inter"]
@@ -200,7 +199,7 @@ describe("CARD_FONT_OPTIONS 与 index.html 的 Google Fonts URL 同步（漂移�
  * `CARD_FONT_OPTIONS` 数组一致，便于按 index 对账。
  */
 function parseCardFontStacks(source: string): string[] {
-  const stripped = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  const stripped = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   return [...stripped.matchAll(/--lex-card-font:\s*([^;]+);/g)].map((match) => match[1]!.trim());
 }
 
@@ -340,5 +339,14 @@ describe("parseCardFontStacks（CSS 块注释剥除，RAY-339 R4 suggestion 1）
       "stack-playpen",
       "stack-newsreader",
     ]);
+  });
+
+  it("行首 `//` 才剥离，行内 `//`（如 url(//…)) 不被误剥（RAY-339 R6 Oscar 复核 nit）", () => {
+    const source = `
+:root { background: url(//cdn.example.com/x.png); --lex-card-font: real-a; }
+[data-card-font="google-sans"] { --lex-card-font: real-b; }
+`;
+    // `url(//…)` 行内 // 未在行首，收窄后的 `^\\s*//` 不应剥整行
+    expect(parseCardFontStacks(source)).toEqual(["real-a", "real-b"]);
   });
 });
