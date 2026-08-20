@@ -422,7 +422,7 @@ interface SettingsMainViewProps {
   /** 生词本开关（RAY-284 / RAY-303）：学习列表是否包含生词本 */
   includeNotebook: boolean;
   onIncludeNotebookToggle(): void;
-  /** 卡片字体（RAY-323）：4 档（inter / google-sans / playpen / newsreader） */
+  /** 卡片字体（RAY-323，RAY-359）：4 档（inter / google-sans / playpen / sentient） */
   cardFont: CardFont;
   onCardFontChange(next: CardFont): void;
   /** 主题偏好三档（RAY-261）：App 级 useTheme 单一数据源下发 */

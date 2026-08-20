@@ -69,7 +69,7 @@ describe("FontPicker 卡片字体选择（RAY-323）", () => {
     const onChange = vi.fn();
     render(<FontPicker value="inter" onChange={onChange} groupLabel="卡片字体" />);
 
-    const targets: CardFont[] = ["google-sans", "playpen", "newsreader"];
+    const targets: CardFont[] = ["google-sans", "playpen", "sentient"];
     for (const next of targets) {
       // 点击 label 文本会冒泡到原生 radio，触发 onChange
       fireEvent.click(screen.getByText(CARD_FONT_OPTIONS.find((o) => o.id === next)!.label));

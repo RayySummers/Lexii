@@ -37,35 +37,46 @@
     <link rel="icon" href="./icons/icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <!--
-      卡片字体（RAY-323）：4 档 Google Fonts 在首帧渲染前到达。
-      选 `preconnect` 把 DNS / TLS 握手当字体 CSS 真正请求的并行预热，
-      减少设置页/复习卡首次切档时的字体回退闪烁（FOIT / FOUT）；
-      `font-display: swap` 在 url() 串中已声明，字体到达前会先以
-      系统等线字体渲染，下载完成后平滑替换。
-      字重与 src/lib/cardFont.ts 的 CARD_FONT_OPTIONS.fontWeight 严格一致
-      （Oscar 评审 suggestion 2）：inter 800 / 其余 600——不加载的字重会
-      被浏览器合成导致字面失真。改动任一档字重必须三处同步：本 URL、
-      CARD_FONT_OPTIONS.fontWeight、tokens.css 的 --lex-card-font-weight
-      （以及 public/sw.js 的 CARD_FONT_CSS_URL，离线预缓存同一 URL）。
-      RAY-338 A1：「现代简约」的主字体为自托管 Inter Display ExtraBold
-      （下方 ./fonts/inter-display.css；Google Fonts 无 Inter Display），
-      本 URL 中的 Inter 800 仅作安全网回退——unicode-range 子集化让浏览器
-      在自托管命中时不再下载 Inter 字形文件，真实网络代价 ≈ 一个 CSS
-      请求与共享的 preconnect；换来的是自托管 woff2 因部署/缓存未就绪
-      而 404 时卡片仍能渲染 Inter ExtraBold（视觉与 Inter Display 接近）
-      而非系统字体。Oscar 复核 nit 1 已知取舍，本 PR 不删 Inter preconnect
-      与 URL 段；如未来要压到「首次无缓存请求最小」可考虑把 Inter 也改
-      自托管（额外 ~30KB latin subset），但代价是双倍 woff2 体积与不再
-      享受 Google Fonts 的 CDN 分发。
+      卡片字体（RAY-323，RAY-359）：
+      - Google Fonts 在首帧渲染前到达（Inter 回退 + Playpen Sans + Google Sans Flex）。
+        选 `preconnect` 把 DNS / TLS 握手当字体 CSS 真正请求的并行预热，
+        减少设置页/复习卡首次切档时的字体回退闪烁（FOIT / FOUT）；
+        `font-display: swap` 在 url() 串中已声明，字体到达前会先以
+        系统等线字体渲染，下载完成后平滑替换。
+      - 字重与 src/lib/cardFont.ts 的 CARD_FONT_OPTIONS.fontWeight 严格一致
+        （Oscar 评审 suggestion 2）：inter 800（ExtraBold，自托管 Inter Display
+        回退）/ sentient 500（Medium，自托管 Sentient，RAY-359）/ 其余 600
+        （Google Fonts SemiBold）——不加载的字重会被浏览器合成导致字面失真。
+        改动任一档字重必须三处同步：本 URL（或对应自托管 CSS）、
+        CARD_FONT_OPTIONS.fontWeight、tokens.css 的 --lex-card-font-weight
+        （以及 public/sw.js 的 CARD_FONT_CSS_URL，离线预缓存同一 URL）。
+      - RAY-338 A1：「现代简约」的主字体为自托管 Inter Display ExtraBold
+        （下方 ./fonts/inter-display.css；Google Fonts 无 Inter Display），
+        本 URL 中的 Inter 800 仅作安全网回退——unicode-range 子集化让浏览器
+        在自托管命中时不再下载 Inter 字形文件，真实网络代价 ≈ 一个 CSS
+        请求与共享的 preconnect；换来的是自托管 woff2 因部署/缓存未就绪
+        而 404 时卡片仍能渲染 Inter ExtraBold（视觉与 Inter Display 接近）
+        而非系统字体。Oscar 复核 nit 1 已知取舍，本 PR 不删 Inter preconnect
+        与 URL 段；如未来要压到「首次无缓存请求最小」可考虑把 Inter 也改
+        自托管（额外 ~30KB latin subset），但代价是双倍 woff2 体积与不再
+        享受 Google Fonts 的 CDN 分发。
+      - RAY-359：「优雅衬线」由 Newsreader SemiBold（Google Fonts 600）替换为
+        Sentient Medium（Fontshare，500，自托管 ./fonts/sentient.css，见
+        public/fonts/Fontshare-Sentient-LICENSE.txt）。Google Fonts URL 中已
+        移除 Newsreader，优雅衬线档的 FOUT 仍由 font-display: swap 保证，
+        字体栈回退 Georgia 系，无回退到系统字体外的异常；卡片预览与导出的
+        字体一致性由 tokens.css 的 --lex-card-font 单点保证。
     -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@800&family=Newsreader:wght@600&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@800&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&display=swap"
     />
     <!-- RAY-338 A1：Inter Display ExtraBold 自托管（同源部署、子路径安全、离线预缓存） -->
     <link rel="stylesheet" href="./fonts/inter-display.css" />
+    <!-- RAY-359：Sentient Medium 自托管（同源部署、子路径安全、离线预缓存，替换 Newsreader） -->
+    <link rel="stylesheet" href="./fonts/sentient.css" />
     <title>乐希 Lexii</title>
   </head>
   <body>
