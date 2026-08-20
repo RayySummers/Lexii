@@ -1,10 +1,11 @@
 /**
- * 卡片字体管理（RAY-323，RAY-359）测试。
+ * 卡片字体管理（RAY-323，RAY-359，RAY-366 扩至 7 档）测试。
  *
  * 覆盖：初始值读 localStorage（无值回落默认 modern）；setFont 写
  * localStorage 并同步到 <html data-card-font>；跨标签页 storage 事件
  * 让本页跟随；localStorage 抛错（隐私模式）不炸。
  * RAY-359：newsreader → sentient 迁移，旧存量读为 sentient。
+ * RAY-366：新增 geist-mono / nunito / geist-pixel 三档，尾部追加与 sentient 共存。
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -50,14 +51,11 @@ describe("useCardFont（RAY-323）", () => {
     expect(document.documentElement.dataset.cardFont).toBe("sentient");
   });
 
-  it("setFont 写 localStorage 并同步到 <html data-card-font>，4 档都能切", () => {
+  it("setFont 写 localStorage 并同步到 <html data-card-font>，7 档都能切（RAY-366 与 RAY-359 无冲突：尾部 3 档新增，sentient 替换 newsreader）", () => {
     const { result } = renderHook(() => useCardFont());
-    const sequence: Array<"inter" | "google-sans" | "playpen" | "sentient"> = [
-      "google-sans",
-      "playpen",
-      "sentient",
-      "inter",
-    ];
+    const sequence: Array<
+      "inter" | "google-sans" | "playpen" | "sentient" | "geist-mono" | "nunito" | "geist-pixel"
+    > = ["google-sans", "playpen", "sentient", "geist-mono", "nunito", "geist-pixel", "inter"];
     for (const next of sequence) {
       act(() => {
         result.current.setFont(next);
