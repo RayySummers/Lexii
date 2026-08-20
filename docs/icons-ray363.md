@@ -14,42 +14,42 @@
 
 审计命令：`grep -rn "from.*icons" apps/web/src` + `grep -rn "Icon" apps/web/src --include="*.tsx"`
 
-| # | 旧组件 | 文件 | 调用位置 | 旧实现 | 备注 |
-|---|--------|------|----------|--------|------|
-| 1 | `BackArrowIcon` | `components/icons.tsx` | `ScreenHeader.tsx:11`, `ReviewScreen.tsx:40`, `QuizScreen.tsx:10` | 手写 SVG `M15 18l-6-6 6-6` | 返回 |
-| 2 | `SpeakerIcon` | `components/icons.tsx` | `ReviewScreen.tsx:421` | 手写扬声器 + 声波 | 发音 |
-| 3 | `UndoIcon` | `components/icons.tsx` | `ReviewScreen.tsx:477` | 手写 `M3 7v6h6` + `M3 13a9 9 0 1 0 3-7.7L3 13` | **实心圆根因** |
-| 4 | `RedoIcon` | `components/icons.tsx` | `ReviewScreen.tsx:498` | 手写 `M21 7v6h-6` + `M21 13a9 9...` | RAY-341 新增 |
-| 5 | `SearchIcon` | `components/icons.tsx` | `SearchScreen.tsx:261` | `circle + path` 放大镜 | 搜词 |
-| 6 | `CloseIcon` | `components/icons.tsx` | `SearchScreen.tsx:473` | `M6 6l12 12` 叉叉 | 历史删除 |
-| 7 | `CheckIcon` | `components/icons.tsx` | `AddToListsDialog.tsx:228`, `SearchScreen.tsx:541` | `M5 13l4 4L19 7` | 已加/勾号 |
-| 8 | `PlusIcon` | `components/icons.tsx` | `AddToListsDialog.tsx:188,287`, `CustomListsScreen.tsx:280,318`, `SearchScreen.tsx:543` | `M12 5v14` + `M5 12h14` | 加词/新建 |
-| 9 | `BookmarkIcon` | `components/icons.tsx` | `App.tsx:232` | 书签轮廓 | 生词本 |
-| 10 | `TrashIcon` | `components/icons.tsx` | `CustomListsScreen.tsx:403`, `WordbookLibraryScreen.tsx:378` | 垃圾桶 | 删除 |
-| 11 | `EditIcon` | `components/icons.tsx` | `CustomListsScreen.tsx:395` | 铅笔 | 编辑 |
-| 12 | `ListIcon` | `components/icons.tsx` | `App.tsx:242`, `ReviewScreen.tsx:441`, `SearchScreen.tsx:525` | 三线 + 三圆点 | 词单 |
+| #   | 旧组件          | 文件                   | 调用位置                                                                                | 旧实现                                         | 备注           |
+| --- | --------------- | ---------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------- | -------------- |
+| 1   | `BackArrowIcon` | `components/icons.tsx` | `ScreenHeader.tsx:11`, `ReviewScreen.tsx:40`, `QuizScreen.tsx:10`                       | 手写 SVG `M15 18l-6-6 6-6`                     | 返回           |
+| 2   | `SpeakerIcon`   | `components/icons.tsx` | `ReviewScreen.tsx:421`                                                                  | 手写扬声器 + 声波                              | 发音           |
+| 3   | `UndoIcon`      | `components/icons.tsx` | `ReviewScreen.tsx:477`                                                                  | 手写 `M3 7v6h6` + `M3 13a9 9 0 1 0 3-7.7L3 13` | **实心圆根因** |
+| 4   | `RedoIcon`      | `components/icons.tsx` | `ReviewScreen.tsx:498`                                                                  | 手写 `M21 7v6h-6` + `M21 13a9 9...`            | RAY-341 新增   |
+| 5   | `SearchIcon`    | `components/icons.tsx` | `SearchScreen.tsx:261`                                                                  | `circle + path` 放大镜                         | 搜词           |
+| 6   | `CloseIcon`     | `components/icons.tsx` | `SearchScreen.tsx:473`                                                                  | `M6 6l12 12` 叉叉                              | 历史删除       |
+| 7   | `CheckIcon`     | `components/icons.tsx` | `AddToListsDialog.tsx:228`, `SearchScreen.tsx:541`                                      | `M5 13l4 4L19 7`                               | 已加/勾号      |
+| 8   | `PlusIcon`      | `components/icons.tsx` | `AddToListsDialog.tsx:188,287`, `CustomListsScreen.tsx:280,318`, `SearchScreen.tsx:543` | `M12 5v14` + `M5 12h14`                        | 加词/新建      |
+| 9   | `BookmarkIcon`  | `components/icons.tsx` | `App.tsx:232`                                                                           | 书签轮廓                                       | 生词本         |
+| 10  | `TrashIcon`     | `components/icons.tsx` | `CustomListsScreen.tsx:403`, `WordbookLibraryScreen.tsx:378`                            | 垃圾桶                                         | 删除           |
+| 11  | `EditIcon`      | `components/icons.tsx` | `CustomListsScreen.tsx:395`                                                             | 铅笔                                           | 编辑           |
+| 12  | `ListIcon`      | `components/icons.tsx` | `App.tsx:242`, `ReviewScreen.tsx:441`, `SearchScreen.tsx:525`                           | 三线 + 三圆点                                  | 词单           |
 
 **总量**：12 个导出的图标组件，无第三方图标库依赖（`package.json` 无 `lucide`/`heroicons`/`react-icons`/`font-awesome`）。
 
 ## 3. 替换映射（旧 → Material Symbols Outlined）
 
-| 旧组件 | Material Symbol ligature | 官方字形说明 | 变更类型 |
-|--------|--------------------------|--------------|----------|
-| `BackArrowIcon` | `arrow_back` | 系统返回箭头 | 等价替换 |
-| `SpeakerIcon` | `volume_up` | 扬声器 | 等价替换 |
-| `UndoIcon` | `undo` | 逆时针箭头 | **修复实心圆** |
-| `RedoIcon` | `redo` | 顺时针箭头 | 等价替换 |
-| `SearchIcon` | `search` | 放大镜 | 等价替换 |
-| `CloseIcon` | `close` | 叉叉 | 等价替换 |
-| `CheckIcon` | `check` | 勾号 | 等价替换 |
-| `PlusIcon` | `add` | 加号 | 等价替换 |
-| `BookmarkIcon` | `bookmark` | 书签 | 等价替换 |
-| `TrashIcon` | `delete` | 垃圾桶 | 语义更准（旧为手绘 trash，新为官方 delete） |
-| `EditIcon` | `edit` | 铅笔 | 等价替换 |
-| `ListIcon` | `lists` | 列表（词单语义） | 原 bullet 列表 → `lists`（备选 `format_list_bulleted`） |
-| `BarChartIcon` *(新增)* | `bar_chart` | 柱状图 | 为 RAY-360 Header「统计」图标化预留 |
-| `SettingsIcon` *(新增)* | `settings` | 齿轮 | 为 RAY-360 Header「设置」图标化预留 |
-| `KeyboardIcon` *(新增)* | `keyboard` | 键盘 | 为 RAY-362 保留 key icon 提示预留 |
+| 旧组件                  | Material Symbol ligature | 官方字形说明     | 变更类型                                                |
+| ----------------------- | ------------------------ | ---------------- | ------------------------------------------------------- |
+| `BackArrowIcon`         | `arrow_back`             | 系统返回箭头     | 等价替换                                                |
+| `SpeakerIcon`           | `volume_up`              | 扬声器           | 等价替换                                                |
+| `UndoIcon`              | `undo`                   | 逆时针箭头       | **修复实心圆**                                          |
+| `RedoIcon`              | `redo`                   | 顺时针箭头       | 等价替换                                                |
+| `SearchIcon`            | `search`                 | 放大镜           | 等价替换                                                |
+| `CloseIcon`             | `close`                  | 叉叉             | 等价替换                                                |
+| `CheckIcon`             | `check`                  | 勾号             | 等价替换                                                |
+| `PlusIcon`              | `add`                    | 加号             | 等价替换                                                |
+| `BookmarkIcon`          | `bookmark`               | 书签             | 等价替换                                                |
+| `TrashIcon`             | `delete`                 | 垃圾桶           | 语义更准（旧为手绘 trash，新为官方 delete）             |
+| `EditIcon`              | `edit`                   | 铅笔             | 等价替换                                                |
+| `ListIcon`              | `lists`                  | 列表（词单语义） | 原 bullet 列表 → `lists`（备选 `format_list_bulleted`） |
+| `BarChartIcon` _(新增)_ | `bar_chart`              | 柱状图           | 为 RAY-360 Header「统计」图标化预留                     |
+| `SettingsIcon` _(新增)_ | `settings`               | 齿轮             | 为 RAY-360 Header「设置」图标化预留                     |
+| `KeyboardIcon` _(新增)_ | `keyboard`               | 键盘             | 为 RAY-362 保留 key icon 提示预留                       |
 
 > **尺寸契约**：`h-4 w-4 → 16px`、`h-5 w-5 → 20px`、`h-3.5 w-3.5 → 14px`，由 `icons.tsx:resolveFontSize` 统一映射，保持既有布局不变。
 > **颜色契约**：`color: currentColor` 继承文本色，随 `tokens.css` 的 `--lex-text` / `--lex-text-muted` / `--lex-primary` 等自动适配浅色/深色。
@@ -57,6 +57,7 @@
 ## 4. 撤销图标实心圆根因与修复
 
 **根因**：旧 `UndoIcon` 的第二段路径 `M3 13a9 9 0 1 0 3-7.7L3 13`
+
 - `a9 9 0 1 0 3-7.7` 中 `3-7.7` 依赖 SVG 规范「负号即分隔符」的容错解析，部分 WebKit/Blink 版本在 `stroke` + 闭合路径叠加时将弧线误判为需填充的闭合形状，叠加 `strokeWidth=2` 的渲染批次，导致视觉上出现实心圆（而非空心箭头）。
 - 该写法在不同 DPI / 缩放 / 字体抗锯齿设置下表现不稳定，无法通过 `stroke-linecap` 等样式稳定修复。
 
