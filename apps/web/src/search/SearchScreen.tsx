@@ -43,6 +43,7 @@ import {
   removeSearchHistory,
   type SearchHistoryStorage,
 } from "../lib/searchHistory";
+import { SETTINGS_ANCHOR_EXTENSION_PACKAGES } from "../settings/anchors";
 import type { SearchDataProvider, SearchResult } from "./types";
 
 /** 输入防抖间隔（毫秒） */
@@ -52,8 +53,13 @@ export interface SearchScreenProps {
   provider: SearchDataProvider;
   /** 返回首页 */
   onExit(): void;
-  /** RAY-319：跳转设置页安装扩展词包 */
-  onNavigateToSettings?(): void;
+  /**
+   * RAY-319 / RAY-364：跳转设置页安装扩展词包。
+   * RAY-364 要求可持续锚点：调用方传入稳定锚点字符串（如 extension-packages），
+   * Settings 侧以 id / data-anchor 定位，禁止硬编码索引。
+   * 旧调用方无参调用仍兼容（按无锚点处理）。
+   */
+  onNavigateToSettings?(anchor?: string): void;
   /**
    * 搜词历史存储（测试注入内存 storage；默认 window.localStorage）。
    * 仅本地读写，绝不上传。
@@ -313,8 +319,11 @@ interface SearchContentProps {
   onSelectHistory(term: string): void;
   onRemoveHistory(term: string): void;
   onToggleNotebook(senseId: SenseId): void;
-  /** RAY-319：跳转设置页安装扩展词包 */
-  onNavigateToSettings?(): void;
+  /**
+   * RAY-319 / RAY-364：跳转设置页安装扩展词包（可持续锚点：stable anchor）。
+   * 传入 anchor 字符串时按 id/data-anchor 定位，禁止硬编码索引。
+   */
+  onNavigateToSettings?(anchor?: string): void;
   /** RAY-325：打开「添加到列表」对话框 */
   onOpenAddToLists(sense: Sense): void;
 }
@@ -404,7 +413,7 @@ function SearchContent({
         {onNavigateToSettings ? (
           <button
             type="button"
-            onClick={onNavigateToSettings}
+            onClick={() => onNavigateToSettings(SETTINGS_ANCHOR_EXTENSION_PACKAGES)}
             className="mt-1 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
             前往设置安装扩展词包

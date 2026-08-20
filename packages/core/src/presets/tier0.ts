@@ -15,7 +15,7 @@
  */
 import { convertPresetEntry } from "./convertEntry";
 import type { PresetPackage } from "./types";
-import tier0Data from "./tier0.data.json";
+import tier0Data from "./tier0.data.json" with { type: "json" };
 
 /** 生成物原始形态（紧凑元组：[term, definitions, pos, ipa, tags]，全字符串） */
 type RawTier0Data = {
