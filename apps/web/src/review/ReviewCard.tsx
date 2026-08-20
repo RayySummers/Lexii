@@ -21,10 +21,11 @@
  * 底栏（翻面/评分提示）布局一致）。滚动区以 sense.id 为 key，换卡
  * 时重建、滚动位置不跨卡残留。
  *
- * RAY-323：正反面词本体（sense.term）应用用户选择的卡片字体
- * （见 src/lib/cardFont），4 档字体与字重分别经 CSS 变量
+ * RAY-323/RAY-359/RAY-366：正反面词本体（sense.term）应用用户选择的卡片字体
+ * （见 src/lib/cardFont），7 档字体与字重分别经 CSS 变量
  * --lex-card-font / --lex-card-font-weight 单点切换；字重不写死
- * font-bold（700），按档位取已加载字重（inter 800 / 其余 600，
+ * font-bold（700），按档位取已加载字重（inter/nunito 800 / sentient
+ * 500 / geist-pixel 400 / google-sans/playpen/geist-mono 600，
  * Oscar 评审 suggestion 2：未加载字重会被浏览器合成伪粗体导致
  * 字面失真）。本组件只引用变量，不在多处硬编码字体名，也不在多档
  * 各自定义一套样式（评审 C-12 可维护性）。
