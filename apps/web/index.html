@@ -63,9 +63,13 @@
       - RAY-359：「优雅衬线」由 Newsreader SemiBold（Google Fonts 600）替换为
         Sentient Medium（Fontshare，500，自托管 ./fonts/sentient.css，见
         public/fonts/Fontshare-Sentient-LICENSE.txt）。Google Fonts URL 中已
-        移除 Newsreader，优雅衬线档的 FOUT 仍由 font-display: swap 保证，
-        字体栈回退 Georgia 系，无回退到系统字体外的异常；卡片预览与导出的
-        字体一致性由 tokens.css 的 --lex-card-font 单点保证。
+        移除 Newsreader（补正后 fallback 栈中 "Newsreader" 仅作 CSS 系统字体
+        栈声明，联动评估见 RAY-359 补正说明：不恢复 Google Fonts 加载），
+        优雅衬线档的 FOUT 仍由 font-display: swap 保证，字体栈按 Owner 口径
+        补正为 Sentient → Newsreader → Georgia Pro → Georgia → Times New
+        Roman → serif（见 tokens.css 与 cardFont.ts），无回退到系统字体外
+        的异常；卡片预览与导出的字体一致性由 tokens.css 的 --lex-card-font
+        单点保证。
     -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

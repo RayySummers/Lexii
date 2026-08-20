@@ -30,7 +30,7 @@
  * CACHE_NAME 在「缓存结构或预缓存清单变化」时递增；纯内容更新无需改版本。
  * 本文件为纯静态资源（public/ 原样拷贝进产物），不经 Vite 构建。
  */
-const CACHE_NAME = "lexii-shell-v3";
+const CACHE_NAME = "lexii-shell-v4";
 
 /**
  * 卡片字体 CSS 入口（RAY-323，RAY-359）：与 index.html 的 Google Fonts

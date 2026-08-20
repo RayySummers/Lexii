@@ -137,7 +137,7 @@ export const CARD_FONT_OPTIONS: ReadonlyArray<CardFontOption> = [
     label: "优雅衬线",
     description: "衬线端正、阅读稳重。",
     sampleText: "vocabulary",
-    fontFamily: '"Sentient", Georgia, "Times New Roman", serif',
+    fontFamily: '"Sentient", "Newsreader", "Georgia Pro", Georgia, "Times New Roman", serif',
     fontWeight: 500,
   },
 ];

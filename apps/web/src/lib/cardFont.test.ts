@@ -201,11 +201,16 @@ describe("CARD_FONT_OPTIONS 与 index.html 的 Google Fonts URL 同步（漂移�
     expect(inter.fontWeight).toBe(800);
   });
 
-  it("sentient 档主字体为自托管 Sentient（RAY-359），字重 500 Medium", () => {
+  it("sentient 档主字体为自托管 Sentient（RAY-359），字重 500 Medium；fallback 含 Newsreader/Georgia Pro 链", () => {
     const sentient = CARD_FONT_OPTIONS.find((option) => option.id === "sentient")!;
     expect(fontNameOf(sentient.fontFamily)).toBe("Sentient");
     expect(sentient.fontWeight).toBe(500);
-    expect(sentient.fontFamily).toBe('"Sentient", Georgia, "Times New Roman", serif');
+    expect(sentient.fontFamily).toBe(
+      '"Sentient", "Newsreader", "Georgia Pro", Georgia, "Times New Roman", serif',
+    );
+    // fallback 链精确顺序契约（Owner 口径补正）：Sentient → Newsreader → Georgia Pro → Georgia → Times New Roman
+    expect(sentient.fontFamily).toContain('"Newsreader"');
+    expect(sentient.fontFamily).toContain('"Georgia Pro"');
   });
 });
 
@@ -263,10 +268,13 @@ describe("tokens.css 的字体栈与 CARD_FONT_OPTIONS 同步（RAY-338 A1 漂�
     expect(interStack).toContain('"Inter"');
   });
 
-  it("sentient 档主字体为自托管 Sentient（RAY-359），serif 回退 Georgia", () => {
+  it("sentient 档主字体为自托管 Sentient（RAY-359），serif 回退 Georgia Pro 链（5 级 fallback）", () => {
     const stacks = loadStacksFromTokensCss();
     const sentientStack = stacks[CARD_FONT_OPTIONS.findIndex((option) => option.id === "sentient")]!;
+    expect(sentientStack).toBe('"Sentient", "Newsreader", "Georgia Pro", Georgia, "Times New Roman", serif');
     expect(sentientStack.startsWith('"Sentient"')).toBe(true);
+    expect(sentientStack).toContain('"Newsreader"');
+    expect(sentientStack).toContain('"Georgia Pro"');
     expect(sentientStack).toContain("Georgia");
     expect(sentientStack).toContain('"Times New Roman"');
   });

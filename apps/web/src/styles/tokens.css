@@ -82,6 +82,11 @@
  * - RAY-359：sentient 档主字体为 Sentient Medium（自托管 500，
  *   见 public/fonts/sentient.css 与同目录 Fontshare 许可证；原
  *   Newsreader SemiBold 已移除，Google Fonts URL 中不再加载 Newsreader）。
+ *   RAY-359 补正（Owner fallback 口径）：sentient 档 fallback 栈精确为
+ *   Sentient → Newsreader → Georgia Pro → Georgia → Times New Roman，
+ *   对应 font-family 为 "Sentient", "Newsreader", "Georgia Pro", Georgia,
+ *   "Times New Roman", serif；Newsreader / Georgia Pro 为系统字体栈声明，
+ *   无需额外网络加载（Sentient 自托管已保证首选可用，见下方联动评估）。
  *   卡片预览与导出共用同一 CSS 变量，字体一致性由变量单点保证；FOUT
  *   策略由各 @font-face 的 font-display: swap 保证，无回退到系统字体外的异常。
  * - 字体降级栈：每档在字体加载失败 / 离线时退回系统字体
@@ -104,6 +109,6 @@
 }
 
 [data-card-font="sentient"] {
-  --lex-card-font: "Sentient", Georgia, "Times New Roman", serif;
+  --lex-card-font: "Sentient", "Newsreader", "Georgia Pro", Georgia, "Times New Roman", serif;
   --lex-card-font-weight: 500;
 }
