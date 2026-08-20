@@ -100,3 +100,17 @@
   --lex-card-font: "Newsreader", Georgia, "Times New Roman", serif;
   --lex-card-font-weight: 600;
 }
+
+/*
+ * 音标字体（RAY-361 音标豆腐块修复）：
+ * - 音标区域强制使用通用字体 Inter，不受卡片字体/浏览器字体选择影响；
+ * - 栈为 Inter + 系统通用兜底（system-ui / -apple-system / Segoe UI / Roboto /
+ *   Helvetica Neue / Arial / sans-serif），IPA 符号在 Inter 覆盖不到时
+ *   由系统字体兜底，避免引入新的豆腐块；
+ * - Google Fonts 已预加载 Inter（index.html），此处不新增字体请求；未加载或
+ *   离线时退回系统栈仍可读；
+ * - 组件层通过 var(--lex-phonetic-font) 单点引用，不硬编码字面量。
+ */
+:root {
+  --lex-phonetic-font: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}

@@ -248,14 +248,20 @@ function DefinitionMarker({ pos, index }: { pos: string; index: number }) {
   return null;
 }
 
-/** 美/英双音标行（富化缺省回退词书自带音标；无任何音标数据则不渲染） */
+/** 美/英双音标行（富化缺省回退词书自带音标；无任何音标数据则不渲染）
+ * RAY-361：音标区域强制使用通用字体 Inter（var(--lex-phonetic-font)），不受
+ * 卡片字体/浏览器字体选择影响，避免 Playpen/Newsreader 等字体缺 IPA 字形
+ * 导致的豆腐块；兜底栈含系统通用字体，避免引入新的豆腐块。 */
 function PhoneticsRow({ sense, className = "" }: { sense: Sense; className?: string }) {
   const badges = dualPhonetics(sense);
   if (badges.length === 0) {
     return null;
   }
   return (
-    <span className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 ${className}`}>
+    <span
+      className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 ${className}`}
+      style={{ fontFamily: "var(--lex-phonetic-font)" }}
+    >
       {badges.map((badge, index) => (
         <span
           key={`${index}:${badge.value}`}
