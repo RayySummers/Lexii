@@ -273,8 +273,11 @@ describe("tokens.css 的字体栈与 CARD_FONT_OPTIONS 同步（RAY-338 A1 漂�
 
   it("sentient 档主字体为自托管 Sentient（RAY-359），serif 回退 Georgia Pro 链（5 级 fallback）", () => {
     const stacks = loadStacksFromTokensCss();
-    const sentientStack = stacks[CARD_FONT_OPTIONS.findIndex((option) => option.id === "sentient")]!;
-    expect(sentientStack).toBe('"Sentient", "Newsreader", "Georgia Pro", Georgia, "Times New Roman", serif');
+    const sentientStack =
+      stacks[CARD_FONT_OPTIONS.findIndex((option) => option.id === "sentient")]!;
+    expect(sentientStack).toBe(
+      '"Sentient", "Newsreader", "Georgia Pro", Georgia, "Times New Roman", serif',
+    );
     expect(sentientStack.startsWith('"Sentient"')).toBe(true);
     expect(sentientStack).toContain('"Newsreader"');
     expect(sentientStack).toContain('"Georgia Pro"');
