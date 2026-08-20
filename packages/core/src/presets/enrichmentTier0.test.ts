@@ -124,7 +124,8 @@ describe("enrichment.tier0.data.json（生成 → 装载契约）", () => {
         const d = depth(ez);
         if (d.full !== 0) {
           unbalanced += 1;
-          if (unbalancedSamples.length < 3) unbalancedSamples.push(`${tuple[0]}.etymologyZh:${JSON.stringify(ez.slice(0, 40))}`);
+          if (unbalancedSamples.length < 3)
+            unbalancedSamples.push(`${tuple[0]}.etymologyZh:${JSON.stringify(ez.slice(0, 40))}`);
         }
       }
       if (wp) {
@@ -135,7 +136,8 @@ describe("enrichment.tier0.data.json（生成 → 装载契约）", () => {
           const d = depth(note);
           if (d.full !== 0) {
             unbalanced += 1;
-            if (unbalancedSamples.length < 3) unbalancedSamples.push(`${tuple[0]}.wordParts:${JSON.stringify(part.slice(0, 50))}`);
+            if (unbalancedSamples.length < 3)
+              unbalancedSamples.push(`${tuple[0]}.wordParts:${JSON.stringify(part.slice(0, 50))}`);
             break;
           }
         }

@@ -94,8 +94,8 @@ describe("parseWordParts（词根词缀拆解解析）", () => {
   });
 
   it("RAY-365：半角括号不平衡同样补全", () => {
-    expect(parseWordParts("accept<接受（拉丁语 accipere（ad- \"to\" + caper>")).toEqual([
-      { part: "accept", meaning: "接受（拉丁语 accipere（ad- \"to\" + caper））" },
+    expect(parseWordParts('accept<接受（拉丁语 accipere（ad- "to" + caper>')).toEqual([
+      { part: "accept", meaning: '接受（拉丁语 accipere（ad- "to" + caper））' },
     ]);
   });
 

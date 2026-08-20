@@ -374,7 +374,10 @@ export function mergeEnrichmentIntoContent(
     if (!merged.wordParts) {
       merged.wordParts = enrichment.wordParts;
       changed = true;
-    } else if (isWordPartsUnbalanced(merged.wordParts) && !isWordPartsUnbalanced(enrichment.wordParts)) {
+    } else if (
+      isWordPartsUnbalanced(merged.wordParts) &&
+      !isWordPartsUnbalanced(enrichment.wordParts)
+    ) {
       merged.wordParts = enrichment.wordParts;
       changed = true;
     }
@@ -491,7 +494,10 @@ export function mergeEnrichmentIntoSense(
     if (!merged.wordParts) {
       merged.wordParts = enrichment.wordParts;
       changed = true;
-    } else if (isWordPartsUnbalanced(merged.wordParts) && !isWordPartsUnbalanced(enrichment.wordParts)) {
+    } else if (
+      isWordPartsUnbalanced(merged.wordParts) &&
+      !isWordPartsUnbalanced(enrichment.wordParts)
+    ) {
       merged.wordParts = enrichment.wordParts;
       changed = true;
     }

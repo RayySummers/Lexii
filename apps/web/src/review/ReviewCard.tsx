@@ -41,7 +41,12 @@ import { useEffect, useRef } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { resolveDefinitionPos, type Sense } from "@lexii/core";
 import { KeyboardIcon } from "../components/icons";
-import { dualPhonetics, ensureBalancedText, parseInlineMarkdown, parseWordParts } from "./enrichmentUi";
+import {
+  dualPhonetics,
+  ensureBalancedText,
+  parseInlineMarkdown,
+  parseWordParts,
+} from "./enrichmentUi";
 import type { PhoneticBadge } from "./enrichmentUi";
 
 export interface ReviewCardProps {
