@@ -45,11 +45,17 @@
  *
  * 全部颜色走 design tokens（浅色/深色两套自动生效），不硬编码颜色。
  */
-import { lazy, Suspense, useCallback, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { APP_VERSION } from "../lib/appVersion";
 import type { CardFont } from "../lib/cardFont";
+import {
+  findSettingsSectionByAnchor,
+  parseSettingsAnchorFromHash,
+  SETTINGS_ANCHOR_EXTENSION_PACKAGES,
+  SETTINGS_SECTION_ID_EXTENSION_PACKAGES,
+} from "./anchors";
 import {
   DAILY_NEW_CARD_LIMIT_MAX,
   DAILY_NEW_CARD_LIMIT_MIN,
@@ -120,6 +126,13 @@ export interface SettingsScreenProps {
   onCardFontChange(font: CardFont): void;
   /** 开发者面板数据源工厂（RAY-297：默认浏览器 IndexedDB；测试注入 mock，解锁时才创建） */
   developerDataProviderFactory?: () => DeveloperDataProvider;
+  /**
+   * RAY-364 可持续锚点：进入设置页后自动滚动到的区块标识（如 extension-packages）。
+   * 由搜词无结果页「前往设置安装扩展词包」按钮传入，经 App 透传。
+   * 为空时不滚动。实现基于稳定的 id / data-anchor（禁止硬编码索引），
+   * 设置项增删/重排后仍有效。若未传但 URL hash 含 ?anchor=，也视为同等锚点（刷新可持续）。
+   */
+  initialAnchor?: string | null;
 }
 
 /** 数据源错误 → 用户可见文案（不暴露内部实现细节） */
@@ -145,6 +158,7 @@ export function SettingsScreen({
   cardFont,
   onCardFontChange,
   developerDataProviderFactory = createDefaultDeveloperDataProvider,
+  initialAnchor = null,
 }: SettingsScreenProps) {
   // 二级视图分发（hooks 规则：主视图的全部 hooks 在 SettingsMainView 内，此处仅一个 state）
   const [view, setView] = useState<"main" | "licenses" | "wordbooks" | "dictionary">("main");
@@ -382,6 +396,7 @@ export function SettingsScreen({
       devPanelUnlocked={devPanelTapState.unlocked}
       onVersionTap={handleVersionTap}
       developerDataProviderFactory={developerDataProviderFactory}
+      initialAnchor={initialAnchor}
     />
   );
 }
@@ -432,6 +447,8 @@ interface SettingsMainViewProps {
   devPanelUnlocked: boolean;
   onVersionTap(): void;
   developerDataProviderFactory: () => DeveloperDataProvider;
+  /** RAY-364 可持续锚点：主视图挂载后自动滚动到对应区块 */
+  initialAnchor?: string | null;
 }
 
 function SettingsMainView({
@@ -467,8 +484,28 @@ function SettingsMainView({
   devPanelUnlocked,
   onVersionTap,
   developerDataProviderFactory,
+  initialAnchor = null,
 }: SettingsMainViewProps) {
   const persistence = usePersistenceStatus();
+
+  // RAY-364 可持续锚点：基于稳定的 id / data-anchor 定位，禁止硬编码索引。
+  // 触发条件：props initialAnchor 或 URL ?anchor=（刷新/直链可持续）。
+  // 定时器 0ms 确保 Section 已挂载到 DOM 后再查询；失败静默（锚点不存在不抛错）。
+  // B1 加固：querySelector 经 CSS.escape 转义并 try/catch，避免异常 anchor 抛 SyntaxError。
+  useEffect(() => {
+    let anchor = initialAnchor?.trim() ?? "";
+    if (!anchor && typeof window !== "undefined") {
+      anchor = parseSettingsAnchorFromHash(window.location.hash) ?? "";
+    }
+    if (!anchor) return;
+    const timer = setTimeout(() => {
+      const target = findSettingsSectionByAnchor(anchor);
+      if (target && typeof (target as HTMLElement).scrollIntoView === "function") {
+        (target as HTMLElement).scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [initialAnchor]);
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
@@ -725,7 +762,11 @@ function SettingsMainView({
         </button>
       </Section>
 
-      <Section title="扩展词包">
+      <Section
+        title="扩展词包"
+        id={SETTINGS_SECTION_ID_EXTENSION_PACKAGES}
+        anchor={SETTINGS_ANCHOR_EXTENSION_PACKAGES}
+      >
         <p className="text-sm text-text-muted">
           下载 Tier 1/2 扩展词包（需联网，下载后可离线使用），将词典检索范围从内置 7,195 词扩展到
           ECDICT 全量覆盖（如 kaleidoscope、menstrual 等 Tier 0 未收录词均可搜到）。
@@ -818,10 +859,27 @@ function SettingsMainView({
   );
 }
 
-/** 设置分组容器 */
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/**
+ * 设置分组容器（RAY-364：支持稳定锚点 id / data-anchor，禁止硬编码索引）。
+ * 锚点区块需传入 id + anchor，普通分组无需传。
+ */
+function Section({
+  title,
+  children,
+  id,
+  anchor,
+}: {
+  title: string;
+  children: React.ReactNode;
+  id?: string;
+  anchor?: string;
+}) {
   return (
-    <section className="rounded-2xl border border-border bg-surface p-6">
+    <section
+      id={id}
+      data-anchor={anchor}
+      className="rounded-2xl border border-border bg-surface p-6"
+    >
       <h2 className="text-base font-semibold">{title}</h2>
       <div className="mt-4 flex flex-col gap-4">{children}</div>
     </section>
