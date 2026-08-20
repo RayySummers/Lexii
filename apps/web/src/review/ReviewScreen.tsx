@@ -64,6 +64,8 @@ export interface ReviewScreenProps {
    * 旧测试 / 旧调用方未传时退回 no-op 工厂，避免破坏既有测试。
    */
   getAddToListsProvider?: () => AddToListsDataProvider;
+  /** RAY-367：近义词点击跳转搜词页（按义项分组，点击具体近义词） */
+  onSynonymSelect?: (term: string) => void;
 }
 
 /** 队列为空（有词但当前模式无可复习内容）时的按模式文案 */
@@ -112,6 +114,7 @@ export function ReviewScreen({
   mode,
   onExit,
   getAddToListsProvider = () => NOOP_ADD_TO_LISTS_PROVIDER,
+  onSynonymSelect,
 }: ReviewScreenProps) {
   const session = useReviewSession(provider, mode);
   const dueLabels = session.current ? computeDueLabels(session.current) : null;
@@ -218,6 +221,7 @@ export function ReviewScreen({
           target.tagName === "INPUT" ||
           target.tagName === "TEXTAREA" ||
           target.isContentEditable ||
+          target.getAttribute("role") === "button" ||
           // RAY-291 suggestion 1：面内滚动区（Chrome 127+ 可聚焦）同样放行，
           // 空格交给滚动容器的原生滚动行为
           isScrollableRegion(target));
@@ -275,6 +279,7 @@ export function ReviewScreen({
         speakNotice={speakNotice}
         onOpenAddToLists={handleOpenAddToLists}
         onExit={onExit}
+        onSynonymSelect={onSynonymSelect}
       />
       {addToListsDialog ? (
         <AddToListsDialog
@@ -301,6 +306,8 @@ interface PhaseContentProps {
   /** RAY-325：打开「添加到列表」对话框 */
   onOpenAddToLists(): void;
   onExit(): void;
+  /** RAY-367：近义词点击跳转 */
+  onSynonymSelect?: (term: string) => void;
 }
 
 /** 按会话阶段渲染对应内容（独立于容器，便于逐阶段阅读） */
@@ -313,6 +320,7 @@ function PhaseContent({
   speakNotice,
   onOpenAddToLists,
   onExit,
+  onSynonymSelect,
 }: PhaseContentProps) {
   switch (session.phase) {
     case "loading":
@@ -404,6 +412,7 @@ function PhaseContent({
             sense={session.current.sense}
             flipped={session.flipped}
             onFlip={session.flip}
+            onSynonymSelect={onSynonymSelect}
           />
           <div className="flex items-center justify-center gap-2">
             <button

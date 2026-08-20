@@ -43,11 +43,23 @@ import {
   removeSearchHistory,
   type SearchHistoryStorage,
 } from "../lib/searchHistory";
+import { getSynonymGroups, isSelfSynonym, truncateDefinition } from "../lib/synonymGroups";
 import { SETTINGS_ANCHOR_EXTENSION_PACKAGES } from "../settings/anchors";
 import type { SearchDataProvider, SearchResult } from "./types";
 
 /** 输入防抖间隔（毫秒） */
 const DEBOUNCE_MS = 200;
+
+/**
+ * 压栈辅助（RAY-367 S3）：将当前 query 压入返回栈前，先过滤掉已存在的 normalized（大小写不敏感），避免 A→B→A 循环时栈内重复 A；
+ * 上限 20 条，与内部 `handleSynonymSelect` 同口径复用。
+ * 导出仅供测试（S1 栈上限 20 截断单测）。
+ */
+export function pushToStack(prev: string[], curTrim: string, normalized: string): string[] {
+  const filtered = prev.filter((item) => item.toLowerCase() !== normalized.toLowerCase());
+  const next = curTrim.length > 0 ? [...filtered, curTrim] : filtered;
+  return next.slice(-20);
+}
 
 export interface SearchScreenProps {
   provider: SearchDataProvider;
@@ -70,6 +82,11 @@ export interface SearchScreenProps {
    * 旧测试 / 旧调用方未传时退回 no-op 工厂，避免破坏既有测试。
    */
   getAddToListsProvider?: () => AddToListsDataProvider;
+  /**
+   * RAY-367：外部指定初始检索词（近义词点击跳转）。
+   * 有值时进入页面即填入该词并检索；与受控输入共存，外部变更会同步到输入框。
+   */
+  initialQuery?: string;
 }
 
 /** 数据源错误 → 原始错误信息（仅供「错误详情」折叠区展示） */
@@ -94,8 +111,9 @@ export function SearchScreen({
   onNavigateToSettings,
   historyStorage,
   getAddToListsProvider = () => NOOP_ADD_TO_LISTS_PROVIDER,
+  initialQuery,
 }: SearchScreenProps) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery ?? "");
   const [results, setResults] = useState<SearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +121,35 @@ export function SearchScreen({
   const [history, setHistory] = useState<string[]>(() =>
     loadSearchHistory(resolveHistoryStorage(historyStorage)),
   );
+  // RAY-367：近义词跳转的返回栈（记录上一跳的 query，供返回按钮逐级回退；上限 20 避免无限增长）
+  const [queryStack, setQueryStack] = useState<string[]>(() => []);
+  const prevInitialRef = useRef<string | undefined>(initialQuery);
+  // S4：用 ref 镜像 query，避免在 setQuery updater 内触发 setQueryStack 的副作用
+  const queryRef = useRef(query);
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
+
+  // 外部 initialQuery 变更（近义词从复习卡或 App 导航）同步到输入框并入栈（循环跳转的进入口）
+  useEffect(() => {
+    if (initialQuery === undefined) {
+      prevInitialRef.current = undefined;
+      return;
+    }
+    if (prevInitialRef.current === initialQuery) {
+      return;
+    }
+    prevInitialRef.current = initialQuery;
+    const normalized = initialQuery.trim();
+    const curTrim = queryRef.current.trim();
+    if (curTrim.length > 0 && curTrim.toLowerCase() !== normalized.toLowerCase()) {
+      setQueryStack((prev) => pushToStack(prev, curTrim, normalized));
+    }
+    setQuery(initialQuery);
+    setError(null);
+    setResults(null);
+    setSearching(false);
+  }, [initialQuery]);
   // 生词本覆盖的义项 id 集合（RAY-284：结果行「已在生词本」标记；进入页面读一次）
   const [notebookSenseIds, setNotebookSenseIds] = useState<ReadonlySet<string> | null>(null);
   // RAY-325: 「添加到列表」对话框（null = 关闭）。sense 与 provider 成对
@@ -259,9 +306,44 @@ export function SearchScreen({
     setAddToListsDialog(null);
   }, []);
 
+  // RAY-367：近义词点击 → 把当前 query 压栈后跳到该近义词（大小写去重，自身循环忽略；S3 复用 pushToStack）
+  const handleSynonymSelect = useCallback(
+    (term: string) => {
+      const normalized = term.trim();
+      if (normalized.length === 0) return;
+      const currentTrim = query.trim();
+      if (normalized.toLowerCase() === currentTrim.toLowerCase()) {
+        return;
+      }
+      setQueryStack((prev) => pushToStack(prev, currentTrim, normalized));
+      setQuery(normalized);
+      setError(null);
+      setResults(null);
+      setSearching(false);
+      // 输入框聚焦，保持可继续编辑
+      inputRef.current?.focus();
+    },
+    [query],
+  );
+
+  // RAY-367：返回按钮优先回退到上一跳的近义词，无栈才退出到首页
+  const handleBack = useCallback(() => {
+    if (queryStack.length > 0) {
+      const previous = queryStack[queryStack.length - 1] ?? "";
+      setQueryStack((prev) => prev.slice(0, -1));
+      setQuery(previous);
+      setError(null);
+      setResults(null);
+      setSearching(false);
+      inputRef.current?.focus();
+      return;
+    }
+    onExit();
+  }, [queryStack, onExit]);
+
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
-      <ScreenHeader title="搜词" onBack={onExit} />
+      <ScreenHeader title="搜词" onBack={handleBack} />
 
       <div className="relative">
         <SearchIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
@@ -280,6 +362,19 @@ export function SearchScreen({
         />
       </div>
 
+      {queryStack.length > 0 ? (
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-raised px-4 py-2 text-xs text-text-muted">
+          <span className="truncate">来自「{queryStack[queryStack.length - 1]}」的近义词跳转</span>
+          <button
+            type="button"
+            onClick={handleBack}
+            className="ml-auto shrink-0 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            返回
+          </button>
+        </div>
+      ) : null}
+
       <SearchContent
         query={query.trim()}
         results={results}
@@ -293,6 +388,8 @@ export function SearchScreen({
         onToggleNotebook={handleToggleNotebook}
         onNavigateToSettings={onNavigateToSettings}
         onOpenAddToLists={handleOpenAddToLists}
+        onSynonymSelect={handleSynonymSelect}
+        currentQuery={query.trim()}
       />
       {addToListsDialog ? (
         <AddToListsDialog
@@ -326,6 +423,10 @@ interface SearchContentProps {
   onNavigateToSettings?(anchor?: string): void;
   /** RAY-325：打开「添加到列表」对话框 */
   onOpenAddToLists(sense: Sense): void;
+  /** RAY-367：近义词点击跳转搜词页 */
+  onSynonymSelect?(term: string): void;
+  /** 当前完整 query（用于循环检测，大小写去重） */
+  currentQuery?: string;
 }
 
 /** 按状态渲染检索区内容（独立于容器，便于逐状态阅读与测试） */
@@ -342,6 +443,8 @@ function SearchContent({
   onToggleNotebook,
   onNavigateToSettings,
   onOpenAddToLists,
+  onSynonymSelect,
+  currentQuery,
 }: SearchContentProps) {
   if (error) {
     // 友好文案 + 原始信息折叠（与统计页同一模式，Oscar 评审 nit 1）：
@@ -438,6 +541,8 @@ function SearchContent({
             inNotebook={notebookSenseIds?.has(result.sense.id) ?? false}
             onToggleNotebook={onToggleNotebook}
             onOpenAddToLists={onOpenAddToLists}
+            onSynonymSelect={onSynonymSelect}
+            currentQuery={currentQuery}
           />
         ))}
       </ul>
@@ -488,12 +593,14 @@ function SearchHistoryList({ history, onSelect, onRemove }: SearchHistoryListPro
   );
 }
 
-/** 单条结果：词条 + 词性/音标 + 释义 + 加词入口（RAY-284，RAY-302 可撤销）+ 添加到列表（RAY-325） */
+/** 单条结果：词条 + 词性/音标 + 释义 + 近义词（分组标注·可点击跳转）+ 加词入口 */
 function SearchResultRow({
   result,
   inNotebook,
   onToggleNotebook,
   onOpenAddToLists,
+  onSynonymSelect,
+  currentQuery,
 }: {
   result: SearchResult;
   /** 该义项是否已在生词本（标记集合加载完成前按 false 处理） */
@@ -501,8 +608,12 @@ function SearchResultRow({
   onToggleNotebook(senseId: SenseId): void;
   /** RAY-325：打开「添加到列表」对话框 */
   onOpenAddToLists(sense: Sense): void;
+  /** RAY-367：近义词点击跳转（按义项分组，循环由外层栈处理） */
+  onSynonymSelect?(term: string): void;
+  currentQuery?: string;
 }) {
   const { sense } = result;
+  const synonymGroups = getSynonymGroups(sense);
   return (
     <li className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface p-4">
       <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -526,6 +637,74 @@ function SearchResultRow({
         ) : null}
       </span>
       <p className="text-sm leading-relaxed text-text-muted">{sense.definitions.join("；")}</p>
+      {synonymGroups.length > 0 ? (
+        <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-surface-raised/40 px-3 py-2">
+          <span className="text-xs font-medium text-text-muted">近义词</span>
+          <div className="flex flex-col gap-2">
+            {synonymGroups.map((group) => (
+              <div key={group.definitionIndex} className="flex flex-col gap-1">
+                <span className="flex items-center gap-1 text-xs text-text-muted">
+                  {group.pos ? (
+                    <span className="rounded-full border border-border bg-surface px-1.5 py-px text-xs">
+                      {group.pos}
+                    </span>
+                  ) : null}
+                  <span className="truncate">
+                    释义 {group.definitionIndex + 1}
+                    {group.definition ? ` · ${truncateDefinition(group.definition, 16)}` : ""}
+                  </span>
+                </span>
+                <ul className="flex flex-wrap gap-1.5">
+                  {group.synonyms.map((word, index) => {
+                    const isSelf = isSelfSynonym(word, sense.term);
+                    // S5：isLoop 口径为“与当前输入完全相同（大小写/空白归一）”——与 queryStack 去重负责的 A↔B 循环不同，
+                    // 此处仅禁用“已在当前检索框中的同词”避免无意义的同词重搜；isSelf 负责“与本词条同词”的永久禁用，二者边界正交。
+                    const isLoop =
+                      Boolean(currentQuery) &&
+                      word.trim().toLowerCase() === currentQuery?.trim().toLowerCase();
+                    const clickable = Boolean(onSynonymSelect) && !isSelf && !isLoop;
+                    return (
+                      <li key={`${index}:${word}`}>
+                        {clickable ? (
+                          <button
+                            type="button"
+                            onClick={() => onSynonymSelect?.(word)}
+                            aria-label={`搜索近义词 ${word}`}
+                            title={`搜索「${word}」`}
+                            className="rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                          >
+                            {word}
+                          </button>
+                        ) : (
+                          <span
+                            title={
+                              isSelf
+                                ? `${word}（当前词）`
+                                : isLoop
+                                  ? `${word}（已在当前检索中）`
+                                  : word
+                            }
+                            className={`rounded-full border bg-surface px-2.5 py-0.5 text-xs ${
+                              isSelf || isLoop
+                                ? "cursor-not-allowed border-border text-text-muted opacity-60"
+                                : "border-border"
+                            }`}
+                            aria-label={
+                              isSelf || isLoop ? `${word}（当前词，无需跳转）` : undefined
+                            }
+                          >
+                            {word}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="flex items-center justify-end gap-2">
         <button
           type="button"
@@ -559,3 +738,5 @@ function SearchResultRow({
     </li>
   );
 }
+
+// N1：释义截断复用 lib/synonymGroups.truncateDefinition（卡片 18 / 搜词 16 差异因容器宽度，已在调用处显式传 max）

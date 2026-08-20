@@ -49,11 +49,14 @@ import {
   parseWordParts,
 } from "./enrichmentUi";
 import type { PhoneticBadge } from "./enrichmentUi";
+import { getSynonymGroups, isSelfSynonym, truncateDefinition } from "../lib/synonymGroups";
 
 export interface ReviewCardProps {
   sense: Sense;
   flipped: boolean;
   onFlip(): void;
+  /** RAY-367：点击近义词跳转搜词页（按义项分组，循环与无结果由搜词页处理） */
+  onSynonymSelect?: (term: string) => void;
 }
 
 /**
@@ -78,11 +81,12 @@ export function cardHeightStyle(): CSSProperties {
   };
 }
 
-export function ReviewCard({ sense, flipped, onFlip }: ReviewCardProps) {
+export function ReviewCard({ sense, flipped, onFlip, onSynonymSelect }: ReviewCardProps) {
   const wordParts = parseWordParts(sense.wordParts ?? "");
   // 释义级词性（RAY-349）：口径与解析在 @lexii/core（resolveDefinitionPos），
   // 本组件只做渲染——能确定词性的释义标词性，确定不了的位置退回序号。
   const definitionPos = resolveDefinitionPos(sense);
+  const synonymGroups = getSynonymGroups(sense);
   const backScrollRef = useRef<HTMLDivElement | null>(null);
 
   // 翻面后把焦点移到背面滚动区（suggestion 1）：滚动区在整卡 <button> 内、
@@ -98,6 +102,42 @@ export function ReviewCard({ sense, flipped, onFlip }: ReviewCardProps) {
     return () => cancelAnimationFrame(frame);
   }, [flipped]);
 
+  // B1：外层由 <button> 改为 <div role="button">，避免嵌套 <button> 违反 HTML content model（Oscar 复核 nit）。
+  // 内层近义词 chips 仍为 <button>，点击经 stopPropagation 阻止翻面；键盘路径同样经 stopPropagation/closest 与可滚动容器守卫。
+  // 原生 <button> 的空格键在 keyUp 时合成 click，此处为 <div role="button"> 单独处理 Enter（keyDown）与 Space（keyUp），
+  // 使测试中 fireEvent.keyDown(flipButton, Space) 不立即翻面（与原生按钮一致），真实键盘 Space 仍在 keyUp 时翻面。
+  function isCardScrollableTarget(target: HTMLElement): boolean {
+    const { overflowY } = getComputedStyle(target);
+    const allowsScroll = overflowY === "auto" || overflowY === "scroll";
+    return allowsScroll && target.scrollHeight > target.clientHeight;
+  }
+  const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      (target.closest("button") || isCardScrollableTarget(target))
+    ) {
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      onFlip();
+    }
+  };
+  const handleCardKeyUp = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      (target.closest("button") || isCardScrollableTarget(target))
+    ) {
+      return;
+    }
+    if (event.key === " ") {
+      event.preventDefault();
+      onFlip();
+    }
+  };
+
   return (
     /*
      * 固定高度双层声明（RAY-291，评审 nit 3）：
@@ -108,9 +148,12 @@ export function ReviewCard({ sense, flipped, onFlip }: ReviewCardProps) {
      * 公式口径（卡片外固定内容 ≈ 26rem）的推导见上方常量注释。
      */
     <div className="review-card-height [perspective:1200px]" style={cardHeightStyle()}>
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onFlip}
+        onKeyDown={handleCardKeyDown}
+        onKeyUp={handleCardKeyUp}
         aria-expanded={flipped}
         aria-label={flipped ? `隐藏 ${sense.term} 的释义` : `显示 ${sense.term} 的释义`}
         className="group grid h-full w-full cursor-pointer text-left [transform-style:preserve-3d] transition-transform duration-300 ease-out motion-reduce:transition-none [transform:rotateY(0deg)] aria-expanded:[transform:rotateY(180deg)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
@@ -221,8 +264,8 @@ export function ReviewCard({ sense, flipped, onFlip }: ReviewCardProps) {
                 {parseInlineMarkdown(ensureBalancedText(sense.etymologyZh ?? ""))}
               </p>
             </CardSection>
-            <CardSection title="近义词" visible={(sense.synonyms?.length ?? 0) > 0}>
-              <WordChips words={sense.synonyms ?? []} />
+            <CardSection title="近义词" visible={synonymGroups.length > 0}>
+              <SynonymGroups groups={synonymGroups} term={sense.term} onSelect={onSynonymSelect} />
             </CardSection>
             <CardSection title="反义词" visible={(sense.antonyms?.length ?? 0) > 0}>
               <WordChips words={sense.antonyms ?? []} />
@@ -236,7 +279,7 @@ export function ReviewCard({ sense, flipped, onFlip }: ReviewCardProps) {
             <KeyboardIcon className="h-3.5 w-3.5" />
           </span>
         </CardFace>
-      </button>
+      </div>
     </div>
   );
 }
@@ -324,7 +367,7 @@ function CardSection({
   );
 }
 
-/** 近反义词等词形列表：小圆角 chip 排列 */
+/** 近反义词等词形列表：小圆角 chip 排列（非可点击，用于反义词/派生词等） */
 function WordChips({ words }: { words: string[] }) {
   return (
     <ul className="flex flex-wrap gap-1.5">
@@ -339,6 +382,92 @@ function WordChips({ words }: { words: string[] }) {
     </ul>
   );
 }
+
+/**
+ * 近义词按义项分组（RAY-367）：每组标记所属释义的词性与释义预览，chips 可点击跳转搜词页。
+ *
+ * - 分组标题格式：`近义词 · <pos> <definition>`（pos 可能为空；definition 过长截断至 18 字以内，避免换行过宽）；
+ * - 多分组时每组独立标题 + chips 列，单分组时仅一组；
+ * - 每个 chip 为 button，`aria-label="搜索近义词 xxx"`，点击触发 `onSelect` 并 `stopPropagation` 避免翻面；
+ * - 自身循环（synonym === term，大小写不敏感）禁用点击（置灰、不可聚焦），避免无意义的同词循环跳转；
+ * - 颜色与动效走 design tokens，hover 时边框高亮为 primary。
+ */
+function SynonymGroups({
+  groups,
+  term,
+  onSelect,
+}: {
+  groups: ReturnType<typeof getSynonymGroups>;
+  term: string;
+  onSelect?: (word: string) => void;
+}) {
+  if (groups.length === 0) return null;
+  // 单分组时也保留义项标注（满足「标记具体哪个含义的近义词」），但标题更紧凑
+  return (
+    <div className="flex flex-col gap-3">
+      {groups.map((group) => (
+        <div key={group.definitionIndex} className="flex flex-col gap-1.5">
+          <span className="text-xs text-text-muted">
+            {group.pos ? (
+              <span className="mr-1 rounded-full border border-border bg-surface-raised px-1.5 py-px text-xs text-text-muted">
+                {group.pos}
+              </span>
+            ) : null}
+            <span className="align-middle">
+              释义 {group.definitionIndex + 1}
+              {group.definition ? ` · ${truncateDefinition(group.definition)}` : ""}
+            </span>
+          </span>
+          <ul className="flex flex-wrap gap-1.5">
+            {group.synonyms.map((word, index) => {
+              const isSelf = isSelfSynonym(word, term);
+              const clickable = Boolean(onSelect) && !isSelf;
+              return (
+                <li key={`${index}:${word}`}>
+                  {clickable ? (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        onSelect?.(word);
+                      }}
+                      onKeyDown={(event) => {
+                        // 键盘路径同样阻止冒泡到外层 Card 的翻面处理
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.stopPropagation();
+                        }
+                      }}
+                      aria-label={`搜索近义词 ${word}`}
+                      title={`搜索「${word}」`}
+                      className="rounded-full border border-border bg-surface-raised px-2.5 py-0.5 text-sm transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                    >
+                      {word}
+                    </button>
+                  ) : (
+                    <span
+                      title={isSelf ? `${word}（当前词，无需跳转）` : word}
+                      aria-label={isSelf ? `${word}（当前词）` : undefined}
+                      className={`rounded-full border bg-surface-raised px-2.5 py-0.5 text-sm ${
+                        isSelf
+                          ? "cursor-not-allowed border-border text-text-muted opacity-60"
+                          : "border-border"
+                      }`}
+                    >
+                      {word}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// truncateDefinition 已抽至 lib/synonymGroups（N1），此处不再重复定义。
 
 interface CardFaceProps {
   children: ReactNode;

@@ -207,10 +207,39 @@ export function App({
     [settingsProviderFactory, navigate],
   );
 
+  // RAY-367：近义词跳转的初始词（外部指定）与返回路径
+  const [searchInitialQuery, setSearchInitialQuery] = useState<string | undefined>(undefined);
+  const [searchReturnToReview, setSearchReturnToReview] = useState(false);
+
   const openSearch = useCallback(() => {
     setSearchProvider((current) => current ?? searchProviderFactory());
+    setSearchInitialQuery(undefined);
+    setSearchReturnToReview(false);
     navigate("search");
   }, [searchProviderFactory, navigate]);
+
+  // RAY-367：从复习卡/搜词结果的近义词点击跳转到搜词页（带返回路径）
+  const openSearchWithQuery = useCallback(
+    (term: string) => {
+      setSearchProvider((current) => current ?? searchProviderFactory());
+      setSearchInitialQuery(term);
+      // 若当前在复习页，返回应回到复习；否则按普通搜词处理（返回首页，内部栈优先）
+      setSearchReturnToReview(view === "review");
+      navigate("search");
+    },
+    [searchProviderFactory, navigate, view],
+  );
+
+  const handleSearchExit = useCallback(() => {
+    if (searchReturnToReview) {
+      setSearchReturnToReview(false);
+      setSearchInitialQuery(undefined); // N4：同步清理，避免重进搜词时闪现旧词
+      navigate("review");
+      return;
+    }
+    setSearchInitialQuery(undefined);
+    navigate("home");
+  }, [searchReturnToReview, navigate]);
 
   const openNotebook = useCallback(() => {
     setNotebookProvider((current) => current ?? notebookProviderFactory());
@@ -322,14 +351,16 @@ export function App({
             mode={reviewMode}
             onExit={goHome}
             getAddToListsProvider={getAddToListsProvider}
+            onSynonymSelect={openSearchWithQuery}
           />
         )
       ) : view === "search" && searchProvider ? (
         <SearchScreen
           provider={searchProvider}
-          onExit={goHome}
+          onExit={handleSearchExit}
           onNavigateToSettings={openSettings}
           getAddToListsProvider={getAddToListsProvider}
+          initialQuery={searchInitialQuery}
         />
       ) : view === "notebook" && notebookProvider ? (
         <NotebookScreen provider={notebookProvider} onExit={goHome} />
