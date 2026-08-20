@@ -51,8 +51,8 @@
 }
 
 /*
- * 卡片字体（RAY-323）：
- * - 默认值与四种档位在 :root / [data-card-font="..."] 上定义，
+ * 卡片字体（RAY-323，RAY-366 三档新增）：
+ * - 默认值与七种档位在 :root / [data-card-font="..."] 上定义，
  *   复习卡片本体与设置页示例区均引用 var(--lex-card-font)，
  *   字重引用 var(--lex-card-font-weight)。
  * - 单点来源在 src/lib/cardFont.ts 的 CARD_FONT_OPTIONS（每个
@@ -60,7 +60,9 @@
  *   映射到 "font-family / font-weight"——组件层不感知具体字体名，
  *   也不在多处重复字面量（评审 C-11 性能/可维护性）。
  * - 字重口径与 Google Fonts URL 严格一致（Oscar 评审 suggestion 2）：
- *   inter 800（ExtraBold）/ 其余 600（SemiBold）。不加载的字重会被
+ *   inter/nunito 800（ExtraBold）/ google-sans/playpen/newsreader/
+ *   geist-mono 600（SemiBold）/ geist-pixel 400（Regular，像素字体
+ *   无粗体变体，用常规字重保持像素颗粒清晰）。不加载的字重会被
  *   浏览器合成（伪粗体）导致字面失真，故字重不写死 font-bold(700)，
  *   由本变量按档位取值。改动任一档字重必须三处同步：本文件、
  *   CARD_FONT_OPTIONS.fontWeight、index.html 的 Google Fonts URL。
@@ -68,7 +70,10 @@
  *   出现顺序须与 `CARD_FONT_OPTIONS` 数组顺序一致——`cardFont.test.ts`
  *   的「每档栈字面值与 CARD_FONT_OPTIONS.fontFamily 一致」断言按 index
  *   对账，重排或插入新档时务必同步两侧顺序。实测防线 + 此处文档级提醒
- *   形成双层兜底，避免仅依赖 README 类的「未挂代码」约束。
+ *   形成双层兜底，避免仅依赖 README 类的「未挂代码」约束。RAY-366：
+ *   三档新增置于数组尾部，不重排已有 4 档，与 RAY-359（Sentient 替换
+ *   newsreader）无冲突——Sentient 替换仅改动 newsreader 槽位，尾部三档
+ *   索引不变。
  *   互相交叉指向（RAY-339 R4 复核 nit 1）：如调整本句措辞，请同步
  *   `cardFont.test.ts` 合并形态决策注释；详见该测试末尾的反向交叉指向。
  * - RAY-338 A1：inter 档主字体为 Inter Display（自托管 ExtraBold，
@@ -78,7 +83,7 @@
  *   字面值一致，用逗号选择器合并声明（Oscar 复核 suggestion 1），避免
  *   字面量双份维护。
  * - 字体降级栈：每档在字体加载失败 / 离线时退回系统字体
- *   （无衬线 / 衬线 / 手写体），卡片仍可读，绝不出现空字形。
+ *   （无衬线 / 衬线 / 手写体 / 等宽 / 像素回退），卡片仍可读，绝不出现空字形。
  */
 :root,
 [data-card-font="inter"] {
@@ -99,4 +104,19 @@
 [data-card-font="newsreader"] {
   --lex-card-font: "Newsreader", Georgia, "Times New Roman", serif;
   --lex-card-font-weight: 600;
+}
+
+[data-card-font="geist-mono"] {
+  --lex-card-font: "Geist Mono", ui-monospace, monospace;
+  --lex-card-font-weight: 600;
+}
+
+[data-card-font="nunito"] {
+  --lex-card-font: "Nunito", system-ui, sans-serif;
+  --lex-card-font-weight: 800;
+}
+
+[data-card-font="geist-pixel"] {
+  --lex-card-font: "Geist Pixel", "Press Start 2P", ui-monospace, monospace;
+  --lex-card-font-weight: 400;
 }

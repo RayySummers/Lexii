@@ -1,25 +1,41 @@
 /**
- * 「卡片字体」偏好（RAY-323）。
+ * 「卡片字体」偏好（RAY-323，RAY-366 新增三档）。
  *
  * 产品口径：用户在设置里为复习卡片上的单词本体（sense.term）选择
- * 一种字体，共 4 档：现代简约（Inter Display ExtraBold）、现代圆润
+ * 一种字体，共 7 档：现代简约（Inter Display ExtraBold）、现代圆润
  * （Google Sans Flex）、手写温润（Playpen Sans SemiBold）、优雅衬线
- * （Newsreader SemiBold）。选择立即应用到当前与未来所有卡片。
+ * （Newsreader SemiBold）、等宽秩序（Geist Mono SemiBold）、圆润可爱
+ * （Nunito ExtraBold）、像素风格（Geist Pixel）。选择立即应用到当前
+ * 与未来所有卡片。
  *
  * 存储走 localStorage（与主题、发音口音、生词本开关等偏好同一持久化
- * 模式）。4 种字体通过 index.html 引入的字体样式表在首帧渲染前到达——
+ * 模式）。7 种字体通过 index.html 引入的字体样式表在首帧渲染前到达——
  * 其中 inter 档主字体 Inter Display ExtraBold 自托管（public/fonts/，
- * RAY-338 A1），其余三档走 Google Fonts <link>；CSS 端通过
+ * RAY-338 A1），其余六档走 Google Fonts <link>；CSS 端通过
  * <html data-card-font="..."> 切换到对应的 font-family（见
  * styles/tokens.css），卡片本体用 var(--lex-card-font) 应用字体，
  * 组件层不感知具体字体名。
+ *
+ * RAY-366 与 RAY-359（Newsreader → Sentient 替换）无冲突设计：
+ * - 本批次在数组尾部追加三档（geist-mono / nunito / geist-pixel），
+ *   不重排已有 4 档顺序，Sentient 替换仅改动 newsreader 槽位（id 不变
+ *   或改为 sentient 均不影响尾部三档的索引与 CSS 变量映射）；
+ * - 字体名/字重与 index.html Google Fonts URL、tokens.css 变量栈、
+ *   public/sw.js CARD_FONT_CSS_URL 三处同步，漂移校验在 cardFont.test.ts。
  *
  * 偏好不是学习数据，不随 JSON 备份导出。解析失败 / 存储不可用一律
  * 回落默认值（inter，现代简约），绝不阻塞复习。
  */
 
-/** 4 种卡片字体档位（按 settings 卡片展示顺序） */
-export type CardFont = "inter" | "google-sans" | "playpen" | "newsreader";
+/** 7 种卡片字体档位（按 settings 卡片展示顺序；尾部三档为 RAY-366 新增） */
+export type CardFont =
+  | "inter"
+  | "google-sans"
+  | "playpen"
+  | "newsreader"
+  | "geist-mono"
+  | "nunito"
+  | "geist-pixel";
 
 /** 偏好存储键 */
 export const CARD_FONT_STORAGE_KEY = "lexii:card-font";
@@ -30,7 +46,13 @@ export const DEFAULT_CARD_FONT: CardFont = "inter";
 /** 判断 localStorage 原始值是否为合法档位 */
 export function isCardFont(value: string | null | undefined): value is CardFont {
   return (
-    value === "inter" || value === "google-sans" || value === "playpen" || value === "newsreader"
+    value === "inter" ||
+    value === "google-sans" ||
+    value === "playpen" ||
+    value === "newsreader" ||
+    value === "geist-mono" ||
+    value === "nunito" ||
+    value === "geist-pixel"
   );
 }
 
@@ -73,7 +95,7 @@ export function writeCardFont(font: CardFont): boolean {
 }
 
 /**
- * 4 种字体档位的展示元数据（settings 卡片渲染与示例文案单点来源）：
+ * 7 种字体档位的展示元数据（settings 卡片渲染与示例文案单点来源）：
  * - `id`：与 CardFont 类型一一对应
  * - `label`：中文短名（卡片标题）
  * - `description`：一句中文描述（卡片副文案）
@@ -87,7 +109,9 @@ export function writeCardFont(font: CardFont): boolean {
  *   文本切 Inter），其后 Inter 为 Google Fonts 加载的回退。
  * - `fontWeight`：该档的字重，与 index.html 的 Google Fonts URL 中加载的
  *   字重严格一致（Oscar 评审 suggestion 2）：inter 800（ExtraBold）/
- *   其余 600（SemiBold）——不加载的字重会被浏览器合成，导致字面失真；
+ *   google-sans/playpen/newsreader/geist-mono 600（SemiBold）/
+ *   nunito 800（ExtraBold）/ geist-pixel 400（Regular，像素字体无粗体变体，
+ *   用常规字重保持像素颗粒清晰）——不加载的字重会被浏览器合成，导致字面失真；
  *   tokens.css 的 --lex-card-font-weight 与本字段按同一口径取值
  */
 export interface CardFontOption {
@@ -131,5 +155,29 @@ export const CARD_FONT_OPTIONS: ReadonlyArray<CardFontOption> = [
     sampleText: "vocabulary",
     fontFamily: '"Newsreader", Georgia, "Times New Roman", serif',
     fontWeight: 600,
+  },
+  {
+    id: "geist-mono",
+    label: "等宽秩序",
+    description: "等宽排版、秩序感。",
+    sampleText: "vocabulary",
+    fontFamily: '"Geist Mono", ui-monospace, monospace',
+    fontWeight: 600,
+  },
+  {
+    id: "nunito",
+    label: "圆润可爱",
+    description: "圆润饱满、亲和可爱。",
+    sampleText: "vocabulary",
+    fontFamily: '"Nunito", system-ui, sans-serif',
+    fontWeight: 800,
+  },
+  {
+    id: "geist-pixel",
+    label: "像素风格",
+    description: "像素颗粒、复古游戏感。",
+    sampleText: "vocabulary",
+    fontFamily: '"Geist Pixel", "Press Start 2P", ui-monospace, monospace',
+    fontWeight: 400,
   },
 ];

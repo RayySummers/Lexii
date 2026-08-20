@@ -42,14 +42,11 @@ describe("useCardFont（RAY-323）", () => {
     expect(document.documentElement.dataset.cardFont).toBe("newsreader");
   });
 
-  it("setFont 写 localStorage 并同步到 <html data-card-font>，4 档都能切", () => {
+  it("setFont 写 localStorage 并同步到 <html data-card-font>，7 档都能切（RAY-366 与 RAY-359 无冲突：尾部 3 档新增）", () => {
     const { result } = renderHook(() => useCardFont());
-    const sequence: Array<"inter" | "google-sans" | "playpen" | "newsreader"> = [
-      "google-sans",
-      "playpen",
-      "newsreader",
-      "inter",
-    ];
+    const sequence: Array<
+      "inter" | "google-sans" | "playpen" | "newsreader" | "geist-mono" | "nunito" | "geist-pixel"
+    > = ["google-sans", "playpen", "newsreader", "geist-mono", "nunito", "geist-pixel", "inter"];
     for (const next of sequence) {
       act(() => {
         result.current.setFont(next);

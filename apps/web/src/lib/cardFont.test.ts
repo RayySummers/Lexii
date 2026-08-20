@@ -1,11 +1,13 @@
 /**
- * 「卡片字体」偏好（RAY-323）解析/读写测试。
+ * 「卡片字体」偏好（RAY-323，RAY-366 扩至 7 档）解析/读写测试。
  *
  * 纯函数（parseCardFont / isCardFont）直接测；localStorage 读写用 jsdom
  * 环境验证（损坏值回落默认，隐私模式抛错不炸）；CARD_FONT_OPTIONS 锁定
- * 4 档、id 与 CardFont 类型一一对应、每档都有示例文案与字重；最后一块
+ * 7 档、id 与 CardFont 类型一一对应、每档都有示例文案与字重；最后一块
  * 校验 CARD_FONT_OPTIONS.fontWeight 与 index.html 的 Google Fonts URL
  * 加载字重严格一致（Oscar 评审 suggestion 2 的漂移防线）。
+ * RAY-366 三档（geist-mono 600 / nunito 800 / geist-pixel 400）在尾部追加，
+ * 与 RAY-359（Sentient 替换 newsreader）无冲突——id 不重叠、顺序尾部追加。
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -31,11 +33,14 @@ afterEach(() => {
 });
 
 describe("isCardFont（类型守卫）", () => {
-  it("4 档合法值", () => {
+  it("7 档合法值", () => {
     expect(isCardFont("inter")).toBe(true);
     expect(isCardFont("google-sans")).toBe(true);
     expect(isCardFont("playpen")).toBe(true);
     expect(isCardFont("newsreader")).toBe(true);
+    expect(isCardFont("geist-mono")).toBe(true);
+    expect(isCardFont("nunito")).toBe(true);
+    expect(isCardFont("geist-pixel")).toBe(true);
   });
 
   it("非法值拒绝（含空、含未知名、含大小写错误）", () => {
@@ -104,12 +109,15 @@ describe("readCardFont / writeCardFont（localStorage 读写）", () => {
 });
 
 describe("CARD_FONT_OPTIONS（settings 卡片元数据单点来源）", () => {
-  it("锁定 4 档、按 settings 卡片展示顺序排列", () => {
+  it("锁定 7 档、按 settings 卡片展示顺序排列（尾部三档为 RAY-366 新增，与 RAY-359 无冲突）", () => {
     expect(CARD_FONT_OPTIONS.map((option) => option.id)).toEqual([
       "inter",
       "google-sans",
       "playpen",
       "newsreader",
+      "geist-mono",
+      "nunito",
+      "geist-pixel",
     ]);
   });
 
@@ -124,10 +132,12 @@ describe("CARD_FONT_OPTIONS（settings 卡片元数据单点来源）", () => {
     }
   });
 
-  it("字重口径（Oscar 评审 suggestion 2）：inter 800（ExtraBold），其余 600（SemiBold）", () => {
+  it("字重口径（Oscar 评审 suggestion 2）：inter/nunito 800（ExtraBold），google-sans/playpen/newsreader/geist-mono 600（SemiBold），geist-pixel 400（Regular，像素字体）", () => {
     expect(CARD_FONT_OPTIONS.find((option) => option.id === "inter")!.fontWeight).toBe(800);
+    expect(CARD_FONT_OPTIONS.find((option) => option.id === "nunito")!.fontWeight).toBe(800);
+    expect(CARD_FONT_OPTIONS.find((option) => option.id === "geist-pixel")!.fontWeight).toBe(400);
     for (const option of CARD_FONT_OPTIONS) {
-      if (option.id === "inter") continue;
+      if (option.id === "inter" || option.id === "nunito" || option.id === "geist-pixel") continue;
       expect(option.fontWeight).toBe(600);
     }
   });
@@ -212,7 +222,8 @@ describe("tokens.css 的字体栈与 CARD_FONT_OPTIONS 同步（RAY-338 A1 漂�
   /**
    * tokens.css 中 `--lex-card-font:` 的字面值按文件顺序：
    * 第 1 条 = 默认档 / inter（合并的 :root, [data-card-font="inter"] 块，Oscar 复核 suggestion 1）
-   * 第 2–4 条 = google-sans / playpen / newsreader 各自档。
+   * 第 2–4 条 = google-sans / playpen / newsreader 各自档；
+   * 第 5–7 条 = geist-mono / nunito / geist-pixel（RAY-366 新增，与 RAY-359 无冲突——尾部追加不重排前 4）。
    * 与 CARD_FONT_OPTIONS 顺序一致，便于按 index 对账。
    */
   function loadStacksFromTokensCss(): string[] {

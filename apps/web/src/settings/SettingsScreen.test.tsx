@@ -673,23 +673,26 @@ describe("RAY-303 学习设置：学习列表包含生词本开关（从首页�
   });
 });
 
-describe("RAY-323 外观：卡片字体 2×2 选择器", () => {
-  it("外观分组下展示 4 张字体卡片，按 CARD_FONT_OPTIONS 顺序排列", async () => {
+describe("RAY-323 外观：卡片字体选择器（RAY-366 扩至 7 档，与 RAY-359 无冲突）", () => {
+  it("外观分组下展示 7 张字体卡片，按 CARD_FONT_OPTIONS 顺序排列", async () => {
     renderSettings();
     await screen.findByText("外观");
 
     const group = screen.getByRole("radiogroup", { name: "卡片字体" });
     const cards = within(group).getAllByRole("radio", { hidden: true });
-    expect(cards).toHaveLength(4);
+    expect(cards).toHaveLength(7);
     expect(cards.map((card) => (card as HTMLInputElement).value)).toEqual([
       "inter",
       "google-sans",
       "playpen",
       "newsreader",
+      "geist-mono",
+      "nunito",
+      "geist-pixel",
     ]);
   });
 
-  it("默认档位（inter）显示「已选」徽标，其他三档无徽标", async () => {
+  it("默认档位（inter）显示「已选」徽标，其他六档无徽标", async () => {
     renderSettings();
     await screen.findByText("外观");
 
@@ -697,7 +700,7 @@ describe("RAY-323 外观：卡片字体 2×2 选择器", () => {
     const selectedLabel = screen.getByText("已选").closest("label");
     expect(selectedLabel).not.toBeNull();
     expect(selectedLabel!.className).toContain("border-primary");
-    // 4 档中只有 1 个「已选」徽标
+    // 7 档中只有 1 个「已选」徽标
     expect(screen.getAllByText("已选")).toHaveLength(1);
   });
 

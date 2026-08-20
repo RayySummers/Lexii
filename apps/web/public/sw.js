@@ -42,7 +42,7 @@ const CACHE_NAME = "lexii-shell-v3";
  * （APP_SHELL 预缓存），本 URL 中的 Inter 800 仅为回退（正常不下载）。
  */
 const CARD_FONT_CSS_URL =
-  "https://fonts.googleapis.com/css2?family=Inter:wght@800&family=Newsreader:wght@600&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&display=swap";
+  "https://fonts.googleapis.com/css2?family=Inter:wght@800&family=Newsreader:wght@600&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&family=Geist+Mono:wght@600&family=Nunito:wght@800&family=Geist+Pixel:wght@400&display=swap";
 
 /** Google Fonts 域名（fetch 处理器放行的唯一跨域白名单） */
 const FONT_HOSTS = new Set(["fonts.googleapis.com", "fonts.gstatic.com"]);
