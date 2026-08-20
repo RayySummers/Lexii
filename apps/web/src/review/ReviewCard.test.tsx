@@ -257,9 +257,10 @@ describe("ReviewCard 固定高度与卡片内部滚动（RAY-291）", () => {
     // 底栏仍在卡片底部（滚动区外）
     expect(scrollRegion).not.toContainElement(hintBar);
     expect(hintBar.parentElement).toBe(backFace);
-    // key icon 保留且样式正常（svg），移动端隐藏桌面端保留（hidden md:flex）
-    const svg = hintBar.querySelector("svg");
-    expect(svg).not.toBeNull();
+    // key icon 保留且样式正常（RAY-363 Material Symbols: keyboard），移动端隐藏桌面端保留（hidden md:flex）
+    const icon = hintBar.querySelector(".material-symbols-outlined");
+    expect(icon).not.toBeNull();
+    expect(icon?.textContent).toBe("keyboard");
     expect(hintBar).toHaveClass("hidden");
     expect(hintBar).toHaveClass("md:flex");
   });
