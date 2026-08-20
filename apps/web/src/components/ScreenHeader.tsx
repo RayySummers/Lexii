@@ -21,16 +21,16 @@ export interface ScreenHeaderProps {
 
 export function ScreenHeader({ title, onBack, backLabel = "返回首页" }: ScreenHeaderProps) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-3">
       <button
         type="button"
         onClick={onBack}
         aria-label={backLabel}
-        className="rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring aspect-square"
       >
         <BackArrowIcon className="h-5 w-5" />
       </button>
-      <h1 className="text-right text-xl font-bold tracking-tight">{title}</h1>
+      <h1 className="min-w-0 flex-1 text-right text-xl font-bold tracking-tight truncate">{title}</h1>
     </div>
   );
 }
