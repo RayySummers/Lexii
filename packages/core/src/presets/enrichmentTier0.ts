@@ -9,7 +9,7 @@
  */
 import { parseEnrichmentPreset } from "./enrichment";
 import type { EnrichmentPresetPackage } from "./types";
-import enrichmentData from "./enrichment.tier0.data.json";
+import enrichmentData from "./enrichment.tier0.data.json" with { type: "json" };
 
 const SOURCE_NAME = "enrichment.tier0.data.json";
 
