@@ -95,11 +95,6 @@ function computeDueLabels(card: ReviewCardData): Record<ReviewRating, string | n
   };
 }
 
-/** 背面评分快捷键提示（随档位模式切换） */
-function ratingHintFor(mode: RatingTierMode): string {
-  return mode === "three" ? "按 1–3 评分" : "按 1–4（或 A / H / G / E）评分";
-}
-
 /**
  * 可滚动容器判定（RAY-291 suggestion 1）：Chrome 127+ 中无焦点子元素的
  * 滚动容器可以键盘聚焦。焦点落在卡片面内滚动区时，空格应交给该容器
@@ -409,7 +404,6 @@ function PhaseContent({
             sense={session.current.sense}
             flipped={session.flipped}
             onFlip={session.flip}
-            ratingHint={ratingHintFor(tierMode)}
           />
           <div className="flex items-center justify-center gap-2">
             <button
@@ -457,7 +451,8 @@ function PhaseContent({
           ) : session.canReturn ? (
             <ReturnButton onReturn={() => void session.redo()} />
           ) : null}
-          <p className="text-center text-xs text-text-muted">
+          {/* RAY-362：按键指示移动端隐藏（<768px hidden），桌面端保留，纯 CSS 响应式无布局跳动 */}
+          <p className="hidden text-center text-xs text-text-muted md:block">
             空格翻面 ·{" "}
             {tierMode === "three" ? "数字键 1–3 评分" : "数字键 1–4 或字母 A / H / G / E 评分"}
           </p>

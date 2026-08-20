@@ -40,6 +40,7 @@
 import { useEffect, useRef } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { resolveDefinitionPos, type Sense } from "@lexii/core";
+import { KeyboardIcon } from "../components/icons";
 import { dualPhonetics, parseInlineMarkdown, parseWordParts } from "./enrichmentUi";
 import type { PhoneticBadge } from "./enrichmentUi";
 
@@ -47,8 +48,6 @@ export interface ReviewCardProps {
   sense: Sense;
   flipped: boolean;
   onFlip(): void;
-  /** 背面评分快捷键提示（RAY-265：三档 / 四档文案不同，由界面层传入） */
-  ratingHint: string;
 }
 
 /**
@@ -73,7 +72,7 @@ export function cardHeightStyle(): CSSProperties {
   };
 }
 
-export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardProps) {
+export function ReviewCard({ sense, flipped, onFlip }: ReviewCardProps) {
   const wordParts = parseWordParts(sense.wordParts ?? "");
   // 释义级词性（RAY-349）：口径与解析在 @lexii/core（resolveDefinitionPos），
   // 本组件只做渲染——能确定词性的释义标词性，确定不了的位置退回序号。
@@ -223,8 +222,12 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardPro
               <WordChips words={sense.antonyms ?? []} />
             </CardSection>
           </div>
-          <span className="shrink-0 px-6 pb-5 pt-2 text-center text-xs text-text-muted">
-            {ratingHint}
+          {/* RAY-362：文案“按 1-3 评分”已删除，保留 key icon；移动端 <768px 自动隐藏，桌面端保留，纯 CSS 响应式无布局跳动 */}
+          <span
+            className="hidden shrink-0 items-center justify-center px-6 pb-5 pt-2 text-text-muted md:flex"
+            aria-hidden="true"
+          >
+            <KeyboardIcon className="h-3.5 w-3.5" />
           </span>
         </CardFace>
       </button>

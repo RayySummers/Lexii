@@ -169,9 +169,12 @@ test.describe("背词卡片固定高度（RAY-291）", () => {
         'button[aria-expanded] [aria-hidden="false"]',
       ) as HTMLElement;
       const region = face.querySelector(".overflow-y-auto") as HTMLElement;
-      const hint = [...face.querySelectorAll("span")].find((el) =>
-        el.textContent?.includes("评分"),
-      );
+      // RAY-362：文案“按 1-3 评分”已删除，保留 key icon（svg）；底栏为 face.lastElementChild（aria-hidden="true"）
+      const hint =
+        (face.querySelector('span[aria-hidden="true"]') as HTMLElement | null) ??
+        ([...face.querySelectorAll("span")].find((el) => el.textContent?.includes("评分")) as
+          HTMLElement | undefined) ??
+        (face.lastElementChild as HTMLElement);
       if (!hint) {
         return false;
       }
