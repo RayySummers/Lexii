@@ -57,12 +57,14 @@
       与 URL 段；如未来要压到「首次无缓存请求最小」可考虑把 Inter 也改
       自托管（额外 ~30KB latin subset），但代价是双倍 woff2 体积与不再
       享受 Google Fonts 的 CDN 分发。
+      RAY-361 S1：Inter 新增 400（400;800）供音标常规体使用（.lex-phonetic 400），
+      与 800 共用同一 CSS 请求，增量约一个 woff2 子集；SW 预缓存同步此 URL。
     -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@800&family=Newsreader:wght@600&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;800&family=Newsreader:wght@600&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&display=swap"
     />
     <!-- RAY-338 A1：Inter Display ExtraBold 自托管（同源部署、子路径安全、离线预缓存） -->
     <link rel="stylesheet" href="./fonts/inter-display.css" />

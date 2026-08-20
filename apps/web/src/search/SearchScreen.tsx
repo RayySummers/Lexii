@@ -507,7 +507,9 @@ function SearchResultRow({
           {sense.term}
         </span>
         {sense.pos ? <span className="text-xs text-text-muted">{sense.pos}</span> : null}
-        {sense.ipa ? <span className="text-xs text-text-muted">/{sense.ipa}/</span> : null}
+        {sense.ipa ? (
+          <span className="lex-phonetic text-xs text-text-muted">/{sense.ipa}/</span>
+        ) : null}
         {result.source === "dictionary" ? (
           <span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-xs text-accent">
             扩展词典
