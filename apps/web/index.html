@@ -37,8 +37,8 @@
     <link rel="icon" href="./icons/icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <!--
-      卡片字体（RAY-323，RAY-359）：
-      - Google Fonts 在首帧渲染前到达（Inter 回退 + Playpen Sans + Google Sans Flex）。
+      卡片字体（RAY-323，RAY-359，RAY-361）：
+      - Google Fonts 在首帧渲染前到达（Inter 400;800 回退 + Playpen Sans + Google Sans Flex）。
         选 `preconnect` 把 DNS / TLS 握手当字体 CSS 真正请求的并行预热，
         减少设置页/复习卡首次切档时的字体回退闪烁（FOIT / FOUT）；
         `font-display: swap` 在 url() 串中已声明，字体到达前会先以
@@ -70,12 +70,24 @@
         Roman → serif（见 tokens.css 与 cardFont.ts），无回退到系统字体外
         的异常；卡片预览与导出的字体一致性由 tokens.css 的 --lex-card-font
         单点保证。
+      - RAY-361 S1：Inter 新增 400（400;800）供音标常规体使用（.lex-phonetic 400），
+        与 800 共用同一 CSS 请求，增量约一个 woff2 子集；SW 预缓存同步此 URL。
     -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@800&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;800&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&display=swap"
+    />
+    <!--
+      图标系统（RAY-363）：Google Material Symbols Outlined — 全量图标统一来源。
+      与卡片字体同属 Google Fonts，利用上方 preconnect 并行预热，无额外 DNS 成本；
+      `display=swap` 保证字体到达前不阻塞首帧渲染（走系统回退，swap 后平滑替换）。
+      样式约定见 src/components/icons.tsx（MaterialIcon）与 src/styles/index.css。
+    -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap"
     />
     <!-- RAY-338 A1：Inter Display ExtraBold 自托管（同源部署、子路径安全、离线预缓存） -->
     <link rel="stylesheet" href="./fonts/inter-display.css" />

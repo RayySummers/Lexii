@@ -156,16 +156,18 @@ describe("CARD_FONT_OPTIONS（settings 卡片元数据单点来源）", () => {
 describe("CARD_FONT_OPTIONS 与 index.html 的 Google Fonts URL 同步（漂移校验）", () => {
   const INDEX_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../index.html");
 
-  /** index.html 的 <link href> → 字体名 → 加载字重 的映射（仅 Google Fonts 部分） */
-  function loadFontWeightsFromIndexHtml(): Map<string, number> {
+  /** index.html 的 <link href> → 字体名 → 加载字重集合 的映射（RAY-361 S1：Inter 400;800） */
+  function loadFontWeightsFromIndexHtml(): Map<string, Set<number>> {
     const source = readFileSync(INDEX_PATH, "utf8");
     const hrefMatch = source.match(/href="(https:\/\/fonts\.googleapis\.com\/css2[^"]+)"/);
     expect(hrefMatch).not.toBeNull();
     const cssUrl = hrefMatch![1]!;
-    const weights = new Map<string, number>();
-    // family=Playpen+Sans:wght@600 —— 字体名中的 + 还原为空格
-    for (const match of cssUrl.matchAll(/family=([^&:]+):wght@(\d+)/g)) {
-      weights.set(match[1]!.replace(/\+/g, " "), Number(match[2]));
+    const weights = new Map<string, Set<number>>();
+    // family=Inter:wght@400;800 或 family=Playpen+Sans:wght@600 —— 字体名中的 + 还原为空格
+    for (const match of cssUrl.matchAll(/family=([^&:]+):wght@([^&]+)/g)) {
+      const name = match[1]!.replace(/\+/g, " ");
+      const raw = match[2]!.split(";").map(Number);
+      weights.set(name, new Set(raw));
     }
     return weights;
   }
@@ -179,7 +181,7 @@ describe("CARD_FONT_OPTIONS 与 index.html 的 Google Fonts URL 同步（漂移�
   it("每档 fontWeight 与对应加载源字重严格一致（未加载字重会被合成）", () => {
     const loadedWeights = loadFontWeightsFromIndexHtml();
     // RAY-359：Sentient 自托管（500）不在 Google Fonts URL 中；Inter 也为自托管但保留 800 回退
-    // 故 Google Fonts 中应有 3 条（Inter 回退 800 + Playpen 600 + Google Sans Flex 600）
+    // 故 Google Fonts 中应有 3 条（Inter 400;800 + Playpen 600 + Google Sans Flex 600）
     expect(loadedWeights.size).toBe(3);
     for (const option of CARD_FONT_OPTIONS) {
       if (option.id === "sentient") {
@@ -189,9 +191,10 @@ describe("CARD_FONT_OPTIONS 与 index.html 的 Google Fonts URL 同步（漂移�
       }
       // RAY-338 A1：inter 档主字体 Inter Display 为自托管（public/fonts/，
       // @font-face 800），Google Fonts 只加载其回退字体 Inter 800
+      // RAY-361 S1：音标新增 Inter 400（400;800）与卡片 800 共存，校验改为包含关系
       const loadedName = option.id === "inter" ? "Inter" : fontNameOf(option.fontFamily);
       expect(loadedWeights.has(loadedName)).toBe(true);
-      expect(loadedWeights.get(loadedName)).toBe(option.fontWeight);
+      expect(loadedWeights.get(loadedName)!.has(option.fontWeight)).toBe(true);
     }
   });
 

@@ -43,9 +43,11 @@ const CACHE_NAME = "lexii-shell-v4";
  * RAY-359：优雅衬线档已由 Newsreader（Google Fonts 600）替换为 Sentient
  * Medium（自托管 ./fonts/sentient.css，500），Google Fonts URL 中已移除
  * Newsreader，Sentient 随 APP_SHELL + precacheAssetsFromHtml 预缓存。
+ * RAY-361 S1：Inter 追加 400（400;800）供音标常规体（.lex-phonetic 400）使用，
+ * 与 SW 预缓存同步，增量约一个 woff2 子集。
  */
 const CARD_FONT_CSS_URL =
-  "https://fonts.googleapis.com/css2?family=Inter:wght@800&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&display=swap";
+  "https://fonts.googleapis.com/css2?family=Inter:wght@400;800&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&display=swap";
 
 /** Google Fonts 域名（fetch 处理器放行的唯一跨域白名单） */
 const FONT_HOSTS = new Set(["fonts.googleapis.com", "fonts.gstatic.com"]);
