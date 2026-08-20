@@ -59,6 +59,11 @@ export interface Sense {
   ipaUk?: string;
   /** 近义词（可选，富化数据提供） */
   synonyms?: string[];
+  /**
+   * 近义词按义项分组（可选，RAY-367）：与 definitions 等长，第 i 项为第 i 条释义的近义词列表。
+   * 存量数据无此字段时，UI 按首义项归属展示（见 apps/web 的 synonymGroups）。
+   */
+  synonymsByDefinition?: string[][];
   /** 反义词（可选，富化数据提供） */
   antonyms?: string[];
   /** 派生词（可选，富化数据提供） */

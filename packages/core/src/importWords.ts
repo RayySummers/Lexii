@@ -94,6 +94,8 @@ export interface WordEntryContent {
   ipaUs?: string;
   ipaUk?: string;
   synonyms?: string[];
+  /** 近义词按义项分组（可选，RAY-367）：与 definitions 等长，优于 flat synonyms */
+  synonymsByDefinition?: string[][];
   antonyms?: string[];
   derived?: string[];
   etymology?: string;
@@ -117,6 +119,7 @@ export function toSense(entry: WordEntryContent, lang: LanguageCode): Sense {
     ...(entry.ipaUs ? { ipaUs: entry.ipaUs } : {}),
     ...(entry.ipaUk ? { ipaUk: entry.ipaUk } : {}),
     ...(entry.synonyms ? { synonyms: entry.synonyms } : {}),
+    ...(entry.synonymsByDefinition ? { synonymsByDefinition: entry.synonymsByDefinition } : {}),
     ...(entry.antonyms ? { antonyms: entry.antonyms } : {}),
     ...(entry.derived ? { derived: entry.derived } : {}),
     ...(entry.etymology ? { etymology: entry.etymology } : {}),

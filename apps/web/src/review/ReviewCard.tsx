@@ -42,6 +42,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { resolveDefinitionPos, type Sense } from "@lexii/core";
 import { dualPhonetics, parseInlineMarkdown, parseWordParts } from "./enrichmentUi";
 import type { PhoneticBadge } from "./enrichmentUi";
+import { getSynonymGroups, isSelfSynonym } from "../lib/synonymGroups";
 
 export interface ReviewCardProps {
   sense: Sense;
@@ -49,6 +50,8 @@ export interface ReviewCardProps {
   onFlip(): void;
   /** 背面评分快捷键提示（RAY-265：三档 / 四档文案不同，由界面层传入） */
   ratingHint: string;
+  /** RAY-367：点击近义词跳转搜词页（按义项分组，循环与无结果由搜词页处理） */
+  onSynonymSelect?: (term: string) => void;
 }
 
 /**
@@ -73,11 +76,12 @@ export function cardHeightStyle(): CSSProperties {
   };
 }
 
-export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardProps) {
+export function ReviewCard({ sense, flipped, onFlip, ratingHint, onSynonymSelect }: ReviewCardProps) {
   const wordParts = parseWordParts(sense.wordParts ?? "");
   // 释义级词性（RAY-349）：口径与解析在 @lexii/core（resolveDefinitionPos），
   // 本组件只做渲染——能确定词性的释义标词性，确定不了的位置退回序号。
   const definitionPos = resolveDefinitionPos(sense);
+  const synonymGroups = getSynonymGroups(sense);
   const backScrollRef = useRef<HTMLDivElement | null>(null);
 
   // 翻面后把焦点移到背面滚动区（suggestion 1）：滚动区在整卡 <button> 内、
@@ -216,8 +220,8 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardPro
                 {parseInlineMarkdown(sense.etymologyZh ?? "")}
               </p>
             </CardSection>
-            <CardSection title="近义词" visible={(sense.synonyms?.length ?? 0) > 0}>
-              <WordChips words={sense.synonyms ?? []} />
+            <CardSection title="近义词" visible={synonymGroups.length > 0}>
+              <SynonymGroups groups={synonymGroups} term={sense.term} onSelect={onSynonymSelect} />
             </CardSection>
             <CardSection title="反义词" visible={(sense.antonyms?.length ?? 0) > 0}>
               <WordChips words={sense.antonyms ?? []} />
@@ -310,7 +314,7 @@ function CardSection({
   );
 }
 
-/** 近反义词等词形列表：小圆角 chip 排列 */
+/** 近反义词等词形列表：小圆角 chip 排列（非可点击，用于反义词/派生词等） */
 function WordChips({ words }: { words: string[] }) {
   return (
     <ul className="flex flex-wrap gap-1.5">
@@ -324,6 +328,90 @@ function WordChips({ words }: { words: string[] }) {
       ))}
     </ul>
   );
+}
+
+/**
+ * 近义词按义项分组（RAY-367）：每组标记所属释义的词性与释义预览，chips 可点击跳转搜词页。
+ *
+ * - 分组标题格式：`近义词 · <pos> <definition>`（pos 可能为空；definition 过长截断至 18 字以内，避免换行过宽）；
+ * - 多分组时每组独立标题 + chips 列，单分组时仅一组；
+ * - 每个 chip 为 button，`aria-label="搜索近义词 xxx"`，点击触发 `onSelect` 并 `stopPropagation` 避免翻面；
+ * - 自身循环（synonym === term，大小写不敏感）禁用点击（置灰、不可聚焦），避免无意义的同词循环跳转；
+ * - 颜色与动效走 design tokens，hover 时边框高亮为 primary。
+ */
+function SynonymGroups({
+  groups,
+  term,
+  onSelect,
+}: {
+  groups: ReturnType<typeof getSynonymGroups>;
+  term: string;
+  onSelect?: (word: string) => void;
+}) {
+  if (groups.length === 0) return null;
+  // 单分组时也保留义项标注（满足「标记具体哪个含义的近义词」），但标题更紧凑
+  return (
+    <div className="flex flex-col gap-3">
+      {groups.map((group) => (
+        <div key={group.definitionIndex} className="flex flex-col gap-1.5">
+          <span className="text-xs text-text-muted">
+            {group.pos ? (
+              <span className="mr-1 rounded-full border border-border bg-surface-raised px-1.5 py-px text-xs text-text-muted">
+                {group.pos}
+              </span>
+            ) : null}
+            <span className="align-middle">
+              释义 {group.definitionIndex + 1}
+              {group.definition ? ` · ${truncateDefinition(group.definition)}` : ""}
+            </span>
+          </span>
+          <ul className="flex flex-wrap gap-1.5">
+            {group.synonyms.map((word, index) => {
+              const isSelf = isSelfSynonym(word, term);
+              const clickable = Boolean(onSelect) && !isSelf;
+              return (
+                <li key={`${index}:${word}`}>
+                  {clickable ? (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        onSelect?.(word);
+                      }}
+                      aria-label={`搜索近义词 ${word}`}
+                      title={isSelf ? `${word}（当前词）` : `搜索「${word}」`}
+                      className="rounded-full border border-border bg-surface-raised px-2.5 py-0.5 text-sm transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                    >
+                      {word}
+                    </button>
+                  ) : (
+                    <span
+                      title={isSelf ? `${word}（当前词，无需跳转）` : word}
+                      aria-label={isSelf ? `${word}（当前词）` : undefined}
+                      className={`rounded-full border bg-surface-raised px-2.5 py-0.5 text-sm ${
+                        isSelf
+                          ? "cursor-not-allowed border-border text-text-muted opacity-60"
+                          : "border-border"
+                      }`}
+                    >
+                      {word}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function truncateDefinition(text: string, max = 18): string {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max)}…`;
 }
 
 interface CardFaceProps {
