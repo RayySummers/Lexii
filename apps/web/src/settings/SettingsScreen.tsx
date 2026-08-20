@@ -26,11 +26,13 @@
  *   持久化到 localStorage（与发音口音同一模式）；线上源为候选级联
  *   （Free Dictionary API 真人录音 + Lingva 在线合成，均实测可跨域），
  *   失败时自动回落系统朗读（见 lib/pronunciation.ts）。
- * - 卡片字体（RAY-323）：外观分组内 2×2 卡片选择器（4 档：现代简约 /
- *   现代圆润 / 手写温润 / 优雅衬线），每张卡片用对应字体渲染示例单词，
- *   让用户选择前看清字面特征；选中立即写入 localStorage，并通过
- *   <html data-card-font="..."> 同步到全局 CSS 变量 --lex-card-font，
- *   复习卡本体（ReviewCard 词条）下次渲染即生效。
+ * - 卡片字体（RAY-323，RAY-366 扩至 7 档）：外观分组内卡片选择器（7 档：现代简约
+ *   / 现代圆润 / 手写温润 / 优雅衬线 / 等宽秩序 / 圆润可爱 / 像素风格），
+ *   每张卡片用对应字体渲染示例单词，让用户选择前看清字面特征；选中立即
+ *   写入 localStorage，并通过 <html data-card-font="..."> 同步到全局 CSS
+ *   变量 --lex-card-font，复习卡本体（ReviewCard 词条）下次渲染即生效。
+ *   RAY-366 三档（geist-mono / nunito / geist-pixel）在尾部追加，与
+ *   RAY-359（Newsreader → Sentient）无冲突——后者仅改动 newsreader 槽位。
  * - 隐藏开发者面板（RAY-297）：页面底部版本号连点 5 次解锁「开发者」分组
  *   （再次连点 5 次折叠，解锁状态存 localStorage）；分组内为通道切换器 /
  *   构建信息 / 版本回退 / 数据库调试 / FSRS 调试 / Feature flags，
@@ -437,7 +439,7 @@ interface SettingsMainViewProps {
   /** 生词本开关（RAY-284 / RAY-303）：学习列表是否包含生词本 */
   includeNotebook: boolean;
   onIncludeNotebookToggle(): void;
-  /** 卡片字体（RAY-323，RAY-359）：4 档（inter / google-sans / playpen / sentient） */
+  /** 卡片字体（RAY-323，RAY-359，RAY-366 扩至 7 档：inter / google-sans / playpen / sentient / geist-mono / nunito / geist-pixel） */
   cardFont: CardFont;
   onCardFontChange(next: CardFont): void;
   /** 主题偏好三档（RAY-261）：App 级 useTheme 单一数据源下发 */
@@ -594,14 +596,16 @@ function SettingsMainView({
             <option value="system">跟随系统</option>
           </select>
         </label>
-        {/* 卡片字体（RAY-323）：2×2 卡片选单，每张以对应字体渲染示例单词，
+        {/* 卡片字体（RAY-323，RAY-366 扩至 7 档）：卡片选单，每张以对应字体渲染示例单词，
             让用户选择前直接看到字面特征；选档立即持久化并同步到复习卡。
-            RAY-339（Oscar 复核 suggestion 2）：提示现代简约档主字体的字符集覆盖范围。 */}
+            RAY-339（Oscar 复核 suggestion 2）：提示现代简约档主字体的字符集覆盖范围。
+            RAY-366 新增三档（等宽秩序 / 圆润可爱 / 像素风格）在尾部追加，与
+            RAY-359（Newsreader → Sentient）无冲突。 */}
         <div className="flex flex-col gap-2">
           <div>
             <span className="text-sm font-semibold">卡片字体</span>
             <span className="mt-1 block text-xs text-text-muted">
-              复习卡上单词本体的字体（4 档可选，选档立即生效）。
+              复习卡上单词本体的字体（7 档可选，选档立即生效）。
             </span>
           </div>
           <FontPicker value={cardFont} onChange={onCardFontChange} groupLabel="卡片字体" />

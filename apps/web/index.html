@@ -37,18 +37,20 @@
     <link rel="icon" href="./icons/icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <!--
-      卡片字体（RAY-323，RAY-359，RAY-361）：
-      - Google Fonts 在首帧渲染前到达（Inter 400;800 回退 + Playpen Sans + Google Sans Flex）。
+      卡片字体（RAY-323，RAY-359，RAY-361，RAY-366 三档新增至 7 档）：
+      - Google Fonts 在首帧渲染前到达（Inter 400;800 回退 + Playpen Sans + Google Sans Flex
+        + Geist Mono 600 + Nunito 800 + Geist Pixel 400）。
         选 `preconnect` 把 DNS / TLS 握手当字体 CSS 真正请求的并行预热，
         减少设置页/复习卡首次切档时的字体回退闪烁（FOIT / FOUT）；
         `font-display: swap` 在 url() 串中已声明，字体到达前会先以
         系统等线字体渲染，下载完成后平滑替换。
       - 字重与 src/lib/cardFont.ts 的 CARD_FONT_OPTIONS.fontWeight 严格一致
         （Oscar 评审 suggestion 2）：inter 800（ExtraBold，自托管 Inter Display
-        回退）/ sentient 500（Medium，自托管 Sentient，RAY-359）/ 其余 600
-        （Google Fonts SemiBold）——不加载的字重会被浏览器合成导致字面失真。
-        改动任一档字重必须三处同步：本 URL（或对应自托管 CSS）、
-        CARD_FONT_OPTIONS.fontWeight、tokens.css 的 --lex-card-font-weight
+        回退，Google Fonts 400;800 中 800 段）/ sentient 500（Medium，自托管
+        Sentient，RAY-359，不在 Google Fonts URL）/ geist-mono 600 / nunito
+        800 / geist-pixel 400 / google-sans & playpen 600——不加载的字重会
+        被浏览器合成导致字面失真。改动任一档字重必须三处同步：本 URL（或对应
+        自托管 CSS）、CARD_FONT_OPTIONS.fontWeight、tokens.css 的 --lex-card-font-weight
         （以及 public/sw.js 的 CARD_FONT_CSS_URL，离线预缓存同一 URL）。
       - RAY-338 A1：「现代简约」的主字体为自托管 Inter Display ExtraBold
         （下方 ./fonts/inter-display.css；Google Fonts 无 Inter Display），
@@ -64,20 +66,21 @@
         Sentient Medium（Fontshare，500，自托管 ./fonts/sentient.css，见
         public/fonts/Fontshare-Sentient-LICENSE.txt）。Google Fonts URL 中已
         移除 Newsreader（补正后 fallback 栈中 "Newsreader" 仅作 CSS 系统字体
-        栈声明，联动评估见 RAY-359 补正说明：不恢复 Google Fonts 加载），
-        优雅衬线档的 FOUT 仍由 font-display: swap 保证，字体栈按 Owner 口径
-        补正为 Sentient → Newsreader → Georgia Pro → Georgia → Times New
-        Roman → serif（见 tokens.css 与 cardFont.ts），无回退到系统字体外
-        的异常；卡片预览与导出的字体一致性由 tokens.css 的 --lex-card-font
-        单点保证。
+        栈声明，不恢复 Google Fonts 加载），优雅衬线档的 FOUT 仍由
+        font-display: swap 保证，字体栈按 Owner 口径补正为 Sentient →
+        Newsreader → Georgia Pro → Georgia → Times New Roman → serif。
       - RAY-361 S1：Inter 新增 400（400;800）供音标常规体使用（.lex-phonetic 400），
         与 800 共用同一 CSS 请求，增量约一个 woff2 子集；SW 预缓存同步此 URL。
+      - RAY-366：新增三档（Geist Mono SemiBold 600 / Nunito ExtraBold 800 /
+        Geist Pixel 400）在尾部追加，不重排已有 4 档（inter/google-sans/
+        playpen/sentient），与 RAY-359 无冲突。Geist Pixel 为像素风格，
+        回退栈含 Press Start 2P。
     -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;800&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;800&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&family=Geist+Mono:wght@600&family=Nunito:wght@800&family=Geist+Pixel:wght@400&display=swap"
     />
     <!--
       图标系统（RAY-363）：Google Material Symbols Outlined — 全量图标统一来源。
