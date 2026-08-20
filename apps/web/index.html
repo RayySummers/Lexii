@@ -66,6 +66,16 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;800&family=Newsreader:wght@600&family=Playpen+Sans:wght@600&family=Google+Sans+Flex:wght@600&display=swap"
     />
+    <!--
+      图标系统（RAY-363）：Google Material Symbols Outlined — 全量图标统一来源。
+      与卡片字体同属 Google Fonts，利用上方 preconnect 并行预热，无额外 DNS 成本；
+      `display=swap` 保证字体到达前不阻塞首帧渲染（走系统回退，swap 后平滑替换）。
+      样式约定见 src/components/icons.tsx（MaterialIcon）与 src/styles/index.css。
+    -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap"
+    />
     <!-- RAY-338 A1：Inter Display ExtraBold 自托管（同源部署、子路径安全、离线预缓存） -->
     <link rel="stylesheet" href="./fonts/inter-display.css" />
     <title>乐希 Lexii</title>
