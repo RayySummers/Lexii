@@ -31,7 +31,6 @@ describe("enrichment.tier0.data.json（生成 → 装载契约）", () => {
     // 显式 pin 版本，防 1.3.0 数据被误回滚；brotli 阈值防 64→128 等无意膨胀
     expect(ENRICHMENT_TIER0_PRESET.version).toBe("1.4.0");
     const json = JSON.stringify(ENRICHMENT_TIER0_PRESET);
-    // @ts-expect-error - zlib can take string directly, Buffer not needed
     const brotliBytes = brotliCompressSync(json, {
       params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11 },
     }).length;
