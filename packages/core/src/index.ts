@@ -99,6 +99,21 @@ export type { CsvParseResult, CsvWordEntry } from "./csv";
 export { exportCsvWordlist, serializeWordlistCsv } from "./exportCsv";
 export { SAMPLE_WORDLIST, SAMPLE_WORDLIST_CSV, SAMPLE_WORDLIST_ROW_COUNT } from "./sampleWordlist";
 export { importCsvWordlist, toMemoryState, toSense } from "./importWords";
+export { hasDefinitionPos, resolveDefinitionPos } from "./definitionPos";
+export {
+  backfillDefinitionPos,
+  DEFINITION_POS_CHUNK_SIZE,
+  definitionPosDoneKey,
+  definitionPosProgressKey,
+  markDefinitionPosDone,
+  mergeDefinitionPosIntoSense,
+} from "./presets/definitionPosBackfill";
+export type {
+  DefinitionPosBackfillOptions,
+  DefinitionPosBackfillResult,
+  DefinitionPosSource,
+} from "./presets/definitionPosBackfill";
+export type { DefinitionPosInput } from "./definitionPos";
 export type { ImportWordsOptions, ImportWordsResult, WordEntryContent } from "./importWords";
 export {
   getPresetInstallState,

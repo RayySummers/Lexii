@@ -45,4 +45,55 @@ describe("enrichment.tier0.data.json（生成 → 装载契约）", () => {
     // 说明构建管线取数失败（如 kaikki 抽取未命中词表）。
     expect(ENRICHMENT_TIER0_ENTRY_COUNT / tier0Count).toBeGreaterThan(0.5);
   });
+
+  it("RAY-344：wordParts 注释无残段（不收尾于半切的全角括号内）", () => {
+    // 回归样本：RAY-338 报告里的「preside.sid: 坐（拉丁语 se」属于此问题
+    // （8-char 上限 + 全角括号未对齐）。回填后 8 → 32 字、sentence-boundary，
+    // 应基本消除 8-char 上限带来的「（」收尾；剩余仅为少数 OE 源本就 > 32
+    // 字且句中无可对齐全角括号的边缘情况（如 fridge / listen）。
+    let truncated = 0;
+    for (const tuple of ENRICHMENT_TIER0_PRESET.entries) {
+      const wp = tuple[7];
+      if (!wp) continue;
+      for (const part of wp.split(" · ")) {
+        const match = part.match(/^(.*?)<([^>]*)>$/);
+        if (!match) continue;
+        const note = match[2];
+        if (note === undefined) continue;
+        if (note.endsWith("（") || note.endsWith("(")) {
+          truncated += 1;
+        }
+      }
+    }
+    // v1.2.3 因 8-char 上限 100% 注释都被截断，其中 80 条以「（」收尾；
+    // RAY-344 上限 32 字 + sentence-boundary 后剩余应在个位数（实测 2：
+    // fridge / listen 两个 OE 源 > 32 字且无完整全角括号的边缘条目）。
+    expect(truncated, "wordParts 注释收尾于「（」残段").toBeLessThan(10);
+  });
+
+  it("RAY-344：etymologyZh 无半句截断（=== 64 而非 < 64，pin 上限确实放开）", () => {
+    // 回归样本：RAY-338 报告的 etymologyZh 全被 64-char 上限切到中段
+    // （v1.2.3 共有 4315 条 etymologyZh 长度恰好 64 字且以中文单字收尾）。
+    //
+    // 阈值必须是 `=== 64` 而不是 `< 64`：v1.2.3 的硬切是「截到正好 64 字」，
+    // 所以 `ez.length < 64` 在旧数据上同样命中 0 条（`< 64` 在新旧数据上都
+    // 通过），等于没设防。`=== 64` 才是真正钉住「上限真的被放开」这件事。
+    //
+    // 配套一条防御：`maxLen > 64` —— 直接断言实际产物的 etymologyZh 长度
+    // 上限已经超过 64（覆盖未来若有人把上限改回 ≤ 64 字的情况，不依赖 0
+    // 命中阈值也能 fail）。
+    let midSentence = 0;
+    let maxLen = 0;
+    for (const tuple of ENRICHMENT_TIER0_PRESET.entries) {
+      const ez = tuple[8];
+      if (!ez) continue;
+      if (ez.length > maxLen) maxLen = ez.length;
+      // 长度恰好 64 字且以中文单字收尾（无标点）⇒ v1.2.3 的硬切痕迹
+      if (ez.length === 64 && /[一-鿿]$/.test(ez)) {
+        midSentence += 1;
+      }
+    }
+    expect(midSentence, "etymologyZh 仍存在半句截断（旧数据 4315 → 新数据 0）").toBe(0);
+    expect(maxLen, "etymologyZh 上限需 > 64 字（RAY-344 实际为 384）").toBeGreaterThan(64);
+  });
 });

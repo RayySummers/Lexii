@@ -417,7 +417,7 @@ describe("ReviewScreen", () => {
 });
 
 describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
-  it("标熟：调用 markMastered 并进入下一张卡，可撤销回到该卡", async () => {
+  it("标熟：调用 markMastered 并进入下一张卡，撤销后按钮变「返回」可重放标熟", async () => {
     const first = makeCard();
     first.sense.term = "apple";
     const second = makeCard();
@@ -436,11 +436,19 @@ describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
     fireEvent.click(screen.getByRole("button", { name: "撤销上一步" }));
     await expectCardShown("apple");
     expect(harness.undoGrade).toHaveBeenCalledTimes(1);
-    // 撤销成功后按钮消失（连续只能撤销一次）
+    // RAY-341：撤销成功后按钮变为「返回」（不再消失，连续只能撤销一次）
     expect(screen.queryByRole("button", { name: "撤销上一步" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "返回" })).toBeInTheDocument();
+
+    // 「返回」重放标熟，回到撤销前所在的下一张卡
+    fireEvent.click(screen.getByRole("button", { name: "返回" }));
+    await expectCardShown("book");
+    expect(harness.markMastered).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("button", { name: "撤销上一步" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "返回" })).not.toBeInTheDocument();
   });
 
-  it("评分后出现「撤销上一步」；撤销回退到上一张卡且不可连退", async () => {
+  it("评分后出现「撤销上一步」；撤销后按钮变「返回」，点击重放原评分", async () => {
     const first = makeCard();
     first.sense.term = "apple";
     const second = makeCard();
@@ -459,9 +467,16 @@ describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
     await expectCardShown("apple");
     expect(harness.undoGrade).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("button", { name: "撤销上一步" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "返回" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "返回" }));
+    await expectCardShown("book");
+    expect(harness.grade).toHaveBeenCalledTimes(2);
+    expect(harness.grade).toHaveBeenLastCalledWith(first, "good", expect.anything());
+    expect(screen.getByRole("button", { name: "撤销上一步" })).toBeInTheDocument();
   });
 
-  it("完成态仍可撤销最后一步评分", async () => {
+  it("完成态仍可撤销最后一步评分，撤销后「返回」回到完成态", async () => {
     const card = makeCard();
     const harness = makeHarness({ queue: [card] });
     render(<ReviewScreen provider={harness.provider} mode="review" onExit={() => {}} />);
@@ -474,6 +489,11 @@ describe("ReviewScreen 标熟 / 单步撤销 / 发音（RAY-265）", () => {
     fireEvent.click(screen.getByRole("button", { name: "撤销上一步" }));
     await expectCardShown(card.sense.term);
     expect(harness.undoGrade).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "返回" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "返回" }));
+    expect(await screen.findByText("本轮复习完成")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "撤销上一步" })).toBeInTheDocument();
   });
 
   it("发音：以设置口音朗读当前词条（浏览器语音合成，离线）", async () => {

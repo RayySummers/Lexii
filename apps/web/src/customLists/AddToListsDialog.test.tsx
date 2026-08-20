@@ -145,13 +145,14 @@ describe("AddToListsDialog", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("空列表引导：提供新建入口", async () => {
+  it("空列表引导：提供「暂无词单」空状态与「去创建」入口", async () => {
     const harness = makeHarness({ lists: [] });
     render(<AddToListsDialog provider={harness.provider} sense={makeSense()} onClose={() => {}} />);
 
     await waitFor(() => {
-      expect(screen.getByText("还没有自定义词单，先创建一个吧。")).toBeInTheDocument();
+      expect(screen.getByText("暂无词单")).toBeInTheDocument();
     });
+    expect(screen.getByRole("button", { name: /去创建/ })).toBeInTheDocument();
   });
 
   it("内联新建：填名称 → 创建并加入 → 自动勾选", async () => {
@@ -188,5 +189,20 @@ describe("AddToListsDialog", () => {
     expect(onClose).toHaveBeenCalled();
     expect(harness.addWordToList).not.toHaveBeenCalled();
     expect(harness.removeWordFromList).not.toHaveBeenCalled();
+  });
+
+  it("候选词单滚动容器预留内边距：选中卡片 focus 描边不被裁剪（RAY-338 A2）", async () => {
+    // 选中卡片的 focus 描边为 outline-2 + outline-offset-2（边框外 4px）。
+    // 滚动容器 overflow-y-auto 会把 overflow-x 强制为 auto；容器无内边距时
+    // 贴边卡片的左右描边被裁剪、只剩底边（描边残缺）。p-1.5（6px）保证
+    // 描边完整落在裁剪区内——此处断言容器类名，防回归误删。
+    const harness = makeHarness({
+      lists: [makeList({ id: "cl_a" as CustomList["id"], name: "A" })],
+    });
+    render(<AddToListsDialog provider={harness.provider} sense={makeSense()} onClose={() => {}} />);
+
+    const listContainer = await screen.findByRole("list", { name: "候选词单" });
+    expect(listContainer.className).toContain("overflow-y-auto");
+    expect(listContainer.className).toContain("p-1.5");
   });
 });

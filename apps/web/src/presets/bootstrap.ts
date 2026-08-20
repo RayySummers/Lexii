@@ -17,9 +17,11 @@
  * （apps/web 不做算法实现）。
  */
 import {
+  backfillDefinitionPos,
   backfillEnrichment,
   getPresetInstallState,
   installPreset,
+  markDefinitionPosDone,
   markEnrichmentDone,
   openDatabase,
   TIER0_PRESET,
@@ -163,6 +165,47 @@ export async function bootstrapCoreWordbooks(
 }
 
 /**
+ * RAY-349：词书共享池的释义词性回填 / 完成标记。
+ *
+ * 词书数据走子路径动态 import（不进主 bundle，与安装路径同口径）。
+ * 共享池覆盖 10 本词书的全部词条，按 term 一次回填即可覆盖用户装过的
+ * 任意词书；新装路径词条落库时已带 posByDefinition，只写完成标记。
+ *
+ * freshInstall 信号由 `bootstrapCoreWordbooks` 的结果数组直接派生
+ * （Oscar R1 nit 1）：本函数只认「结果里出现 installed」这一语义条件，
+ * 调用方不再把「已安装词书数」这类 numeric 信号折成 bool 传进来。
+ * 依据仍是同一条互斥契约（全新库才装、老用户全跳，见调用处注释）；
+ * 契约若放宽到混合态，判定留在本函数内一处调整即可，不会因为调用方
+ * 传错 bool 而静默走上错误分支。
+ *
+ * @param db 已打开的数据库
+ * @param wordbookResults `bootstrapCoreWordbooks` 的返回值（与其入参等长）
+ */
+export async function bootstrapWordbookDefinitionPos(
+  db: LexiiDatabase,
+  wordbookResults: readonly BootstrapOutcome[],
+): Promise<void> {
+  // 全新安装：词条落库时已带 posByDefinition（随预设数据分发），只写完成
+  // 标记；其余情形（老用户全跳 / 已安装 / 出错）走存量回填，回填幂等，
+  // 多跑一次只是零写入的全量扫描，不会写坏数据。
+  const freshInstall = wordbookResults.some((result) => result.status === "installed");
+  const { WORDBOOK_DATA_VERSION, WORDBOOK_POOL } = await import("@lexii/core/presets/books");
+  const source = {
+    id: "wordbook-pool",
+    version: WORDBOOK_DATA_VERSION,
+    entries: [...WORDBOOK_POOL.values()],
+  };
+  if (freshInstall) {
+    await markDefinitionPosDone(db, source);
+    return;
+  }
+  const result = await backfillDefinitionPos(db, source);
+  if (result.status === "backfilled" && result.filledCount > 0) {
+    console.info(`[presets] 释义词性回填完成：${result.filledCount} 条词条（词书共享池）`);
+  }
+}
+
+/**
  * 浏览器入口（main.tsx 启动时调用）：打开默认数据库并后台安装 + 富化回填。
  * 绝不抛错、绝不阻塞启动；失败静默记录（首启安装失败不影响已有功能，
  * 用户仍可手动导入词库）。
@@ -192,6 +235,18 @@ export function bootstrapTier0Preset(db?: LexiiDatabase): void {
         const backfill = await backfillEnrichment(database, ENRICHMENT_TIER0_PRESET);
         if (backfill.status === "backfilled" && backfill.filledCount > 0) {
           console.info(`[presets] 富化回填完成：${backfill.filledCount} 条词条`);
+        }
+      }
+
+      // RAY-349 释义词性回填：Tier 0 词条。新装路径落库时已带
+      // posByDefinition（随预设数据分发），直接写完成标记跳过全量扫描；
+      // 存量库按 term 补字段（只补缺失、释义被改过的义项不动，幂等）。
+      if (outcome.status === "installed") {
+        await markDefinitionPosDone(database, TIER0_PRESET);
+      } else {
+        const posBackfill = await backfillDefinitionPos(database, TIER0_PRESET);
+        if (posBackfill.status === "backfilled" && posBackfill.filledCount > 0) {
+          console.info(`[presets] 释义词性回填完成：${posBackfill.filledCount} 条词条（Tier 0）`);
         }
       }
 
@@ -227,6 +282,12 @@ export function bootstrapTier0Preset(db?: LexiiDatabase): void {
         console.info(
           `[presets] 核心词书安装完成：${installedBooks.length} 本，净增 ${netDelta} 词条（dev 参考：各本去重累计 ${sumInstalled}，与 Tier 0 / 其它词书重叠已去重）`,
         );
+      }
+      // RAY-349：词书词条的释义词性回填（新装路径已内联带上，只写标记）
+      try {
+        await bootstrapWordbookDefinitionPos(database, wordbookResults);
+      } catch (err) {
+        console.error("[presets] 词书释义词性回填失败：", err);
       }
       if (skippedBooks.length > 0) {
         // 老用户：库内已有数据，核心词书按口径全部跳过——给开发者

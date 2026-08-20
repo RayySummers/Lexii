@@ -1,5 +1,5 @@
 /**
- * 「添加到列表」对话框（RAY-325）：复习页 / 搜词页共用。
+ * 「添加到词单」对话框（RAY-325）：复习页 / 搜词页共用。
  *
  * 设计要点：
  * - 取代原有「加词」按钮（背的都是词书或生词本里已有的词；改为多列表选择）；
@@ -178,21 +178,26 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
             </div>
           ) : allLists.length === 0 && !creating ? (
             <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-surface-raised p-6 text-center">
-              <p className="text-sm text-text-muted">还没有自定义词单，先创建一个吧。</p>
+              {/* RAY-338 A4：空词单状态显示「暂无词单」并提供「去创建」入口 */}
+              <p className="text-sm text-text-muted">暂无词单</p>
               <button
                 type="button"
                 onClick={() => setCreating(true)}
                 className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
               >
                 <PlusIcon className="h-4 w-4" />
-                新建词单
+                去创建
               </button>
             </div>
           ) : (
             <ul
-              className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+              className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-1.5"
               aria-label="候选词单"
             >
+              {/* RAY-338 A2：p-1.5（6px）容纳选中卡片的 focus 描边
+                  （outline-2 + outline-offset-2 = 边框外 4px）。overflow-y-auto 会把
+                  overflow-x 强制为 auto，贴边卡片的外扩描边会被滚动容器裁掉，
+                  只剩底边可见（描边残缺）。留出内边距后描边完整落在裁剪区内。 */}
               {allLists.map((list) => {
                 const checked = selectedIds.has(list.id);
                 return (

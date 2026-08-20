@@ -10,6 +10,11 @@
  * 与词条标签同口径——圆角 chip、文字色继承 text-text-muted、显式
  * text-xs（不依赖父容器继承，避免父级 text-sm 改动时静默连带变化）。
  *
+ * RAY-349：背面每条释义前标该释义的词性（n. / vt. / adj.…），替代原来
+ * 只有序号（1. 2. 3.）的形态——词性口径与解析在 @lexii/core 的
+ * resolveDefinitionPos（打包侧对齐数组优先，存量数据按 pos 汇总串推断），
+ * 词性无法确定的位置退回序号，绝不猜测。
+ *
  * RAY-291（真机反馈）：卡片高度固定、与内容长度无关——不同词条
  * 不再让卡片忽长忽短；高度控制在移动端一屏内，内容超出时在卡片
  * 内部滚动（正反面同口径：共用同一 CardFace 结构，滚动区与固定
@@ -34,7 +39,7 @@
  */
 import { useEffect, useRef } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import type { Sense } from "@lexii/core";
+import { resolveDefinitionPos, type Sense } from "@lexii/core";
 import { dualPhonetics, parseInlineMarkdown, parseWordParts } from "./enrichmentUi";
 import type { PhoneticBadge } from "./enrichmentUi";
 
@@ -70,6 +75,9 @@ export function cardHeightStyle(): CSSProperties {
 
 export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardProps) {
   const wordParts = parseWordParts(sense.wordParts ?? "");
+  // 释义级词性（RAY-349）：口径与解析在 @lexii/core（resolveDefinitionPos），
+  // 本组件只做渲染——能确定词性的释义标词性，确定不了的位置退回序号。
+  const definitionPos = resolveDefinitionPos(sense);
   const backScrollRef = useRef<HTMLDivElement | null>(null);
 
   // 翻面后把焦点移到背面滚动区（suggestion 1）：滚动区在整卡 <button> 内、
@@ -173,7 +181,7 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardPro
             <span className="flex flex-col gap-1.5">
               {sense.definitions.map((definition, index) => (
                 <span key={`${index}:${definition}`} className="text-base leading-relaxed">
-                  {index > 0 ? <span className="text-text-muted">{index + 1}. </span> : null}
+                  <DefinitionMarker pos={definitionPos[index] ?? ""} index={index} />
                   {definition}
                 </span>
               ))}
@@ -222,6 +230,22 @@ export function ReviewCard({ sense, flipped, onFlip, ratingHint }: ReviewCardPro
       </button>
     </div>
   );
+}
+
+/**
+ * 释义前缀（RAY-349）：优先标词性（n. / vt. / adj.…），词性未知时退回旧口径
+ * 的序号；单条释义且无词性时不加任何前缀（与改动前一致，避免噪声）。
+ * 词性用 text-text-muted + 显式 text-xs，与标题行的词性 chip 同色阶、
+ * 不喧宾夺主（RAY-321 chip 口径）。
+ */
+function DefinitionMarker({ pos, index }: { pos: string; index: number }) {
+  if (pos !== "") {
+    return <span className="mr-1 text-xs text-text-muted">{pos}</span>;
+  }
+  if (index > 0) {
+    return <span className="text-text-muted">{index + 1}. </span>;
+  }
+  return null;
 }
 
 /** 美/英双音标行（富化缺省回退词书自带音标；无任何音标数据则不渲染） */
