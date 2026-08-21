@@ -65,6 +65,21 @@ export function DataSourcesScreen({ provider, onBack }: DataSourcesScreenProps) 
         乐希的预设词表由开源数据清洗打包而成，随应用内置、离线可用。以下列出全部数据来源、许可与署名信息。
       </p>
 
+      {/* RAY-375 S1-3：全局界面字体说明（与词表来源区分，不混淆） */}
+      <p className="text-sm text-text-muted">
+        界面字体：默认使用小米{" "}
+        <a
+          href="https://hyperos.mi.com/font/zh/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        >
+          MiSans
+        </a>{" "}
+       （以 woff2 形式随应用分发，400/500/700 三档，font-display: swap，离线回退系统字体）。卡片英文词条字体仍由“外观-卡片字体”7
+        档独立控制，不受全局字体影响。
+      </p>
+
       <section className="rounded-2xl border border-border bg-surface p-6">
         <h2 className="text-base font-semibold">内置词表</h2>
         <div className="mt-4 flex flex-col gap-3">

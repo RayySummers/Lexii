@@ -27,6 +27,18 @@
 }
 
 /*
+ * 全局界面字体（RAY-375 S1-3）：全站默认 MiSans。
+ * - 字体由 public/fonts/misans.css 的 @font-face 提供（400/500/700 woff2，font-display: swap）；
+ * - 回退栈在 tokens.css 的 --lex-body-font 定义（MiSans 首选，系统字体兜底）；
+ * - 卡片词条（.term）显式走 var(--lex-card-font) 隔离，不继承此全局字体；
+ * - 音标（.lex-phonetic）与图标（.material-symbols-outlined）各有独立栈，不受影响；
+ * - 离线/加载失败时回退系统字体，不阻塞首帧（swap，无 FOIT）。
+ */
+html {
+  font-family: var(--lex-body-font);
+}
+
+/*
  * 图标系统（RAY-363）：Google Material Symbols Outlined 全局约定。
  * - 字体由 index.html 的 Google Fonts 样式表提供（display=swap）；
  * - 图标颜色继承文本色（currentColor），随浅色/深色 token 自动适配；

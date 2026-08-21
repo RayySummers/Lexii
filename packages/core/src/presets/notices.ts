@@ -167,4 +167,12 @@ export const THIRD_PARTY_NOTICES = [
   "- 修改：仅取词根词缀拆解与中文词源字段；按 Tier 0/1 词表裁剪；",
   "  跨册词条首现优先去重。",
   "",
+  "## MiSans",
+  "",
+  "- 来源：https://hyperos.mi.com/font/zh/（小米 MiSans / MiSans Global）",
+  "- 许可：MiSans License（小米自有许可，允许免费商用与随应用分发 webfont，见 https://hyperos.mi.com/font-download/MiSans%E5%AD%97%E4%BD%93%E7%9F%A5%E8%AF%86%E4%BA%A7%E6%9D%83%E8%AE%B8%E5%8F%AF%E5%8D%8F%E8%AE%AE.pdf）",
+  "- 署名：MiSans © Xiaomi Inc. 详见官方许可页。",
+  "- 用途：界面默认字体（webfont，400/500/700 woff2，font-display: swap，随应用分发，离线回退系统字体）",
+  "- 说明：随应用分发 woff2 子集（Latin 子集，400 Regular 50KB / 500 Medium 54KB / 700 Bold 55KB，见 public/fonts/misans.css 与 MiSans-LICENSE.txt）；卡片字体（--lex-card-font 7 档）隔离不受影响；字体与代码以聚合形式分发，与 GPL-3.0-or-later 兼容（Vega 核验记录）",
+  "",
 ].join("\n");

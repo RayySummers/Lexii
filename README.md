@@ -103,6 +103,7 @@ Lexii/
 | [Tatoeba](https://downloads.tatoeba.org/exports/per_language/)                 | CC BY 2.0 FR + CC0 子集        | 中英双语例句                                                             |
 | [ipa-dict](https://github.com/open-dict-data/ipa-dict)                         | MIT（en_US）/ GPL-3.0（en_UK） | 美式 / 英式双音标                                                        |
 | [OpenEtymology](https://github.com/openetymology/OpenEtymology)                | CC BY-SA 4.0                   | 词根词缀拆解与中文词源                                                   |
+| [MiSans](https://hyperos.mi.com/font/zh/)（[许可协议 PDF](https://hyperos.mi.com/font-download/MiSans%E5%AD%97%E4%BD%93%E7%9F%A5%E8%AF%86%E4%BA%A7%E6%9D%83%E8%AE%B8%E5%8F%AF%E5%8D%8F%E8%AE%AE.pdf)） | MiSans License（小米自有许可，允许免费商用与随应用分发 webfont） | 界面默认字体：全站 `font-family` 首选 MiSans，`woff2` 400/500/700 + `font-display: swap`，加载失败回退系统字体；卡片词条 `.term` 仍走 `var(--lex-card-font)` 7 档，不受全局字体影响 |
 
 - **Tier 0 内置核心词表**：约 7,200 词，随 PWA 打包、首次启动即安装，离线可用；含例句、近反义词、词源等富化数据。
 - **Tier 1 / Tier 2 扩展词包**：覆盖 ECDICT 全量词条（约 5.8 万 / 40 万词），在应用内主动下载后离线检索；Tier 1 富化数据可选下载。应用默认不发任何网络请求。

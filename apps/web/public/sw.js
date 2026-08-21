@@ -75,6 +75,11 @@ const APP_SHELL = [
   // RAY-359：Sentient Medium 自托管（优雅衬线档；样式表由 index.html 的
   // <link href> 经 precacheAssetsFromHtml 解析预缓存，woff2 显式预缓存离线可用）
   "./fonts/Sentient-Medium.woff2",
+  // RAY-375 S1-3：MiSans 全局界面字体（400/500/700 woff2，同源部署、离线预缓存；
+  // 样式表 ./fonts/misans.css 由 precacheAssetsFromHtml 解析预缓存，woff2 显式预缓存）
+  "./fonts/MiSans-Regular.woff2",
+  "./fonts/MiSans-Medium.woff2",
+  "./fonts/MiSans-Bold.woff2",
 ].map(resolveUrl);
 
 /** 导航回退与外壳解析使用的入口 URL */

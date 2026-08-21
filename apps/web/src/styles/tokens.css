@@ -31,6 +31,12 @@
   --lex-phonetic-font:
     "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
     Arial, sans-serif;
+
+  /* 全局界面字体（RAY-375 S1-3）：MiSans 为首选，woff2 400/500/700 + font-display: swap，
+   * 加载失败/离线时按回退栈回退至系统字体；卡片词条仍走 --lex-card-font 隔离，不受此变量影响 */
+  --lex-body-font:
+    "MiSans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Noto Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
 }
 
 [data-theme="dark"] {
