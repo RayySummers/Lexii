@@ -286,23 +286,23 @@ export function App({
            RAY-325 用短标签「词单」（可达名「自定义词单」）；RAY-360 移动端四按钮图标化
           （搜词 search / 词单 lists / 统计 bar_chart / 设置 settings，sm 断点图标/文字切换，
            aria-label + aria-hidden + focus-visible 可达，复用 RAY-363 Material Symbols 基线）。桌面端无回归。 */}
-      <header className="mx-auto flex w-full max-w-3xl items-center justify-end gap-1.5 px-4 py-6 sm:gap-2 sm:px-6">
+      <header className="mx-auto flex w-full max-w-3xl flex-nowrap items-center justify-end gap-1.5 px-4 py-6 sm:gap-2 sm:px-6">
         <button
           type="button"
           onClick={openSearch}
           aria-label="搜词"
           aria-pressed={view === "search"}
-          className="flex items-center justify-center rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4 sm:py-2"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:h-10 sm:w-auto sm:px-4"
         >
           <SearchIcon className="h-5 w-5 sm:hidden" />
-          <span className="hidden text-sm font-medium sm:inline">搜词</span>
+          <span className="hidden text-sm font-medium leading-none sm:inline">搜词</span>
         </button>
         <button
           type="button"
           onClick={openNotebook}
           aria-pressed={view === "notebook"}
           aria-label="生词本"
-          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
+          className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface px-3 text-sm font-medium leading-none text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4"
         >
           <BookmarkIcon className="h-4 w-4" />
           生词本
@@ -312,10 +312,10 @@ export function App({
           onClick={openCustomLists}
           aria-pressed={view === "custom-lists" || view === "custom-list"}
           aria-label="自定义词单"
-          className="flex items-center justify-center gap-1.5 rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:gap-1.5 sm:px-4 sm:py-2"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:h-10 sm:w-auto sm:px-4"
         >
           <ListIcon className="h-5 w-5 sm:hidden" />
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium">
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium leading-none">
             <ListIcon className="h-4 w-4" />
             <span>词单</span>
           </span>
@@ -325,20 +325,20 @@ export function App({
           onClick={openStats}
           aria-label="统计"
           aria-pressed={view === "stats"}
-          className="flex items-center justify-center rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4 sm:py-2"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:h-10 sm:w-auto sm:px-4"
         >
           <BarChartIcon className="h-5 w-5 sm:hidden" />
-          <span className="hidden text-sm font-medium sm:inline">统计</span>
+          <span className="hidden text-sm font-medium leading-none sm:inline">统计</span>
         </button>
         <button
           type="button"
           onClick={() => openSettings()}
           aria-label="设置"
           aria-pressed={view === "settings"}
-          className="flex items-center justify-center rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:px-4 sm:py-2"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:h-10 sm:w-auto sm:px-4"
         >
           <SettingsIcon className="h-5 w-5 sm:hidden" />
-          <span className="hidden text-sm font-medium sm:inline">设置</span>
+          <span className="hidden text-sm font-medium leading-none sm:inline">设置</span>
         </button>
       </header>
 

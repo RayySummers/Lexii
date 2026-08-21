@@ -75,9 +75,10 @@ function MaterialIcon({ name, className }: { name: string } & IconProps) {
   return (
     <span
       aria-hidden="true"
-      className={`material-symbols-outlined inline-flex items-center justify-center leading-none select-none overflow-hidden ${className ?? ""}`}
+      className={`material-symbols-outlined inline-flex items-center justify-center leading-none select-none overflow-hidden shrink-0 ${className ?? ""}`}
       style={{
         fontSize,
+        lineHeight: 1,
         // 继承文本色（currentColor），与浅色/深色 token 自动适配，不硬编码
         // 可变轴与 index.css 的 .material-symbols-outlined 一致，此处显式兜底
         // 以防样式表未就绪前闪烁（swap 期间亦保持 400 常规字重）；opsz 动态兜底见上
