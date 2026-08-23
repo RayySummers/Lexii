@@ -3,7 +3,7 @@
   "variant": "TonalSpot",
   "platform": "phone",
   "contrastLevel": 0.5,
-  "contrastNote": "selective medium contrast — primary + neutral containers use 0.5 tones (primary tone 23/46, surfaceContainer 96→92→88→84), secondary/tertiary/error stay at 0.0; verified by Cale 2026-08-23 (raw MCU 0.0 gives #5a5892/#e2dfff)",
+  "contrastNote": "selective medium contrast — primary + neutral containers use 0.5 tones (primary tone 22.7 #313066 vs 40 #5a5892, surfaceContainer #eae7ef tone 92.1 vs #f0ecf4 93.9, etc.), secondary/tertiary/error/outline remain at 0.0 (secondary #5e5c71, tertiary #7a5368, outline #787680); verified by Cale 2026-08-23 (raw MCU 0.0 gives #5a5892/#e2dfff)",
   "generated": "2026-08-23T00:00:00Z — frozen spec selective 0.5, Cale verified; derived from TonalSpot palettes (hue36/16/hue+60·24/neutral6/neutralVariant8/error25·84/success146·32) with frozen selective tone mapping, not raw MCU tone 40/90",
   "light": {
     "primary": "#313066",

@@ -14,8 +14,7 @@
 ### 0.1 Seed 与色板来源
 
 - **Seed：** `#4F46E5`（indigo，HCT 287.1° / 73.3 / 40.7）
-- **生成方式：** 基于 `material-color-utilities` 的 TonalSpot 调色板（`TonalPalette.fromHueAndChroma(hue,36)` · 次色 `16` · 三级 `hue+60/24` · 中性 `6` · 中性变体 `8` · 错误 `25/84` · 成功自定义 `146/32`，`contrastLevel 0.5 (Medium Contrast) 选择性应用`）按冻结 tone 映射派生，非直接取 `SchemeTonalSpot` 默认 `contrastLevel 0.0` 的 tone 40/90 原生输出。
-  - 选择性映射（Cale 06:21 核验）：primary 与中性容器（`primary` tone 23 / `primaryContainer` tone 46 / `surfaceContainer*` 阶梯 `96→92→88→84`）采用 0.5 tones 以获得 12:1 主色对比与更深容器缓冲；secondary / tertiary / error 保持 0.0 以维持原有彩度与可读性。例：light primary 取 tone 22.7 `#313066`（0.0 下为 40 `#5a5892`）、primaryContainer tone 45.9 `#6867a1`（0.0 下为 90 `#e2dfff`）；`pure-palette.json` 为此选择性映射的唯一可信源（`contrastLevel: 0.5 selective`）。
+- **生成方式：** Seed `#4F46E5` → `SchemeTonalSpot` **contrastLevel 0.5 (medium contrast)** for **primary group + neutral containers** (`primary tone 22.7 #313066` vs default 40 `#5a5892`, `primaryContainer 45.9 #6867a1` vs 90, `surfaceContainer #eae7ef` tone 92.1 vs `#f0ecf4` 93.9, etc.); **secondary/tertiary/error/outline remain at contrast 0.0** (`secondary #5e5c71`, `tertiary #7a5368`, `outline #787680`). This selective medium contrast is intentional for stronger primary legibility — not a pure MCU output — `pure-palette.json` is the byte source; `specVersion` pinned per Cale (2021 legacy mapping, 0.3.0 verified; note Theme Builder export parity).
 - **附件：** `pure-palette.json`（冻结完整色板，含 16 个中性角色 + 彩色组两套）为本文件的机器可读副本。
 
 ### 0.2 命名与前缀
