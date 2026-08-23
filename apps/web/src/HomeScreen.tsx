@@ -24,6 +24,12 @@
  * RAY-352：额度提示在复习队列为空（dueCount === 0）但额度已恢复时也展示——
  * Day 2 早晨「今日无待学词，休息一下。」不该被误读为「无学习额度」。
  *
+ * RAY-398 迁移批次 1（P0）：按冻结色板与新 token 将本页从旧别名迁移到 --lex-* 角色，外观不变。
+ * - 颜色：bg-bg → bg-background、text-text → text-on-surface、text-text-muted → text-on-surface-variant、
+ *   border-border → border-outline-variant、accent → tertiary、focus-ring → outline-primary；
+ * - 形状：rounded-2xl（16px）→ rounded-lg（M3 --radius-lg 16px，外观等价，契合卡片 md/lg 映射）、rounded-full 保留（M3 full）；
+ * - 行为与布局零变化，仅 token 收敛；迁移前后截图对照保障。
+ *
  * - 待学徽标数据经 StatsDataProvider（statsProvider 为 null 时不展示，
  *   如无 IndexedDB 的测试环境）；
  * - 仅承载展示与导航，队列数据一律由 ReviewScreen / QuizScreen 按模式加载；
@@ -85,10 +91,10 @@ export function HomeScreen({ onStart, statsProvider }: HomeScreenProps) {
             role="radio"
             aria-checked={format === f}
             onClick={() => setFormat(f)}
-            className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
+            className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
               format === f
                 ? "border-primary bg-primary/10 text-primary"
-                : "border-border bg-surface text-text-muted hover:border-primary"
+                : "border-outline-variant bg-surface text-on-surface-variant hover:border-primary"
             }`}
           >
             <span>{title}</span>
@@ -106,10 +112,10 @@ export function HomeScreen({ onStart, statsProvider }: HomeScreenProps) {
             key={mode}
             type="button"
             onClick={() => onStart(mode, format)}
-            className="flex flex-col gap-1 rounded-2xl border border-border bg-surface p-6 text-left transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="flex flex-col gap-1 rounded-lg border border-outline-variant bg-surface p-6 text-left transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <span className="text-xl font-semibold">{title}</span>
-            <span aria-hidden="true" className="text-sm text-text-muted">
+            <span aria-hidden="true" className="text-sm text-on-surface-variant">
               {subtitle}
             </span>
           </button>
@@ -136,7 +142,7 @@ export function HomeScreen({ onStart, statsProvider }: HomeScreenProps) {
  */
 function NewCardQuotaHint({ remaining }: { remaining: number }) {
   return (
-    <p className="text-sm text-text-muted">
+    <p className="text-sm text-on-surface-variant">
       今日新卡额度剩余 {remaining} 张，超出部分顺延到之后的日子。
     </p>
   );
@@ -156,12 +162,12 @@ function DueBadge({ dueCount, hasReviewed }: { dueCount: number | null; hasRevie
   let content: ReactNode = null;
   if (dueCount !== null && dueCount > 0) {
     content = (
-      <span className="rounded-full border border-accent/40 bg-surface px-4 py-1.5 text-sm font-medium text-accent">
+      <span className="rounded-full border border-tertiary/40 bg-surface px-4 py-1.5 text-sm font-medium text-tertiary">
         今日待学 {dueCount} 词
       </span>
     );
   } else if (dueCount !== null && hasReviewed) {
-    content = <span className="text-sm text-text-muted">今日无待学词，休息一下。</span>;
+    content = <span className="text-sm text-on-surface-variant">今日无待学词，休息一下。</span>;
   }
   return <div role="status">{content}</div>;
 }
