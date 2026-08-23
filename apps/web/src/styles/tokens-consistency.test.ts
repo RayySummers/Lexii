@@ -200,8 +200,8 @@ describe("tokens-consistency（三源一致性）", () => {
   it("docs/design-tokens.md 存在且包含关键 token 表", () => {
     expect(docsFound, "docs/design-tokens.md 未找到（应位于 docs/design-tokens.md）").toBe(true);
     expect(docsContent).toContain("--lex-primary");
-    expect(docsContent).toContain("#313066");
-    expect(docsContent).toContain("#dbd8ff");
+    expect(docsContent).toContain("#5a5892");
+    expect(docsContent).toContain("#c3c0ff");
     expect(docsContent).toContain("--lex-radius-");
     expect(docsContent).toContain("--lex-typescale-");
     expect(docsContent).toContain("--lex-motion-");
@@ -209,14 +209,14 @@ describe("tokens-consistency（三源一致性）", () => {
   });
 
   it("docs 表格数值与 tokens.css 一致（抽样）", () => {
-    // 抽样若干关键色值在文档中出现且与 tokens.css 一致
+    // 抽样若干关键色值在文档中出现且与 tokens.css 一致（MCU 0.3.0）
     const samples: Array<{ varName: string; lightVal: string; darkVal: string }> = [
-      { varName: "--lex-primary", lightVal: "#313066", darkVal: "#dbd8ff" },
-      { varName: "--lex-primary-container", lightVal: "#6867a1", darkVal: "#8c8bc8" },
+      { varName: "--lex-primary", lightVal: "#5a5892", darkVal: "#c3c0ff" },
+      { varName: "--lex-primary-container", lightVal: "#e2dfff", darkVal: "#424178" },
       { varName: "--lex-background", lightVal: "#fcf8ff", darkVal: "#131318" },
-      { varName: "--lex-surface-container", lightVal: "#eae7ef", darkVal: "#1f1f2a" },
+      { varName: "--lex-surface-container", lightVal: "#f0ecf4", darkVal: "#201f25" },
       { varName: "--lex-error", lightVal: "#ba1a1a", darkVal: "#ffb4ab" },
-      { varName: "--lex-success", lightVal: "#146c2e", darkVal: "#88d88a" },
+      { varName: "--lex-success", lightVal: "#35693e", darkVal: "#9cd4a0" },
     ];
     for (const s of samples) {
       const cssLight = lightVars.get(s.varName);

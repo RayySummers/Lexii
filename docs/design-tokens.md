@@ -1,135 +1,143 @@
 # 设计令牌规范（Design Tokens）
 
-> 冻结口径：纯 M3 单 seed `#4F46E5` Tonal spot（官方 Theme Builder 默认变体）  
+> 冻结口径：纯 M3 单 seed `#4F46E5` Tonal spot（官方 Theme Builder 默认变体，`Variant.TONAL_SPOT`，material-color-utilities 0.3.0）  
 > 单一真相源：`apps/web/src/theme/pure-palette.json` → `tokens.css` / `palette.ts` / 本文档三处同源，`tokens-consistency.test.ts` 自动校验  
 > 对比度守护：所有 `onX vs X` ≥ 4.5:1，`token-contrast.test.ts` 读 `tokens.css` 浅/深两套自动计算，CI 拦截
 
-## 1. 颜色角色表（M3 官方角色 + 自定义 success）
+## 1. 颜色角色表（M3 官方角色 + 自定义 success，MCU 0.3.0 SchemeTonalSpot 可复现）
 
 前缀 `--lex-*`，Tailwind 映射 `--color-*`（见 `src/styles/index.css` `@theme inline`）。
 
 ### 1.1 浅色（light）
 
-| 角色                    | Token                             | 值        | 用途                      |
-| ----------------------- | --------------------------------- | --------- | ------------------------- |
-| primary                 | `--lex-primary`                   | `#313066` | 主色按钮/主强调           |
-| onPrimary               | `--lex-on-primary`                | `#ffffff` | 主色前景（文本/图标）     |
-| primaryContainer        | `--lex-primary-container`         | `#6867a1` | 主色容器背景              |
-| onPrimaryContainer      | `--lex-on-primary-container`      | `#ffffff` | 容器前景                  |
-| secondary               | `--lex-secondary`                 | `#5c5c71` | 次级色                    |
-| onSecondary             | `--lex-on-secondary`              | `#ffffff` |                           |
-| secondaryContainer      | `--lex-secondary-container`       | `#e2e0f7` |                           |
-| onSecondaryContainer    | `--lex-on-secondary-container`    | `#1a1a2e` |                           |
-| tertiary                | `--lex-tertiary`                  | `#775365` | 第三色                    |
-| onTertiary              | `--lex-on-tertiary`               | `#ffffff` |                           |
-| tertiaryContainer       | `--lex-tertiary-container`        | `#ffd8ea` |                           |
-| onTertiaryContainer     | `--lex-on-tertiary-container`     | `#2c1122` |                           |
-| error                   | `--lex-error`                     | `#ba1a1a` | 错误                      |
-| onError                 | `--lex-on-error`                  | `#ffffff` |                           |
-| errorContainer          | `--lex-error-container`           | `#ffdad6` |                           |
-| onErrorContainer        | `--lex-on-error-container`        | `#410002` |                           |
-| success                 | `--lex-success`                   | `#146c2e` | 成功（自定，M3 无此角色） |
-| onSuccess               | `--lex-on-success`                | `#ffffff` |                           |
-| successContainer        | `--lex-success-container`         | `#a6f2a6` |                           |
-| onSuccessContainer      | `--lex-on-success-container`      | `#002106` |                           |
-| background              | `--lex-background`                | `#fcf8ff` | 页面背景                  |
-| onBackground            | `--lex-on-background`             | `#1c1b1f` |                           |
-| surface                 | `--lex-surface`                   | `#fcf8ff` | 卡片/表面                 |
-| onSurface               | `--lex-on-surface`                | `#1c1b1f` |                           |
-| surfaceVariant          | `--lex-surface-variant`           | `#e4e1ec` | 变体表面                  |
-| onSurfaceVariant        | `--lex-on-surface-variant`        | `#47464f` |                           |
-| surfaceContainerLowest  | `--lex-surface-container-lowest`  | `#ffffff` | 容器阶梯最低              |
-| surfaceContainerLow     | `--lex-surface-container-low`     | `#f6f2fa` |                           |
-| surfaceContainer        | `--lex-surface-container`         | `#eae7ef` |                           |
-| surfaceContainerHigh    | `--lex-surface-container-high`    | `#dfdbe3` |                           |
-| surfaceContainerHighest | `--lex-surface-container-highest` | `#d4d0d8` | 最高                      |
-| outline                 | `--lex-outline`                   | `#787680` | 边框                      |
-| outlineVariant          | `--lex-outline-variant`           | `#c8c5d0` | 弱边框                    |
-| scrim                   | `--lex-scrim`                     | `#000000` | 遮幕                      |
-| inverseSurface          | `--lex-inverse-surface`           | `#313034` | 逆色表面（Toast）         |
-| inverseOnSurface        | `--lex-inverse-on-surface`        | `#f3eff4` |                           |
-| inversePrimary          | `--lex-inverse-primary`           | `#c3c0ff` | 逆色主色                  |
+| 角色                    | Token                             | 值        | 用途                                |
+| ----------------------- | --------------------------------- | --------- | ----------------------------------- |
+| primary                 | `--lex-primary`                   | `#5a5892` | 主色按钮/主强调                     |
+| onPrimary               | `--lex-on-primary`                | `#ffffff` | 主色前景（文本/图标）               |
+| primaryContainer        | `--lex-primary-container`         | `#e2dfff` | 主色容器背景                        |
+| onPrimaryContainer      | `--lex-on-primary-container`      | `#424178` | 容器前景                            |
+| secondary               | `--lex-secondary`                 | `#5e5c71` | 次级色                              |
+| onSecondary             | `--lex-on-secondary`              | `#ffffff` |                                     |
+| secondaryContainer      | `--lex-secondary-container`       | `#e3e0f9` |                                     |
+| onSecondaryContainer    | `--lex-on-secondary-container`    | `#464559` |                                     |
+| tertiary                | `--lex-tertiary`                  | `#7a5368` | 第三色                              |
+| onTertiary              | `--lex-on-tertiary`               | `#ffffff` |                                     |
+| tertiaryContainer       | `--lex-tertiary-container`        | `#ffd8ea` |                                     |
+| onTertiaryContainer     | `--lex-on-tertiary-container`     | `#603c50` |                                     |
+| error                   | `--lex-error`                     | `#ba1a1a` | 错误                                |
+| onError                 | `--lex-on-error`                  | `#ffffff` |                                     |
+| errorContainer          | `--lex-error-container`           | `#ffdad6` |                                     |
+| onErrorContainer        | `--lex-on-error-container`        | `#93000a` |                                     |
+| success                 | `--lex-success`                   | `#35693e` | 成功（自定，M3 无此角色，MCU 生成） |
+| onSuccess               | `--lex-on-success`                | `#ffffff` |                                     |
+| successContainer        | `--lex-success-container`         | `#b7f1ba` |                                     |
+| onSuccessContainer      | `--lex-on-success-container`      | `#1c5128` |                                     |
+| background              | `--lex-background`                | `#fcf8ff` | 页面背景                            |
+| onBackground            | `--lex-on-background`             | `#1b1b21` |                                     |
+| surface                 | `--lex-surface`                   | `#fcf8ff` | 卡片/表面                           |
+| onSurface               | `--lex-on-surface`                | `#1b1b21` |                                     |
+| surfaceVariant          | `--lex-surface-variant`           | `#e4e1ec` | 变体表面                            |
+| onSurfaceVariant        | `--lex-on-surface-variant`        | `#47464f` |                                     |
+| surfaceDim              | `--lex-surface-dim`               | `#dcd9e0` | 最暗表面                            |
+| surfaceBright           | `--lex-surface-bright`            | `#fcf8ff` | 最亮表面                            |
+| surfaceContainerLowest  | `--lex-surface-container-lowest`  | `#ffffff` | 容器阶梯最低                        |
+| surfaceContainerLow     | `--lex-surface-container-low`     | `#f6f2fa` |                                     |
+| surfaceContainer        | `--lex-surface-container`         | `#f0ecf4` |                                     |
+| surfaceContainerHigh    | `--lex-surface-container-high`    | `#eae7ef` |                                     |
+| surfaceContainerHighest | `--lex-surface-container-highest` | `#e5e1e9` | 最高                                |
+| surfaceTint             | `--lex-surface-tint`              | `#5a5892` | 表面着色                            |
+| outline                 | `--lex-outline`                   | `#787680` | 边框                                |
+| outlineVariant          | `--lex-outline-variant`           | `#c8c5d0` | 弱边框                              |
+| scrim                   | `--lex-scrim`                     | `#000000` | 遮幕                                |
+| shadow                  | `--lex-shadow`                    | `#000000` | 阴影                                |
+| inverseSurface          | `--lex-inverse-surface`           | `#313036` | 逆色表面（Toast）                   |
+| inverseOnSurface        | `--lex-inverse-on-surface`        | `#f3eff7` |                                     |
+| inversePrimary          | `--lex-inverse-primary`           | `#c3c0ff` | 逆色主色                            |
 
 ### 1.2 深色（dark, `[data-theme="dark"]`）
 
 | 角色                    | Token                             | 值        |
 | ----------------------- | --------------------------------- | --------- |
-| primary                 | `--lex-primary`                   | `#dbd8ff` |
-| onPrimary               | `--lex-on-primary`                | `#2e2a7a` |
-| primaryContainer        | `--lex-primary-container`         | `#8c8bc8` |
-| onPrimaryContainer      | `--lex-on-primary-container`      | `#000060` |
+| primary                 | `--lex-primary`                   | `#c3c0ff` |
+| onPrimary               | `--lex-on-primary`                | `#2b2a60` |
+| primaryContainer        | `--lex-primary-container`         | `#424178` |
+| onPrimaryContainer      | `--lex-on-primary-container`      | `#e2dfff` |
 | secondary               | `--lex-secondary`                 | `#c7c4dd` |
-| onSecondary             | `--lex-on-secondary`              | `#2e2d42` |
-| secondaryContainer      | `--lex-secondary-container`       | `#444559` |
-| onSecondaryContainer    | `--lex-on-secondary-container`    | `#e2e0f7` |
+| onSecondary             | `--lex-on-secondary`              | `#2f2e42` |
+| secondaryContainer      | `--lex-secondary-container`       | `#464559` |
+| onSecondaryContainer    | `--lex-on-secondary-container`    | `#e3e0f9` |
 | tertiary                | `--lex-tertiary`                  | `#eab9d1` |
-| onTertiary              | `--lex-on-tertiary`               | `#463041` |
-| tertiaryContainer       | `--lex-tertiary-container`        | `#5e3c4d` |
+| onTertiary              | `--lex-on-tertiary`               | `#472639` |
+| tertiaryContainer       | `--lex-tertiary-container`        | `#603c50` |
 | onTertiaryContainer     | `--lex-on-tertiary-container`     | `#ffd8ea` |
 | error                   | `--lex-error`                     | `#ffb4ab` |
 | onError                 | `--lex-on-error`                  | `#690005` |
 | errorContainer          | `--lex-error-container`           | `#93000a` |
 | onErrorContainer        | `--lex-on-error-container`        | `#ffdad6` |
-| success                 | `--lex-success`                   | `#88d88a` |
-| onSuccess               | `--lex-on-success`                | `#00390f` |
-| successContainer        | `--lex-success-container`         | `#00531a` |
-| onSuccessContainer      | `--lex-on-success-container`      | `#a6f2a6` |
+| success                 | `--lex-success`                   | `#9cd4a0` |
+| onSuccess               | `--lex-on-success`                | `#003914` |
+| successContainer        | `--lex-success-container`         | `#1c5128` |
+| onSuccessContainer      | `--lex-on-success-container`      | `#b7f1ba` |
 | background              | `--lex-background`                | `#131318` |
-| onBackground            | `--lex-on-background`             | `#e5e1e6` |
+| onBackground            | `--lex-on-background`             | `#e5e1e9` |
 | surface                 | `--lex-surface`                   | `#131318` |
-| onSurface               | `--lex-on-surface`                | `#e5e1e6` |
+| onSurface               | `--lex-on-surface`                | `#e5e1e9` |
 | surfaceVariant          | `--lex-surface-variant`           | `#47464f` |
 | onSurfaceVariant        | `--lex-on-surface-variant`        | `#c8c5d0` |
-| surfaceContainerLowest  | `--lex-surface-container-lowest`  | `#0f0e13` |
-| surfaceContainerLow     | `--lex-surface-container-low`     | `#1a1c22` |
-| surfaceContainer        | `--lex-surface-container`         | `#1f1f2a` |
-| surfaceContainerHigh    | `--lex-surface-container-high`    | `#2a2a33` |
-| surfaceContainerHighest | `--lex-surface-container-highest` | `#35343d` |
+| surfaceDim              | `--lex-surface-dim`               | `#131318` |
+| surfaceBright           | `--lex-surface-bright`            | `#39383f` |
+| surfaceContainerLowest  | `--lex-surface-container-lowest`  | `#0e0e13` |
+| surfaceContainerLow     | `--lex-surface-container-low`     | `#1b1b21` |
+| surfaceContainer        | `--lex-surface-container`         | `#201f25` |
+| surfaceContainerHigh    | `--lex-surface-container-high`    | `#2a292f` |
+| surfaceContainerHighest | `--lex-surface-container-highest` | `#35343a` |
+| surfaceTint             | `--lex-surface-tint`              | `#c3c0ff` |
 | outline                 | `--lex-outline`                   | `#928f9a` |
 | outlineVariant          | `--lex-outline-variant`           | `#47464f` |
 | scrim                   | `--lex-scrim`                     | `#000000` |
-| inverseSurface          | `--lex-inverse-surface`           | `#e5e1e6` |
-| inverseOnSurface        | `--lex-inverse-on-surface`        | `#313034` |
-| inversePrimary          | `--lex-inverse-primary`           | `#4f46e5` |
+| shadow                  | `--lex-shadow`                    | `#000000` |
+| inverseSurface          | `--lex-inverse-surface`           | `#e5e1e9` |
+| inverseOnSurface        | `--lex-inverse-on-surface`        | `#313036` |
+| inversePrimary          | `--lex-inverse-primary`           | `#5a5892` |
 
 ### 1.3 旧别名（deprecated，兼容存量组件，禁止新代码使用）
 
 | 旧 Token                 | 指向新角色                 | 浅色等价  | 深色等价  |
 | ------------------------ | -------------------------- | --------- | --------- |
 | `--lex-bg`               | `--lex-background`         | `#fcf8ff` | `#131318` |
-| `--lex-surface-raised`   | `--lex-surface-container`  | `#eae7ef` | `#1f1f2a` |
+| `--lex-surface-raised`   | `--lex-surface-container`  | `#f0ecf4` | `#201f25` |
 | `--lex-border`           | `--lex-outline-variant`    | `#c8c5d0` | `#47464f` |
-| `--lex-text`             | `--lex-on-background`      | `#1c1b1f` | `#e5e1e6` |
+| `--lex-text`             | `--lex-on-background`      | `#1b1b21` | `#e5e1e9` |
 | `--lex-text-muted`       | `--lex-on-surface-variant` | `#47464f` | `#c8c5d0` |
-| `--lex-primary-contrast` | `--lex-on-primary`         | `#ffffff` | `#2e2a7a` |
-| `--lex-accent`           | `--lex-tertiary`           | `#775365` | `#eab9d1` |
+| `--lex-primary-contrast` | `--lex-on-primary`         | `#ffffff` | `#2b2a60` |
+| `--lex-accent`           | `--lex-tertiary`           | `#7a5368` | `#eab9d1` |
 | `--lex-danger`           | `--lex-error`              | `#ba1a1a` | `#ffb4ab` |
-| `--lex-focus-ring`       | `--lex-primary`            | `#313066` | `#dbd8ff` |
+| `--lex-focus-ring`       | `--lex-primary`            | `#5a5892` | `#c3c0ff` |
 
 > 别名以 `var(--lex-*)` 实现，数值随主题自动切换；新代码请直接使用 M3 命名。按批次迁移后别名将删除。
 
-## 2. 对比度矩阵（WCAG AA ≥ 4.5:1）
+## 2. 对比度矩阵（WCAG AA ≥ 4.5:1，MCU 0.3.0 实测）
 
-`token-contrast.test.ts` 自动计算浅/深两套所有 `onX vs X` 的对比度，数值与下表一致即通过。
+`token-contrast.test.ts` 自动计算浅/深两套所有 `onX vs X` 的对比度，数值与下表一致即通过（material-color-utilities 0.3.0 SchemeTonalSpot，seed #4F46E5）。
 
 | 前景 / 背景                               | 浅色对比度 | 深色对比度 | 是否 ≥4.5 |
 | ----------------------------------------- | ---------- | ---------- | --------- |
-| onPrimary / primary                       | 12.03      | 8.84       | ✅        |
-| onPrimaryContainer / primaryContainer     | 5.19       | 5.68       | ✅        |
-| onSecondary / secondary                   | 6.51       | 7.88       | ✅        |
-| onSecondaryContainer / secondaryContainer | 13.19      | 7.25       | ✅        |
-| onTertiary / tertiary                     | 6.54       | 7.02       | ✅        |
-| onTertiaryContainer / tertiaryContainer   | 13.44      | 7.29       | ✅        |
+| onPrimary / primary                       | 6.47       | 7.68       | ✅        |
+| onPrimaryContainer / primaryContainer     | 7.19       | 7.19       | ✅        |
+| onSecondary / secondary                   | 6.47       | 7.78       | ✅        |
+| onSecondaryContainer / secondaryContainer | 7.22       | 7.22       | ✅        |
+| onTertiary / tertiary                     | 6.43       | 7.70       | ✅        |
+| onTertiaryContainer / tertiaryContainer   | 7.20       | 7.20       | ✅        |
 | onError / error                           | 6.46       | 7.72       | ✅        |
-| onErrorContainer / errorContainer         | 13.26      | 7.24       | ✅        |
-| onSuccess / success                       | 6.53       | 7.69       | ✅        |
-| onSuccessContainer / successContainer     | 13.01      | 7.05       | ✅        |
-| onBackground / background                 | 16.32      | 13.5       | ✅        |
-| onSurface / surface                       | 16.32      | 13.5       | ✅        |
-| onSurfaceVariant / surfaceVariant         | 7.21       | 7.5        | ✅        |
-| inverseOnSurface / inverseSurface         | 11.2       | 11.2       | ✅        |
+| onErrorContainer / errorContainer         | 7.24       | 7.24       | ✅        |
+| onSuccess / success                       | 6.48       | 7.73       | ✅        |
+| onSuccessContainer / successContainer     | 7.22       | 7.22       | ✅        |
+| onBackground / background                 | 16.33      | 14.35      | ✅        |
+| onSurface / surface                       | 16.33      | 14.35      | ✅        |
+| onSurfaceVariant / surfaceVariant         | 7.21       | 5.47       | ✅        |
+| inverseOnSurface / inverseSurface         | 11.52      | 10.13      | ✅        |
 
-> surfaceContainer 阶梯（low/low/high/highest）均以 `onSurface (#1c1b1f / #e5e1e6)` 为前景，容器色阶越高对比度略降但仍 >12。实测值见测试输出。
+> surfaceContainer 阶梯（low/low/high/highest）均以 `onSurface (#1b1b21 / #e5e1e9)` 为前景，容器色阶越高对比度略降但仍 >10。实测值见测试输出。
 
 ## 3. 组件映射
 
@@ -219,6 +227,6 @@ P0 仅落地 token 与全局规则，P2 再应用到评分确认 / 卡片翻面 
 
 ## 6. 同源校验
 
-- 唯一来源 `pure-palette.json`
+- 唯一来源 `pure-palette.json`（MCU 0.3.0 SchemeTonalSpot，seed #4F46E5）
 - `tokens.css` / `palette.ts` / 本文档三处数值由 `tokens-consistency.test.ts` 校验，不一致即 CI 失败
 - 守护：`token-contrast.test.ts`（对比度）、`scan-hardcoded-colors.mjs`（禁硬编码 hex/rgb）亦接入 CI
