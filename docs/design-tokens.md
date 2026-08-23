@@ -14,7 +14,7 @@
 ### 0.1 Seed 与色板来源
 
 - **Seed：** `#4F46E5`（indigo，HCT 287.1° / 73.3 / 40.7）
-- **生成方式：** Seed `#4F46E5` → `SchemeTonalSpot` **contrastLevel 0.5 (medium contrast)** for **primary group + neutral containers** (`primary tone 22.7 #313066` vs default 40 `#5a5892`, `primaryContainer 45.9 #6867a1` vs 90, `surfaceContainer #eae7ef` tone 92.1 vs `#f0ecf4` 93.9, etc.); **secondary/tertiary/error/outline remain at contrast 0.0** (`secondary #5e5c71`, `tertiary #7a5368`, `outline #787680`). This selective medium contrast is intentional for stronger primary legibility — not a pure MCU output — `pure-palette.json` is the byte source; `specVersion` pinned per Cale (2021 legacy mapping, 0.3.0 verified; note Theme Builder export parity).
+- **生成方式：** **Seed:** `#4F46E5` (HCT 287.1°/73.3/40.7) → **TonalSpot palettes** `TonalPalette.fromHueAndChroma(hue,36)` · 次色 `16` · 三级 `hue+60/24` · 中性 `6` · 中性变体 `8` · 错误 `25/84` · 成功 `146/32` · 中性等 (`MCU 0.3.0 / spec 2021 / platform phone / contrastLevel 0.0` palettes as source)。**冻结 tone 映射**（非 `new SchemeTonalSpot(hct,isDark,0)` 默认 `tone 40/90/80/30`）：light primary `22.7 #313066` (非 40 `#5a5892`)、primaryContainer `45.9 #6867a1` (非 90 `#e2dfff`, medium)、dark primary `87.7 #dbd8ff` (非 80 `#c3c0ff`)、primaryContainer `60.1 #8c8bc8` (非 30 `#424178`); 次色/三级/错误保留默认 `tone 40` (`#5e5c71/#7a5368/#ba1a1a`); light `surfaceContainer 92.1 #eae7ef` (vs raw 93.9 `#f0ecf4`)。禁止脱离调色板手工改色相/彩度。**`pure-palette.json` (seed `#4F46E5`, variant `TonalSpot`, platform phone, contrast 0.0 palettes + frozen tones) 为唯一可信源**，Theme Builder 2021 `cl0` 导出为 `#5a5892`，不等同冻结值，切勿用 raw scheme 重生成。
 - **附件：** `pure-palette.json`（冻结完整色板，含 16 个中性角色 + 彩色组两套）为本文件的机器可读副本。
 
 ### 0.2 命名与前缀
@@ -403,7 +403,7 @@ export const darkPalette: Record<Role, string> = {
   "seed": "#4F46E5",
   "variant": "TonalSpot",
   "platform": "phone",
-  "contrastLevel": 0.5,
+  "contrastLevel": 0.0,
   "light": {
     "primary": "#313066", "onPrimary": "#ffffff", "primaryContainer": "#6867a1", "onPrimaryContainer": "#ffffff",
     "secondary": "#5e5c71", "onSecondary": "#ffffff", "secondaryContainer": "#e3e0f9", "onSecondaryContainer": "#1a1a2c",
