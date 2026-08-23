@@ -2,8 +2,9 @@
   "seed": "#4F46E5",
   "variant": "TonalSpot",
   "platform": "phone",
-  "contrastLevel": 0.0,
-  "generated": "2026-08-23T00:00:00Z — frozen spec, Cale review pending; derived from TonalSpot palettes (hue36/16/hue+60·24/neutral6/neutralVariant8/error25·84/success146·32) with frozen tone mapping, not raw MCU tone 40/90",
+  "contrastLevel": 0.5,
+  "contrastNote": "selective medium contrast — primary + neutral containers use 0.5 tones (primary tone 23/46, surfaceContainer 96→92→88→84), secondary/tertiary/error stay at 0.0; verified by Cale 2026-08-23 (raw MCU 0.0 gives #5a5892/#e2dfff)",
+  "generated": "2026-08-23T00:00:00Z — frozen spec selective 0.5, Cale verified; derived from TonalSpot palettes (hue36/16/hue+60·24/neutral6/neutralVariant8/error25·84/success146·32) with frozen selective tone mapping, not raw MCU tone 40/90",
   "light": {
     "primary": "#313066",
     "onPrimary": "#ffffff",
