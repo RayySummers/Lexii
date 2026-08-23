@@ -569,7 +569,7 @@ interface ConfirmDeleteDialogProps {
   onCancel(): void;
 }
 
-/** 删除确认对话框（与词书删除同模式，RAY-320）：醒目提示词条记录保留 */
+/** 删除确认对话框（与词书删除同模式，RAY-320）：醒目提示词条记录保留 — M3 tokens (scrim/outline/surface/tertiary/error) */
 function ConfirmDeleteDialog({
   listName,
   entryCount,
@@ -595,14 +595,14 @@ function ConfirmDeleteDialog({
       aria-label="确认删除词单"
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
     >
-      <div className="absolute inset-0 bg-black/40" onClick={onCancel} aria-hidden="true" />
-      <div className="relative flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-surface p-6 shadow-lg">
-        <h3 className="text-base font-semibold">确认删除词单</h3>
-        <p className="text-sm text-text-muted">
+      <div className="absolute inset-0 bg-scrim/40" onClick={onCancel} aria-hidden="true" />
+      <div className="relative flex w-full max-w-sm flex-col gap-4 rounded-xl border border-outline-variant bg-surface p-6 shadow-lg">
+        <h3 className="text-base font-semibold text-on-surface">确认删除词单</h3>
+        <p className="text-sm text-on-surface-variant">
           确定要删除「{listName}」吗？该词单当前包含 {entryCount} 个词。
         </p>
-        <div className="rounded-xl border border-warning/40 bg-warning/10 p-3">
-          <p className="text-sm font-medium text-warning">
+        <div className="rounded-lg border border-tertiary/40 bg-tertiary/10 p-3">
+          <p className="text-sm font-medium text-tertiary">
             词单与词条的归类记录将被移除，但词条本身不会被删除，仍在词库中可搜可用。
           </p>
         </div>
@@ -610,7 +610,7 @@ function ConfirmDeleteDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full border border-border px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full border border-outline-variant px-4 py-2 text-sm font-medium text-on-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
             取消
           </button>
@@ -618,7 +618,7 @@ function ConfirmDeleteDialog({
             type="button"
             onClick={onConfirm}
             disabled={deleting}
-            className="rounded-full bg-danger px-4 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full bg-error px-4 py-2 text-sm font-semibold text-on-error transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
           >
             {deleting ? "删除中…" : "确认删除"}
           </button>
