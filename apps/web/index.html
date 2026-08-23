@@ -28,7 +28,7 @@
       深色模式由 useTheme 运行时读取 --lex-bg token 同步更新（src/theme/themeColor.ts）。
       themeColor.test.ts 会校验此处与 token 一致，防止两处漂移。
     -->
-    <meta name="theme-color" content="#fafaf9" />
+    <meta name="theme-color" content="#fcf8ff" />
     <meta
       name="description"
       content="乐希 Lexii — 定制化背单词体验：现代简洁、多语言、支持导入词库、local-first"
@@ -96,6 +96,8 @@
     <link rel="stylesheet" href="./fonts/inter-display.css" />
     <!-- RAY-359：Sentient Medium 自托管（同源部署、子路径安全、离线预缓存，替换 Newsreader） -->
     <link rel="stylesheet" href="./fonts/sentient.css" />
+    <!-- RAY-375 S1-3 + RAY-396：MiSans 全局界面字体（400/500/700 woff2，font-display: swap，同源部署、子路径安全、离线预缓存；--lex-font-sans 首选） -->
+    <link rel="stylesheet" href="./fonts/misans.css" />
     <title>乐希 Lexii</title>
   </head>
   <body>
