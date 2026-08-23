@@ -98,7 +98,7 @@ export interface DictionaryPackagesScreenProps {
 }
 
 /**
- * 下载确认对话框（模态）。
+ * 下载确认对话框（模态，M3 — scrim/outline/surface）。
  * 展示包名称、体积、ECDICT MIT 许可声明，用户确认后开始下载。
  */
 function DownloadConfirmDialog({
@@ -114,16 +114,16 @@ function DownloadConfirmDialog({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/50 p-4"
       role="dialog"
       aria-modal="true"
       aria-label={`确认下载 ${packageName}`}
     >
-      <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl bg-surface p-6 shadow-lg">
-        <h2 className="text-lg font-semibold">下载确认</h2>
-        <div className="flex flex-col gap-2 text-sm text-text-muted">
+      <div className="flex w-full max-w-sm flex-col gap-4 rounded-xl border border-outline-variant bg-surface p-6 shadow-lg">
+        <h2 className="text-lg font-semibold text-on-surface">下载确认</h2>
+        <div className="flex flex-col gap-2 text-sm text-on-surface-variant">
           <p>
-            即将下载<strong className="text-text"> {packageName}</strong>
+            即将下载<strong className="text-on-surface"> {packageName}</strong>
             {sizeBytes ? `（${formatSize(sizeBytes)}）` : ""}。
           </p>
           <p>
@@ -137,14 +137,14 @@ function DownloadConfirmDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full border border-outline-variant bg-surface px-5 py-2.5 text-sm font-medium text-on-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
             取消
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
             确认下载
           </button>

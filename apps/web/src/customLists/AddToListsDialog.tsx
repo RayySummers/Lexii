@@ -8,7 +8,8 @@
  * - 提交：批量加入 / 取消加入（不勾选 → 移出），单事务；
  * - 状态机：加载中 → 列表 → 提交中 → 完成（按 ESC / 点遮罩关闭）；
  * - 可达性：role=dialog + aria-modal + ESC 关闭；标题、控件全部可键盘访问；
- * - 全部颜色走 design tokens（浅色 / 深色自动生效），不硬编码颜色。
+ * - 全部颜色走 M3 design tokens（--lex-*，浅色 / 深色自动生效），不硬编码颜色；
+ *   遮罩走 --lex-scrim，容器走 --lex-surface / --lex-surface-container，边框 --lex-outline-variant。
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CustomList, CustomListId, Sense } from "@lexii/core";
@@ -150,12 +151,12 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
       aria-label={`把「${sense.term}」添加到词单`}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
     >
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
-      <div className="relative flex max-h-[85dvh] w-full max-w-md flex-col gap-4 overflow-hidden rounded-2xl border border-border bg-surface p-6 shadow-lg">
+      <div className="absolute inset-0 bg-scrim/40" onClick={onClose} aria-hidden="true" />
+      <div className="relative flex max-h-[85dvh] w-full max-w-md flex-col gap-4 overflow-hidden rounded-xl border border-outline-variant bg-surface p-6 shadow-lg">
         <header className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
-            <h3 className="text-base font-semibold">添加到词单</h3>
-            <p className="text-xs text-text-muted">
+            <h3 className="text-base font-semibold text-on-surface">添加到词单</h3>
+            <p className="text-xs text-on-surface-variant">
               勾选目标词单后保存。「{sense.term}」可同时归入多个词单。
             </p>
           </div>
@@ -163,7 +164,7 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
             type="button"
             onClick={onClose}
             aria-label="关闭对话框"
-            className="shrink-0 rounded-full p-1.5 text-text-muted transition-colors hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="shrink-0 rounded-full p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
             <span aria-hidden="true" className="text-base leading-none">
               ×
@@ -173,17 +174,17 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
           {phase === "loading" ? (
-            <div role="status" className="py-8 text-center text-sm text-text-muted">
+            <div role="status" className="py-8 text-center text-sm text-on-surface-variant">
               正在加载词单…
             </div>
           ) : allLists.length === 0 && !creating ? (
-            <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-surface-raised p-6 text-center">
+            <div className="flex flex-col items-center gap-3 rounded-lg border border-outline-variant bg-surface-container p-6 text-center">
               {/* RAY-338 A4：空词单状态显示「暂无词单」并提供「去创建」入口 */}
-              <p className="text-sm text-text-muted">暂无词单</p>
+              <p className="text-sm text-on-surface-variant">暂无词单</p>
               <button
                 type="button"
                 onClick={() => setCreating(true)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
               >
                 <PlusIcon className="h-4 w-4" />
                 去创建
@@ -203,10 +204,10 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
                 return (
                   <li key={list.id}>
                     <label
-                      className={`flex w-full cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus-ring ${
+                      className={`flex w-full cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus-ring ${
                         checked
                           ? "border-primary bg-primary/5"
-                          : "border-border bg-surface hover:border-primary"
+                          : "border-outline-variant bg-surface hover:border-primary"
                       }`}
                     >
                       <input
@@ -217,9 +218,9 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
                         aria-label={`词单「${list.name}」`}
                       />
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="truncate text-sm font-medium">{list.name}</span>
+                        <span className="truncate text-sm font-medium text-on-surface">{list.name}</span>
                         {list.description ? (
-                          <span className="line-clamp-2 text-xs leading-relaxed text-text-muted">
+                          <span className="line-clamp-2 text-xs leading-relaxed text-on-surface-variant">
                             {list.description}
                           </span>
                         ) : null}
@@ -240,9 +241,9 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
                 event.preventDefault();
                 void submitCreate();
               }}
-              className="flex flex-col gap-2 rounded-xl border border-border bg-surface-raised p-3"
+              className="flex flex-col gap-2 rounded-lg border border-outline-variant bg-surface-container p-3"
             >
-              <span className="text-xs font-medium text-text-muted">新建词单</span>
+              <span className="text-xs font-medium text-on-surface-variant">新建词单</span>
               <input
                 type="text"
                 value={newName}
@@ -250,10 +251,10 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
                 onChange={(event) => setNewName(event.target.value)}
                 placeholder="词单名称"
                 autoFocus
-                className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                className="rounded-sm border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
               />
               {createError ? (
-                <p role="alert" className="text-xs text-danger">
+                <p role="alert" className="text-xs text-error">
                   {createError}
                 </p>
               ) : null}
@@ -265,14 +266,14 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
                     setNewName("");
                     setCreateError(null);
                   }}
-                  className="rounded-full border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                  className="rounded-full border border-outline-variant px-3 py-1.5 text-xs font-medium text-on-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
                 >
                   取消
                 </button>
                 <button
                   type="submit"
                   disabled={creating2}
-                  className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {creating2 ? "创建中…" : "创建并加入"}
                 </button>
@@ -282,7 +283,7 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
             <button
               type="button"
               onClick={() => setCreating(true)}
-              className="inline-flex w-fit items-center gap-1.5 self-start rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+              className="inline-flex w-fit items-center gap-1.5 self-start rounded-full border border-outline-variant bg-surface px-3 py-1.5 text-xs font-medium text-on-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
             >
               <PlusIcon className="h-3.5 w-3.5" />
               新建词单
@@ -293,14 +294,14 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
         {error ? (
           <p
             role="alert"
-            className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger"
+            className="rounded-lg border border-error/40 bg-error/10 p-3 text-sm text-error"
           >
             {error}
           </p>
         ) : null}
 
-        <footer className="flex items-center justify-between gap-2 border-t border-border pt-4">
-          <span className="text-xs text-text-muted">
+        <footer className="flex items-center justify-between gap-2 border-t border-outline-variant pt-4">
+          <span className="text-xs text-on-surface-variant">
             {allLists.length === 0
               ? "无可勾选词单"
               : `已选 ${totalSelected} / ${allLists.length} 个词单`}
@@ -309,7 +310,7 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full border border-border px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+              className="rounded-full border border-outline-variant px-4 py-2 text-sm font-medium text-on-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
             >
               取消
             </button>
@@ -317,7 +318,7 @@ export function AddToListsDialog({ provider, sense, onClose }: AddToListsDialogP
               type="button"
               onClick={() => void submit()}
               disabled={phase === "submitting" || allLists.length === 0}
-              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
             >
               {phase === "submitting" ? "保存中…" : "保存"}
             </button>

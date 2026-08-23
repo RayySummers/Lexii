@@ -400,7 +400,7 @@ interface ConfirmDeleteDialogProps {
   onCancel(): void;
 }
 
-/** 删除确认对话框：醒目提示学习记录保留，二次确认后移除词书安装标记 */
+/** 删除确认对话框：醒目提示学习记录保留，二次确认后移除词书安装标记 — M3 tokens (scrim/outline/tertiary/error) */
 function ConfirmDeleteDialog({ wordbookName, onConfirm, onCancel }: ConfirmDeleteDialogProps) {
   // ESC 键关闭
   useEffect(() => {
@@ -420,15 +420,15 @@ function ConfirmDeleteDialog({ wordbookName, onConfirm, onCancel }: ConfirmDelet
       aria-label="确认删除词书"
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
     >
-      {/* 背景遮罩 */}
-      <div className="absolute inset-0 bg-black/40" onClick={onCancel} aria-hidden="true" />
-      {/* 对话框主体 */}
-      <div className="relative flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-surface p-6 shadow-lg">
-        <h3 className="text-base font-semibold">确认删除词书</h3>
-        <p className="text-sm text-text-muted">确定要移除「{wordbookName}」吗？</p>
-        {/* 醒目提示框 */}
-        <div className="rounded-xl border border-warning/40 bg-warning/10 p-3">
-          <p className="text-sm font-medium text-warning">
+      {/* 背景遮罩 — M3 scrim */}
+      <div className="absolute inset-0 bg-scrim/40" onClick={onCancel} aria-hidden="true" />
+      {/* 对话框主体 — M3 xl + outline-variant */}
+      <div className="relative flex w-full max-w-sm flex-col gap-4 rounded-xl border border-outline-variant bg-surface p-6 shadow-lg">
+        <h3 className="text-base font-semibold text-on-surface">确认删除词书</h3>
+        <p className="text-sm text-on-surface-variant">确定要移除「{wordbookName}」吗？</p>
+        {/* 醒目提示框 — tertiary 替代 warning（M3 无 warning 角色，复用 tertiary） */}
+        <div className="rounded-lg border border-tertiary/40 bg-tertiary/10 p-3">
+          <p className="text-sm font-medium text-tertiary">
             已学习的词记录不会被删除，但新词将不会继续安排学习。
           </p>
         </div>
@@ -436,14 +436,14 @@ function ConfirmDeleteDialog({ wordbookName, onConfirm, onCancel }: ConfirmDelet
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full border border-border px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full border border-outline-variant px-4 py-2 text-sm font-medium text-on-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
             取消
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-full bg-danger px-4 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full bg-error px-4 py-2 text-sm font-semibold text-on-error transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
             确认删除
           </button>
