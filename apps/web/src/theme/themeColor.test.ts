@@ -10,15 +10,15 @@ import themeColorSource from "./themeColor?raw";
 // 避免 Node 全局类型渗入应用代码，且 jsdom 环境的 URL 会按 http://localhost 解析相对路径。
 const tokensCss = readFileSync("src/styles/tokens.css", "utf8");
 
-// 提取 tokens.css 的 :root 块中浅色 --lex-bg 的值（design tokens 的唯一来源）
+// 提取 tokens.css 的 :root 块中浅色 --lex-background 的值（design tokens 的唯一来源，Batch5 后 --lex-bg 已删除）
 function extractLightBgToken(source: string): string {
   const rootBlock = source.match(/:root\s*\{([\s\S]*?)\}/);
   if (!rootBlock || rootBlock[1] === undefined) {
     throw new Error("tokens.css 中未找到 :root 块");
   }
-  const match = rootBlock[1].match(/--lex-bg:\s*([^;]+);/);
+  const match = rootBlock[1].match(/--lex-background:\s*([^;]+);/);
   if (!match || match[1] === undefined) {
-    throw new Error(":root 块中未找到 --lex-bg");
+    throw new Error(":root 块中未找到 --lex-background");
   }
   return match[1].trim();
 }
@@ -49,8 +49,8 @@ describe("themeColor（meta theme-color 同步）", () => {
     document.documentElement.removeAttribute("style");
   });
 
-  it("将 meta content 同步为当前 --lex-bg token 值", () => {
-    document.documentElement.style.setProperty("--lex-bg", "#0c0a09");
+  it("将 meta content 同步为当前 --lex-background token 值", () => {
+    document.documentElement.style.setProperty("--lex-background", "#0c0a09");
     syncThemeColorMeta();
     expect(meta.content).toBe("#0c0a09");
   });
@@ -62,7 +62,7 @@ describe("themeColor（meta theme-color 同步）", () => {
 
   it("页面不存在 meta 时不抛错", () => {
     document.head.innerHTML = "";
-    document.documentElement.style.setProperty("--lex-bg", "#0c0a09");
+    document.documentElement.style.setProperty("--lex-background", "#0c0a09");
     expect(() => syncThemeColorMeta()).not.toThrow();
   });
 
@@ -70,7 +70,7 @@ describe("themeColor（meta theme-color 同步）", () => {
     expect(themeColorSource).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 
-  it("index.html 初始值与 tokens.css 浅色 --lex-bg 一致（防漂移）", () => {
+  it("index.html 初始值与 tokens.css 浅色 --lex-background 一致（防漂移）", () => {
     expect(extractMetaContent(html)).toBe(extractLightBgToken(tokensCss));
   });
 });
