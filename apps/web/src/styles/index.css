@@ -6,24 +6,113 @@
 
 /*
  * 将语义 token 映射为 Tailwind 工具类：
- * --color-bg          → bg-bg / text-bg / border-bg ...
- * --color-surface     → bg-surface ...
- * --color-primary     → bg-primary / text-primary ...
+ * --color-* → bg-* / text-* / border-* ...
+ * M3 角色全量注册；旧 Tailwind 别名（--color-bg 等）为兼容存量组件保留，
+ * 已重定向至 M3 角色（不再依赖已删除的 --lex-* 旧别名），新代码应优先使用 M3 命名（--color-background 等）。
  * 组件中一律使用这些语义工具类，不直接写十六进制颜色。
+ * Batch5 已删除 --lex-* 旧别名，本处 Tailwind 兼容层随之重定向，后续批次将迁移组件至 M3 类名后移除。
  */
 @theme inline {
-  --color-bg: var(--lex-bg);
+  /* 兼容层（保留旧 Tailwind 类名，底层已指向 M3 --lex-*，待组件迁完后移除） */
+  --color-bg: var(--lex-background);
   --color-surface: var(--lex-surface);
-  --color-surface-raised: var(--lex-surface-raised);
-  --color-border: var(--lex-border);
-  --color-text: var(--lex-text);
-  --color-text-muted: var(--lex-text-muted);
+  --color-surface-raised: var(--lex-surface-container);
+  --color-border: var(--lex-outline-variant);
+  --color-text: var(--lex-on-background);
+  --color-text-muted: var(--lex-on-surface-variant);
   --color-primary: var(--lex-primary);
-  --color-primary-contrast: var(--lex-primary-contrast);
-  --color-accent: var(--lex-accent);
-  --color-danger: var(--lex-danger);
+  --color-primary-contrast: var(--lex-on-primary);
+  --color-accent: var(--lex-tertiary);
+  --color-danger: var(--lex-error);
   --color-success: var(--lex-success);
-  --color-focus-ring: var(--lex-focus-ring);
+  --color-focus-ring: var(--lex-primary);
+
+  /* M3 颜色角色（浅/深两套，源自 tokens.css --lex-*） */
+  --color-background: var(--lex-background);
+  --color-on-background: var(--lex-on-background);
+  --color-on-surface: var(--lex-on-surface);
+  --color-surface-variant: var(--lex-surface-variant);
+  --color-on-surface-variant: var(--lex-on-surface-variant);
+  --color-surface-container-lowest: var(--lex-surface-container-lowest);
+  --color-surface-container-low: var(--lex-surface-container-low);
+  --color-surface-container: var(--lex-surface-container);
+  --color-surface-container-high: var(--lex-surface-container-high);
+  --color-surface-container-highest: var(--lex-surface-container-highest);
+  --color-on-primary: var(--lex-on-primary);
+  --color-primary-container: var(--lex-primary-container);
+  --color-on-primary-container: var(--lex-on-primary-container);
+  --color-secondary: var(--lex-secondary);
+  --color-on-secondary: var(--lex-on-secondary);
+  --color-secondary-container: var(--lex-secondary-container);
+  --color-on-secondary-container: var(--lex-on-secondary-container);
+  --color-tertiary: var(--lex-tertiary);
+  --color-on-tertiary: var(--lex-on-tertiary);
+  --color-tertiary-container: var(--lex-tertiary-container);
+  --color-on-tertiary-container: var(--lex-on-tertiary-container);
+  --color-error: var(--lex-error);
+  --color-on-error: var(--lex-on-error);
+  --color-error-container: var(--lex-error-container);
+  --color-on-error-container: var(--lex-on-error-container);
+  --color-success-container: var(--lex-success-container);
+  --color-on-success: var(--lex-on-success);
+  --color-on-success-container: var(--lex-on-success-container);
+  --color-outline: var(--lex-outline);
+  --color-outline-variant: var(--lex-outline-variant);
+  --color-scrim: var(--lex-scrim);
+  --color-inverse-surface: var(--lex-inverse-surface);
+  --color-inverse-on-surface: var(--lex-inverse-on-surface);
+  --color-inverse-primary: var(--lex-inverse-primary);
+
+  /* Shape */
+  --radius-xs: var(--lex-radius-xs);
+  --radius-sm: var(--lex-radius-sm);
+  --radius-md: var(--lex-radius-md);
+  --radius-lg: var(--lex-radius-lg);
+  --radius-xl: var(--lex-radius-xl);
+  --radius-full: var(--lex-radius-full);
+
+  /* Type Scale — 15 档注册为 --text-*（Web 版 sp→rem） */
+  --text-display-large: var(--lex-typescale-display-large-size);
+  --text-display-large--line-height: var(--lex-typescale-display-large-line-height);
+  --text-display-medium: var(--lex-typescale-display-medium-size);
+  --text-display-medium--line-height: var(--lex-typescale-display-medium-line-height);
+  --text-display-small: var(--lex-typescale-display-small-size);
+  --text-display-small--line-height: var(--lex-typescale-display-small-line-height);
+  --text-headline-large: var(--lex-typescale-headline-large-size);
+  --text-headline-large--line-height: var(--lex-typescale-headline-large-line-height);
+  --text-headline-medium: var(--lex-typescale-headline-medium-size);
+  --text-headline-medium--line-height: var(--lex-typescale-headline-medium-line-height);
+  --text-headline-small: var(--lex-typescale-headline-small-size);
+  --text-headline-small--line-height: var(--lex-typescale-headline-small-line-height);
+  --text-title-large: var(--lex-typescale-title-large-size);
+  --text-title-large--line-height: var(--lex-typescale-title-large-line-height);
+  --text-title-medium: var(--lex-typescale-title-medium-size);
+  --text-title-medium--line-height: var(--lex-typescale-title-medium-line-height);
+  --text-title-small: var(--lex-typescale-title-small-size);
+  --text-title-small--line-height: var(--lex-typescale-title-small-line-height);
+  --text-body-large: var(--lex-typescale-body-large-size);
+  --text-body-large--line-height: var(--lex-typescale-body-large-line-height);
+  --text-body-medium: var(--lex-typescale-body-medium-size);
+  --text-body-medium--line-height: var(--lex-typescale-body-medium-line-height);
+  --text-body-small: var(--lex-typescale-body-small-size);
+  --text-body-small--line-height: var(--lex-typescale-body-small-line-height);
+  --text-label-large: var(--lex-typescale-label-large-size);
+  --text-label-large--line-height: var(--lex-typescale-label-large-line-height);
+  --text-label-medium: var(--lex-typescale-label-medium-size);
+  --text-label-medium--line-height: var(--lex-typescale-label-medium-line-height);
+  --text-label-small: var(--lex-typescale-label-small-size);
+  --text-label-small--line-height: var(--lex-typescale-label-small-line-height);
+
+  /* 字体栈 */
+  --font-sans: var(--lex-font-sans);
+  --font-mono: var(--lex-font-mono);
+
+  /* Motion */
+  --ease-standard: var(--lex-motion-easing-standard);
+  --ease-emphasized-decelerate: var(--lex-motion-easing-emphasized-decelerate);
+  --ease-emphasized-accelerate: var(--lex-motion-easing-emphasized-accelerate);
+  --ease-standard-decelerate: var(--lex-motion-easing-standard-decelerate);
+  --ease-standard-accelerate: var(--lex-motion-easing-standard-accelerate);
 }
 
 /*

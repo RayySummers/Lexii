@@ -10,7 +10,7 @@
  * - 初始实际主题：DOM 已应用 data-theme 时直接采用（与内联脚本保持一致，防止二次闪烁），
  *   否则按 localStorage → 系统偏好 → 默认浅色解析（resolveTheme）
  * - 实际主题变化时写入 <html data-theme="..."> 并持久化偏好到 localStorage；
- *   同时同步 <meta name="theme-color">（浏览器外壳色，值取自 --lex-bg token）
+ *   同时同步 <meta name="theme-color">（浏览器外壳色，值取自 --lex-background token）
  */
 import { useCallback, useEffect, useState } from "react";
 import {

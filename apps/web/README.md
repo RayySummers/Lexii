@@ -16,7 +16,7 @@ pnpm build          # tsc --noEmit + vite build
 - `src/styles/tokens.css` — 语义化 design tokens（浅色/深色两套，组件禁止硬编码颜色）
 - `src/hooks/useTheme.ts` — 主题状态（RAY-261 三档偏好：浅色 / 深色 / 跟随系统，localStorage 持久化；跟随系统档位监听设备主题自动切换；跨标签页偏好变更经 storage 事件同步）；实际主题通过 `<html data-theme>` 生效
 - `src/theme/resolve.ts` — 主题解析纯函数：偏好 → 实际主题（light/dark 直接采用，system/缺失/非法跟随系统），与 index.html 内联脚本共用同一套规则
-- `src/theme/themeColor.ts` — 浏览器外壳色同步：`meta theme-color` 跟随主题，值取自 `--lex-bg` token（不硬编码）
+- `src/theme/themeColor.ts` — 浏览器外壳色同步：`meta theme-color` 跟随主题，值取自 `--lex-background` token（M3，Batch5 后 `--lex-bg` 已删除，不硬编码）
 - `src/App.tsx` — 应用外壳：全局导航（统计 / 设置入口，RAY-261 起 header 无主题开关）+ 首页 / 复习 / 设置 / 统计界面切换
 - `src/HomeScreen.tsx` — 首页：三模式按钮（学习 / 复习 / 混合）+ 今日待学徽标（无品牌名与介绍文案，已归档 docs/archive/homepage-intro-v1.md）
 - `src/components/ScreenHeader.tsx` — 内部页面统一导航头（左侧返回箭头、标题右对齐，设置页与统计页共用）
