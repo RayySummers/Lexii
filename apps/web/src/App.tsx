@@ -281,18 +281,19 @@ export function App({
   );
 
   return (
-    <div className="min-h-screen bg-bg text-text transition-colors">
-      {/* RAY-373/374 header 契约：统一 h-10 高度（按钮 inline-flex h-10 w-10 shrink-0 leading-none，图标 h-5 w-5 → 20px，
+    <div className="min-h-screen bg-background text-on-background transition-colors">
+      {/* RAY-373/374 header 契约（RAY-398 已迁移至 M3 角色）：统一 h-10 高度（按钮 inline-flex h-10 w-10 shrink-0 leading-none，图标 h-5 w-5 → 20px，
            opsz 动态 24，Material Symbols），容器 flex-nowrap + shrink-0 保证 390px 单行不换行（OFFSET 86px）且 768px 不回归，
            focus-visible 完整保留；RAY-374 全量图标化 5 按钮（搜词/自定义词单/生词本/统计/设置，aria-label 可达名，图标 aria-hidden 装饰），
-           词单仅单一图标无 h-5/h-4 双图标叠加，移除 sm 文字/图标分叉口径，桌面/移动一致。 */}
+           词单仅单一图标无 h-5/h-4 双图标叠加，移除 sm 文字/图标分叉口径，桌面/移动一致。
+           RAY-398 迁移：bg-bg → bg-background、text-text → text-on-surface、border-border → border-outline-variant、focus-ring → outline-primary，外观不变。 */}
       <header className="mx-auto flex w-full max-w-3xl flex-nowrap items-center justify-end gap-1.5 px-4 py-6 sm:gap-2 sm:px-6">
         <button
           type="button"
           onClick={openSearch}
           aria-label="搜词"
           aria-pressed={view === "search"}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text leading-none transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant bg-surface text-on-surface leading-none transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <SearchIcon className="h-5 w-5" />
         </button>
@@ -301,7 +302,7 @@ export function App({
           onClick={openNotebook}
           aria-pressed={view === "notebook"}
           aria-label="生词本"
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text leading-none transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant bg-surface text-on-surface leading-none transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <BookmarkIcon className="h-5 w-5" />
         </button>
@@ -310,7 +311,7 @@ export function App({
           onClick={openCustomLists}
           aria-pressed={view === "custom-lists" || view === "custom-list"}
           aria-label="自定义词单"
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text leading-none transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant bg-surface text-on-surface leading-none transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <ListIcon className="h-5 w-5" />
         </button>
@@ -319,7 +320,7 @@ export function App({
           onClick={openStats}
           aria-label="统计"
           aria-pressed={view === "stats"}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text leading-none transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant bg-surface text-on-surface leading-none transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <BarChartIcon className="h-5 w-5" />
         </button>
@@ -328,7 +329,7 @@ export function App({
           onClick={() => openSettings()}
           aria-label="设置"
           aria-pressed={view === "settings"}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text leading-none transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant bg-surface text-on-surface leading-none transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <SettingsIcon className="h-5 w-5" />
         </button>

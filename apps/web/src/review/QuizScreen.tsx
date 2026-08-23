@@ -47,7 +47,7 @@ export function QuizScreen({ provider, mode, onExit }: QuizScreenProps) {
           type="button"
           onClick={onExit}
           aria-label="返回首页"
-          className="rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="rounded-full border border-outline-variant bg-surface p-2.5 text-on-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <BackArrowIcon className="h-5 w-5" />
         </button>
@@ -55,7 +55,7 @@ export function QuizScreen({ provider, mode, onExit }: QuizScreenProps) {
           <span
             role="status"
             aria-label={`进度 ${session.index + 1} / ${session.totalCount}`}
-            className="text-sm text-text-muted"
+            className="text-sm text-on-surface-variant"
           >
             {session.index + 1} / {session.totalCount} · 已答 {session.answeredCount}
           </span>
@@ -77,21 +77,21 @@ function PhaseContent({ session, mode, onExit }: PhaseContentProps) {
   switch (session.phase) {
     case "loading":
       return (
-        <div role="status" className="py-16 text-center text-text-muted">
+        <div role="status" className="py-16 text-center text-on-surface-variant">
           正在加载选择题…
         </div>
       );
     case "empty":
       return (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 text-center">
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-outline-variant bg-surface p-8 text-center">
           <h2 className="text-xl font-semibold">词库还是空的</h2>
-          <p className="max-w-sm text-sm text-text-muted">
+          <p className="max-w-sm text-sm text-on-surface-variant">
             还没有任何需要学习的词。先导入词表，再回来做选择题。
           </p>
           <button
             type="button"
             onClick={onExit}
-            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             返回首页
           </button>
@@ -103,13 +103,13 @@ function PhaseContent({ session, mode, onExit }: PhaseContentProps) {
           ? quotaExhaustedCopy(mode, readDailyNewCardLimit())
           : null) ?? NO_QUEUE_COPY[mode];
       return (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 text-center">
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-outline-variant bg-surface p-8 text-center">
           <h2 className="text-xl font-semibold">{copy.title}</h2>
-          <p className="max-w-sm text-sm text-text-muted">{copy.body}</p>
+          <p className="max-w-sm text-sm text-on-surface-variant">{copy.body}</p>
           <button
             type="button"
             onClick={onExit}
-            className="rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full border border-outline-variant bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             返回首页
           </button>
@@ -118,13 +118,13 @@ function PhaseContent({ session, mode, onExit }: PhaseContentProps) {
     }
     case "error":
       return (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-danger/40 bg-surface p-8 text-center">
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-error/40 bg-surface p-8 text-center">
           <h2 className="text-xl font-semibold">加载失败</h2>
-          <p className="max-w-sm text-sm text-text-muted">{session.error}</p>
+          <p className="max-w-sm text-sm text-on-surface-variant">{session.error}</p>
           <button
             type="button"
             onClick={session.retry}
-            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             重试
           </button>
@@ -132,15 +132,15 @@ function PhaseContent({ session, mode, onExit }: PhaseContentProps) {
       );
     case "done":
       return (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 text-center">
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-outline-variant bg-surface p-8 text-center">
           <h2 className="text-xl font-semibold">
             {mode === "learn" ? "本轮学习完成" : "本轮练习完成"}
           </h2>
-          <p className="text-sm text-text-muted">共完成 {session.answeredCount} 道选择题</p>
+          <p className="text-sm text-on-surface-variant">共完成 {session.answeredCount} 道选择题</p>
           <button
             type="button"
             onClick={onExit}
-            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             返回首页
           </button>
@@ -157,7 +157,7 @@ function PhaseContent({ session, mode, onExit }: PhaseContentProps) {
             selectedIndex={session.selectedIndex}
             onSelect={session.select}
           />
-          <p className="text-center text-xs text-text-muted">按 1–4 选择答案</p>
+          <p className="text-center text-xs text-on-surface-variant">按 1–4 选择答案</p>
         </>
       );
   }

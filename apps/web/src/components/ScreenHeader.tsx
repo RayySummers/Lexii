@@ -1,5 +1,5 @@
 /**
- * 内部页面统一导航头（RAY-253 反馈 5）。
+ * 内部页面统一导航头（RAY-253 反馈 5，RAY-398 迁移至 M3）。
  *
  * 用户偏好的导航样式：左侧放向左箭头返回上一页，标题右对齐。
  * 设置页与统计页采用同样式（复习页沿用该箭头按钮样式）。
@@ -7,6 +7,8 @@
  * 「数据来源与许可」）经 backLabel 覆盖为「返回设置」。
  *
  * 可达性：返回按钮的可达名为 backLabel（图标为装饰性，aria-hidden）。
+ * RAY-398 迁移：border-border → border-outline-variant、bg-surface 保留（已为 M3 --lex-surface）、
+ * text-text → text-on-surface、focus-ring → outline-primary、rounded-full 为 M3 full（不变），外观不变。
  */
 import { BackArrowIcon } from "./icons";
 
@@ -26,7 +28,7 @@ export function ScreenHeader({ title, onBack, backLabel = "返回首页" }: Scre
         type="button"
         onClick={onBack}
         aria-label={backLabel}
-        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text leading-none transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant bg-surface text-on-surface leading-none transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         <BackArrowIcon className="h-5 w-5" />
       </button>

@@ -30,17 +30,17 @@ const THREE_TIER_CONFIGS: readonly RatingButtonConfig[] = [
     rating: "again",
     label: "不认识",
     shortcut: RATING_SHORTCUTS.again,
-    textClass: "text-danger",
-    hoverBorderClass: "hover:border-danger",
-    hoverBgClass: "hover:bg-danger/10",
+    textClass: "text-error",
+    hoverBorderClass: "hover:border-error",
+    hoverBgClass: "hover:bg-error/10",
   },
   {
     rating: "hard",
     label: "模糊",
     shortcut: RATING_SHORTCUTS.hard,
-    textClass: "text-accent",
-    hoverBorderClass: "hover:border-accent",
-    hoverBgClass: "hover:bg-accent/10",
+    textClass: "text-tertiary",
+    hoverBorderClass: "hover:border-tertiary",
+    hoverBgClass: "hover:bg-tertiary/10",
   },
   {
     rating: "good",
@@ -58,17 +58,17 @@ const FOUR_TIER_CONFIGS: readonly RatingButtonConfig[] = [
     rating: "again",
     label: "Again",
     shortcut: RATING_SHORTCUTS.again,
-    textClass: "text-danger",
-    hoverBorderClass: "hover:border-danger",
-    hoverBgClass: "hover:bg-danger/10",
+    textClass: "text-error",
+    hoverBorderClass: "hover:border-error",
+    hoverBgClass: "hover:bg-error/10",
   },
   {
     rating: "hard",
     label: "Hard",
     shortcut: RATING_SHORTCUTS.hard,
-    textClass: "text-accent",
-    hoverBorderClass: "hover:border-accent",
-    hoverBgClass: "hover:bg-accent/10",
+    textClass: "text-tertiary",
+    hoverBorderClass: "hover:border-tertiary",
+    hoverBgClass: "hover:bg-tertiary/10",
   },
   {
     rating: "good",
@@ -115,11 +115,11 @@ export function RatingButtons({ dueLabels, onGrade, mode }: RatingButtonsProps) 
             type="button"
             onClick={() => onGrade(config.rating)}
             aria-label={`评分：${config.label}，快捷键 ${config.shortcut}`}
-            className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-semibold transition-colors ${config.hoverBorderClass} ${config.hoverBgClass} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring active:scale-[0.98]`}
+            className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-md border border-outline-variant bg-surface px-3 py-2.5 text-sm font-semibold transition-colors ${config.hoverBorderClass} ${config.hoverBgClass} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.98]`}
           >
             <span className={`text-base font-bold ${config.textClass}`}>{config.label}</span>
-            {dueLabel !== null ? <span className="text-xs text-text-muted">{dueLabel}</span> : null}
-            <kbd className="absolute right-2 top-2 hidden rounded border border-border bg-surface-raised px-1.5 py-0.5 text-[10px] font-normal text-text-muted md:block">
+            {dueLabel !== null ? <span className="text-xs text-on-surface-variant">{dueLabel}</span> : null}
+            <kbd className="absolute right-2 top-2 hidden rounded border border-outline-variant bg-surface-container px-1.5 py-0.5 text-[10px] font-normal text-on-surface-variant md:block">
               {config.shortcut}
             </kbd>
           </button>

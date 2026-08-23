@@ -68,7 +68,7 @@ export function MultipleChoiceCard({ question, selectedIndex, onSelect }: Multip
   return (
     <div ref={containerRef} className="flex flex-col gap-4">
       {/* 题面：英译中 = 词条（大字号）+ 词性；中译英 = 主释义（中等字号，可能较长） */}
-      <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface p-6 text-center">
+      <div className="flex flex-col items-center gap-2 rounded-lg border border-outline-variant bg-surface p-6 text-center">
         <span
           className={`font-bold tracking-tight ${
             isZhEn ? "text-2xl sm:text-3xl" : "text-4xl sm:text-5xl"
@@ -77,11 +77,11 @@ export function MultipleChoiceCard({ question, selectedIndex, onSelect }: Multip
           {promptText}
         </span>
         {!isZhEn && sense.pos ? (
-          <span className="rounded-full border border-border bg-surface-raised px-2 py-0.5 text-sm text-text-muted">
+          <span className="rounded-full border border-outline-variant bg-surface-container px-2 py-0.5 text-sm text-on-surface-variant">
             {sense.pos}
           </span>
         ) : null}
-        <span className="text-sm text-text-muted">{promptHint}</span>
+        <span className="text-sm text-on-surface-variant">{promptHint}</span>
       </div>
 
       {/* 选项列表 */}
@@ -123,11 +123,11 @@ function OptionButton({
   revealed,
   onSelect,
 }: OptionButtonProps) {
-  let stateClass = "border-border hover:border-primary";
+  let stateClass = "border-outline-variant hover:border-primary";
   if (revealed && option.isCorrect) {
     stateClass = "border-success bg-success/10";
   } else if (revealed && selected && !option.isCorrect) {
-    stateClass = "border-danger bg-danger/10";
+    stateClass = "border-error bg-error/10";
   } else if (selected) {
     stateClass = "border-primary bg-primary/10";
   }
@@ -140,9 +140,9 @@ function OptionButton({
       aria-disabled={disabled}
       onClick={onSelect}
       disabled={disabled}
-      className={`relative flex min-h-12 items-center gap-3 rounded-xl border bg-surface px-4 py-3 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-default sm:min-h-14 ${stateClass}`}
+      className={`relative flex min-h-12 items-center gap-3 rounded-md border bg-surface px-4 py-3 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-default sm:min-h-14 ${stateClass}`}
     >
-      <kbd className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border bg-surface-raised text-xs font-medium text-text-muted">
+      <kbd className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-outline-variant bg-surface-container text-xs font-medium text-on-surface-variant">
         {index + 1}
       </kbd>
       <span className="flex-1">{option.text}</span>
@@ -152,7 +152,7 @@ function OptionButton({
         </span>
       ) : null}
       {revealed && selected && !option.isCorrect ? (
-        <span aria-label="错误" className="text-lg text-danger">
+        <span aria-label="错误" className="text-lg text-error">
           ✗
         </span>
       ) : null}

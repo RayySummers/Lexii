@@ -252,7 +252,7 @@ export function ReviewScreen({
           type="button"
           onClick={onExit}
           aria-label="返回首页"
-          className="rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="rounded-full border border-outline-variant bg-surface p-2.5 text-on-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <BackArrowIcon className="h-5 w-5" />
         </button>
@@ -261,7 +261,7 @@ export function ReviewScreen({
             <span
               role="status"
               aria-label={`进度 ${session.index + 1} / ${session.totalCount}，剩余 ${session.totalCount - session.index - 1}`}
-              className="text-sm text-text-muted"
+              className="text-sm text-on-surface-variant"
             >
               {session.index + 1} / {session.totalCount} · 剩余{" "}
               {session.totalCount - session.index - 1}
@@ -325,22 +325,22 @@ function PhaseContent({
   switch (session.phase) {
     case "loading":
       return (
-        <div role="status" className="py-16 text-center text-text-muted">
+        <div role="status" className="py-16 text-center text-on-surface-variant">
           正在加载复习队列…
         </div>
       );
     case "empty":
       return (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 text-center">
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-outline-variant bg-surface p-8 text-center">
           <h2 className="text-xl font-semibold">词库还是空的</h2>
-          <p className="max-w-sm text-sm text-text-muted">
+          <p className="max-w-sm text-sm text-on-surface-variant">
             还没有任何需要学习的词。导入你自己的 CSV 词表，或先导入内置示例词表体验完整的学习流程。
           </p>
           <button
             type="button"
             onClick={() => void session.importSample()}
             disabled={session.importing}
-            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
           >
             {session.importing
               ? "正在导入…"
@@ -354,13 +354,13 @@ function PhaseContent({
           ? quotaExhaustedCopy(mode, readDailyNewCardLimit())
           : null) ?? NO_QUEUE_COPY[mode];
       return (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 text-center">
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-outline-variant bg-surface p-8 text-center">
           <h2 className="text-xl font-semibold">{copy.title}</h2>
-          <p className="max-w-sm text-sm text-text-muted">{copy.body}</p>
+          <p className="max-w-sm text-sm text-on-surface-variant">{copy.body}</p>
           <button
             type="button"
             onClick={onExit}
-            className="rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full border border-outline-variant bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             返回首页
           </button>
@@ -369,13 +369,13 @@ function PhaseContent({
     }
     case "error":
       return (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-danger/40 bg-surface p-8 text-center">
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-error/40 bg-surface p-8 text-center">
           <h2 className="text-xl font-semibold">加载失败</h2>
-          <p className="max-w-sm text-sm text-text-muted">{session.error}</p>
+          <p className="max-w-sm text-sm text-on-surface-variant">{session.error}</p>
           <button
             type="button"
             onClick={session.retry}
-            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             重试
           </button>
@@ -383,11 +383,11 @@ function PhaseContent({
       );
     case "done":
       return (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 text-center">
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-outline-variant bg-surface p-8 text-center">
           <h2 className="text-xl font-semibold">
             {mode === "learn" ? "本轮学习完成" : "本轮复习完成"}
           </h2>
-          <p className="text-sm text-text-muted">
+          <p className="text-sm text-on-surface-variant">
             {mode === "learn"
               ? `共学习 ${session.gradedCount} 张卡片`
               : `共复习 ${session.gradedCount} 张卡片`}
@@ -396,7 +396,7 @@ function PhaseContent({
           <button
             type="button"
             onClick={onExit}
-            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             返回首页
           </button>
@@ -419,7 +419,7 @@ function PhaseContent({
               type="button"
               onClick={onSpeak}
               aria-label={`朗读 ${session.current.sense.term} 的发音`}
-              className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+              className="flex items-center gap-1.5 rounded-full border border-outline-variant bg-surface px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <SpeakerIcon className="h-4 w-4" />
               发音
@@ -428,7 +428,7 @@ function PhaseContent({
               type="button"
               onClick={() => void session.markMastered()}
               aria-label="标熟：这个词我已掌握，按很长的间隔以后再复习（词仍在词书中）"
-              className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold transition-colors hover:border-success hover:bg-success/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+              className="flex items-center gap-1.5 rounded-full border border-outline-variant bg-surface px-4 py-2 text-sm font-semibold transition-colors hover:border-success hover:bg-success/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <span aria-hidden="true" className="text-base leading-none text-success">
                 熟
@@ -439,7 +439,7 @@ function PhaseContent({
               type="button"
               onClick={onOpenAddToLists}
               aria-label={`把「${session.current.sense.term}」添加到词单`}
-              className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text-muted transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+              className="flex items-center gap-1.5 rounded-full border border-outline-variant bg-surface px-4 py-2 text-sm font-medium text-on-surface-variant transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <ListIcon className="h-4 w-4" />
               添加到词单
@@ -451,7 +451,7 @@ function PhaseContent({
             onGrade={(rating) => void session.grade(rating)}
           />
           {speakNotice ? (
-            <p role="status" className="text-center text-xs text-text-muted">
+            <p role="status" className="text-center text-xs text-on-surface-variant">
               {speakNotice}
             </p>
           ) : null}
@@ -461,7 +461,7 @@ function PhaseContent({
             <ReturnButton onReturn={() => void session.redo()} />
           ) : null}
           {/* RAY-362：按键指示移动端隐藏（<768px hidden），桌面端保留，纯 CSS 响应式无布局跳动 */}
-          <p className="hidden text-center text-xs text-text-muted md:block">
+          <p className="hidden text-center text-xs text-on-surface-variant md:block">
             空格翻面 ·{" "}
             {tierMode === "three" ? "数字键 1–3 评分" : "数字键 1–4 或字母 A / H / G / E 评分"}
           </p>
@@ -476,7 +476,7 @@ function UndoButton({ onUndo }: { onUndo(): void }) {
     <button
       type="button"
       onClick={onUndo}
-      className="flex w-fit items-center gap-1.5 self-center rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text-muted transition-colors hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+      className="flex w-fit items-center gap-1.5 self-center rounded-full border border-outline-variant bg-surface px-4 py-2 text-sm font-medium text-on-surface-variant transition-colors hover:border-tertiary hover:text-tertiary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
     >
       <UndoIcon className="h-4 w-4" />
       撤销上一步
@@ -497,7 +497,7 @@ function ReturnButton({ onReturn }: { onReturn(): void }) {
       type="button"
       onClick={onReturn}
       aria-label="返回"
-      className="flex w-fit items-center gap-1.5 self-center rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text-muted transition-colors hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+      className="flex w-fit items-center gap-1.5 self-center rounded-full border border-outline-variant bg-surface px-4 py-2 text-sm font-medium text-on-surface-variant transition-colors hover:border-tertiary hover:text-tertiary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
     >
       <RedoIcon className="h-4 w-4" />
       返回

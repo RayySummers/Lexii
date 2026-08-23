@@ -7,7 +7,7 @@
  * 富化字段全部可选：缺失时不渲染对应区块，卡片退化为既有形态。
  *
  * RAY-321：正反面标题行均展示词性 chip（n. / v. / adj. 等），
- * 与词条标签同口径——圆角 chip、文字色继承 text-text-muted、显式
+ * 与词条标签同口径——圆角 chip、文字色继承 text-on-surface-variant、显式
  * text-xs（不依赖父容器继承，避免父级 text-sm 改动时静默连带变化）。
  *
  * RAY-349：背面每条释义前标该释义的词性（n. / vt. / adj.…），替代原来
@@ -156,7 +156,7 @@ export function ReviewCard({ sense, flipped, onFlip, onSynonymSelect }: ReviewCa
         onKeyUp={handleCardKeyUp}
         aria-expanded={flipped}
         aria-label={flipped ? `隐藏 ${sense.term} 的释义` : `显示 ${sense.term} 的释义`}
-        className="group grid h-full w-full cursor-pointer text-left [transform-style:preserve-3d] transition-transform duration-300 ease-out motion-reduce:transition-none [transform:rotateY(0deg)] aria-expanded:[transform:rotateY(180deg)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        className="group grid h-full w-full cursor-pointer text-left [transform-style:preserve-3d] transition-transform duration-300 ease-out motion-reduce:transition-none [transform:rotateY(0deg)] aria-expanded:[transform:rotateY(180deg)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         <CardFace hidden={flipped}>
           <div
@@ -173,10 +173,10 @@ export function ReviewCard({ sense, flipped, onFlip, onSynonymSelect }: ReviewCa
               >
                 {sense.term}
               </span>
-              <span className="flex flex-wrap items-center justify-center gap-2 text-sm text-text-muted">
+              <span className="flex flex-wrap items-center justify-center gap-2 text-sm text-on-surface-variant">
                 <PhoneticsRow sense={sense} />
                 {sense.pos ? (
-                  <span className="rounded-full border border-border bg-surface-raised px-2 py-0.5 text-xs text-text-muted">
+                  <span className="rounded-full border border-outline-variant bg-surface-container px-2 py-0.5 text-xs text-on-surface-variant">
                     {sense.pos}
                   </span>
                 ) : null}
@@ -186,7 +186,7 @@ export function ReviewCard({ sense, flipped, onFlip, onSynonymSelect }: ReviewCa
                   {sense.tags.map((tag, index) => (
                     <span
                       key={`${index}:${tag}`}
-                      className="rounded-full border border-border px-2 py-0.5 text-xs text-text-muted"
+                      className="rounded-full border border-outline-variant px-2 py-0.5 text-xs text-on-surface-variant"
                     >
                       {tag}
                     </span>
@@ -195,7 +195,7 @@ export function ReviewCard({ sense, flipped, onFlip, onSynonymSelect }: ReviewCa
               ) : null}
             </div>
           </div>
-          <span className="shrink-0 px-6 pb-5 pt-2 text-center text-xs text-text-muted">
+          <span className="shrink-0 px-6 pb-5 pt-2 text-center text-xs text-on-surface-variant">
             点击卡片或按空格查看释义
           </span>
         </CardFace>
@@ -219,7 +219,7 @@ export function ReviewCard({ sense, flipped, onFlip, onSynonymSelect }: ReviewCa
                   {sense.term}
                 </span>
                 {sense.pos ? (
-                  <span className="rounded-full border border-border bg-surface-raised px-2 py-0.5 text-xs text-text-muted">
+                  <span className="rounded-full border border-outline-variant bg-surface-container px-2 py-0.5 text-xs text-on-surface-variant">
                     {sense.pos}
                   </span>
                 ) : null}
@@ -237,7 +237,7 @@ export function ReviewCard({ sense, flipped, onFlip, onSynonymSelect }: ReviewCa
             <CardSection title="例句" visible={sense.examples.length > 0}>
               {sense.examples.map((example, index) => (
                 <span key={`${index}:${example.text}`} className="flex flex-col gap-0.5">
-                  <span className="text-sm text-text-muted">{example.text}</span>
+                  <span className="text-sm text-on-surface-variant">{example.text}</span>
                   {example.translation ? (
                     <span className="text-sm">{example.translation}</span>
                   ) : null}
@@ -249,18 +249,18 @@ export function ReviewCard({ sense, flipped, onFlip, onSynonymSelect }: ReviewCa
                 {wordParts.map((segment, index) => (
                   <li
                     key={`${index}:${segment.part}`}
-                    className="rounded-lg border border-border bg-surface-raised px-2.5 py-0.5 text-sm"
+                    className="rounded-sm border border-outline-variant bg-surface-container px-2.5 py-0.5 text-sm"
                   >
                     <span className="font-semibold">{segment.part}</span>
                     {segment.meaning ? (
-                      <span className="text-text-muted"> {segment.meaning}</span>
+                      <span className="text-on-surface-variant"> {segment.meaning}</span>
                     ) : null}
                   </li>
                 ))}
               </ul>
             </CardSection>
             <CardSection title="中文词源" visible={Boolean(sense.etymologyZh)}>
-              <p className="text-sm leading-relaxed text-text-muted">
+              <p className="text-sm leading-relaxed text-on-surface-variant">
                 {parseInlineMarkdown(ensureBalancedText(sense.etymologyZh ?? ""))}
               </p>
             </CardSection>
@@ -273,7 +273,7 @@ export function ReviewCard({ sense, flipped, onFlip, onSynonymSelect }: ReviewCa
           </div>
           {/* RAY-362：文案“按 1-3 评分”已删除，保留 key icon；移动端 <768px 自动隐藏，桌面端保留，纯 CSS 响应式无布局跳动 */}
           <span
-            className="hidden shrink-0 items-center justify-center px-6 pb-5 pt-2 text-text-muted md:flex"
+            className="hidden shrink-0 items-center justify-center px-6 pb-5 pt-2 text-on-surface-variant md:flex"
             aria-hidden="true"
           >
             <KeyboardIcon className="h-3.5 w-3.5" />
@@ -287,15 +287,15 @@ export function ReviewCard({ sense, flipped, onFlip, onSynonymSelect }: ReviewCa
 /**
  * 释义前缀（RAY-349）：优先标词性（n. / vt. / adj.…），词性未知时退回旧口径
  * 的序号；单条释义且无词性时不加任何前缀（与改动前一致，避免噪声）。
- * 词性用 text-text-muted + 显式 text-xs，与标题行的词性 chip 同色阶、
+ * 词性用 text-on-surface-variant + 显式 text-xs，与标题行的词性 chip 同色阶、
  * 不喧宾夺主（RAY-321 chip 口径）。
  */
 function DefinitionMarker({ pos, index }: { pos: string; index: number }) {
   if (pos !== "") {
-    return <span className="mr-1 text-xs text-text-muted">{pos}</span>;
+    return <span className="mr-1 text-xs text-on-surface-variant">{pos}</span>;
   }
   if (index > 0) {
-    return <span className="text-text-muted">{index + 1}. </span>;
+    return <span className="text-on-surface-variant">{index + 1}. </span>;
   }
   return null;
 }
@@ -320,7 +320,7 @@ function PhoneticsRow({ sense, className = "" }: { sense: Sense; className?: str
           className="flex items-center gap-1"
         >
           {badge.label ? (
-            <span className="rounded-full border border-border bg-surface-raised px-1.5 py-px text-xs">
+            <span className="rounded-full border border-outline-variant bg-surface-container px-1.5 py-px text-xs">
               {badge.label}
             </span>
           ) : null}
@@ -360,8 +360,8 @@ function CardSection({
     return null;
   }
   return (
-    <div className="flex flex-col gap-1.5 border-t border-border pt-3">
-      <span className="text-xs font-medium text-text-muted">{title}</span>
+    <div className="flex flex-col gap-1.5 border-t border-outline-variant pt-3">
+      <span className="text-xs font-medium text-on-surface-variant">{title}</span>
       {children}
     </div>
   );
@@ -374,7 +374,7 @@ function WordChips({ words }: { words: string[] }) {
       {words.map((word, index) => (
         <li
           key={`${index}:${word}`}
-          className="rounded-full border border-border bg-surface-raised px-2.5 py-0.5 text-sm"
+          className="rounded-full border border-outline-variant bg-surface-container px-2.5 py-0.5 text-sm"
         >
           {word}
         </li>
@@ -407,9 +407,9 @@ function SynonymGroups({
     <div className="flex flex-col gap-3">
       {groups.map((group) => (
         <div key={group.definitionIndex} className="flex flex-col gap-1.5">
-          <span className="text-xs text-text-muted">
+          <span className="text-xs text-on-surface-variant">
             {group.pos ? (
-              <span className="mr-1 rounded-full border border-border bg-surface-raised px-1.5 py-px text-xs text-text-muted">
+              <span className="mr-1 rounded-full border border-outline-variant bg-surface-container px-1.5 py-px text-xs text-on-surface-variant">
                 {group.pos}
               </span>
             ) : null}
@@ -440,7 +440,7 @@ function SynonymGroups({
                       }}
                       aria-label={`搜索近义词 ${word}`}
                       title={`搜索「${word}」`}
-                      className="rounded-full border border-border bg-surface-raised px-2.5 py-0.5 text-sm transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                      className="rounded-full border border-outline-variant bg-surface-container px-2.5 py-0.5 text-sm transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     >
                       {word}
                     </button>
@@ -448,10 +448,10 @@ function SynonymGroups({
                     <span
                       title={isSelf ? `${word}（当前词，无需跳转）` : word}
                       aria-label={isSelf ? `${word}（当前词）` : undefined}
-                      className={`rounded-full border bg-surface-raised px-2.5 py-0.5 text-sm ${
+                      className={`rounded-full border bg-surface-container px-2.5 py-0.5 text-sm ${
                         isSelf
-                          ? "cursor-not-allowed border-border text-text-muted opacity-60"
-                          : "border-border"
+                          ? "cursor-not-allowed border-outline-variant text-on-surface-variant opacity-60"
+                          : "border-outline-variant"
                       }`}
                     >
                       {word}
@@ -490,7 +490,7 @@ function CardFace({ children, hidden, rotated = false }: CardFaceProps) {
   return (
     <div
       aria-hidden={hidden}
-      className={`col-start-1 row-start-1 flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-surface [backface-visibility:hidden] ${
+      className={`col-start-1 row-start-1 flex h-full flex-col overflow-hidden rounded-lg border border-outline-variant bg-surface [backface-visibility:hidden] ${
         rotated ? "[transform:rotateY(180deg)]" : ""
       }`}
     >

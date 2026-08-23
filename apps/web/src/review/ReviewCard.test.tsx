@@ -145,7 +145,7 @@ describe("ReviewCard 背面富化内容", () => {
     expect(posBadges.length).toBeGreaterThanOrEqual(2);
     for (const badge of posBadges) {
       expect(badge).toHaveClass("text-xs");
-      expect(badge).toHaveClass("text-text-muted");
+      expect(badge).toHaveClass("text-on-surface-variant");
     }
   });
 
@@ -235,7 +235,7 @@ describe("ReviewCard 固定高度与卡片内部滚动（RAY-291）", () => {
     const faces = Array.from(cardButton().querySelectorAll(":scope > div"));
     expect(faces).toHaveLength(2);
     for (const face of faces) {
-      expect(face).toHaveClass("h-full", "overflow-hidden", "rounded-2xl", "border");
+      expect(face).toHaveClass("h-full", "overflow-hidden", "rounded-lg", "border");
     }
   });
 
