@@ -14,9 +14,8 @@
 ### 0.1 Seed 与色板来源
 
 - **Seed：** `#4F46E5`（indigo，HCT 287.1° / 73.3 / 40.7）
-- **生成方式：** `material-color-utilities` `SchemeTonalSpot`（`DynamicScheme` + `Variant.TONAL_SPOT`，`contrastLevel 0.0`）
-  - 主色组：`TonalPalette.fromHueAndChroma(hue, 36)` · 次色 `16` · 三级 `hue+60 / 24` · 中性 `6` · 中性变体 `8` · 错误 `25 / 84` · 成功（自定义）`146 / 32`
-  - 深浅两套由同一 seed 派生，禁止手工调色；如需修正（Cale 复核）以 `pure-palette.json` 更新为准，本文档随之联动。
+- **生成方式：** 基于 `material-color-utilities` 的 TonalSpot 调色板（`TonalPalette.fromHueAndChroma(hue,36)` · 次色 `16` · 三级 `hue+60/24` · 中性 `6` · 中性变体 `8` · 错误 `25/84` · 成功自定义 `146/32`，`contrastLevel 0.0`）按冻结 tone 映射派生，非直接取 `SchemeTonalSpot` 默认 tone 40/90 原生输出。
+  - 调色板为源、tone 为冻结选取：如 light primary 取该调色板 tone 22.7 `#313066`（而非 MCU 默认 tone 40 `#5a5892`）、primaryContainer tone 45.9 `#6867a1`（而非 90 `#e2dfff`）等，以满足冻结示例与样图 B/D 效果及对比度；禁止脱离调色板手工改色相/彩度，tone 选取以本文件与 `pure-palette.json` 为准（Cale 复核后如有修正再更新）。
 - **附件：** `pure-palette.json`（冻结完整色板，含 16 个中性角色 + 彩色组两套）为本文件的机器可读副本。
 
 ### 0.2 命名与前缀
