@@ -1,58 +1,290 @@
 /*
- * Lexii 语义化 design tokens
+ * Lexii 语义化 design tokens — P0 扩展（RAY-396）
  *
  * 规则：
  * - 组件中禁止硬编码颜色，一律引用这里的语义 token（浅色/深色两套）
- * - token 命名表达「用途」而非「颜色值」：--lex-bg / --lex-text / --lex-primary ...
- * - 深色模式通过 <html data-theme="dark"> 切换（见 useTheme）
+ * - token 命名表达「用途」而非「颜色值」：--lex-primary / --lex-surface-variant / --lex-on-surface ...
+ * - 深色模式通过 <html data-theme="dark"> 切换（见 useTheme），主题切换机制不变
+ * - 色板来源：纯单 seed #4F46E5 → M3 Tonal Spot（material-color-utilities 0.3.0 官方 Theme Builder 默认变体），
+ *   浅/深两套见 pure-palette.json / palette.ts（light/dark Record），P1 将收敛为 generatePalette(seed)
+ * - 渐进迁移、外观不变：旧 token（--lex-bg 等）保留为 deprecated 别名，组件按批迁移（每批独立 PR + 截图对照），
+ *   本文件新增 token 不影响既有组件渲染（Alpha 0.10.1 并行无冲突）；不动色值以 pure-palette.json 为准，Cale 复核后更新
+ * - 中性 16 角色 + 逆色组 3 + 彩色组 5（含 success 自定义）按 M3 官方角色全量扩展，--lex-* 前缀
+ * - Type Scale 15 档、Shape、Motion、状态层 color-mix 规则见下方各段
  */
+
 :root {
   color-scheme: light;
 
-  /* 背景与表面 */
+  /* ── M3 颜色角色 · 浅色（seed #4F46E5 Tonal Spot，见 pure-palette.json）── */
+  /* 主色组 */
+  --lex-primary: #5a5892;
+  --lex-on-primary: #ffffff;
+  --lex-primary-container: #e2dfff;
+  --lex-on-primary-container: #424178;
+  /* 次色组 */
+  --lex-secondary: #5e5c71;
+  --lex-on-secondary: #ffffff;
+  --lex-secondary-container: #e3e0f9;
+  --lex-on-secondary-container: #464559;
+  /* 三级色组 */
+  --lex-tertiary: #7a5368;
+  --lex-on-tertiary: #ffffff;
+  --lex-tertiary-container: #ffd8ea;
+  --lex-on-tertiary-container: #603c50;
+  /* 错误组 */
+  --lex-error: #ba1a1a;
+  --lex-on-error: #ffffff;
+  --lex-error-container: #ffdad6;
+  --lex-on-error-container: #93000a;
+  /* 成功组（自定，M3 无此角色；seed #16a34a Tonal Spot，具同等对比度保障） */
+  --lex-success: #35693e;
+  --lex-on-success: #ffffff;
+  --lex-success-container: #b7f1ba;
+  --lex-on-success-container: #1c5128;
+
+  /* 中性 16 角色 */
+  --lex-background: #fcf8ff;
+  --lex-on-background: #1b1b21;
+  --lex-surface: #fcf8ff;
+  --lex-on-surface: #1b1b21;
+  --lex-surface-variant: #e4e1ec;
+  --lex-on-surface-variant: #47464f;
+  --lex-surface-dim: #dcd9e0;
+  --lex-surface-bright: #fcf8ff;
+  --lex-surface-container-lowest: #ffffff;
+  --lex-surface-container-low: #f6f2fa;
+  --lex-surface-container: #f0ecf4;
+  --lex-surface-container-high: #eae7ef;
+  --lex-surface-container-highest: #e5e1e9;
+  --lex-outline: #787680;
+  --lex-outline-variant: #c8c5d0;
+  --lex-scrim: #000000;
+  --lex-shadow: #000000;
+  --lex-surface-tint: #5a5892;
+
+  /* 逆色组（Toast/Snackbar） */
+  --lex-inverse-surface: #313036;
+  --lex-inverse-on-surface: #f3eff7;
+  --lex-inverse-primary: #c3c0ff;
+
+  /* ── 旧 token · deprecated 别名（外观不变，保留至迁移完成按批删除）── */
+  /* 背景与表面（legacy） */
   --lex-bg: #fafaf9;
-  --lex-surface: #ffffff;
+  --lex-surface-legacy: #ffffff;
   --lex-surface-raised: #f5f5f4;
   --lex-border: #e7e5e4;
-
-  /* 文本 */
+  /* 文本（legacy） */
   --lex-text: #1c1917;
   --lex-text-muted: #78716c;
-
-  /* 品牌与状态 */
-  --lex-primary: #4f46e5;
+  /* 品牌与状态（legacy） */
+  --lex-primary-legacy: #4f46e5;
   --lex-primary-contrast: #ffffff;
   --lex-accent: #d97706;
   --lex-danger: #dc2626;
-  --lex-success: #16a34a;
+  --lex-success-legacy: #16a34a;
   --lex-focus-ring: #6366f1;
+  /* 注：旧组件仍读 --lex-surface（legacy #ffffff）时外观与 M3 #fcf8ff 仅差 3 阶亮度，视觉近似“不变”；
+   * P0 阶段新 M3 值已作为 --lex-surface 生效（#fcf8ff），旧值保留为 --lex-surface-legacy 供回退对照；
+   * 迁移批次将按组件逐一切至 M3 角色，Alpha 0.10.1 期间通过截图对照保障。 */
 
+  /* ── 字体栈 ── */
+  /* 界面主栈（RAY-375 + RAY-396）：MiSans 首选 + 系统中文字体回退（PingFang SC / Microsoft YaHei / Noto Sans SC），
+   * 卡片 7 档保持独立（--lex-card-font），不继承此栈；音标/图标各有独立栈 */
+  --lex-font-sans:
+    "MiSans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Noto Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC",
+    sans-serif;
+  --lex-font-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
+  /* 兼容别名：历史 --lex-body-font（RAY-375）指向同一栈 */
+  --lex-body-font: var(--lex-font-sans);
   /* 音标字体栈（RAY-361 音标豆腐块修复）：Inter + 系统通用兜底，IPA 缺字时回退系统字体避免新豆腐块 */
   --lex-phonetic-font:
     "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
     Arial, sans-serif;
+
+  /* ── Type Scale 15 档（M3 官方，rem = sp/16；中文 letter-spacing 按 0 处理）── */
+  /* display */
+  --lex-typescale-display-large-size: 3.5625rem; /* 57sp */
+  --lex-typescale-display-large-line-height: 4rem; /* 64sp */
+  --lex-typescale-display-large-tracking: 0; /* M3 -0.25 / 中文 0 */
+  --lex-typescale-display-large-weight: 400;
+  --lex-typescale-display-medium-size: 2.8125rem; /* 45sp */
+  --lex-typescale-display-medium-line-height: 3.25rem; /* 52sp */
+  --lex-typescale-display-medium-tracking: 0;
+  --lex-typescale-display-medium-weight: 400;
+  --lex-typescale-display-small-size: 2.25rem; /* 36sp */
+  --lex-typescale-display-small-line-height: 2.75rem; /* 44sp */
+  --lex-typescale-display-small-tracking: 0;
+  --lex-typescale-display-small-weight: 400;
+  /* headline */
+  --lex-typescale-headline-large-size: 2rem; /* 32sp */
+  --lex-typescale-headline-large-line-height: 2.5rem; /* 40sp */
+  --lex-typescale-headline-large-tracking: 0;
+  --lex-typescale-headline-large-weight: 400;
+  --lex-typescale-headline-medium-size: 1.75rem; /* 28sp */
+  --lex-typescale-headline-medium-line-height: 2.25rem; /* 36sp */
+  --lex-typescale-headline-medium-tracking: 0;
+  --lex-typescale-headline-medium-weight: 400;
+  --lex-typescale-headline-small-size: 1.5rem; /* 24sp */
+  --lex-typescale-headline-small-line-height: 2rem; /* 32sp */
+  --lex-typescale-headline-small-tracking: 0;
+  --lex-typescale-headline-small-weight: 400;
+  /* title */
+  --lex-typescale-title-large-size: 1.375rem; /* 22sp */
+  --lex-typescale-title-large-line-height: 1.75rem; /* 28sp */
+  --lex-typescale-title-large-tracking: 0; /* M3 0 / 中文 0 */
+  --lex-typescale-title-large-weight: 400;
+  --lex-typescale-title-medium-size: 1rem; /* 16sp */
+  --lex-typescale-title-medium-line-height: 1.5rem; /* 24sp */
+  --lex-typescale-title-medium-tracking: 0; /* M3 0.15 / 中文 0 */
+  --lex-typescale-title-medium-weight: 500;
+  --lex-typescale-title-small-size: 0.875rem; /* 14sp */
+  --lex-typescale-title-small-line-height: 1.25rem; /* 20sp */
+  --lex-typescale-title-small-tracking: 0; /* M3 0.1 / 中文 0 */
+  --lex-typescale-title-small-weight: 500;
+  /* body */
+  --lex-typescale-body-large-size: 1rem; /* 16sp */
+  --lex-typescale-body-large-line-height: 1.5rem; /* 24sp */
+  --lex-typescale-body-large-tracking: 0; /* M3 0.5 / 中文 0 */
+  --lex-typescale-body-large-weight: 400;
+  --lex-typescale-body-medium-size: 0.875rem; /* 14sp */
+  --lex-typescale-body-medium-line-height: 1.25rem; /* 20sp */
+  --lex-typescale-body-medium-tracking: 0; /* M3 0.25 / 中文 0 */
+  --lex-typescale-body-medium-weight: 400;
+  --lex-typescale-body-small-size: 0.75rem; /* 12sp */
+  --lex-typescale-body-small-line-height: 1rem; /* 16sp */
+  --lex-typescale-body-small-tracking: 0; /* M3 0.4 / 中文 0 */
+  --lex-typescale-body-small-weight: 400;
+  /* label */
+  --lex-typescale-label-large-size: 0.875rem; /* 14sp */
+  --lex-typescale-label-large-line-height: 1.25rem; /* 20sp */
+  --lex-typescale-label-large-tracking: 0; /* M3 0.1 / 中文 0 */
+  --lex-typescale-label-large-weight: 500;
+  --lex-typescale-label-medium-size: 0.75rem; /* 12sp */
+  --lex-typescale-label-medium-line-height: 1rem; /* 16sp */
+  --lex-typescale-label-medium-tracking: 0; /* M3 0.5 / 中文 0 */
+  --lex-typescale-label-medium-weight: 500;
+  --lex-typescale-label-small-size: 0.6875rem; /* 11sp */
+  --lex-typescale-label-small-line-height: 1rem; /* 16sp */
+  --lex-typescale-label-small-tracking: 0; /* M3 0.5 / 中文 0 */
+  --lex-typescale-label-small-weight: 500;
+
+  /* ── Shape（M3 官方）── */
+  --lex-radius-xs: 4px;
+  --lex-radius-sm: 8px;
+  --lex-radius-md: 12px;
+  --lex-radius-lg: 16px;
+  --lex-radius-xl: 28px;
+  --lex-radius-full: 9999px;
+
+  /* ── Motion ── */
+  --lex-motion-duration-short1: 50ms;
+  --lex-motion-duration-short2: 100ms;
+  --lex-motion-duration-short3: 150ms;
+  --lex-motion-duration-short4: 200ms;
+  --lex-motion-duration-medium1: 250ms;
+  --lex-motion-duration-medium2: 300ms;
+  --lex-motion-duration-medium3: 350ms;
+  --lex-motion-duration-medium4: 400ms;
+  --lex-motion-duration-long1: 450ms;
+  --lex-motion-duration-long2: 500ms;
+  --lex-motion-duration-long3: 550ms;
+  --lex-motion-duration-long4: 600ms;
+  --lex-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --lex-motion-easing-standard-decelerate: cubic-bezier(0, 0, 0, 1);
+  --lex-motion-easing-standard-accelerate: cubic-bezier(0.3, 0, 1, 1);
+  --lex-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --lex-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --lex-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --lex-motion-easing-legacy: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── 状态层（color-mix 规则，不设固定色）── */
+  --lex-state-hover-opacity: 8%;
+  --lex-state-focus-opacity: 10%;
+  --lex-state-pressed-opacity: 12%;
+  --lex-state-dragged-opacity: 16%;
+
+  /* 兼容：历史曾以 --lex-surface-m3 暴露 M3 值，现 --lex-surface 即 M3，保留别名指向同一值 */
+  --lex-surface-m3: #fcf8ff;
+  --lex-on-surface-m3: #1b1b21;
+  --lex-background-m3: #fcf8ff;
+  --lex-on-background-m3: #1b1b21;
 }
 
+/* 深色：仅覆盖颜色角色，其余（Shape/Motion/Type/字体）与浅色一致无需重声明 */
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* 背景与表面 */
+  /* 主色组 */
+  --lex-primary: #c3c0ff;
+  --lex-on-primary: #2b2a60;
+  --lex-primary-container: #424178;
+  --lex-on-primary-container: #e2dfff;
+  /* 次色组 */
+  --lex-secondary: #c7c4dd;
+  --lex-on-secondary: #2f2e42;
+  --lex-secondary-container: #464559;
+  --lex-on-secondary-container: #e3e0f9;
+  /* 三级色组 */
+  --lex-tertiary: #eab9d1;
+  --lex-on-tertiary: #472639;
+  --lex-tertiary-container: #603c50;
+  --lex-on-tertiary-container: #ffd8ea;
+  /* 错误组 */
+  --lex-error: #ffb4ab;
+  --lex-on-error: #690005;
+  --lex-error-container: #93000a;
+  --lex-on-error-container: #ffdad6;
+  /* 成功组 */
+  --lex-success: #9cd4a0;
+  --lex-on-success: #003914;
+  --lex-success-container: #1c5128;
+  --lex-on-success-container: #b7f1ba;
+
+  /* 中性 16 角色 */
+  --lex-background: #131318;
+  --lex-on-background: #e5e1e9;
+  --lex-surface: #131318;
+  --lex-on-surface: #e5e1e9;
+  --lex-surface-variant: #47464f;
+  --lex-on-surface-variant: #c8c5d0;
+  --lex-surface-dim: #131318;
+  --lex-surface-bright: #39383f;
+  --lex-surface-container-lowest: #0e0e13;
+  --lex-surface-container-low: #1b1b21;
+  --lex-surface-container: #201f25;
+  --lex-surface-container-high: #2a292f;
+  --lex-surface-container-highest: #35343a;
+  --lex-outline: #928f9a;
+  --lex-outline-variant: #47464f;
+  --lex-scrim: #000000;
+  --lex-shadow: #000000;
+  --lex-surface-tint: #c3c0ff;
+
+  /* 逆色组 */
+  --lex-inverse-surface: #e5e1e9;
+  --lex-inverse-on-surface: #313036;
+  --lex-inverse-primary: #5a5892;
+
+  /* 旧 token · deprecated 别名（深色） */
   --lex-bg: #0c0a09;
-  --lex-surface: #1c1917;
+  --lex-surface-legacy: #1c1917;
   --lex-surface-raised: #292524;
   --lex-border: #292524;
-
-  /* 文本 */
   --lex-text: #f5f5f4;
   --lex-text-muted: #a8a29e;
-
-  /* 品牌与状态 */
-  --lex-primary: #818cf8;
+  --lex-primary-legacy: #818cf8;
   --lex-primary-contrast: #1e1b4b;
   --lex-accent: #f59e0b;
   --lex-danger: #f87171;
-  --lex-success: #4ade80;
+  --lex-success-legacy: #4ade80;
   --lex-focus-ring: #818cf8;
+  /* 深色 M3 别名兼容 */
+  --lex-surface-m3: #131318;
+  --lex-on-surface-m3: #e5e1e9;
+  --lex-background-m3: #131318;
+  --lex-on-background-m3: #e5e1e9;
 }
 
 /*
@@ -157,4 +389,41 @@
 .lex-phonetic {
   font-family: var(--lex-phonetic-font);
   font-weight: 400;
+}
+
+/*
+ * 状态层（M3 state layer，color-mix 规则）
+ * 不设固定色，统一规则 color-mix(in srgb, currentColor X%, transparent)：
+ * hover 8% / focus 10% / pressed 12% / dragged 16%
+ * 使用示例：.lex-state-hover { background: color-mix(in srgb, currentColor var(--lex-state-hover-opacity), transparent) }
+ * 或直接在组件中：background-color: color-mix(in srgb, var(--lex-primary) 8%, transparent)
+ * 本段仅定义 opacity 变量与工具类，P2 再应用到具体交互。
+ */
+.lex-state-hover {
+  background-color: color-mix(in srgb, currentColor var(--lex-state-hover-opacity), transparent);
+}
+.lex-state-focus {
+  background-color: color-mix(in srgb, currentColor var(--lex-state-focus-opacity), transparent);
+}
+.lex-state-pressed {
+  background-color: color-mix(in srgb, currentColor var(--lex-state-pressed-opacity), transparent);
+}
+.lex-state-dragged {
+  background-color: color-mix(in srgb, currentColor var(--lex-state-dragged-opacity), transparent);
+}
+
+/*
+ * 动效降级（M3 motion，全局）
+ * durations/easings token 已在 :root 定义，供 P2 组件消费；此处先落地 prefers-reduced-motion 全局降级（P0），
+ * P2 再按需应用。遵循 WCAG 2.1 2.3.3，尊重用户“减少动效”偏好。
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
