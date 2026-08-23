@@ -46,8 +46,8 @@ export function FontPicker({ value, onChange, groupLabel }: FontPickerProps) {
         return (
           <label
             key={option.id}
-            className={`flex cursor-pointer flex-col gap-2 rounded-xl border bg-surface p-4 transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus-ring hover:bg-surface-raised ${
-              selected ? "border-primary" : "border-border"
+            className={`flex cursor-pointer flex-col gap-2 rounded-md border bg-surface p-4 transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary hover:bg-surface-container ${
+              selected ? "border-primary" : "border-outline-variant"
             }`}
           >
             <input
@@ -63,7 +63,7 @@ export function FontPicker({ value, onChange, groupLabel }: FontPickerProps) {
               {selected ? (
                 <span
                   aria-hidden="true"
-                  className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-contrast"
+                  className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-on-primary"
                 >
                   已选
                 </span>
@@ -76,7 +76,7 @@ export function FontPicker({ value, onChange, groupLabel }: FontPickerProps) {
             >
               {option.sampleText}
             </span>
-            <span className="text-xs text-text-muted">{option.description}</span>
+            <span className="text-xs text-on-surface-variant">{option.description}</span>
           </label>
         );
       })}

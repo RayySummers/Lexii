@@ -98,26 +98,26 @@ export function DeveloperPanel({ providerFactory }: DeveloperPanelProps) {
   const otherChannelPath = getOtherChannelPath(window.location.pathname);
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-6" aria-label="开发者">
+    <section className="rounded-lg border border-outline-variant bg-surface p-6" aria-label="开发者">
       <h2 className="text-base font-semibold">开发者</h2>
-      <p className="mt-1 text-xs text-text-muted">
+      <p className="mt-1 text-xs text-on-surface-variant">
         本分组为隐藏彩蛋，仅供维护者调试：所有信息均构建时注入或本机读取，无任何联网请求。
       </p>
       <div className="mt-4 flex flex-col gap-6">
         <DevSection title="通道">
           <p className="text-sm">
             当前通道：<span className="font-medium">{CHANNEL_LABELS[channel]}</span>
-            <span className="mt-1 block text-xs text-text-muted">
+            <span className="mt-1 block text-xs text-on-surface-variant">
               部署路径：{window.location.pathname}
             </span>
           </p>
           <a
             href={otherChannelPath}
-            className="inline-flex w-fit items-center rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="inline-flex w-fit items-center rounded-full border border-outline-variant bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             切换到 {channel === "release" ? "Dev" : "Release"} 通道
           </a>
-          <p className="text-xs text-text-muted">
+          <p className="text-xs text-on-surface-variant">
             纯页面跳转（{otherChannelPath}
             ），两通道同源、共享同一 IndexedDB，数据互通。
           </p>
@@ -145,17 +145,17 @@ export function DeveloperPanel({ providerFactory }: DeveloperPanelProps) {
                   href={`https://github.com/RayySummers/Lexii/releases/tag/${tag}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                  className="text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 >
                   {tag}
                 </a>
                 {tag === CURRENT_VERSION_TAG ? (
-                  <span className="text-xs text-text-muted">（当前）</span>
+                  <span className="text-xs text-on-surface-variant">（当前）</span>
                 ) : null}
               </li>
             ))}
           </ul>
-          <p className="text-xs text-text-muted">
+          <p className="text-xs text-on-surface-variant">
             Pages 仅托管最新稳定版，旧版本回退请跳转到对应 tag 的 GitHub Release
             页面（纯外链，不请求数据）。
           </p>
@@ -163,7 +163,7 @@ export function DeveloperPanel({ providerFactory }: DeveloperPanelProps) {
 
         <DevSection title="数据库调试">
           {loading ? (
-            <p className="text-sm text-text-muted">正在读取…</p>
+            <p className="text-sm text-on-surface-variant">正在读取…</p>
           ) : databaseDebug ? (
             <>
               <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
@@ -174,7 +174,7 @@ export function DeveloperPanel({ providerFactory }: DeveloperPanelProps) {
                 {databaseDebug.tables.map((table) => (
                   <li key={table.name} className="flex items-center justify-between gap-4">
                     <span className="font-mono text-xs">{table.name}</span>
-                    <span className="text-text-muted">{table.count} 条</span>
+                    <span className="text-on-surface-variant">{table.count} 条</span>
                   </li>
                 ))}
               </ul>
@@ -184,8 +184,8 @@ export function DeveloperPanel({ providerFactory }: DeveloperPanelProps) {
                   onClick={handleClearClick}
                   className={
                     clearArmed
-                      ? "w-fit rounded-full bg-danger px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-                      : "w-fit rounded-full border border-danger/40 bg-surface px-5 py-2.5 text-sm font-medium text-danger transition-colors hover:border-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                      ? "w-fit rounded-full bg-error px-5 py-2.5 text-sm font-semibold text-on-error transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                      : "w-fit rounded-full border border-error/40 bg-surface px-5 py-2.5 text-sm font-medium text-error transition-colors hover:border-error focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   }
                 >
                   {clearArmed ? "再次点击确认清空（不可恢复）" : "清空本地数据库"}
@@ -195,7 +195,7 @@ export function DeveloperPanel({ providerFactory }: DeveloperPanelProps) {
                     数据库已清空。请刷新页面重新开始。
                   </p>
                 ) : (
-                  <p className="text-xs text-text-muted">
+                  <p className="text-xs text-on-surface-variant">
                     危险操作：删除全部本地学习数据，请先导出备份；需二次点击确认。
                   </p>
                 )}
@@ -206,7 +206,7 @@ export function DeveloperPanel({ providerFactory }: DeveloperPanelProps) {
 
         <DevSection title="FSRS 调试">
           {loading ? (
-            <p className="text-sm text-text-muted">正在读取…</p>
+            <p className="text-sm text-on-surface-variant">正在读取…</p>
           ) : fsrsDebug ? (
             <>
               <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
@@ -237,7 +237,7 @@ export function DeveloperPanel({ providerFactory }: DeveloperPanelProps) {
               </dl>
               <div>
                 <p className="text-sm">权重 w（{fsrsDebug.parameters.w.length} 个）</p>
-                <p className="mt-1 break-all font-mono text-xs text-text-muted">
+                <p className="mt-1 break-all font-mono text-xs text-on-surface-variant">
                   {fsrsDebug.parameters.w.join(", ")}
                 </p>
               </div>
@@ -253,7 +253,7 @@ export function DeveloperPanel({ providerFactory }: DeveloperPanelProps) {
               <div>
                 <p className="text-sm">即将到期样例（未来 30 天，最多 10 条）</p>
                 {fsrsDebug.dueSample.length === 0 ? (
-                  <p className="mt-1 text-xs text-text-muted">未来 30 天内没有到期条目。</p>
+                  <p className="mt-1 text-xs text-on-surface-variant">未来 30 天内没有到期条目。</p>
                 ) : (
                   <ul className="mt-1 flex flex-col gap-1 text-sm">
                     {fsrsDebug.dueSample.map((entry) => (
@@ -262,7 +262,7 @@ export function DeveloperPanel({ providerFactory }: DeveloperPanelProps) {
                         className="flex flex-wrap items-baseline justify-between gap-x-4"
                       >
                         <span>{entry.term}</span>
-                        <span className="text-xs text-text-muted">
+                        <span className="text-xs text-on-surface-variant">
                           到期 {entry.due} · S {entry.stabilityDays} · D {entry.difficulty}
                         </span>
                       </li>
@@ -291,12 +291,12 @@ export function DeveloperPanel({ providerFactory }: DeveloperPanelProps) {
                 />
                 <span>
                   {flag.name}
-                  <span className="mt-0.5 block text-xs text-text-muted">{flag.description}</span>
+                  <span className="mt-0.5 block text-xs text-on-surface-variant">{flag.description}</span>
                 </span>
               </label>
             ))}
           </div>
-          <p className="text-xs text-text-muted">
+          <p className="text-xs text-on-surface-variant">
             开关仅持久化到本机 localStorage，当前版本均未接入功能逻辑（下一期候选方向的 A/B 预留）。
           </p>
         </DevSection>
@@ -304,7 +304,7 @@ export function DeveloperPanel({ providerFactory }: DeveloperPanelProps) {
         {error ? (
           <p
             role="alert"
-            className="rounded-xl border border-danger/40 bg-surface p-4 text-sm text-text"
+            className="rounded-md border border-error/40 bg-surface p-4 text-sm text-on-surface"
           >
             读取失败：{error}
           </p>
@@ -318,7 +318,7 @@ export function DeveloperPanel({ providerFactory }: DeveloperPanelProps) {
 function DevSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-sm font-semibold text-text-muted">{title}</h3>
+      <h3 className="text-sm font-semibold text-on-surface-variant">{title}</h3>
       <div className="mt-2 flex flex-col gap-2">{children}</div>
     </div>
   );
@@ -328,7 +328,7 @@ function DevSection({ title, children }: { title: string; children: React.ReactN
 function DebugField({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-xs text-text-muted">{label}</dt>
+      <dt className="text-xs text-on-surface-variant">{label}</dt>
       <dd className="text-right font-mono text-xs" title={title}>
         {value}
       </dd>

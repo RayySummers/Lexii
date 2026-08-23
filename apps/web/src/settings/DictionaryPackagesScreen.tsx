@@ -114,16 +114,16 @@ function DownloadConfirmDialog({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/50 p-4"
       role="dialog"
       aria-modal="true"
       aria-label={`确认下载 ${packageName}`}
     >
-      <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl bg-surface p-6 shadow-lg">
+      <div className="flex w-full max-w-sm flex-col gap-4 rounded-lg bg-surface p-6 shadow-lg">
         <h2 className="text-lg font-semibold">下载确认</h2>
-        <div className="flex flex-col gap-2 text-sm text-text-muted">
+        <div className="flex flex-col gap-2 text-sm text-on-surface-variant">
           <p>
-            即将下载<strong className="text-text"> {packageName}</strong>
+            即将下载<strong className="text-on-surface"> {packageName}</strong>
             {sizeBytes ? `（${formatSize(sizeBytes)}）` : ""}。
           </p>
           <p>
@@ -137,14 +137,14 @@ function DownloadConfirmDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full border border-outline-variant bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             取消
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             确认下载
           </button>
@@ -344,13 +344,13 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
       <ScreenHeader title="扩展词包" onBack={onBack} backLabel="返回设置" />
 
-      <p className="text-sm text-text-muted">
+      <p className="text-sm text-on-surface-variant">
         下载扩展词包可将词典检索范围从内置 7,195 词扩展到 ECDICT
         全量覆盖。下载时需要联网，下载后可离线使用。词包仅扩充检索层，不影响已有学习数据；只有加入词书或生词本后，才会进入学习队列。
       </p>
 
       {loadingManifest ? (
-        <div role="status" className="py-8 text-center text-sm text-text-muted">
+        <div role="status" className="py-8 text-center text-sm text-on-surface-variant">
           正在获取词包信息…
         </div>
       ) : null}
@@ -369,9 +369,9 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
         ))}
       </div>
 
-      <div className="rounded-2xl border border-border bg-surface p-4">
+      <div className="rounded-lg border border-outline-variant bg-surface p-4">
         <h3 className="text-sm font-medium">数据来源与许可</h3>
-        <p className="mt-2 text-xs leading-relaxed text-text-muted">
+        <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
           Tier 1 / 2 扩展词包数据来自 ECDICT（MIT 许可，© 2025 Linwei，
           <a
             href="https://github.com/skywind3000/ECDICT"
@@ -397,14 +397,14 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
 
       <div aria-live="polite">
         {error ? (
-          <p role="alert" className="rounded-xl border border-danger/40 bg-surface p-4 text-sm">
+          <p role="alert" className="rounded-md border border-error/40 bg-surface p-4 text-sm">
             {error}
           </p>
         ) : null}
         {notice ? (
           <p
             role="status"
-            className="rounded-xl border border-border bg-surface p-4 text-sm text-success"
+            className="rounded-md border border-outline-variant bg-surface p-4 text-sm text-success"
           >
             {notice}
           </p>
@@ -442,26 +442,26 @@ function DictionaryPackageCard({
     compareSemver(installedVersion, manifestVersion) < 0;
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-border p-4">
+    <div className="flex flex-col gap-2 rounded-md border border-outline-variant p-4">
       <span className="flex items-center justify-between gap-3">
         <span className="text-sm font-medium">{summary.name}</span>
         <span
           className={`rounded-full border px-2.5 py-0.5 text-xs ${
             status === "installed"
               ? isUpgradeAvailable
-                ? "border-accent/40 text-accent"
+                ? "border-tertiary/40 text-tertiary"
                 : "border-success/40 text-success"
               : status === "covered"
                 ? "border-success/40 text-success"
                 : status === "installing"
-                  ? "border-accent/40 text-accent"
-                  : "border-border text-text-muted"
+                  ? "border-tertiary/40 text-tertiary"
+                  : "border-outline-variant text-on-surface-variant"
           }`}
         >
           {statusLabel(status, installedVersion, manifestVersion)}
         </span>
       </span>
-      <span className="text-xs text-text-muted">
+      <span className="text-xs text-on-surface-variant">
         {totalCount.toLocaleString()} 词条
         {sizeBytes ? ` · ${formatSize(sizeBytes)}` : ""}
       </span>
@@ -474,20 +474,20 @@ function DictionaryPackageCard({
               aria-valuemin={0}
               aria-valuemax={totalCount}
               aria-valuenow={installedCount}
-              className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-raised"
+              className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-container"
             >
               <div
                 className="h-full rounded-full bg-primary transition-all"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <span className="shrink-0 text-xs text-text-muted">{progressPercent}%</span>
+            <span className="shrink-0 text-xs text-on-surface-variant">{progressPercent}%</span>
           </div>
           {installing ? (
             <button
               type="button"
               onClick={() => onCancel(summary.id)}
-              className="w-fit rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium transition-colors hover:border-danger hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+              className="w-fit rounded-full border border-outline-variant bg-surface px-4 py-1.5 text-xs font-medium transition-colors hover:border-error hover:text-error focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               取消
             </button>
@@ -501,7 +501,7 @@ function DictionaryPackageCard({
             type="button"
             disabled={installing}
             onClick={() => onDownload(summary)}
-            className="w-fit rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-fit rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
           >
             {installing ? "下载中…" : "下载"}
           </button>
@@ -509,7 +509,7 @@ function DictionaryPackageCard({
             <button
               type="button"
               onClick={() => onCancel(summary.id)}
-              className="rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium transition-colors hover:border-danger hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+              className="rounded-full border border-outline-variant bg-surface px-4 py-1.5 text-xs font-medium transition-colors hover:border-error hover:text-error focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               取消
             </button>
@@ -522,7 +522,7 @@ function DictionaryPackageCard({
           type="button"
           disabled={installing}
           onClick={() => onDownload(summary)}
-          className="w-fit rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-fit rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
         >
           {installing ? "升级中…" : `升级到 v${manifestVersion}`}
         </button>

@@ -342,7 +342,7 @@ export function SettingsScreen({
         fallback={
           <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
             <ScreenHeader title="词书库" onBack={() => setView("main")} backLabel="返回设置" />
-            <p className="text-sm text-text-muted">正在加载词书目录…</p>
+            <p className="text-sm text-on-surface-variant">正在加载词书目录…</p>
           </main>
         }
       >
@@ -356,7 +356,7 @@ export function SettingsScreen({
         fallback={
           <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
             <ScreenHeader title="扩展词包" onBack={() => setView("main")} backLabel="返回设置" />
-            <p className="text-sm text-text-muted">正在加载扩展词包…</p>
+            <p className="text-sm text-on-surface-variant">正在加载扩展词包…</p>
           </main>
         }
       >
@@ -519,7 +519,7 @@ function SettingsMainView({
           onExport={onExportJson}
           exporting={exporting === "json"}
         />
-        <p className="text-sm text-text-muted">
+        <p className="text-sm text-on-surface-variant">
           学习数据只存本机（IndexedDB），可能因清理网站数据或卸载而丢失，建议定期导出备份。
         </p>
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -527,7 +527,7 @@ function SettingsMainView({
             type="button"
             onClick={onExportJson}
             disabled={exporting !== null}
-            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
           >
             {exporting === "json" ? "导出中…" : "导出 JSON 完整备份"}
           </button>
@@ -535,18 +535,18 @@ function SettingsMainView({
             type="button"
             onClick={onExportCsv}
             disabled={exporting !== null}
-            className="rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full border border-outline-variant bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
           >
             {exporting === "csv" ? "导出中…" : "导出 CSV 词表"}
           </button>
         </div>
-        <p className="text-xs text-text-muted">
+        <p className="text-xs text-on-surface-variant">
           JSON 含词库、学习记录与进度，可原样导回；CSV 仅词表（词条 / 释义 / 词性），不含学习进度。
         </p>
       </Section>
 
       <Section title="导入数据">
-        <p className="text-sm text-text-muted">
+        <p className="text-sm text-on-surface-variant">
           从之前导出的 JSON 备份恢复数据（同 ID 记录会被覆盖）。
         </p>
         <input
@@ -564,7 +564,7 @@ function SettingsMainView({
         />
         <label
           htmlFor="import-backup-input"
-          className="inline-flex w-fit cursor-pointer rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus-ring"
+          className="inline-flex w-fit cursor-pointer rounded-full border border-outline-variant bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary"
         >
           {importing ? "正在恢复…" : "选择备份文件…"}
         </label>
@@ -577,7 +577,7 @@ function SettingsMainView({
         >
           <span>
             主题
-            <span className="mt-1 block text-xs text-text-muted">
+            <span className="mt-1 block text-xs text-on-surface-variant">
               浅色、深色或跟随系统（随设备主题自动切换）。
             </span>
           </span>
@@ -589,7 +589,7 @@ function SettingsMainView({
                 onThemePreferenceChange(event.target.value);
               }
             }}
-            className="w-40 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="w-40 rounded-full border border-outline-variant bg-surface px-4 py-2 text-sm text-on-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <option value="light">浅色</option>
             <option value="dark">深色</option>
@@ -604,14 +604,14 @@ function SettingsMainView({
         <div className="flex flex-col gap-2">
           <div>
             <span className="text-sm font-semibold">卡片字体</span>
-            <span className="mt-1 block text-xs text-text-muted">
+            <span className="mt-1 block text-xs text-on-surface-variant">
               复习卡上单词本体的字体（7 档可选，选档立即生效）。
             </span>
           </div>
           <FontPicker value={cardFont} onChange={onCardFontChange} groupLabel="卡片字体" />
           {/* RAY-339（Oscar 复核 suggestion 2）：现代简约档主字体 Inter Display 仅
               覆盖拉丁字符；非拉丁词条按字体栈自动回退到系统字体，无需切档。 */}
-          <p className="text-xs text-text-muted">
+          <p className="text-xs text-on-surface-variant">
             现代简约档的主字体仅覆盖拉丁字符，非拉丁词条会自动回退到系统字体。
           </p>
         </div>
@@ -624,7 +624,7 @@ function SettingsMainView({
         >
           <span>
             每日新卡上限
-            <span className="mt-1 block text-xs text-text-muted">
+            <span className="mt-1 block text-xs text-on-surface-variant">
               每天最多学习的新词数（1–999，默认 20）；超出部分顺延到之后的日子，复习不受限制。
             </span>
           </span>
@@ -638,7 +638,7 @@ function SettingsMainView({
             value={newCardLimitText}
             onChange={(event) => onNewCardLimitChange(event.target.value)}
             onBlur={onNewCardLimitBlur}
-            className="w-28 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="w-28 rounded-full border border-outline-variant bg-surface px-4 py-2 text-sm text-on-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           />
         </label>
         <label
@@ -647,7 +647,7 @@ function SettingsMainView({
         >
           <span>
             评分档位
-            <span className="mt-1 block text-xs text-text-muted">
+            <span className="mt-1 block text-xs text-on-surface-variant">
               默认三档（认识 / 模糊 / 不认识）；可选四档（Anki 传统，含 Easy）。
             </span>
           </span>
@@ -655,7 +655,7 @@ function SettingsMainView({
             id="rating-tiers"
             value={ratingTier}
             onChange={(event) => onRatingTierChange(event.target.value)}
-            className="w-40 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="w-40 rounded-full border border-outline-variant bg-surface px-4 py-2 text-sm text-on-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <option value="three">三档（默认）</option>
             <option value="four">四档（Anki 传统）</option>
@@ -667,7 +667,7 @@ function SettingsMainView({
         >
           <span>
             发音口音
-            <span className="mt-1 block text-xs text-text-muted">
+            <span className="mt-1 block text-xs text-on-surface-variant">
               美式 / 英式；同时影响系统与线上两种发音源。
             </span>
           </span>
@@ -675,7 +675,7 @@ function SettingsMainView({
             id="pronunciation-accent"
             value={pronunciationAccent}
             onChange={(event) => onPronunciationAccentChange(event.target.value)}
-            className="w-40 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="w-40 rounded-full border border-outline-variant bg-surface px-4 py-2 text-sm text-on-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <option value="us">美式</option>
             <option value="uk">英式</option>
@@ -688,7 +688,7 @@ function SettingsMainView({
         >
           <span>
             发音源
-            <span className="mt-1 block text-xs text-text-muted">
+            <span className="mt-1 block text-xs text-on-surface-variant">
               系统自带：浏览器语音合成，离线可用；线上发音：词典真人录音与在线合成（需联网），
               发音更标准清晰，失败时自动回落系统语音。
             </span>
@@ -697,7 +697,7 @@ function SettingsMainView({
             id="pronunciation-source"
             value={pronunciationSource}
             onChange={(event) => onPronunciationSourceChange(event.target.value)}
-            className="w-40 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="w-40 rounded-full border border-outline-variant bg-surface px-4 py-2 text-sm text-on-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <option value="system">系统自带</option>
             <option value="online">线上发音</option>
@@ -709,7 +709,7 @@ function SettingsMainView({
         >
           <span>
             选择题出题方向
-            <span className="mt-1 block text-xs text-text-muted">
+            <span className="mt-1 block text-xs text-on-surface-variant">
               英译中：看单词选释义；中译英：看释义选单词；混合：每道题随机方向。
             </span>
           </span>
@@ -717,7 +717,7 @@ function SettingsMainView({
             id="quiz-direction"
             value={quizDirection}
             onChange={(event) => onQuizDirectionChange(event.target.value)}
-            className="w-40 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="w-40 rounded-full border border-outline-variant bg-surface px-4 py-2 text-sm text-on-surface transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <option value="en-zh">英译中</option>
             <option value="zh-en">中译英</option>
@@ -728,7 +728,7 @@ function SettingsMainView({
         <label className="flex items-start justify-between gap-4">
           <span>
             <span className="text-sm font-semibold">学习队列包含生词本</span>
-            <span className="mt-1 block text-xs text-text-muted">
+            <span className="mt-1 block text-xs text-on-surface-variant">
               关闭后，生词本的词不再进入学习 / 复习 / 混合队列，词书不受影响。
             </span>
           </span>
@@ -738,8 +738,8 @@ function SettingsMainView({
             aria-checked={includeNotebook}
             aria-label="学习队列是否包含生词本"
             onClick={onIncludeNotebookToggle}
-            className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
-              includeNotebook ? "border-primary bg-primary" : "border-border bg-surface-raised"
+            className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+              includeNotebook ? "border-primary bg-primary" : "border-outline-variant bg-surface-container"
             }`}
           >
             <span
@@ -753,14 +753,14 @@ function SettingsMainView({
       </Section>
 
       <Section title="词书库">
-        <p className="text-sm text-text-muted">
+        <p className="text-sm text-on-surface-variant">
           考试分级词书（中考 / 高考 / 四六级 / 考研 / 托福 / 雅思 / GRE
           与冲刺词书）随应用内置，按需选装、全程离线；与已学词条相同的词会自动跳过。
         </p>
         <button
           type="button"
           onClick={onOpenWordbooks}
-          className="w-fit rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="w-fit rounded-full border border-outline-variant bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           浏览并安装词书
         </button>
@@ -771,7 +771,7 @@ function SettingsMainView({
         id={SETTINGS_SECTION_ID_EXTENSION_PACKAGES}
         anchor={SETTINGS_ANCHOR_EXTENSION_PACKAGES}
       >
-        <p className="text-sm text-text-muted">
+        <p className="text-sm text-on-surface-variant">
           下载 Tier 1/2 扩展词包（需联网，下载后可离线使用），将词典检索范围从内置 7,195 词扩展到
           ECDICT 全量覆盖（如 kaleidoscope、menstrual 等 Tier 0 未收录词均可搜到）。
           词包仅扩充检索层，加入词书/生词本后才进入学习队列。
@@ -779,27 +779,27 @@ function SettingsMainView({
         <button
           type="button"
           onClick={onOpenDictionary}
-          className="w-fit rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="w-fit rounded-full border border-outline-variant bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           管理扩展词包
         </button>
       </Section>
 
       <Section title="数据来源与许可">
-        <p className="text-sm text-text-muted">
+        <p className="text-sm text-on-surface-variant">
           预设词表由开源数据（ECDICT、NGSL 1.2）清洗打包，随应用内置、离线可用。
         </p>
         <button
           type="button"
           onClick={onOpenLicenses}
-          className="w-fit rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="w-fit rounded-full border border-outline-variant bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           查看数据来源与许可
         </button>
       </Section>
 
       <Section title="关于">
-        <p className="text-sm text-text-muted">
+        <p className="text-sm text-on-surface-variant">
           乐希 Lexii 是开源软件（local-first，学习数据只存本机）。欢迎在 GitHub
           上查看源码、反馈问题或提出建议。
         </p>
@@ -811,7 +811,7 @@ function SettingsMainView({
             href={GITHUB_REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex w-fit items-center rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="inline-flex w-fit items-center rounded-full border border-outline-variant bg-surface px-5 py-2.5 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             GitHub 仓库
           </a>
@@ -819,7 +819,7 @@ function SettingsMainView({
             href={GITHUB_ISSUES_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex w-fit items-center rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="inline-flex w-fit items-center rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             反馈问题
           </a>
@@ -832,7 +832,7 @@ function SettingsMainView({
         {notice ? (
           <p
             role="status"
-            className="rounded-xl border border-border bg-surface p-4 text-sm text-success"
+            className="rounded-md border border-outline-variant bg-surface p-4 text-sm text-success"
           >
             {notice}
           </p>
@@ -840,7 +840,7 @@ function SettingsMainView({
         {error ? (
           <p
             role="alert"
-            className="rounded-xl border border-danger/40 bg-surface p-4 text-sm text-text"
+            className="rounded-md border border-error/40 bg-surface p-4 text-sm text-on-surface"
           >
             {error}
           </p>
@@ -850,11 +850,11 @@ function SettingsMainView({
       {/* RAY-297：版本号为隐藏彩蛋入口——连点 5 次解锁「开发者」分组，
           再次连点 5 次折叠；解锁状态存 localStorage。样式上仍是普通脚注文本，
           但语义上可点（按钮），键盘可聚焦、可用（无障碍不破坏）。 */}
-      <footer className="border-t border-border pt-4 text-center">
+      <footer className="border-t border-outline-variant pt-4 text-center">
         <button
           type="button"
           onClick={onVersionTap}
-          className="rounded-full px-3 py-1 text-xs text-text-muted transition-colors hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="rounded-full px-3 py-1 text-xs text-on-surface-variant transition-colors hover:text-on-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           乐希 Lexii v{APP_VERSION}
         </button>
@@ -882,7 +882,7 @@ function Section({
     <section
       id={id}
       data-anchor={anchor}
-      className="rounded-2xl border border-border bg-surface p-6"
+      className="rounded-lg border border-outline-variant bg-surface p-6"
     >
       <h2 className="text-base font-semibold">{title}</h2>
       <div className="mt-4 flex flex-col gap-4">{children}</div>
@@ -902,13 +902,13 @@ function PersistenceBanner({
 }) {
   if (status === "denied") {
     return (
-      <div className="flex flex-col gap-3 rounded-xl border border-accent/40 bg-surface p-4">
+      <div className="flex flex-col gap-3 rounded-md border border-tertiary/40 bg-surface p-4">
         <p className="text-sm">当前数据可能被浏览器清理，建议导出备份。</p>
         <button
           type="button"
           onClick={onExport}
           disabled={exporting}
-          className="w-fit rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-fit rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
         >
           {exporting ? "导出中…" : "导出 JSON 备份"}
         </button>
@@ -916,7 +916,7 @@ function PersistenceBanner({
     );
   }
   if (status === "persisted" || status === "granted") {
-    return <p className="text-sm text-text-muted">本地数据已受浏览器持久化保护。</p>;
+    return <p className="text-sm text-on-surface-variant">本地数据已受浏览器持久化保护。</p>;
   }
   return null;
 }

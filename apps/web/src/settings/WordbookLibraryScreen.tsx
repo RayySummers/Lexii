@@ -211,7 +211,7 @@ export function WordbookLibraryScreen({ provider, onBack }: WordbookLibraryScree
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
       <ScreenHeader title="词书库" onBack={onBack} backLabel="返回设置" />
 
-      <p className="text-sm text-text-muted">
+      <p className="text-sm text-on-surface-variant">
         浏览并按需安装内置词书（考试词汇 /
         冲刺词书）。所有词书随应用打包，无需联网。安装的词条自动进入学习队列；与已学词条重复的会跳过，不会重复学习。
       </p>
@@ -232,7 +232,7 @@ export function WordbookLibraryScreen({ provider, onBack }: WordbookLibraryScree
           value={installedWordCount === undefined ? "…" : formatWordCount(installedWordCount)}
         />
       </section>
-      <p className="text-xs text-text-muted">词数按词书规模计，跨词书重叠词条分别计入。</p>
+      <p className="text-xs text-on-surface-variant">词数按词书规模计，跨词书重叠词条分别计入。</p>
 
       {(Object.keys(CATEGORY_TITLES) as WordbookCategory[]).map((category) => {
         const books = WORDBOOK_CATALOG.filter((book) => book.category === category);
@@ -240,7 +240,7 @@ export function WordbookLibraryScreen({ provider, onBack }: WordbookLibraryScree
           return null;
         }
         return (
-          <section key={category} className="rounded-2xl border border-border bg-surface p-6">
+          <section key={category} className="rounded-lg border border-outline-variant bg-surface p-6">
             <h2 className="text-base font-semibold">{CATEGORY_TITLES[category]}</h2>
             <div className="mt-4 flex flex-col gap-3">
               {books.map((book) => {
@@ -265,14 +265,14 @@ export function WordbookLibraryScreen({ provider, onBack }: WordbookLibraryScree
 
       <div aria-live="polite">
         {error ? (
-          <p role="alert" className="rounded-xl border border-danger/40 bg-surface p-4 text-sm">
+          <p role="alert" className="rounded-md border border-error/40 bg-surface p-4 text-sm">
             {error}
           </p>
         ) : null}
         {notice ? (
           <p
             role="status"
-            className="rounded-xl border border-border bg-surface p-4 text-sm text-success"
+            className="rounded-md border border-outline-variant bg-surface p-4 text-sm text-success"
           >
             {notice}
           </p>
@@ -323,15 +323,15 @@ function WordbookCard({
       : 0;
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-border p-4">
+    <div className="flex flex-col gap-2 rounded-md border border-outline-variant p-4">
       <span className="flex items-center justify-between gap-3">
         <span className="text-sm font-medium">{name}</span>
-        <span className="rounded-full border border-border px-2.5 py-0.5 text-xs text-text-muted">
+        <span className="rounded-full border border-outline-variant px-2.5 py-0.5 text-xs text-on-surface-variant">
           {summary ? statusLabel(summary) : "未安装"}
         </span>
       </span>
-      <p className="text-xs leading-relaxed text-text-muted">{description}</p>
-      <span className="text-xs text-text-muted">
+      <p className="text-xs leading-relaxed text-on-surface-variant">{description}</p>
+      <span className="text-xs text-on-surface-variant">
         {summary ? summary.totalCount : "—"} 词条
         {status === "installed" && summary?.installedVersion
           ? ` · v${summary.installedVersion}`
@@ -344,7 +344,7 @@ function WordbookCard({
             aria-valuemin={0}
             aria-valuemax={summary?.totalCount ?? 0}
             aria-valuenow={summary?.installedCount ?? 0}
-            className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-raised"
+            className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-container"
           >
             <div
               className="h-full rounded-full bg-primary transition-all"
@@ -355,7 +355,7 @@ function WordbookCard({
             type="button"
             disabled={installing}
             onClick={() => void onInstall(bookId)}
-            className="w-24 shrink-0 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-24 shrink-0 rounded-full border border-outline-variant bg-surface px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
           >
             {installing ? "安装中…" : "继续安装"}
           </button>
@@ -365,7 +365,7 @@ function WordbookCard({
           <button
             type="button"
             disabled
-            className="w-24 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-contrast opacity-60 cursor-not-allowed"
+            className="w-24 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary opacity-60 cursor-not-allowed"
           >
             已安装
           </button>
@@ -373,7 +373,7 @@ function WordbookCard({
             type="button"
             onClick={() => onDelete(bookId)}
             aria-label={`删除词书：${name}`}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-text-muted transition-colors hover:border-danger hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-outline-variant text-on-surface-variant transition-colors hover:border-error hover:text-error focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <TrashIcon className="h-4 w-4" />
           </button>
@@ -383,7 +383,7 @@ function WordbookCard({
           type="button"
           disabled={installing}
           onClick={() => void onInstall(bookId)}
-          className="w-24 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-24 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
         >
           安装
         </button>
@@ -421,14 +421,14 @@ function ConfirmDeleteDialog({ wordbookName, onConfirm, onCancel }: ConfirmDelet
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
     >
       {/* 背景遮罩 */}
-      <div className="absolute inset-0 bg-black/40" onClick={onCancel} aria-hidden="true" />
+      <div className="absolute inset-0 bg-scrim/40" onClick={onCancel} aria-hidden="true" />
       {/* 对话框主体 */}
-      <div className="relative flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-surface p-6 shadow-lg">
+      <div className="relative flex w-full max-w-sm flex-col gap-4 rounded-lg border border-outline-variant bg-surface p-6 shadow-lg">
         <h3 className="text-base font-semibold">确认删除词书</h3>
-        <p className="text-sm text-text-muted">确定要移除「{wordbookName}」吗？</p>
+        <p className="text-sm text-on-surface-variant">确定要移除「{wordbookName}」吗？</p>
         {/* 醒目提示框 */}
-        <div className="rounded-xl border border-warning/40 bg-warning/10 p-3">
-          <p className="text-sm font-medium text-warning">
+        <div className="rounded-md border border-tertiary/40 bg-tertiary/10 p-3">
+          <p className="text-sm font-medium text-tertiary">
             已学习的词记录不会被删除，但新词将不会继续安排学习。
           </p>
         </div>
@@ -436,14 +436,14 @@ function ConfirmDeleteDialog({ wordbookName, onConfirm, onCancel }: ConfirmDelet
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full border border-border px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full border border-outline-variant px-4 py-2 text-sm font-medium transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             取消
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-full bg-danger px-4 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full bg-error px-4 py-2 text-sm font-semibold text-on-error transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             确认删除
           </button>

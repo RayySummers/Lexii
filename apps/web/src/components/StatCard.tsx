@@ -5,9 +5,9 @@
  */
 export function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-surface-raised p-4 text-center">
+    <div className="rounded-md border border-outline-variant bg-surface-container p-4 text-center">
       <p className="text-2xl font-bold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-text-muted">{label}</p>
+      <p className="mt-1 text-xs text-on-surface-variant">{label}</p>
     </div>
   );
 }
