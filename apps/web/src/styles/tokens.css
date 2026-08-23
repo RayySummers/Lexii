@@ -13,26 +13,26 @@
   color-scheme: light;
 
   /* ===== M3 颜色角色（浅色，来自 pure-palette.json light — MCU 0.3.0 SchemeTonalSpot） ===== */
-  --lex-primary: #5a5892;
+  --lex-primary: #313066;
   --lex-on-primary: #ffffff;
-  --lex-primary-container: #e2dfff;
-  --lex-on-primary-container: #424178;
+  --lex-primary-container: #6867a1;
+  --lex-on-primary-container: #ffffff;
   --lex-secondary: #5e5c71;
   --lex-on-secondary: #ffffff;
   --lex-secondary-container: #e3e0f9;
-  --lex-on-secondary-container: #464559;
+  --lex-on-secondary-container: #1a1a2c;
   --lex-tertiary: #7a5368;
   --lex-on-tertiary: #ffffff;
   --lex-tertiary-container: #ffd8ea;
-  --lex-on-tertiary-container: #603c50;
+  --lex-on-tertiary-container: #2f1123;
   --lex-error: #ba1a1a;
   --lex-on-error: #ffffff;
   --lex-error-container: #ffdad6;
-  --lex-on-error-container: #93000a;
-  --lex-success: #35693e;
+  --lex-on-error-container: #410002;
+  --lex-success: #1b5c1a;
   --lex-on-success: #ffffff;
-  --lex-success-container: #b7f1ba;
-  --lex-on-success-container: #1c5128;
+  --lex-success-container: #a6f2a5;
+  --lex-on-success-container: #00210a;
   --lex-background: #fcf8ff;
   --lex-on-background: #1b1b21;
   --lex-surface: #fcf8ff;
@@ -43,15 +43,14 @@
   --lex-surface-bright: #fcf8ff;
   --lex-surface-container-lowest: #ffffff;
   --lex-surface-container-low: #f6f2fa;
-  --lex-surface-container: #f0ecf4;
-  --lex-surface-container-high: #eae7ef;
-  --lex-surface-container-highest: #e5e1e9;
+  --lex-surface-container: #eae7ef;
+  --lex-surface-container-high: #dfdbe3;
+  --lex-surface-container-highest: #d4d0d8;
   --lex-outline: #787680;
   --lex-outline-variant: #c8c5d0;
   --lex-scrim: #000000;
   --lex-shadow: #000000;
-  --lex-surface-tint: #5a5892;
-  --lex-inverse-surface: #313036;
+    --lex-inverse-surface: #313036;
   --lex-inverse-on-surface: #f3eff7;
   --lex-inverse-primary: #c3c0ff;
 
@@ -166,10 +165,10 @@
   color-scheme: dark;
 
   /* ===== M3 颜色角色（深色，MCU 0.3.0 SchemeTonalSpot） ===== */
-  --lex-primary: #c3c0ff;
+  --lex-primary: #dbd8ff;
   --lex-on-primary: #2b2a60;
-  --lex-primary-container: #424178;
-  --lex-on-primary-container: #e2dfff;
+  --lex-primary-container: #8c8bc8;
+  --lex-on-primary-container: #16134a;
   --lex-secondary: #c7c4dd;
   --lex-on-secondary: #2f2e42;
   --lex-secondary-container: #464559;
@@ -182,10 +181,10 @@
   --lex-on-error: #690005;
   --lex-error-container: #93000a;
   --lex-on-error-container: #ffdad6;
-  --lex-success: #9cd4a0;
-  --lex-on-success: #003914;
-  --lex-success-container: #1c5128;
-  --lex-on-success-container: #b7f1ba;
+  --lex-success: #76db7a;
+  --lex-on-success: #00390a;
+  --lex-success-container: #005313;
+  --lex-on-success-container: #a6f2a5;
   --lex-background: #131318;
   --lex-on-background: #e5e1e9;
   --lex-surface: #131318;
@@ -195,16 +194,15 @@
   --lex-surface-dim: #131318;
   --lex-surface-bright: #39383f;
   --lex-surface-container-lowest: #0e0e13;
-  --lex-surface-container-low: #1b1b21;
-  --lex-surface-container: #201f25;
-  --lex-surface-container-high: #2a292f;
-  --lex-surface-container-highest: #35343a;
+  --lex-surface-container-low: #1a1c22;
+  --lex-surface-container: #1f1f2a;
+  --lex-surface-container-high: #2a2a33;
+  --lex-surface-container-highest: #35343d;
   --lex-outline: #928f9a;
   --lex-outline-variant: #47464f;
   --lex-scrim: #000000;
   --lex-shadow: #000000;
-  --lex-surface-tint: #c3c0ff;
-  --lex-inverse-surface: #e5e1e9;
+    --lex-inverse-surface: #e5e1e9;
   --lex-inverse-on-surface: #313036;
   --lex-inverse-primary: #5a5892;
 
