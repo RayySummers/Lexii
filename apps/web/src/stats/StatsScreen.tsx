@@ -61,28 +61,28 @@ export function StatsScreen({ provider, onExit }: StatsScreenProps) {
       <ScreenHeader title="统计" onBack={onExit} />
 
       {error ? (
-        <div className="flex flex-col items-start gap-3 rounded-2xl border border-danger/40 bg-surface p-6">
+        <div className="flex flex-col items-start gap-3 rounded-lg border border-error/40 bg-surface p-6">
           <p className="text-sm">无法读取本地数据，请重试。</p>
-          <details className="text-xs text-text-muted">
+          <details className="text-xs text-on-surface-variant">
             <summary>错误详情</summary>
             <p className="mt-1 whitespace-pre-wrap">{error}</p>
           </details>
           <button
             type="button"
             onClick={reload}
-            className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             重试
           </button>
         </div>
       ) : !stats ? (
-        <p role="status" className="text-sm text-text-muted">
+        <p role="status" className="text-sm text-on-surface-variant">
           正在加载…
         </p>
       ) : !hasData ? (
-        <div className="rounded-2xl border border-border bg-surface p-6 text-center">
+        <div className="rounded-lg border border-outline-variant bg-surface p-6 text-center">
           <p className="text-sm">还没有学习数据。</p>
-          <p className="mt-1 text-sm text-text-muted">完成第一次复习后，这里会显示你的学习统计。</p>
+          <p className="mt-1 text-sm text-on-surface-variant">完成第一次复习后，这里会显示你的学习统计。</p>
         </div>
       ) : (
         <section aria-label="学习统计" className="grid grid-cols-2 gap-3 sm:grid-cols-4">

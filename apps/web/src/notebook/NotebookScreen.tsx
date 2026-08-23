@@ -99,44 +99,44 @@ export function NotebookScreen({ provider, onExit }: NotebookScreenProps) {
       <ScreenHeader title="生词本" onBack={onExit} />
 
       {phase === "loading" ? (
-        <div role="status" className="py-16 text-center text-sm text-text-muted">
+        <div role="status" className="py-16 text-center text-sm text-on-surface-variant">
           正在加载生词本…
         </div>
       ) : phase === "error" ? (
-        <div className="flex flex-col items-start gap-3 rounded-2xl border border-danger/40 bg-surface p-6">
+        <div className="flex flex-col items-start gap-3 rounded-lg border border-error/40 bg-surface p-6">
           <p role="alert" className="text-sm">
             生词本暂时无法加载，请稍后重试。
           </p>
-          <details className="text-xs text-text-muted">
+          <details className="text-xs text-on-surface-variant">
             <summary>错误详情</summary>
             <p className="mt-1 whitespace-pre-wrap">{error}</p>
           </details>
           <button
             type="button"
             onClick={runLoad}
-            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             重试
           </button>
         </div>
       ) : entries.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface p-8 text-center">
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-outline-variant bg-surface p-8 text-center">
           <h2 className="text-xl font-semibold">生词本还是空的</h2>
-          <p className="max-w-sm text-sm text-text-muted">
+          <p className="max-w-sm text-sm text-on-surface-variant">
             在搜词页的结果上点「加词」，或在复习卡页点「加词」，就能把想重点掌握的词收进这里。
             加入后可在设置页开关「学习队列包含生词本」，决定它们是否进入学习队列。
           </p>
         </div>
       ) : (
         <>
-          <p role="status" className="text-sm text-text-muted">
+          <p role="status" className="text-sm text-on-surface-variant">
             共 {entries.length} 个词
           </p>
           <ul className="flex flex-col gap-3">
             {entries.map(({ entry, sense }) => (
               <li
                 key={entry.id}
-                className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface p-4"
+                className="flex flex-col gap-1.5 rounded-md border border-outline-variant bg-surface p-4"
               >
                 <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   <span
@@ -148,23 +148,23 @@ export function NotebookScreen({ provider, onExit }: NotebookScreenProps) {
                   >
                     {sense.term}
                   </span>
-                  {sense.pos ? <span className="text-xs text-text-muted">{sense.pos}</span> : null}
+                  {sense.pos ? <span className="text-xs text-on-surface-variant">{sense.pos}</span> : null}
                   {sense.ipa ? (
-                    <span className="lex-phonetic text-xs text-text-muted">/{sense.ipa}/</span>
+                    <span className="lex-phonetic text-xs text-on-surface-variant">/{sense.ipa}/</span>
                   ) : null}
                 </span>
-                <p className="text-sm leading-relaxed text-text-muted">
+                <p className="text-sm leading-relaxed text-on-surface-variant">
                   {sense.definitions.join("；")}
                 </p>
                 <div className="flex items-center justify-end gap-2">
                   {confirmingId === entry.id ? (
                     <span className="flex items-center gap-2">
-                      <span className="text-xs text-text-muted">移出后进度不再计入学习队列</span>
+                      <span className="text-xs text-on-surface-variant">移出后进度不再计入学习队列</span>
                       <button
                         type="button"
                         onClick={() => void handleRemove(entry.id)}
                         disabled={removingId !== null}
-                        className="rounded-full bg-danger px-4 py-1.5 text-xs font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-full bg-error px-4 py-1.5 text-xs font-semibold text-on-error transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {removingId === entry.id ? "移出中…" : "确认移出"}
                       </button>
@@ -172,7 +172,7 @@ export function NotebookScreen({ provider, onExit }: NotebookScreenProps) {
                         type="button"
                         onClick={() => setConfirmingId(null)}
                         disabled={removingId !== null}
-                        className="rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium text-text-muted transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-full border border-outline-variant bg-surface px-4 py-1.5 text-xs font-medium text-on-surface-variant transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         取消
                       </button>
@@ -185,7 +185,7 @@ export function NotebookScreen({ provider, onExit }: NotebookScreenProps) {
                         setConfirmingId(entry.id);
                       }}
                       aria-label={`把「${sense.term}」移出生词本`}
-                      className="rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium text-text-muted transition-colors hover:border-danger hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                      className="rounded-full border border-outline-variant bg-surface px-4 py-1.5 text-xs font-medium text-on-surface-variant transition-colors hover:border-error hover:text-error focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     >
                       移出
                     </button>
@@ -198,7 +198,7 @@ export function NotebookScreen({ provider, onExit }: NotebookScreenProps) {
       )}
 
       {removeError ? (
-        <p role="alert" className="text-center text-xs text-text-muted">
+        <p role="alert" className="text-center text-xs text-on-surface-variant">
           移出失败：{removeError}
         </p>
       ) : null}
