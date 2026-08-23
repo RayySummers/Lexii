@@ -1,59 +1,236 @@
 /*
- * Lexii 语义化 design tokens
+ * Lexii 语义化 design tokens — M3 Tonal Spot (seed #4F46E5)
  *
  * 规则：
  * - 组件中禁止硬编码颜色，一律引用这里的语义 token（浅色/深色两套）
- * - token 命名表达「用途」而非「颜色值」：--lex-bg / --lex-text / --lex-primary ...
+ * - token 命名对齐 M3 官方角色：--lex-primary / on-primary / container 等，--lex-* 前缀
  * - 深色模式通过 <html data-theme="dark"> 切换（见 useTheme）
+ * - 旧 token（--lex-bg / --lex-primary / --lex-danger 等）保留为 deprecated 别名（var() 指向），组件迁完按批删除
+ * - 单 seed #4F46E5 Tonal spot 基准见 pure-palette.json；修改请同步 palette.ts 与 docs/design-tokens.md
  */
+
 :root {
   color-scheme: light;
 
-  /* 背景与表面 */
-  --lex-bg: #fafaf9;
-  --lex-surface: #ffffff;
-  --lex-surface-raised: #f5f5f4;
-  --lex-border: #e7e5e4;
+  /* ===== M3 颜色角色（浅色，来自 pure-palette.json light） ===== */
+  --lex-primary: #313066;
+  --lex-on-primary: #ffffff;
+  --lex-primary-container: #6867a1;
+  --lex-on-primary-container: #ffffff;
+  --lex-secondary: #5c5c71;
+  --lex-on-secondary: #ffffff;
+  --lex-secondary-container: #e2e0f7;
+  --lex-on-secondary-container: #1a1a2e;
+  --lex-tertiary: #775365;
+  --lex-on-tertiary: #ffffff;
+  --lex-tertiary-container: #ffd8ea;
+  --lex-on-tertiary-container: #2c1122;
+  --lex-error: #ba1a1a;
+  --lex-on-error: #ffffff;
+  --lex-error-container: #ffdad6;
+  --lex-on-error-container: #410002;
+  --lex-success: #146c2e;
+  --lex-on-success: #ffffff;
+  --lex-success-container: #a6f2a6;
+  --lex-on-success-container: #002106;
+  --lex-background: #fcf8ff;
+  --lex-on-background: #1c1b1f;
+  --lex-surface: #fcf8ff;
+  --lex-on-surface: #1c1b1f;
+  --lex-surface-variant: #e4e1ec;
+  --lex-on-surface-variant: #47464f;
+  --lex-surface-container-lowest: #ffffff;
+  --lex-surface-container-low: #f6f2fa;
+  --lex-surface-container: #eae7ef;
+  --lex-surface-container-high: #dfdbe3;
+  --lex-surface-container-highest: #d4d0d8;
+  --lex-outline: #787680;
+  --lex-outline-variant: #c8c5d0;
+  --lex-scrim: #000000;
+  --lex-inverse-surface: #313034;
+  --lex-inverse-on-surface: #f3eff4;
+  --lex-inverse-primary: #c3c0ff;
 
-  /* 文本 */
-  --lex-text: #1c1917;
-  --lex-text-muted: #78716c;
+  /* ===== Shape（M3 官方值） ===== */
+  --lex-radius-xs: 4px;
+  --lex-radius-sm: 8px;
+  --lex-radius-md: 12px;
+  --lex-radius-lg: 16px;
+  --lex-radius-xl: 28px;
+  --lex-radius-full: 9999px;
 
-  /* 品牌与状态 */
-  --lex-primary: #4f46e5;
-  --lex-primary-contrast: #ffffff;
-  --lex-accent: #d97706;
-  --lex-danger: #dc2626;
-  --lex-success: #16a34a;
-  --lex-focus-ring: #6366f1;
+  /* ===== Type Scale 15 档（rem = sp/16，含 size/line-height/tracking/weight；中文 tracking 按 0 处理见文档） ===== */
+  --lex-typescale-display-large-size: 3.5625rem;
+  --lex-typescale-display-large-line-height: 4rem;
+  --lex-typescale-display-large-tracking: -0.016rem;
+  --lex-typescale-display-large-weight: 400;
+  --lex-typescale-display-medium-size: 2.8125rem;
+  --lex-typescale-display-medium-line-height: 3.25rem;
+  --lex-typescale-display-medium-tracking: 0;
+  --lex-typescale-display-medium-weight: 400;
+  --lex-typescale-display-small-size: 2.25rem;
+  --lex-typescale-display-small-line-height: 2.75rem;
+  --lex-typescale-display-small-tracking: 0;
+  --lex-typescale-display-small-weight: 400;
+  --lex-typescale-headline-large-size: 2rem;
+  --lex-typescale-headline-large-line-height: 2.5rem;
+  --lex-typescale-headline-large-tracking: 0;
+  --lex-typescale-headline-large-weight: 400;
+  --lex-typescale-headline-medium-size: 1.75rem;
+  --lex-typescale-headline-medium-line-height: 2.25rem;
+  --lex-typescale-headline-medium-tracking: 0;
+  --lex-typescale-headline-medium-weight: 400;
+  --lex-typescale-headline-small-size: 1.5rem;
+  --lex-typescale-headline-small-line-height: 2rem;
+  --lex-typescale-headline-small-tracking: 0;
+  --lex-typescale-headline-small-weight: 400;
+  --lex-typescale-title-large-size: 1.375rem;
+  --lex-typescale-title-large-line-height: 1.75rem;
+  --lex-typescale-title-large-tracking: 0;
+  --lex-typescale-title-large-weight: 400;
+  --lex-typescale-title-medium-size: 1rem;
+  --lex-typescale-title-medium-line-height: 1.5rem;
+  --lex-typescale-title-medium-tracking: 0.009rem;
+  --lex-typescale-title-medium-weight: 500;
+  --lex-typescale-title-small-size: 0.875rem;
+  --lex-typescale-title-small-line-height: 1.25rem;
+  --lex-typescale-title-small-tracking: 0.006rem;
+  --lex-typescale-title-small-weight: 500;
+  --lex-typescale-body-large-size: 1rem;
+  --lex-typescale-body-large-line-height: 1.5rem;
+  --lex-typescale-body-large-tracking: 0.031rem;
+  --lex-typescale-body-large-weight: 400;
+  --lex-typescale-body-medium-size: 0.875rem;
+  --lex-typescale-body-medium-line-height: 1.25rem;
+  --lex-typescale-body-medium-tracking: 0.016rem;
+  --lex-typescale-body-medium-weight: 400;
+  --lex-typescale-body-small-size: 0.75rem;
+  --lex-typescale-body-small-line-height: 1rem;
+  --lex-typescale-body-small-tracking: 0.025rem;
+  --lex-typescale-body-small-weight: 400;
+  --lex-typescale-label-large-size: 0.875rem;
+  --lex-typescale-label-large-line-height: 1.25rem;
+  --lex-typescale-label-large-tracking: 0.006rem;
+  --lex-typescale-label-large-weight: 500;
+  --lex-typescale-label-medium-size: 0.75rem;
+  --lex-typescale-label-medium-line-height: 1rem;
+  --lex-typescale-label-medium-tracking: 0.031rem;
+  --lex-typescale-label-medium-weight: 500;
+  --lex-typescale-label-small-size: 0.6875rem;
+  --lex-typescale-label-small-line-height: 1rem;
+  --lex-typescale-label-small-tracking: 0.031rem;
+  --lex-typescale-label-small-weight: 500;
 
-  /* 音标字体栈（RAY-361 音标豆腐块修复）：Inter + 系统通用兜底，IPA 缺字时回退系统字体避免新豆腐块 */
+  /* ===== 字体栈（MiSans 主栈 + 系统回退；卡片 7 档保持独立见下方） ===== */
+  --lex-font-sans:
+    "MiSans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  --lex-font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, monospace;
+
+  /* ===== Motion durations（M3 官方） ===== */
+  --lex-motion-duration-short1: 50ms;
+  --lex-motion-duration-short2: 100ms;
+  --lex-motion-duration-medium1: 250ms;
+  --lex-motion-duration-medium2: 300ms;
+  --lex-motion-duration-long1: 450ms;
+  --lex-motion-duration-long2: 500ms;
+
+  /* ===== Motion easings（M3 官方） ===== */
+  --lex-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --lex-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --lex-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --lex-motion-easing-standard-decelerate: cubic-bezier(0, 0, 0, 1);
+  --lex-motion-easing-standard-accelerate: cubic-bezier(0.3, 0, 1, 1);
+
+  /* ===== 音标字体栈（RAY-361） ===== */
   --lex-phonetic-font:
     "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
     Arial, sans-serif;
+
+  /* ===== Deprecated 别名（兼容旧组件，迁完按批删除；值通过 var() 指向新角色，--lex-bg 例外：需与 themeColor.test 保持 hex 直链以校验首帧 theme-color） ===== */
+  --lex-bg: #fcf8ff; /* alias for --lex-background, kept as hex for FOUC test parity */
+  --lex-surface-raised: var(--lex-surface-container);
+  --lex-border: var(--lex-outline-variant);
+  --lex-text: var(--lex-on-background);
+  --lex-text-muted: var(--lex-on-surface-variant);
+  --lex-primary-contrast: var(--lex-on-primary);
+  --lex-accent: var(--lex-tertiary);
+  --lex-danger: var(--lex-error);
+  --lex-focus-ring: var(--lex-primary);
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* 背景与表面 */
-  --lex-bg: #0c0a09;
-  --lex-surface: #1c1917;
-  --lex-surface-raised: #292524;
-  --lex-border: #292524;
+  /* ===== M3 颜色角色（深色） ===== */
+  --lex-primary: #dbd8ff;
+  --lex-on-primary: #2e2a7a;
+  --lex-primary-container: #8c8bc8;
+  --lex-on-primary-container: #000060;
+  --lex-secondary: #c7c4dd;
+  --lex-on-secondary: #2e2d42;
+  --lex-secondary-container: #444559;
+  --lex-on-secondary-container: #e2e0f7;
+  --lex-tertiary: #eab9d1;
+  --lex-on-tertiary: #463041;
+  --lex-tertiary-container: #5e3c4d;
+  --lex-on-tertiary-container: #ffd8ea;
+  --lex-error: #ffb4ab;
+  --lex-on-error: #690005;
+  --lex-error-container: #93000a;
+  --lex-on-error-container: #ffdad6;
+  --lex-success: #88d88a;
+  --lex-on-success: #00390f;
+  --lex-success-container: #00531a;
+  --lex-on-success-container: #a6f2a6;
+  --lex-background: #131318;
+  --lex-on-background: #e5e1e6;
+  --lex-surface: #131318;
+  --lex-on-surface: #e5e1e6;
+  --lex-surface-variant: #47464f;
+  --lex-on-surface-variant: #c8c5d0;
+  --lex-surface-container-lowest: #0f0e13;
+  --lex-surface-container-low: #1a1c22;
+  --lex-surface-container: #1f1f2a;
+  --lex-surface-container-high: #2a2a33;
+  --lex-surface-container-highest: #35343d;
+  --lex-outline: #928f9a;
+  --lex-outline-variant: #47464f;
+  --lex-scrim: #000000;
+  --lex-inverse-surface: #e5e1e6;
+  --lex-inverse-on-surface: #313034;
+  --lex-inverse-primary: #4f46e5;
 
-  /* 文本 */
-  --lex-text: #f5f5f4;
-  --lex-text-muted: #a8a29e;
+  /* Shape / Type / Motion / 字体栈 随浅色保持一致（不因主题变），此处不再重复 */
 
-  /* 品牌与状态 */
-  --lex-primary: #818cf8;
-  --lex-primary-contrast: #1e1b4b;
-  --lex-accent: #f59e0b;
-  --lex-danger: #f87171;
-  --lex-success: #4ade80;
-  --lex-focus-ring: #818cf8;
+  /* ===== Deprecated 别名（深色同样 var() 指向，--lex-bg 例外 hex 直链） ===== */
+  --lex-bg: #131318; /* alias for --lex-background */
+  --lex-surface-raised: var(--lex-surface-container);
+  --lex-border: var(--lex-outline-variant);
+  --lex-text: var(--lex-on-background);
+  --lex-text-muted: var(--lex-on-surface-variant);
+  --lex-primary-contrast: var(--lex-on-primary);
+  --lex-accent: var(--lex-tertiary);
+  --lex-danger: var(--lex-error);
+  --lex-focus-ring: var(--lex-primary);
 }
+
+/* ===== prefers-reduced-motion 全局降级（P0 落地，P2 再应用动效） ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * 状态层（hover 8% / focus 10% / pressed 12% / dragged 16%）
+ * 统一规则 color-mix(in srgb, currentColor X%, transparent)，组件中按需使用，不设固定色。
+ * 示例：hover: background: color-mix(in srgb, currentColor 8%, transparent);
+ */
 
 /*
  * 卡片字体（RAY-323，RAY-359，RAY-366，RAY-361）：
