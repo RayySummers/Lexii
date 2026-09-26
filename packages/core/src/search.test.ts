@@ -67,6 +67,22 @@ describe("searchSenses（纯函数口径）", () => {
     expect(hits.every((hit) => hit.kind === "definition")).toBe(true);
   });
 
+  it("多词短语词条可检索（RAY-492：带空格的 term 不切词、不漏检）", () => {
+    const withPhrase: Sense[] = [
+      ...SENSES,
+      makeSense(6, { term: "de jure", definitions: ["法律上，按照法律的"] }),
+      makeSense(7, { term: "ice cream", definitions: ["冰淇淋"] }),
+    ];
+    // 完整短语前缀命中（装好 Tier 2 后的验收路径）
+    const hit = searchSenses(withPhrase, "de jure");
+    expect(hit[0]?.sense.term).toBe("de jure");
+    expect(hit[0]?.kind).toBe("term-prefix");
+    // 短语内部子串命中：按整体字符串匹配，不按空格切词
+    expect(searchSenses(withPhrase, "jure")[0]?.sense.term).toBe("de jure");
+    // 大小写不敏感（查询侧 trim 后比较）
+    expect(searchSenses(withPhrase, "ICE CREAM")[0]?.sense.term).toBe("ice cream");
+  });
+
   it("无命中返回空结果", () => {
     expect(searchSenses(SENSES, "zzz")).toEqual([]);
   });

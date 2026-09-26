@@ -1,13 +1,62 @@
 import { describe, expect, it } from "vitest";
 import { CsvFormatError, parseCsvWordlist, TERM_PATTERN } from "./csv";
-import { TERM_PATTERN as SHARED_TERM_PATTERN } from "./termPattern.js";
+import {
+  isPhraseTerm,
+  isPhraseTerm as SHARED_IS_PHRASE_TERM,
+  TERM_PATTERN as SHARED_TERM_PATTERN,
+} from "./termPattern.js";
 
 describe("TERM_PATTERN 共享常量（RAY-260 评审 nit 1：消除双处维护）", () => {
   it("csv.ts 与打包脚本引用的唯一物理定义是同一对象", () => {
     // termPattern.js 是唯一物理定义：csv.ts 经 re-export 暴露，
     // scripts/presets/lib/ecdict.mjs 直接 import 同一文件（无第二份定义）。
     expect(TERM_PATTERN).toBe(SHARED_TERM_PATTERN);
-    expect(TERM_PATTERN.source).toBe("^[A-Za-z][A-Za-z'-]*[.]?$");
+    expect(TERM_PATTERN.source).toBe("^[A-Za-z][A-Za-z'-]*(?: [A-Za-z][A-Za-z'-]*)*[.]?$");
+  });
+
+  it("短语判定 isPhraseTerm 与 TERM_PATTERN 同处一个物理定义（RAY-492）", () => {
+    // 打包侧（Tier 0/1 与内置词书）用同一函数挡短语，无双处判定。
+    expect(isPhraseTerm).toBe(SHARED_IS_PHRASE_TERM);
+  });
+});
+
+describe("TERM_PATTERN 形状正反例（RAY-492：单词 + 多词短语）", () => {
+  it("单词形态不回归：字母/撇号/连字符/结尾点", () => {
+    for (const term of ["apple", "don't", "well-known", "Mr.", "A", "x-ray"]) {
+      expect(TERM_PATTERN.test(term), term).toBe(true);
+    }
+  });
+
+  it("接受多词短语：词内单个空格（de jure 等）", () => {
+    for (const term of [
+      "de jure",
+      "de facto",
+      "as a matter of fact",
+      "ice cream",
+      "well-known phrase",
+      "ad hoc.",
+    ]) {
+      expect(TERM_PATTERN.test(term), term).toBe(true);
+    }
+  });
+
+  it("拒绝首尾空格与连续空格", () => {
+    for (const term of [" well-known", "well-known ", "a  b", " de jure", "de jure ", "a b "]) {
+      expect(TERM_PATTERN.test(term), term).toBe(false);
+    }
+  });
+
+  it("拒绝数字/非英文字符/内部点/空串（原有口径不回归）", () => {
+    for (const term of ["apple2", "苹 果", "U.S.", "e.g", "de-jure 2", "", "-ability", "'hood"]) {
+      expect(TERM_PATTERN.test(term), term).toBe(false);
+    }
+  });
+
+  it("isPhraseTerm：仅内部含空格为短语（与形状校验无关）", () => {
+    expect(isPhraseTerm("de jure")).toBe(true);
+    expect(isPhraseTerm("ice cream")).toBe(true);
+    expect(isPhraseTerm("well-known")).toBe(false);
+    expect(isPhraseTerm("Mr.")).toBe(false);
   });
 });
 
@@ -133,6 +182,21 @@ describe("parseCsvWordlist（CSV 词表解析与格式校验）", () => {
       // 超长非法词条：错误信息中截断展示（避免撑爆提示）
       expect(() => parseCsvWordlist(`${"9".repeat(30)},苹果`)).toThrow(/格式非法/);
       expect(() => parseCsvWordlist(`${"9".repeat(30)},苹果`)).toThrow(/…/);
+    });
+
+    it("多词短语放行 / 连续空格仍拒（RAY-492）", () => {
+      // 用户词表可导入短语（与内置档分级口径无关，这里只管形状）
+      expect(parseCsvWordlist('de jure,"法律上, 按照法律的"').entries).toEqual([
+        { term: "de jure", definitions: ["法律上, 按照法律的"] },
+      ]);
+      // 单元格首尾空白由解析层 trim（不会产生首尾空格词条）
+      expect(parseCsvWordlist('" well-known",著名的').entries).toEqual([
+        { term: "well-known", definitions: ["著名的"] },
+      ]);
+      // 词条内部连续空格不是合法短语（trim 不掉，进形状校验）
+      expect(() => parseCsvWordlist('"a  b",两个空格')).toThrow(/第 1 行：单词格式非法/);
+      // 错误文案同步说明短语写法（与 TERM_PATTERN 口径一致）
+      expect(() => parseCsvWordlist("apple2,苹果")).toThrow(/多词短语用单个空格分隔/);
     });
 
     it("释义缺失", () => {

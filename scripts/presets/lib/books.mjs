@@ -34,7 +34,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { TAG_LABELS } from "./ecdict.mjs";
+import { isPhraseTerm, TAG_LABELS } from "./ecdict.mjs";
 
 /**
  * 考试分级词书定义。
@@ -154,15 +154,19 @@ function getExternalRefWords() {
  * 基础通用词补入（P1.5），并剔除不在外部考试参考词表中的 GRE 标签词。
  * 专八截断排序将补入词置前优先保留，保证补入词不被词频截断裁掉。
  *
+ * RAY-492：词书库只收单词——多词短语只进 Tier 2 全量包。否则 `ice cream`
+ * （zk 标签）这类短语会漏进词书，改变已发布的词数与共享池体积。
+ *
  * @param {Array<import("./ecdict.mjs").CleanedEntry>} cleanedAll 清洗后的全部词条
  * @returns {Map<string, Array<import("./ecdict.mjs").CleanedEntry>>}
  */
 export function selectBookEntries(cleanedAll) {
   const externalRef = getExternalRefWords();
   const p15Words = getP15Words();
+  const singleWords = cleanedAll.filter((entry) => !isPhraseTerm(entry.term));
   const bookEntriesById = new Map();
   for (const def of BOOK_DEFS) {
-    let entries = cleanedAll
+    let entries = singleWords
       .filter((entry) => entry.examTags.some((tag) => def.tagList.includes(tag)))
       .sort((a, b) => a.term.localeCompare(b.term));
 
@@ -181,7 +185,7 @@ export function selectBookEntries(cleanedAll) {
       const termSet = new Set(entries.map((e) => e.term.toLowerCase()));
       const p1Words = getP1Words()[def.id];
       const wanted = new Set([...(p1Words ?? []), ...p15Words]);
-      const additions = cleanedAll.filter(
+      const additions = singleWords.filter(
         (entry) => wanted.has(entry.term.toLowerCase()) && !termSet.has(entry.term.toLowerCase()),
       );
       entries = [...entries, ...additions].sort((a, b) => a.term.localeCompare(b.term));

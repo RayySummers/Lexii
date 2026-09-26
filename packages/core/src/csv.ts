@@ -9,6 +9,9 @@
  * 格式错误必须给出明确提示（行号 + 原因），整份数据要么全通过要么全拒绝，
  * 绝不静默丢弃行。中文释义栏内的逗号须加引号（RFC 4180 风格，容错处理
  * 未闭合引号）。
+ *
+ * 词条形状见 termPattern.js（RAY-492 起接受多词短语，如 `de jure`：
+ * 词内单个空格合法，首尾空格与连续空格仍拒）。
  */
 import type { LanguageCode } from "./domain";
 import { TERM_PATTERN } from "./termPattern.js";
@@ -170,7 +173,7 @@ function parseDataRow(cells: string[], plan: ColumnPlan, line: number): CsvWordE
   if (!TERM_PATTERN.test(termCell)) {
     throw new CsvFormatError(
       line,
-      `单词格式非法："${truncate(termCell)}"（仅支持英文字母、'、-、.）`,
+      `单词格式非法："${truncate(termCell)}"（仅支持英文字母、'、-、.；多词短语用单个空格分隔）`,
     );
   }
   if (termCell.length > MAX_FIELD_LENGTH) {

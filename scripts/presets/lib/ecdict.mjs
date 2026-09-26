@@ -10,14 +10,17 @@
  * 本模块只用 Node 内置 API（fs/zlib），无第三方依赖，便于在任何环境复现。
  */
 import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
-import { TERM_PATTERN } from "../../../packages/core/src/termPattern.js";
+import { TERM_PATTERN, isPhraseTerm } from "../../../packages/core/src/termPattern.js";
 
 /**
- * 与 core 侧共享的词条模式（唯一物理定义在
+ * 与 core 侧共享的词条模式与短语判定（唯一物理定义在
  * packages/core/src/termPattern.js——core 的 csv.ts 与打包脚本 import 同一文件，
  * 消除双处维护漂移，RAY-260 评审 nit 1）。
+ *
+ * RAY-492 起 TERM_PATTERN 接受多词短语（内部单个空格），`isPhraseTerm`
+ * 供分级侧把短语限制在 Tier 2 全量包（Tier 0/1 与内置词书仍只收单词）。
  */
-export { TERM_PATTERN };
+export { TERM_PATTERN, isPhraseTerm };
 
 /** 与 core 侧一致的单字段上限（500 字符） */
 export const MAX_FIELD_LENGTH = 500;
@@ -233,7 +236,9 @@ export function normalizeTranslation(translation) {
 export function rejectReason(row) {
   const word = row.word;
   if (!TERM_PATTERN.test(word)) {
-    return "term-shape"; // 短语 / 词缀 / 缩略 / 非英语词条（如 "why not"、"-ability"、"'hood"）
+    // RAY-492：多词短语（"de jure"）已放行——仍拒的是词缀 / 缩略 / 非英语 /
+    // 形状非法行（"-ability"、"'hood"、"a  b"、" well-known"）。
+    return "term-shape";
   }
   if (word.length > MAX_FIELD_LENGTH) {
     return "term-too-long";

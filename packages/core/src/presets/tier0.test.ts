@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { TERM_PATTERN } from "../csv";
+import { isPhraseTerm } from "../termPattern.js";
 import { TIER0_PRESET, TIER0_PRESET_ROW_COUNT } from "./tier0";
 import { THIRD_PARTY_DATA_SOURCES, THIRD_PARTY_NOTICES } from "./notices";
 
@@ -33,6 +34,12 @@ describe("TIER0_PRESET（内置核心词表）", () => {
       expect(seen.has(entry.term.toLowerCase()), `词条重复：${entry.term}`).toBe(false);
       seen.add(entry.term.toLowerCase());
     }
+  });
+
+  it("Tier 0 只收单词：多词短语只进 Tier 2 全量包（RAY-492 分级口径）", () => {
+    // TERM_PATTERN 放宽后短语能通过形状校验，分级守卫必须把内置档挡住，
+    // 否则 ice cream（zk 标签）这类短语会进 Tier 0，7,195 条基线被打破。
+    expect(TIER0_PRESET.entries.filter((entry) => isPhraseTerm(entry.term))).toEqual([]);
   });
 
   it("词条按字母序排列（打包侧排序契约）", () => {

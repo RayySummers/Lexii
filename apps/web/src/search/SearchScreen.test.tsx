@@ -97,6 +97,24 @@ describe("SearchScreen", () => {
     expect(provider.search).toHaveBeenCalledWith("app");
   });
 
+  it("多词短语命中展示「扩展词典」来源标注（RAY-492：de jure 这类词条）", async () => {
+    const phrase: SearchResult = {
+      ...makeResult("de jure", ["法律上，按照法律的"]),
+      source: "dictionary",
+    };
+    const provider = makeProvider({
+      search: vi.fn<(query: string) => Promise<SearchResult[]>>().mockResolvedValue([phrase]),
+    });
+    render(<SearchScreen provider={provider} onExit={() => {}} />);
+
+    typeQuery("de jure");
+
+    // 词条整体展示（不按空格截断），来源为扩展词典表 → 「扩展词典」徽标
+    expect(await screen.findByText("de jure")).toBeInTheDocument();
+    expect(screen.getByText("扩展词典")).toBeInTheDocument();
+    expect(screen.getByText("法律上，按照法律的")).toBeInTheDocument();
+  });
+
   it("结果行词条本体应用设置里的卡片字体（RAY-338 A1，CSS 变量口径与复习卡一致）", async () => {
     const provider = makeProvider({
       search: vi.fn().mockResolvedValue([makeResult("apple", ["苹果"])]),
