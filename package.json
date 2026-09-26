@@ -15,6 +15,7 @@
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "lint:presets": "node scripts/presets/scan_traditional.mjs",
+    "lint:tokens": "node scripts/scan-hardcoded-colors.mjs",
     "check:release-version": "node scripts/check-release-version.mjs"
   },
   "devDependencies": {

@@ -1,0 +1,36 @@
+MiSans 字体许可说明（RAY-375，S1-3）
+
+来源：小米 MiSans / MiSans Global
+官方主页：https://hyperos.mi.com/font/zh/
+官方下载与许可页：https://hyperos.mi.com/font/zh/download/
+许可协议 PDF：https://hyperos.mi.com/font-download/MiSans%E5%AD%97%E4%BD%93%E7%9F%A5%E8%AF%86%E4%BA%A7%E6%9D%83%E8%AE%B8%E5%8F%AF%E5%8D%8F%E8%AE%AE.pdf
+
+《MiSans 字体知识产权许可协议》要点（以官方 PDF 全文为准）：
+- 许可方：小米科技有限责任公司
+- 授权：不可转让、非独占、免版税、可撤销、全球性的版权许可
+- 条件：
+  1) 需在软件中特别注明使用了 MiSans 字体；
+  2) 不得对字体或其组件进行改编或二次开发；
+  3) 不得单独将字体文件对外租赁、再许可、给予、出借或进一步分发；
+     但使用 MiSans 创作的作品（如宣传素材、logo、App 界面渲染结果）可分发/出售。
+- 结论：允许随应用以 woff2 webfont 形式分发（作为界面渲染资源），
+  满足本项目 local-first 离线分发与 GPL-3.0-or-later 聚合分发要求
+  （字体文件与代码聚合分发，非衍生；Vega 核验记录见 README/设置页口径）。
+
+本目录分发的 woff2 文件来源与构建：
+- 构建来源：dsrkafuu/misans（https://github.com/dsrkafuu/misans）Latin 子集，
+  对应上游小米官方 MiSans TTF，经 Noto Sans SC unicode-range 子集化与 woff2 转码，
+  许可证：脚本 Apache-2.0，字体本体遵循小米官方许可；
+- 当前分发：MiSans-Regular.woff2 (400, 50KB) / MiSans-Medium.woff2 (500, 54KB) /
+  MiSans-Bold.woff2 (700, 55KB)，均为 Latin 子集（拉丁/数字/常用符号），
+  中文缺字时按 CSS 回退栈 fallback 至系统字体；
+- 如需中文全量，建议按 Normal 119 分片或基于界面文案的自定义子集扩展，
+  本 Alpha 0.10.1 阶段以 Latin + 回退栈满足性能与离线要求。
+
+GPL-3.0-or-later 兼容性结论（Vega 核验，待 1 句结论归档）：
+MiSans 以聚合（mere aggregation）形式随应用分发，字体许可与项目 GPL-3.0-or-later
+代码许可隔离，不构成衍生作品；署名与来源声明已在 README、设置页、NOTICE 中完整提供，
+符合小米许可“注明来源”义务与 GPL-3.0-or-later 分发要求。
+
+详见：README “词表数据与许可”新增 MiSans 行、设置页 DataSourcesScreen 文案、
+packages/core/src/presets/notices.ts 的 THIRD_PARTY_NOTICES MiSans 段。

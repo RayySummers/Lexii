@@ -61,32 +61,32 @@ export function DataSourcesScreen({ provider, onBack }: DataSourcesScreenProps) 
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
       <ScreenHeader title="数据来源与许可" onBack={onBack} backLabel="返回设置" />
 
-      <p className="text-sm text-text-muted">
+      <p className="text-sm text-on-surface-variant">
         乐希的预设词表由开源数据清洗打包而成，随应用内置、离线可用。以下列出全部数据来源、许可与署名信息。
       </p>
 
-      <section className="rounded-2xl border border-border bg-surface p-6">
+      <section className="rounded-lg border border-outline-variant bg-surface p-6">
         <h2 className="text-base font-semibold">内置词表</h2>
         <div className="mt-4 flex flex-col gap-3">
           {error ? (
-            <p role="alert" className="rounded-xl border border-danger/40 bg-surface p-4 text-sm">
+            <p role="alert" className="rounded-md border border-error/40 bg-surface p-4 text-sm">
               读取安装状态失败：{error}
             </p>
           ) : summaries === null ? (
-            <p className="text-sm text-text-muted">正在读取安装状态…</p>
+            <p className="text-sm text-on-surface-variant">正在读取安装状态…</p>
           ) : (
             summaries.map((summary) => (
               <div
                 key={summary.id}
-                className="flex flex-col gap-1 rounded-xl border border-border p-4"
+                className="flex flex-col gap-1 rounded-md border border-outline-variant p-4"
               >
                 <span className="flex items-center justify-between gap-3">
                   <span className="text-sm font-medium">{summary.name}</span>
-                  <span className="rounded-full border border-border px-2.5 py-0.5 text-xs text-text-muted">
+                  <span className="rounded-full border border-outline-variant px-2.5 py-0.5 text-xs text-on-surface-variant">
                     {statusLabel(summary)}
                   </span>
                 </span>
-                <span className="text-xs text-text-muted">
+                <span className="text-xs text-on-surface-variant">
                   {summary.totalCount} 词条
                   {summary.status === "installed" && summary.installedVersion
                     ? ` · v${summary.installedVersion}`
@@ -98,7 +98,7 @@ export function DataSourcesScreen({ provider, onBack }: DataSourcesScreenProps) 
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-surface p-6">
+      <section className="rounded-lg border border-outline-variant bg-surface p-6">
         <h2 className="text-base font-semibold">数据来源</h2>
         <div className="mt-4 flex flex-col gap-4">
           {THIRD_PARTY_DATA_SOURCES.map((source) => (
@@ -107,9 +107,9 @@ export function DataSourcesScreen({ provider, onBack }: DataSourcesScreenProps) 
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-surface p-6">
+      <section className="rounded-lg border border-outline-variant bg-surface p-6">
         <h2 className="text-base font-semibold">许可声明（NOTICE）</h2>
-        <pre className="mt-4 max-h-80 overflow-auto rounded-xl border border-border bg-surface-raised p-4 text-xs leading-relaxed text-text-muted whitespace-pre-wrap">
+        <pre className="mt-4 max-h-80 overflow-auto rounded-md border border-outline-variant bg-surface-container p-4 text-xs leading-relaxed text-on-surface-variant whitespace-pre-wrap">
           {THIRD_PARTY_NOTICES}
         </pre>
       </section>
@@ -120,21 +120,21 @@ export function DataSourcesScreen({ provider, onBack }: DataSourcesScreenProps) 
 /** 单个数据来源卡片：名称 + 许可徽标 + 使用方式 + 署名 + 出处链接 */
 function DataSourceCard({ source }: { source: ThirdPartyDataSource }) {
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-border p-4">
+    <div className="flex flex-col gap-2 rounded-md border border-outline-variant p-4">
       <span className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-medium">{source.name}</span>
-        <span className="rounded-full border border-border px-2.5 py-0.5 text-xs text-text-muted">
+        <span className="rounded-full border border-outline-variant px-2.5 py-0.5 text-xs text-on-surface-variant">
           {source.license}
         </span>
       </span>
-      <p className="text-sm text-text-muted">{source.usage}</p>
-      <p className="text-xs text-text-muted">{source.attribution}</p>
+      <p className="text-sm text-on-surface-variant">{source.usage}</p>
+      <p className="text-xs text-on-surface-variant">{source.attribution}</p>
       <span className="flex flex-wrap gap-3 text-sm">
         <a
           href={source.sourceUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-primary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="text-primary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           来源主页
         </a>
@@ -142,7 +142,7 @@ function DataSourceCard({ source }: { source: ThirdPartyDataSource }) {
           href={source.licenseUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-primary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="text-primary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           许可文本
         </a>
