@@ -33,6 +33,23 @@
  * - 图标尺寸由使用处的 className（h-5/h-4 等）映射为 font-size（见 icons.tsx），
  *   不在此处硬编码；此处只定义字形渲染所需的可变字体轴与抗锯齿。
  * - 全部为装饰性图标（aria-hidden），可达名由按钮的 aria-label/文本提供。
+ *
+ * ⚠️ 级联层约束（RAY-489 根因结论，勿把本条移进 @layer）：
+ *   Google Fonts 的 Material Symbols 样式表（index.html 的 <link>，跨源）在
+ *   `.material-symbols-outlined` 上声明 `display: inline-block`，且**未分层**；
+ *   Tailwind v4 发出的工具类（`.inline-flex` / `.sm\:hidden` …）都落在
+ *   `@layer utilities` 里。CSS 级联层规则规定「未分层声明 > 任何 @layer 中的声明」，
+ *   与特异性、书写顺序无关 —— 所以带 `material-symbols-outlined` 的元素上，
+ *   Tailwind 的 display / 可见性工具类一律被 Google 的 inline-block 盖掉、静默失效。
+ *   线上实证（2026-09-26，CDP matched styles，稳定通道 /Lexii/ 词单图标 span）：
+ *     .sm\:hidden                 display:none         layer=utilities  media=(width >= 40rem)
+ *     .material-symbols-outlined  display:inline-block layer=(unlayered)      ← 实际生效
+ *   后果即 RAY-489：旧代码用 `sm:hidden` 隐藏桌面端冗余图标，桌面不生效 → 双图标。
+ *   本条是**未分层**的覆盖层（比 Google 晚出现、同特异性），正是它把 Google 的
+ *   inline-block 压回 inline-flex（RAY-373 图标居中依赖此点），因此必须留在层外。
+ *   代价（硬约束）：**不要**把 hidden / sm:hidden / inline-flex 等 display / 可见性
+ *   工具类直接写在本类元素上——它们在本条面前同样无效。需要显隐时用外层普通元素
+ *   包裹（见 icons.tsx 的 MaterialIcon；CI 护栏见 icons.className.test.ts）。
  */
 .material-symbols-outlined {
   font-variation-settings:

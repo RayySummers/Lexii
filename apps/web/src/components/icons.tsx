@@ -66,7 +66,18 @@ function resolveFontSize(className?: string): string {
   return "24px";
 }
 
-/** 物料图标基座：所有图标的唯一渲染路径，统一字形、尺寸与可访问性契约 */
+/**
+ * 物料图标基座：所有图标的唯一渲染路径，统一字形、尺寸与可访问性契约。
+ *
+ * ⚠️ RAY-489（勿踩）：本元素带 `.material-symbols-outlined`，其 display 由 styles/index.css
+ * 里**未分层**的那条规则掌控（为了压住 Google Fonts 未分层的 `display:inline-block`）。
+ * 级联层规则「未分层 > @layer」，因此 `className` 里的 display / 可见性工具类
+ * （hidden / sm:hidden / sm:inline-flex / block / grid …）在这一层元素上会被吞掉、
+ * 静默失效——旧版顶栏正是靠 `sm:hidden` 隐藏桌面端冗余图标而实际没生效，渲染出双图标。
+ * → 需要显隐/布局分叉时，请用外层普通元素包裹图标（如
+ *   `<span className="hidden sm:inline-flex"><ListIcon className="h-5 w-5" /></span>`），
+ *   不要把这些工具类传给图标本身。CI 护栏：icons.className.test.ts（自动拦截新写法）。
+ */
 function MaterialIcon({ name, className }: { name: string } & IconProps) {
   const fontSize = resolveFontSize(className);
   // 光学尺寸（opsz）随字形物理尺寸动态：≤16px 取 20（更紧凑的描边比例），
