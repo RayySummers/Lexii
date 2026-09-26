@@ -12,22 +12,22 @@
  * --font-*           → font-*
  * 组件中一律使用这些语义工具类，不直接写十六进制颜色/尺寸。
  * P0 扩展：M3 全量角色 + Type Scale 15 档 + Shape + Motion 均在此注册；
- * 旧别名（--color-bg 等）保留至迁移完成。
+ * Batch5 已删除 --lex-* 旧别名，上述 Tailwind 兼容层随之重定向，后续批次将迁移组件至 M3 类名后移除。
  */
 @theme inline {
-  /* 旧别名（deprecated，保留至迁移完成） */
-  --color-bg: var(--lex-bg);
+  /* 兼容层（保留旧 Tailwind 类名，底层已指向 M3 --lex-*，待组件迁完后移除） */
+  --color-bg: var(--lex-background);
   --color-surface: var(--lex-surface);
-  --color-surface-raised: var(--lex-surface-raised);
-  --color-border: var(--lex-border);
-  --color-text: var(--lex-text);
-  --color-text-muted: var(--lex-text-muted);
+  --color-surface-raised: var(--lex-surface-container);
+  --color-border: var(--lex-outline-variant);
+  --color-text: var(--lex-on-background);
+  --color-text-muted: var(--lex-on-surface-variant);
   --color-primary: var(--lex-primary);
-  --color-primary-contrast: var(--lex-primary-contrast);
-  --color-accent: var(--lex-accent);
-  --color-danger: var(--lex-danger);
+  --color-primary-contrast: var(--lex-on-primary);
+  --color-accent: var(--lex-tertiary);
+  --color-danger: var(--lex-error);
   --color-success: var(--lex-success);
-  --color-focus-ring: var(--lex-focus-ring);
+  --color-focus-ring: var(--lex-primary);
 
   /* M3 颜色角色 · 主/次/三级/错误/成功 */
   --color-primary-container: var(--lex-primary-container);
