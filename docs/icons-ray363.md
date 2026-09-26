@@ -52,7 +52,7 @@
 | `KeyboardIcon` _(新增)_ | `keyboard`               | 键盘             | 为 RAY-362 保留 key icon 提示预留                       |
 
 > **尺寸契约**：`h-4 w-4 → 16px`、`h-5 w-5 → 20px`、`h-3.5 w-3.5 → 14px`，由 `icons.tsx:resolveFontSize` 统一映射，保持既有布局不变。
-> **颜色契约**：`color: currentColor` 继承文本色，随 `tokens.css` 的 `--lex-text` / `--lex-text-muted` / `--lex-primary` 等自动适配浅色/深色。
+> **颜色契约**：`color: currentColor` 继承文本色，随 `tokens.css` 的 `--lex-on-surface` / `--lex-on-surface-variant` / `--lex-primary` 等 M3 角色自动适配浅色/深色（历史 `--lex-text`/`--lex-text-muted` 已在 Batch5 删除，见 `design-tokens.md §7`）。
 
 ## 4. 撤销图标实心圆根因与修复
 

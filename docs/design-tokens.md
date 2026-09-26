@@ -351,45 +351,46 @@ export const darkPalette: Record<Role, string> = {
 
 ## 7. 旧 Token 别名清单及删除计划
 
-### 7.1 旧别名（deprecated，保留至迁移完成）
+### 7.1 旧别名（Batch5 已删除，历史记录）
 
-> 现存 `tokens.css` 中的旧语义 token（`--lex-bg` 等）将保留为已弃用别名，指向新角色，避免一次性全量替换导致回归风险。
+> **状态：已删除（RAY-402，Batch5）** — 旧语义 token（`--lex-bg` 等）在 P0 迁移期曾保留为已弃用别名（`var(--lex-*)` 指向新角色），组件按批迁移后已于 Batch5 删除；当前 `tokens.css` 仅保留 M3 角色，无别名层。历史映射见下表，供追溯；新代码禁止引用旧 Token。
 
-| 旧 Token                 | 指向新角色                 | 说明                                                          |
-| ------------------------ | -------------------------- | ------------------------------------------------------------- |
-| `--lex-bg`               | `--lex-background`         | 页面背景（旧 `#fafaf9` → 新 `#fcf8ff`）                       |
-| `--lex-surface`          | `--lex-surface`            | 表面（旧 `#ffffff` → 新 `#fcf8ff`，别名自指但保留兼容）       |
-| `--lex-surface-raised`   | `--lex-surface-container`  | 抬升表面                                                      |
-| `--lex-border`           | `--lex-outline-variant`    | 边框                                                          |
-| `--lex-text`             | `--lex-on-surface`         | 主文本（旧 `#1c1917` → 新 `#1b1b21`）                         |
-| `--lex-text-muted`       | `--lex-on-surface-variant` | 次要文本                                                      |
-| `--lex-primary`          | `--lex-primary`            | 主色自指（旧 `#4f46e5` → 新 `#313066` / `#dbd8ff`，别名保留） |
-| `--lex-primary-contrast` | `--lex-on-primary`         | 主色对比文字                                                  |
-| `--lex-accent`           | `--lex-tertiary`           | 强调色 → 三级色                                               |
-| `--lex-danger`           | `--lex-error`              | 危险 → 错误                                                   |
-| `--lex-success`          | `--lex-success`            | 成功（旧 `#16a34a` → 新 `#1b5c1a`）                           |
-| `--lex-focus-ring`       | `--lex-outline`            | 聚焦环                                                        |
+| 旧 Token                 | 曾指向新角色               | 说明                                                          | 状态                                               |
+| ------------------------ | -------------------------- | ------------------------------------------------------------- | -------------------------------------------------- |
+| `--lex-bg`               | `--lex-background`         | 页面背景（旧 `#fafaf9` → 新 `#fcf8ff`）                       | ✅ 已删除                                          |
+| `--lex-surface`          | `--lex-surface`            | 表面（旧 `#ffffff` → 新 `#fcf8ff`，别名自指但保留兼容）       | ✅ 已删除（M3 `--lex-surface` 保留，自指别名移除） |
+| `--lex-surface-raised`   | `--lex-surface-container`  | 抬升表面                                                      | ✅ 已删除                                          |
+| `--lex-border`           | `--lex-outline-variant`    | 边框                                                          | ✅ 已删除                                          |
+| `--lex-text`             | `--lex-on-surface`         | 主文本（旧 `#1c1917` → 新 `#1b1b21`）                         | ✅ 已删除                                          |
+| `--lex-text-muted`       | `--lex-on-surface-variant` | 次要文本                                                      | ✅ 已删除                                          |
+| `--lex-primary`          | `--lex-primary`            | 主色自指（旧 `#4f46e5` → 新 `#313066` / `#dbd8ff`，别名保留） | ✅ 已删除（M3 `--lex-primary` 保留）               |
+| `--lex-primary-contrast` | `--lex-on-primary`         | 主色对比文字                                                  | ✅ 已删除                                          |
+| `--lex-accent`           | `--lex-tertiary`           | 强调色 → 三级色                                               | ✅ 已删除                                          |
+| `--lex-danger`           | `--lex-error`              | 危险 → 错误                                                   | ✅ 已删除                                          |
+| `--lex-success`          | `--lex-success`            | 成功（旧 `#16a34a` → 新 `#1b5c1a`）                           | ✅ 已删除（M3 `--lex-success` 保留）               |
+| `--lex-focus-ring`       | `--lex-outline`            | 聚焦环                                                        | ✅ 已删除                                          |
 
 ```css
-/* tokens.css — 别名层（deprecated，迁移期保留） */
-:root {
-  --lex-bg: var(--lex-background);
-  --lex-text: var(--lex-on-surface);
-  --lex-primary-contrast: var(--lex-on-primary);
-  --lex-danger: var(--lex-error);
-  /* …其余同上表… */
-}
+/* tokens.css — 别名层（Batch5 前，历史） */
+/* :root {
+ *  --lex-bg: var(--lex-background);
+ *  --lex-text: var(--lex-on-surface);
+ *  --lex-primary-contrast: var(--lex-on-primary);
+ *  --lex-danger: var(--lex-error);
+ *  // …其余同上表，已在 RAY-402 删除
+ * } */
+/* 当前 tokens.css 已无此层，仅保留 M3 角色与 Shape/Type/Motion */
 ```
 
 ### 7.2 删除计划（按批，独立 PR，Oscar 13 条评审）
 
-| 批次                 | 范围                                                                      | 依赖                | 截图对照                                                | 目标                                                                                    |
-| -------------------- | ------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| **Batch 1**          | `App` / `Header` / `Home`                                                 | Token 扩展 + 本文档 | 迁移前后真机/浏览器截图对比，外观不变                   | 将三处旧别名替换为新 `--lex-*`，验证主题切换                                            |
-| **Batch 2**          | `Review` / `Quiz`（含 `MultipleChoiceCard` / `RatingButtons`）            | Batch 1             | 同上，仅结构收敛                                        | 复习动效容器色、按钮色收敛                                                              |
-| **Batch 3**          | `Settings` / `Search` / `Stats` / `Notebook`                              | Batch 2             | 同上                                                    | 设置页、搜索、统计、生词本                                                              |
-| **Batch 4**          | `Dialogs`（`FirstOpenDialog` / `AddToListsDialog` / `DeveloperPanel` 等） | Batch 3             | 同上                                                    | 弹窗/抽屉的 `xl` 与遮罩 `scrim`                                                         |
-| **Batch 5 — 删别名** | 全量组件迁完后                                                            | Batch 4             | `scan-hardcoded-colors.mjs` + `tokens-consistency` 双绿 | 删除上表别名层，仅保留 M3 角色；PR 打标签 `BREAKING: remove deprecated --lex-* aliases` |
+| 批次                 | 范围                                                                      | 依赖                | 截图对照                                                | 目标                                                                                    | 状态                 |
+| -------------------- | ------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------- |
+| **Batch 1**          | `App` / `Header` / `Home`                                                 | Token 扩展 + 本文档 | 迁移前后真机/浏览器截图对比，外观不变                   | 将三处旧别名替换为新 `--lex-*`，验证主题切换                                            | ✅ 已完成            |
+| **Batch 2**          | `Review` / `Quiz`（含 `MultipleChoiceCard` / `RatingButtons`）            | Batch 1             | 同上，仅结构收敛                                        | 复习动效容器色、按钮色收敛                                                              | ✅ 已完成            |
+| **Batch 3**          | `Settings` / `Search` / `Stats` / `Notebook`                              | Batch 2             | 同上                                                    | 设置页、搜索、统计、生词本                                                              | ✅ 已完成            |
+| **Batch 4**          | `Dialogs`（`FirstOpenDialog` / `AddToListsDialog` / `DeveloperPanel` 等） | Batch 3             | 同上                                                    | 弹窗/抽屉的 `xl` 与遮罩 `scrim`                                                         | ✅ 已完成            |
+| **Batch 5 — 删别名** | 全量组件迁完后                                                            | Batch 4             | `scan-hardcoded-colors.mjs` + `tokens-consistency` 双绿 | 删除上表别名层，仅保留 M3 角色；PR 打标签 `BREAKING: remove deprecated --lex-* aliases` | ✅ 已完成（RAY-402） |
 
 > 每批独立 PR，外观不变（行为/布局零变化），仅 token 收敛；风险控制：行为不变 + 截图对照，与 Alpha 0.10.1 并行迭代无冲突。
 
@@ -407,9 +408,9 @@ export const darkPalette: Record<Role, string> = {
 **交付物：**
 
 - `docs/design-tokens.md`（本文）
-- `apps/web/src/styles/tokens.css`（浅/深两套 + 别名 + Shape/Type/Motion）
+- `apps/web/src/styles/tokens.css`（浅/深两套 M3 角色 + Shape/Type/Motion，无别名层，Batch5 后）
 - `apps/web/src/theme/palette.ts`（`light` / `dark` Record，P1 预留 `generatePalette(seed)`）
-- `apps/web/src/styles/index.css`（`@theme inline` 映射）
+- `apps/web/src/styles/index.css`（`@theme inline` 映射，旧 Tailwind 别名已重定向至 M3）
 
 ---
 
