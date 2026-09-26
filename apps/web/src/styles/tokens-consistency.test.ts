@@ -228,8 +228,9 @@ describe("tokens-consistency（三源一致性）", () => {
     }
   });
 
-  it("deprecated 别名以 var() 指向新角色（禁止硬编码第二份 hex，--lex-bg 例外：hex 直链供 theme-color FOUC 校验）", () => {
-    const varAliases = [
+  it("Batch5 已删除 deprecated 别名（--lex-bg 等），仅保留 M3 角色", () => {
+    const removedAliases = [
+      "--lex-bg",
       "--lex-surface-raised",
       "--lex-border",
       "--lex-text",
@@ -239,17 +240,19 @@ describe("tokens-consistency（三源一致性）", () => {
       "--lex-danger",
       "--lex-focus-ring",
     ];
-    for (const alias of varAliases) {
-      const val = lightVars.get(alias);
-      expect(val, `缺失 deprecated 别名 ${alias}`).toBeDefined();
-      expect(val!, `${alias} 应为 var(--lex-*) 别名，而非硬编码 ${val}`).toMatch(/var\(--lex-/);
+    for (const alias of removedAliases) {
+      expect(
+        lightVars.get(alias),
+        `Batch5 后不应存在 deprecated 别名 ${alias}（light）`,
+      ).toBeUndefined();
+      expect(
+        darkVars.get(alias),
+        `Batch5 后不应存在 deprecated 别名 ${alias}（dark）`,
+      ).toBeUndefined();
     }
-    // --lex-bg 例外：需与 themeColor.test 的 --lex-bg hex 直链保持一致（首帧 meta theme-color 与 tokens.css 对齐）
-    const bgAlias = lightVars.get("--lex-bg");
-    expect(bgAlias, "缺失 deprecated 别名 --lex-bg").toBeDefined();
-    expect(bgAlias!.trim().toLowerCase()).toBe("#fcf8ff");
-    const bgAliasDark = darkVars.get("--lex-bg");
-    expect(bgAliasDark!.trim().toLowerCase()).toBe("#131318");
+    // M3 背景色仍存在，供 theme-color 同步
+    expect(lightVars.get("--lex-background")?.toLowerCase()).toBe("#fcf8ff");
+    expect(darkVars.get("--lex-background")?.toLowerCase()).toBe("#131318");
   });
 
   it("字体栈与 palette.ts 一致", () => {

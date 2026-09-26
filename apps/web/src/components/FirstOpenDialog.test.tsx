@@ -42,12 +42,15 @@ describe("FirstOpenDialog", () => {
   it("弹窗面板走 design tokens（无硬编码颜色工具类，浅色/深色随主题切换）", () => {
     render(<FirstOpenDialog onDismiss={vi.fn()} />);
     const panel = screen.getByRole("dialog");
-    // 背景 / 边框 / 文本全部引用语义 token 工具类
+    // 背景 / 边框 / 文本全部引用 M3 语义 token 工具类（--lex-*）
     expect(panel.className).toContain("bg-surface");
-    expect(panel.className).toContain("border-border");
-    expect(panel.querySelector("h2")?.className).toContain("text-text");
-    expect(panel.querySelector("p")?.className).toContain("text-text-muted");
+    expect(panel.className).toContain("border-outline-variant");
+    expect(panel.className).toContain("rounded-xl");
+    expect(panel.querySelector("h2")?.className).toContain("text-on-surface");
+    expect(panel.querySelector("p")?.className).toContain("text-on-surface-variant");
     expect(panel.querySelector("button")?.className).toContain("bg-primary");
-    expect(panel.querySelector("button")?.className).toContain("text-primary-contrast");
+    expect(panel.querySelector("button")?.className).toContain("text-on-primary");
+    // 遮罩走 M3 scrim（--lex-scrim）
+    expect(document.body.innerHTML).toContain("bg-scrim/40");
   });
 });

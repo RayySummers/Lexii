@@ -4,7 +4,7 @@
  * - 只在首次打开出现：展示/隐藏由 App 级状态控制，已读标记读写走
  *   `lib/firstOpenDialog`（本组件自身不读存储，便于测试与复用）；
  * - 文案：Vega 产出（RAY-281），与设置页「导出数据」区同一口径；
- * - 浅色/深色两套：全部颜色走 design tokens（bg-surface / text-text 等），
+ * - 浅色/深色两套：全部颜色走 M3 design tokens（bg-surface / bg-scrim / text-on-surface 等，--lex-*），
  *   随 <html data-theme> 自动切换，不硬编码颜色；
  * - 无障碍：role="dialog" + aria-modal + aria-labelledby；打开时焦点落到
  *   「开始使用」按钮；单按钮弹窗内 Tab 保持焦点不外泄，Escape 与点击按钮
@@ -42,19 +42,19 @@ export function FirstOpenDialog({ onDismiss }: FirstOpenDialogProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-bg/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/40 p-4 backdrop-blur-sm"
       role="presentation"
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="first-open-dialog-title"
-        className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-xl"
+        className="w-full max-w-md rounded-xl border border-outline-variant bg-surface p-6 shadow-xl"
       >
-        <h2 id="first-open-dialog-title" className="text-lg font-semibold text-text">
+        <h2 id="first-open-dialog-title" className="text-lg font-semibold text-on-surface">
           学习数据只存本机
         </h2>
-        <p className="mt-3 text-sm leading-relaxed text-text-muted">
+        <p className="mt-3 text-sm leading-relaxed text-on-surface-variant">
           乐希是本地优先（local-first）应用：词书和学习记录都保存在这台设备上，不会上传到任何服务器。数据可能因清理浏览器数据或卸载而丢失，建议定期导出备份——设置页「导出数据」中随时可以导出，换设备时可原样导回。
         </p>
         <div className="mt-6 flex justify-end">
@@ -62,7 +62,7 @@ export function FirstOpenDialog({ onDismiss }: FirstOpenDialogProps) {
             ref={buttonRef}
             type="button"
             onClick={onDismiss}
-            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-contrast transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
             开始使用
           </button>
