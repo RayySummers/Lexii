@@ -248,11 +248,13 @@ export function ReviewScreen({
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
       <div className="flex items-center justify-between">
+        {/* RAY-488：对齐 ScreenHeader（RAY-373）的正圆契约——固定 h-10 w-10 + shrink-0，
+            否则窄视口下与右侧进度文字同处 flex 行，按钮被挤压后 rounded-full 变椭圆。 */}
         <button
           type="button"
           onClick={onExit}
           aria-label="返回首页"
-          className="rounded-full border border-border bg-surface p-2.5 text-text transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text leading-none transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
         >
           <BackArrowIcon className="h-5 w-5" />
         </button>
