@@ -80,6 +80,17 @@ function makePackage(
   };
 }
 
+/** 把任意 JSON 载荷包装成带正确 SHA-256 的 variant（本地 Blob URL，模拟托管产物） */
+async function makeVariant(payload: unknown): Promise<ManifestVariant> {
+  const jsonBytes = new TextEncoder().encode(JSON.stringify(payload));
+  const hashBuffer = await crypto.subtle.digest("SHA-256", jsonBytes);
+  const hashHex = Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  const blob = new Blob([jsonBytes], { type: "application/json" });
+  return { url: URL.createObjectURL(blob), size: jsonBytes.length, sha256: hashHex };
+}
+
 describe("installDictionaryPackage（分块安装扩展词包）", () => {
   it("跨分块完整落库：1 条记录/词条，source 字段正确", async () => {
     const database = freshDatabase();
@@ -834,5 +845,145 @@ describe("downloadAndVerifyPackage（元组转换）", () => {
     expect(defHits).toHaveLength(1);
     expect(defHits[0]!.sense.term).toBe("kaleidoscope");
     expect(defHits[0]!.kind).toBe("definition");
+  });
+});
+
+describe("元组长度与逐条词性（RAY-487：装载侧只认 5 项，线上已是 6 项）", () => {
+  /**
+   * 线上 core-en-tier1-v1.0.0-9d126f9b.json 首条（Ray 亲测「元组 #0 长度非法：6」
+   * 的原始数据，buildCommit 82910e9）：
+   * 第 6 位 posByDefinition 为 "\n\n\nart."，与 4 条释义逐条对齐。
+   */
+  const REAL_FIRST_ENTRY = [
+    "a",
+    "第一个字母 A\n一个\n第一的\n累加器, 加法器, 地址, 振幅, 模拟, 区域, 面积, 汇编, 组件, 异步",
+    "art.",
+    "ei",
+    "中考 高考 高频",
+    "\n\n\nart.",
+  ];
+  const REAL_FIRST_DEFINITIONS = [
+    "第一个字母 A",
+    "一个",
+    "第一的",
+    "累加器, 加法器, 地址, 振幅, 模拟, 区域, 面积, 汇编, 组件, 异步",
+  ];
+
+  it("6 项元组解析成功，posByDefinition 与释义逐条对齐", async () => {
+    const variant = await makeVariant([REAL_FIRST_ENTRY, ["apple", "苹果", "n.", "", "", ""]]);
+    const entries = await downloadAndVerifyPackage(variant);
+
+    expect(entries).toHaveLength(2);
+    const first = entries[0]!;
+    expect(first.term).toBe("a");
+    expect(first.definitions).toEqual(REAL_FIRST_DEFINITIONS);
+    expect(first.pos).toBe("art.");
+    expect(first.ipa).toBe("ei");
+    expect(first.tags).toEqual(["中考", "高考", "高频"]);
+    expect(first.posByDefinition).toEqual(["", "", "", "art."]);
+
+    // 第 6 位全空 → 与字段缺失同口径（不写空数组）
+    expect(entries[1]!.posByDefinition).toBeUndefined();
+  });
+
+  it("6 项元组安装后 posByDefinition 落库（dictionarySenses，晋升同口径保留）", async () => {
+    const database = freshDatabase();
+    const variant = await makeVariant([
+      REAL_FIRST_ENTRY,
+      ["menstrual", "月经的\n经期的", "a.", "/ˈmenstruəl/", "考研", "a.\na."],
+    ]);
+    const entries = await downloadAndVerifyPackage(variant);
+    await installDictionaryPackage(database, makePackage(entries, "core-en-tier1", "1.0.0"), {
+      yield: async () => {},
+    });
+
+    const aSense = await database.dictionarySenses.where("term").equalsIgnoreCase("a").first();
+    expect(aSense).toBeDefined();
+    expect(aSense!.definitions).toEqual(REAL_FIRST_DEFINITIONS);
+    expect(aSense!.posByDefinition).toEqual(["", "", "", "art."]);
+
+    const menstrual = await database.dictionarySenses
+      .where("term")
+      .equalsIgnoreCase("menstrual")
+      .first();
+    expect(menstrual!.posByDefinition).toEqual(["a.", "a."]);
+
+    // 晋升到 senses 表时逐条词性一并带走（卡片按词性标注释义依赖该字段）
+    const promoted = await promoteDictionarySense(database, aSense!.id);
+    expect(promoted!.posByDefinition).toEqual(["", "", "", "art."]);
+  });
+
+  it("5 项旧元组（RAY-349 之前的生成物）仍兼容，posByDefinition 缺省", async () => {
+    const variant = await makeVariant([
+      ["kaleidoscope", "万花筒\n万花筒般变化的东西", "n.", "/kəˈlaɪdəskoʊp/", ""],
+    ]);
+    const entries = await downloadAndVerifyPackage(variant);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.term).toBe("kaleidoscope");
+    expect(entries[0]!.definitions).toEqual(["万花筒", "万花筒般变化的东西"]);
+    expect(entries[0]!.pos).toBe("n.");
+    expect(entries[0]!.posByDefinition).toBeUndefined();
+
+    // 旧元组装库同样不写 posByDefinition（读取侧按 pos 推断，见 definitionPos.ts）
+    const database = freshDatabase();
+    await installDictionaryPackage(database, makePackage(entries, "core-en-tier1", "0.9.0"), {
+      yield: async () => {},
+    });
+    const sense = await database.dictionarySenses
+      .where("term")
+      .equalsIgnoreCase("kaleidoscope")
+      .first();
+    expect(sense!.posByDefinition).toBeUndefined();
+  });
+
+  it("4 项与 7 项元组仍抛错（护栏不放宽为「≥5」）", async () => {
+    const four = await makeVariant([["a", "第一个字母 A", "art.", "ei"]]);
+    await expect(downloadAndVerifyPackage(four)).rejects.toThrow(/元组长度非法：4/);
+
+    const seven = await makeVariant([[...REAL_FIRST_ENTRY, "多余的第 7 位"]]);
+    await expect(downloadAndVerifyPackage(seven)).rejects.toThrow(/元组长度非法：7/);
+  });
+
+  it("升级：旧装义项缺 posByDefinition → 增量更新补齐（保留原 id）", async () => {
+    const database = freshDatabase();
+    // v1：RAY-349 之前的落库形态（有释义无逐条词性）
+    await installDictionaryPackage(
+      database,
+      makePackage(
+        [
+          {
+            term: "a",
+            definitions: REAL_FIRST_DEFINITIONS,
+            pos: "art.",
+            ipa: "ei",
+            tags: ["中考", "高考", "高频"],
+          },
+        ],
+        "core-en-tier1",
+        "1.0.0",
+      ),
+      { yield: async () => {} },
+    );
+    const before = await database.dictionarySenses.where("term").equalsIgnoreCase("a").first();
+    expect(before!.posByDefinition).toBeUndefined();
+
+    // v2：同一词条带上第 6 位逐条词性
+    const variant = await makeVariant([REAL_FIRST_ENTRY]);
+    const entries = await downloadAndVerifyPackage(variant);
+    const result = await installDictionaryPackage(
+      database,
+      makePackage(entries, "core-en-tier1", "1.1.0"),
+      { yield: async () => {} },
+    );
+
+    expect(result.status).toBe("installed");
+    if (result.status !== "installed") throw new Error("unreachable");
+    expect(result.updatedCount).toBe(1);
+    expect(result.skippedCount).toBe(0);
+
+    const after = await database.dictionarySenses.where("term").equalsIgnoreCase("a").first();
+    expect(after!.id).toBe(before!.id);
+    expect(after!.posByDefinition).toEqual(["", "", "", "art."]);
   });
 });
