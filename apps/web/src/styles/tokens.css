@@ -5,7 +5,7 @@
  * - 组件中禁止硬编码颜色，一律引用这里的语义 token（浅色/深色两套）
  * - token 命名对齐 M3 官方角色：--lex-primary / on-primary / container 等，--lex-* 前缀
  * - 深色模式通过 <html data-theme="dark"> 切换（见 useTheme）
- * - 旧 token（--lex-bg / --lex-primary / --lex-danger 等）保留为 deprecated 别名（var() 指向），组件迁完按批删除
+ * - 旧 token（--lex-bg / --lex-surface-raised / --lex-border / --lex-text 等）已在 Batch5 删除，仅保留 M3 角色；历史别名见 docs/design-tokens.md §7
  * - 单 seed #4F46E5 Tonal spot 基准见 pure-palette.json；修改请同步 palette.ts 与 docs/design-tokens.md
  */
 
@@ -148,17 +148,6 @@
   --lex-phonetic-font:
     "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
     Arial, sans-serif;
-
-  /* ===== Deprecated 别名（兼容旧组件，迁完按批删除；值通过 var() 指向新角色，--lex-bg 例外：需与 themeColor.test 保持 hex 直链以校验首帧 theme-color） ===== */
-  --lex-bg: #fcf8ff; /* alias for --lex-background, kept as hex for FOUC test parity */
-  --lex-surface-raised: var(--lex-surface-container);
-  --lex-border: var(--lex-outline-variant);
-  --lex-text: var(--lex-on-background);
-  --lex-text-muted: var(--lex-on-surface-variant);
-  --lex-primary-contrast: var(--lex-on-primary);
-  --lex-accent: var(--lex-tertiary);
-  --lex-danger: var(--lex-error);
-  --lex-focus-ring: var(--lex-primary);
 }
 
 [data-theme="dark"] {
@@ -207,17 +196,6 @@
   --lex-inverse-primary: #5a5892;
 
   /* Shape / Type / Motion / 字体栈 随浅色保持一致（不因主题变），此处不再重复 */
-
-  /* ===== Deprecated 别名（深色同样 var() 指向，--lex-bg 例外 hex 直链） ===== */
-  --lex-bg: #131318; /* alias for --lex-background */
-  --lex-surface-raised: var(--lex-surface-container);
-  --lex-border: var(--lex-outline-variant);
-  --lex-text: var(--lex-on-background);
-  --lex-text-muted: var(--lex-on-surface-variant);
-  --lex-primary-contrast: var(--lex-on-primary);
-  --lex-accent: var(--lex-tertiary);
-  --lex-danger: var(--lex-error);
-  --lex-focus-ring: var(--lex-primary);
 }
 
 /* ===== prefers-reduced-motion 全局降级（P0 落地，P2 再应用动效） ===== */

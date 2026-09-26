@@ -355,21 +355,21 @@ describe("useTheme", () => {
       document.documentElement.removeAttribute("style");
     });
 
-    it("挂载时按当前 --lex-bg token 同步 meta", () => {
+    it("挂载时按当前 --lex-background token 同步 meta", () => {
       installMediaQuery(false);
-      document.documentElement.style.setProperty("--lex-bg", "#fafaf9");
+      document.documentElement.style.setProperty("--lex-background", "#fafaf9");
       renderHook(() => useTheme());
       expect(meta.content).toBe("#fafaf9");
     });
 
     it("切换偏好后重新读取 token 并更新 meta", () => {
       installMediaQuery(false);
-      document.documentElement.style.setProperty("--lex-bg", "#fafaf9");
+      document.documentElement.style.setProperty("--lex-background", "#fafaf9");
       const { result } = renderHook(() => useTheme());
       expect(meta.content).toBe("#fafaf9");
 
-      // 模拟 data-theme="dark" 下 tokens.css 的深色 --lex-bg 已生效
-      document.documentElement.style.setProperty("--lex-bg", "#0c0a09");
+      // 模拟 data-theme="dark" 下 tokens.css 的深色 --lex-background 已生效
+      document.documentElement.style.setProperty("--lex-background", "#0c0a09");
       act(() => {
         result.current.setPreference("dark");
       });
@@ -379,11 +379,11 @@ describe("useTheme", () => {
 
     it("跟随系统档位设备主题变化时同步 meta", () => {
       const media = installMediaQuery(false);
-      document.documentElement.style.setProperty("--lex-bg", "#fafaf9");
+      document.documentElement.style.setProperty("--lex-background", "#fafaf9");
       renderHook(() => useTheme());
       expect(meta.content).toBe("#fafaf9");
 
-      document.documentElement.style.setProperty("--lex-bg", "#0c0a09");
+      document.documentElement.style.setProperty("--lex-background", "#0c0a09");
       act(() => {
         media.setMatches(true);
       });
