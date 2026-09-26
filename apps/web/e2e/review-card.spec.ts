@@ -199,7 +199,8 @@ test.describe("背词卡片固定高度（RAY-291）", () => {
       const face = document.querySelector('[aria-expanded] [aria-hidden="false"]') as HTMLElement;
       return getComputedStyle(face).backgroundColor;
     });
-    // 深色 --lex-surface = #1c1917 = rgb(28, 25, 23)；浅色 #ffffff 不会误判
-    expect(faceBg).toBe("rgb(28, 25, 23)");
+    // RAY-396 冻结色板（Ray 拍板，RAY-394 决策 01a02d43）：深色 --lex-surface = #131318 = rgb(19, 19, 24)。
+    // 浅色 --lex-surface = #fcf8ff，与深色值不同，故精确相等断言仍能识别"未切到深色"的回归。
+    expect(faceBg).toBe("rgb(19, 19, 24)");
   });
 });

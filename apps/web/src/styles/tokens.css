@@ -50,7 +50,7 @@
   --lex-outline-variant: #c8c5d0;
   --lex-scrim: #000000;
   --lex-shadow: #000000;
-    --lex-inverse-surface: #313036;
+  --lex-inverse-surface: #313036;
   --lex-inverse-on-surface: #f3eff7;
   --lex-inverse-primary: #c3c0ff;
 
@@ -202,7 +202,7 @@
   --lex-outline-variant: #47464f;
   --lex-scrim: #000000;
   --lex-shadow: #000000;
-    --lex-inverse-surface: #e5e1e9;
+  --lex-inverse-surface: #e5e1e9;
   --lex-inverse-on-surface: #313036;
   --lex-inverse-primary: #5a5892;
 

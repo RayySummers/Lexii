@@ -37,87 +37,87 @@
 
 ### 1.1 主色组（Primary）
 
-| 角色 | CSS 变量 | 浅色 | 深色 | 用途 |
-|------|----------|------|------|------|
-| primary | `--lex-primary` | `#313066` | `#dbd8ff` | 主按钮填充、强调文字、选中态主色 |
-| on-primary | `--lex-on-primary` | `#ffffff` | `#2b2a60` | 位于 primary 上的文字/图标 |
-| primary-container | `--lex-primary-container` | `#6867a1` | `#8c8bc8` | 含 primary 的容器（卡片高亮、选中背景） |
-| on-primary-container | `--lex-on-primary-container` | `#ffffff` | `#16134a` | 位于 primary-container 上的文字 |
+| 角色                 | CSS 变量                     | 浅色      | 深色      | 用途                                    |
+| -------------------- | ---------------------------- | --------- | --------- | --------------------------------------- |
+| primary              | `--lex-primary`              | `#313066` | `#dbd8ff` | 主按钮填充、强调文字、选中态主色        |
+| on-primary           | `--lex-on-primary`           | `#ffffff` | `#2b2a60` | 位于 primary 上的文字/图标              |
+| primary-container    | `--lex-primary-container`    | `#6867a1` | `#8c8bc8` | 含 primary 的容器（卡片高亮、选中背景） |
+| on-primary-container | `--lex-on-primary-container` | `#ffffff` | `#16134a` | 位于 primary-container 上的文字         |
 
 > 冻结示例：浅色 `primary #313066 / primaryContainer #6867a1`；深色 `primary #dbd8ff / primaryContainer #8c8bc8`（与 `pure-palette.json` 一致）。
 
 ### 1.2 次色组（Secondary）
 
-| 角色 | CSS 变量 | 浅色 | 深色 |
-|------|----------|------|------|
-| secondary | `--lex-secondary` | `#5e5c71` | `#c7c4dd` |
-| on-secondary | `--lex-on-secondary` | `#ffffff` | `#2f2e42` |
-| secondary-container | `--lex-secondary-container` | `#e3e0f9` | `#464559` |
+| 角色                   | CSS 变量                       | 浅色      | 深色      |
+| ---------------------- | ------------------------------ | --------- | --------- |
+| secondary              | `--lex-secondary`              | `#5e5c71` | `#c7c4dd` |
+| on-secondary           | `--lex-on-secondary`           | `#ffffff` | `#2f2e42` |
+| secondary-container    | `--lex-secondary-container`    | `#e3e0f9` | `#464559` |
 | on-secondary-container | `--lex-on-secondary-container` | `#1a1a2c` | `#e3e0f9` |
 
 ### 1.3 三级色组（Tertiary）
 
-| 角色 | CSS 变量 | 浅色 | 深色 |
-|------|----------|------|------|
-| tertiary | `--lex-tertiary` | `#7a5368` | `#eab9d1` |
-| on-tertiary | `--lex-on-tertiary` | `#ffffff` | `#472639` |
-| tertiary-container | `--lex-tertiary-container` | `#ffd8ea` | `#603c50` |
+| 角色                  | CSS 变量                      | 浅色      | 深色      |
+| --------------------- | ----------------------------- | --------- | --------- |
+| tertiary              | `--lex-tertiary`              | `#7a5368` | `#eab9d1` |
+| on-tertiary           | `--lex-on-tertiary`           | `#ffffff` | `#472639` |
+| tertiary-container    | `--lex-tertiary-container`    | `#ffd8ea` | `#603c50` |
 | on-tertiary-container | `--lex-on-tertiary-container` | `#2f1123` | `#ffd8ea` |
 
 ### 1.4 错误组（Error）
 
-| 角色 | CSS 变量 | 浅色 | 深色 |
-|------|----------|------|------|
-| error | `--lex-error` | `#ba1a1a` | `#ffb4ab` |
-| on-error | `--lex-on-error` | `#ffffff` | `#690005` |
-| error-container | `--lex-error-container` | `#ffdad6` | `#93000a` |
+| 角色               | CSS 变量                   | 浅色      | 深色      |
+| ------------------ | -------------------------- | --------- | --------- |
+| error              | `--lex-error`              | `#ba1a1a` | `#ffb4ab` |
+| on-error           | `--lex-on-error`           | `#ffffff` | `#690005` |
+| error-container    | `--lex-error-container`    | `#ffdad6` | `#93000a` |
 | on-error-container | `--lex-on-error-container` | `#410002` | `#ffdad6` |
 
 ### 1.5 成功组（Success · 自定义，M3 无此角色）
 
 > 独立 4 色，复用 tertiary 的 tone 映射逻辑，但 hue 取绿色 146° / chroma 32，避免与 error 混淆；warning 场景使用 `--lex-tertiary` 即可，无需单独 warning。
 
-| 角色 | CSS 变量 | 浅色 | 深色 | 说明 |
-|------|----------|------|------|------|
-| success | `--lex-success` | `#1b5c1a` | `#76db7a` | 成功提示、完成态 |
-| on-success | `--lex-on-success` | `#ffffff` | `#00390a` | 位于 success 上的文字 |
-| success-container | `--lex-success-container` | `#a6f2a5` | `#005313` | 成功容器背景 |
+| 角色                 | CSS 变量                     | 浅色      | 深色      | 说明                            |
+| -------------------- | ---------------------------- | --------- | --------- | ------------------------------- |
+| success              | `--lex-success`              | `#1b5c1a` | `#76db7a` | 成功提示、完成态                |
+| on-success           | `--lex-on-success`           | `#ffffff` | `#00390a` | 位于 success 上的文字           |
+| success-container    | `--lex-success-container`    | `#a6f2a5` | `#005313` | 成功容器背景                    |
 | on-success-container | `--lex-on-success-container` | `#00210a` | `#a6f2a5` | 位于 success-container 上的文字 |
 
 ### 1.6 中性组（Neutral · 16 角色）
 
 > 16 个中性角色构成 M3 表面系统，浅色以 `neutral tone 98→84` 阶梯，深色以 `tone 6→22` 反向阶梯；与冻结示例完全一致。
 
-| 角色 | CSS 变量 | 浅色 | 深色 | 备注 |
-|------|----------|------|------|------|
-| background | `--lex-background` | `#fcf8ff` | `#131318` | 页面背景，冻结示例 `bg #fcf8ff / #131318` |
-| on-background | `--lex-on-background` | `#1b1b21` | `#e5e1e9` | 背景上文字 |
-| surface | `--lex-surface` | `#fcf8ff` | `#131318` | 表面基色，与 background 同值（M3 2025 phone） |
-| on-surface | `--lex-on-surface` | `#1b1b21` | `#e5e1e9` | 表面上文字 |
-| surface-dim | `--lex-surface-dim` | `#dcd9e0` | `#131318` | 最暗表面（分隔/阴影基色） |
-| surface-bright | `--lex-surface-bright` | `#fcf8ff` | `#39383f` | 最亮表面 |
-| surface-container-lowest | `--lex-surface-container-lowest` | `#ffffff` | `#0e0e13` | 容器最低层 |
-| surface-container-low | `--lex-surface-container-low` | `#f6f2fa` | `#1a1c22` | 冻结浅色第 1 阶 `96` / 深色 `10` |
-| surface-container | `--lex-surface-container` | `#eae7ef` | `#1f1f2a` | 冻结第 2 阶 `92` / `12` |
-| surface-container-high | `--lex-surface-container-high` | `#dfdbe3` | `#2a2a33` | 冻结第 3 阶 `88` / `17` |
-| surface-container-highest | `--lex-surface-container-highest` | `#d4d0d8` | `#35343d` | 冻结第 4 阶 `84` / `22` |
-| surface-variant | `--lex-surface-variant` | `#e4e1ec` | `#47464f` | 冻结 `variant #e4e1ec`（`neutralVariant 90`） |
-| on-surface-variant | `--lex-on-surface-variant` | `#47464f` | `#c8c5d0` | 变体表面上文字 |
-| outline | `--lex-outline` | `#787680` | `#928f9a` | 边框（中强度） |
-| outline-variant | `--lex-outline-variant` | `#c8c5d0` | `#47464f` | 边框（弱） |
-| scrim | `--lex-scrim` | `#000000` | `#000000` | 幕布/遮罩，同浅深 |
-| shadow | `--lex-shadow` | `#000000` | `#000000` | 阴影 |
+| 角色                      | CSS 变量                          | 浅色      | 深色      | 备注                                          |
+| ------------------------- | --------------------------------- | --------- | --------- | --------------------------------------------- |
+| background                | `--lex-background`                | `#fcf8ff` | `#131318` | 页面背景，冻结示例 `bg #fcf8ff / #131318`     |
+| on-background             | `--lex-on-background`             | `#1b1b21` | `#e5e1e9` | 背景上文字                                    |
+| surface                   | `--lex-surface`                   | `#fcf8ff` | `#131318` | 表面基色，与 background 同值（M3 2025 phone） |
+| on-surface                | `--lex-on-surface`                | `#1b1b21` | `#e5e1e9` | 表面上文字                                    |
+| surface-dim               | `--lex-surface-dim`               | `#dcd9e0` | `#131318` | 最暗表面（分隔/阴影基色）                     |
+| surface-bright            | `--lex-surface-bright`            | `#fcf8ff` | `#39383f` | 最亮表面                                      |
+| surface-container-lowest  | `--lex-surface-container-lowest`  | `#ffffff` | `#0e0e13` | 容器最低层                                    |
+| surface-container-low     | `--lex-surface-container-low`     | `#f6f2fa` | `#1a1c22` | 冻结浅色第 1 阶 `96` / 深色 `10`              |
+| surface-container         | `--lex-surface-container`         | `#eae7ef` | `#1f1f2a` | 冻结第 2 阶 `92` / `12`                       |
+| surface-container-high    | `--lex-surface-container-high`    | `#dfdbe3` | `#2a2a33` | 冻结第 3 阶 `88` / `17`                       |
+| surface-container-highest | `--lex-surface-container-highest` | `#d4d0d8` | `#35343d` | 冻结第 4 阶 `84` / `22`                       |
+| surface-variant           | `--lex-surface-variant`           | `#e4e1ec` | `#47464f` | 冻结 `variant #e4e1ec`（`neutralVariant 90`） |
+| on-surface-variant        | `--lex-on-surface-variant`        | `#47464f` | `#c8c5d0` | 变体表面上文字                                |
+| outline                   | `--lex-outline`                   | `#787680` | `#928f9a` | 边框（中强度）                                |
+| outline-variant           | `--lex-outline-variant`           | `#c8c5d0` | `#47464f` | 边框（弱）                                    |
+| scrim                     | `--lex-scrim`                     | `#000000` | `#000000` | 幕布/遮罩，同浅深                             |
+| shadow                    | `--lex-shadow`                    | `#000000` | `#000000` | 阴影                                          |
 
 > 容器阶梯完整映射（浅色 `tone 96→92→88→84` / 深色 `10→12→17→22`）：
 > `#f6f2fa → #eae7ef → #dfdbe3 → #d4d0d8` / `#1a1c22 → #1f1f2a → #2a2a33 → #35343d`，与 `pure-palette.json` 及 Theme Builder 完全一致。
 
 ### 1.7 逆色组（Inverse · Toast / Snackbar）
 
-| 角色 | CSS 变量 | 浅色 | 深色 |
-|------|----------|------|------|
-| inverse-surface | `--lex-inverse-surface` | `#313036` | `#e5e1e9` |
+| 角色               | CSS 变量                   | 浅色      | 深色      |
+| ------------------ | -------------------------- | --------- | --------- |
+| inverse-surface    | `--lex-inverse-surface`    | `#313036` | `#e5e1e9` |
 | inverse-on-surface | `--lex-inverse-on-surface` | `#f3eff7` | `#313036` |
-| inverse-primary | `--lex-inverse-primary` | `#c3c0ff` | `#5a5892` |
+| inverse-primary    | `--lex-inverse-primary`    | `#c3c0ff` | `#5a5892` |
 
 ### 1.8 完整 palette.ts 接口（P0 预留，P1 扩展）
 
@@ -143,23 +143,23 @@ export const darkPalette: Record<Role, string> = {
 
 > 测量口径：WCAG 2.1 相对亮度，`(Llighter+0.05)/(Ldarker+0.05)`，与 `token-contrast.test.ts` 同一算法；所有 `onX vs X` 满足 **≥ 4.5:1**（M3 AA 目标，正文可读性）。
 
-| 背景 `X` | 前景 `onX` | 浅色对比度 | 深色对比度 | 是否达标 |
-|----------|------------|------------|------------|----------|
-| primary `#313066` / `#dbd8ff` | on-primary `#ffffff` / `#2b2a60` | 12.03:1 | 9.53:1 | ✅ |
-| primary-container `#6867a1` / `#8c8bc8` | on-primary-container `#ffffff` / `#16134a` | 5.19:1 | 5.42:1 | ✅ |
-| secondary `#5e5c71` / `#c7c4dd` | on-secondary `#ffffff` / `#2f2e42` | 6.47:1 | 7.78:1 | ✅ |
-| secondary-container `#e3e0f9` / `#464559` | on-secondary-container `#1a1a2c` / `#e3e0f9` | 13.27:1 | 7.22:1 | ✅ |
-| tertiary `#7a5368` / `#eab9d1` | on-tertiary `#ffffff` / `#472639` | 6.43:1 | 7.70:1 | ✅ |
-| tertiary-container `#ffd8ea` / `#603c50` | on-tertiary-container `#2f1123` / `#ffd8ea` | 13.27:1 | 7.20:1 | ✅ |
-| error `#ba1a1a` / `#ffb4ab` | on-error `#ffffff` / `#690005` | 6.46:1 | 7.72:1 | ✅ |
-| error-container `#ffdad6` / `#93000a` | on-error-container `#410002` / `#ffdad6` | 13.26:1 | 7.24:1 | ✅ |
-| success `#1b5c1a` / `#76db7a` | on-success `#ffffff` / `#00390a` | 8.10:1 | 7.66:1 | ✅ |
-| success-container `#a6f2a5` / `#005313` | on-success-container `#00210a` / `#a6f2a5` | 12.98:1 | 7.06:1 | ✅ |
-| background `#fcf8ff` / `#131318` | on-background `#1b1b21` / `#e5e1e9` | 16.33:1 | 14.35:1 | ✅ |
-| surface `#fcf8ff` / `#131318` | on-surface `#1b1b21` / `#e5e1e9` | 16.33:1 | 14.35:1 | ✅ |
-| surface-variant `#e4e1ec` / `#47464f` | on-surface-variant `#47464f` / `#c8c5d0` | 7.21:1 | 5.47:1 | ✅ |
-| inverse-surface `#313036` / `#e5e1e9` | inverse-on-surface `#f3eff7` / `#313036` | 11.52:1 | 10.13:1 | ✅ |
-| inverse-primary `#c3c0ff` / `#5a5892` | 常规文字（深/浅互比） | 7.68:1 | 6.47:1 | ✅ |
+| 背景 `X`                                  | 前景 `onX`                                   | 浅色对比度 | 深色对比度 | 是否达标 |
+| ----------------------------------------- | -------------------------------------------- | ---------- | ---------- | -------- |
+| primary `#313066` / `#dbd8ff`             | on-primary `#ffffff` / `#2b2a60`             | 12.03:1    | 9.53:1     | ✅       |
+| primary-container `#6867a1` / `#8c8bc8`   | on-primary-container `#ffffff` / `#16134a`   | 5.19:1     | 5.42:1     | ✅       |
+| secondary `#5e5c71` / `#c7c4dd`           | on-secondary `#ffffff` / `#2f2e42`           | 6.47:1     | 7.78:1     | ✅       |
+| secondary-container `#e3e0f9` / `#464559` | on-secondary-container `#1a1a2c` / `#e3e0f9` | 13.27:1    | 7.22:1     | ✅       |
+| tertiary `#7a5368` / `#eab9d1`            | on-tertiary `#ffffff` / `#472639`            | 6.43:1     | 7.70:1     | ✅       |
+| tertiary-container `#ffd8ea` / `#603c50`  | on-tertiary-container `#2f1123` / `#ffd8ea`  | 13.27:1    | 7.20:1     | ✅       |
+| error `#ba1a1a` / `#ffb4ab`               | on-error `#ffffff` / `#690005`               | 6.46:1     | 7.72:1     | ✅       |
+| error-container `#ffdad6` / `#93000a`     | on-error-container `#410002` / `#ffdad6`     | 13.26:1    | 7.24:1     | ✅       |
+| success `#1b5c1a` / `#76db7a`             | on-success `#ffffff` / `#00390a`             | 8.10:1     | 7.66:1     | ✅       |
+| success-container `#a6f2a5` / `#005313`   | on-success-container `#00210a` / `#a6f2a5`   | 12.98:1    | 7.06:1     | ✅       |
+| background `#fcf8ff` / `#131318`          | on-background `#1b1b21` / `#e5e1e9`          | 16.33:1    | 14.35:1    | ✅       |
+| surface `#fcf8ff` / `#131318`             | on-surface `#1b1b21` / `#e5e1e9`             | 16.33:1    | 14.35:1    | ✅       |
+| surface-variant `#e4e1ec` / `#47464f`     | on-surface-variant `#47464f` / `#c8c5d0`     | 7.21:1     | 5.47:1     | ✅       |
+| inverse-surface `#313036` / `#e5e1e9`     | inverse-on-surface `#f3eff7` / `#313036`     | 11.52:1    | 10.13:1    | ✅       |
+| inverse-primary `#c3c0ff` / `#5a5892`     | 常规文字（深/浅互比）                        | 7.68:1     | 6.47:1     | ✅       |
 
 > 测试实现：`token-contrast.test.ts` 读取 `tokens.css` 的 `:root` 与 `[data-theme="dark"]` 两套变量，遍历上表所有行，逐对计算；任一 < 4.5:1 即失败并打印 16 进制与实测值。
 
@@ -169,14 +169,14 @@ export const darkPalette: Record<Role, string> = {
 
 ### 3.1 Radius Tokens（M3 官方值）
 
-| Token | 值 | CSS 变量 | Tailwind |
-|-------|----|----------|----------|
-| xs | 4px | `--lex-radius-xs` | `rounded-xs` |
-| sm | 8px | `--lex-radius-sm` | `rounded-sm` |
-| md | 12px | `--lex-radius-md` | `rounded-md` |
-| lg | 16px | `--lex-radius-lg` | `rounded-lg` |
-| xl | 28px | `--lex-radius-xl` | `rounded-xl` |
-| full | 9999px | `--lex-radius-full` | `rounded-full` |
+| Token | 值     | CSS 变量            | Tailwind       |
+| ----- | ------ | ------------------- | -------------- |
+| xs    | 4px    | `--lex-radius-xs`   | `rounded-xs`   |
+| sm    | 8px    | `--lex-radius-sm`   | `rounded-sm`   |
+| md    | 12px   | `--lex-radius-md`   | `rounded-md`   |
+| lg    | 16px   | `--lex-radius-lg`   | `rounded-lg`   |
+| xl    | 28px   | `--lex-radius-xl`   | `rounded-xl`   |
+| full  | 9999px | `--lex-radius-full` | `rounded-full` |
 
 ```css
 /* tokens.css */
@@ -188,7 +188,8 @@ export const darkPalette: Record<Role, string> = {
   --lex-radius-xl: 28px;
   --lex-radius-full: 9999px;
 }
-@theme inline { /* Tailwind v4 */
+@theme inline {
+  /* Tailwind v4 */
   --radius-xs: var(--lex-radius-xs);
   --radius-sm: var(--lex-radius-sm);
   --radius-md: var(--lex-radius-md);
@@ -200,13 +201,13 @@ export const darkPalette: Record<Role, string> = {
 
 ### 3.2 组件映射表
 
-| 组件 / 场景 | 采用 Shape | 示例 |
-|-------------|-----------|------|
-| 主按钮（Filled / Filled Tonal）、图标按钮（IconButton）、FAB、Chip（选中） | `full` | `rounded-full`，胶囊形，符合 M3 默认气质 |
-| 卡片（词卡、列表卡、设置分组卡） | `md` / `lg` | 列表卡 `md 12px`，复习卡/弹窗内卡 `lg 16px` |
-| 输入框（搜索框、词库导入输入、设置项输入） | `sm` | `rounded-sm 8px` |
-| 弹窗（Dialog / BottomSheet / Drawer） | `xl` | `rounded-xl 28px`，顶部圆角 |
-| 小标签、Badge、分割线内小容器 | `xs` | `rounded-xs 4px` |
+| 组件 / 场景                                                                | 采用 Shape  | 示例                                        |
+| -------------------------------------------------------------------------- | ----------- | ------------------------------------------- |
+| 主按钮（Filled / Filled Tonal）、图标按钮（IconButton）、FAB、Chip（选中） | `full`      | `rounded-full`，胶囊形，符合 M3 默认气质    |
+| 卡片（词卡、列表卡、设置分组卡）                                           | `md` / `lg` | 列表卡 `md 12px`，复习卡/弹窗内卡 `lg 16px` |
+| 输入框（搜索框、词库导入输入、设置项输入）                                 | `sm`        | `rounded-sm 8px`                            |
+| 弹窗（Dialog / BottomSheet / Drawer）                                      | `xl`        | `rounded-xl 28px`，顶部圆角                 |
+| 小标签、Badge、分割线内小容器                                              | `xs`        | `rounded-xs 4px`                            |
 
 > 形状气质：全 app 不做大圆角统一，遵循 M3 默认（主按钮 full + 卡片 12/16），与 P0 设计草案一致。
 
@@ -216,30 +217,39 @@ export const darkPalette: Record<Role, string> = {
 
 > 数值 = M3 规范 `sp ÷ 16` 转 `rem`（Web 版 sp = rem×16）；`line-height` 为绝对 `rem`；`letter-spacing` 为 `em`（相对）；中文场景 `letter-spacing` 按 `0` 处理（M3 负字距对中文不适用）。
 
-| 类别 | 档位 | Token（CSS / Tailwind） | Size | Line-Height | Letter-Spacing | Weight | 用途举例 |
-|------|------|-------------------------|------|-------------|----------------|--------|----------|
-| **Display** | large | `--lex-typescale-display-large-*` / `text-display-large` | 3.5625rem (57sp) | 4rem (64sp) | -0.0156em (-0.25sp) | 400 | 空状态大标题 |
-| | medium | `display-medium` | 2.8125rem (45sp) | 3.25rem (52sp) | 0em | 400 | 启动页标题 |
-| | small | `display-small` | 2.25rem (36sp) | 2.75rem (44sp) | 0em | 400 | 分组大标题 |
-| **Headline** | large | `headline-large` | 2rem (32sp) | 2.5rem (40sp) | 0em | 400 | 页面主标题 |
-| | medium | `headline-medium` | 1.75rem (28sp) | 2.25rem (36sp) | 0em | 400 | 卡片标题 |
-| | small | `headline-small` | 1.5rem (24sp) | 2rem (32sp) | 0em | 400 | 分组标题 |
-| **Title** | large | `title-large` | 1.375rem (22sp) | 1.75rem (28sp) | 0em | 400 | 列表项标题、Dialog 标题 |
-| | medium | `title-medium` | 1rem (16sp) | 1.5rem (24sp) | 0.0094em (0.15sp) | 500 | 词条标题 |
-| | small | `title-small` | 0.875rem (14sp) | 1.25rem (20sp) | 0.0071em (0.1sp) | 500 | 小标题、按钮文字 |
-| **Body** | large | `body-large` | 1rem (16sp) | 1.5rem (24sp) | 0.0313em (0.5sp) | 400 | 正文、释义 |
-| | medium | `body-medium` | 0.875rem (14sp) | 1.25rem (20sp) | 0.0179em (0.25sp) | 400 | 次要正文、设置说明 |
-| | small | `body-small` | 0.75rem (12sp) | 1rem (16sp) | 0.0333em (0.4sp) | 400 | 辅助信息、时间戳 |
-| **Label** | large | `label-large` | 0.875rem (14sp) | 1.25rem (20sp) | 0.0071em (0.1sp) | 500 | 按钮标签、Chip |
-| | medium | `label-medium` | 0.75rem (12sp) | 1rem (16sp) | 0.0417em (0.5sp) | 500 | 过滤标签 |
-| | small | `label-small` | 0.6875rem (11sp) | 1rem (16sp) | 0.0455em (0.5sp) | 500 | 角标、Caption |
+| 类别         | 档位   | Token（CSS / Tailwind）                                  | Size             | Line-Height    | Letter-Spacing      | Weight | 用途举例                |
+| ------------ | ------ | -------------------------------------------------------- | ---------------- | -------------- | ------------------- | ------ | ----------------------- |
+| **Display**  | large  | `--lex-typescale-display-large-*` / `text-display-large` | 3.5625rem (57sp) | 4rem (64sp)    | -0.0156em (-0.25sp) | 400    | 空状态大标题            |
+|              | medium | `display-medium`                                         | 2.8125rem (45sp) | 3.25rem (52sp) | 0em                 | 400    | 启动页标题              |
+|              | small  | `display-small`                                          | 2.25rem (36sp)   | 2.75rem (44sp) | 0em                 | 400    | 分组大标题              |
+| **Headline** | large  | `headline-large`                                         | 2rem (32sp)      | 2.5rem (40sp)  | 0em                 | 400    | 页面主标题              |
+|              | medium | `headline-medium`                                        | 1.75rem (28sp)   | 2.25rem (36sp) | 0em                 | 400    | 卡片标题                |
+|              | small  | `headline-small`                                         | 1.5rem (24sp)    | 2rem (32sp)    | 0em                 | 400    | 分组标题                |
+| **Title**    | large  | `title-large`                                            | 1.375rem (22sp)  | 1.75rem (28sp) | 0em                 | 400    | 列表项标题、Dialog 标题 |
+|              | medium | `title-medium`                                           | 1rem (16sp)      | 1.5rem (24sp)  | 0.0094em (0.15sp)   | 500    | 词条标题                |
+|              | small  | `title-small`                                            | 0.875rem (14sp)  | 1.25rem (20sp) | 0.0071em (0.1sp)    | 500    | 小标题、按钮文字        |
+| **Body**     | large  | `body-large`                                             | 1rem (16sp)      | 1.5rem (24sp)  | 0.0313em (0.5sp)    | 400    | 正文、释义              |
+|              | medium | `body-medium`                                            | 0.875rem (14sp)  | 1.25rem (20sp) | 0.0179em (0.25sp)   | 400    | 次要正文、设置说明      |
+|              | small  | `body-small`                                             | 0.75rem (12sp)   | 1rem (16sp)    | 0.0333em (0.4sp)    | 400    | 辅助信息、时间戳        |
+| **Label**    | large  | `label-large`                                            | 0.875rem (14sp)  | 1.25rem (20sp) | 0.0071em (0.1sp)    | 500    | 按钮标签、Chip          |
+|              | medium | `label-medium`                                           | 0.75rem (12sp)   | 1rem (16sp)    | 0.0417em (0.5sp)    | 500    | 过滤标签                |
+|              | small  | `label-small`                                            | 0.6875rem (11sp) | 1rem (16sp)    | 0.0455em (0.5sp)    | 500    | 角标、Caption           |
 
 ```css
 /* tokens.css — Type Scale（示例：title-large / body-medium） */
 :root {
-  --lex-typescale-display-large-size: 3.5625rem; --lex-typescale-display-large-line-height: 4rem; --lex-typescale-display-large-tracking: -0.0156em; --lex-typescale-display-large-weight: 400;
-  --lex-typescale-title-large-size: 1.375rem;  --lex-typescale-title-large-line-height: 1.75rem; --lex-typescale-title-large-tracking: 0em; --lex-typescale-title-large-weight: 400;
-  --lex-typescale-body-medium-size: 0.875rem;   --lex-typescale-body-medium-line-height: 1.25rem; --lex-typescale-body-medium-tracking: 0.0179em; --lex-typescale-body-medium-weight: 400;
+  --lex-typescale-display-large-size: 3.5625rem;
+  --lex-typescale-display-large-line-height: 4rem;
+  --lex-typescale-display-large-tracking: -0.0156em;
+  --lex-typescale-display-large-weight: 400;
+  --lex-typescale-title-large-size: 1.375rem;
+  --lex-typescale-title-large-line-height: 1.75rem;
+  --lex-typescale-title-large-tracking: 0em;
+  --lex-typescale-title-large-weight: 400;
+  --lex-typescale-body-medium-size: 0.875rem;
+  --lex-typescale-body-medium-line-height: 1.25rem;
+  --lex-typescale-body-medium-tracking: 0.0179em;
+  --lex-typescale-body-medium-weight: 400;
   /* …其余 12 档同理，Tailwind 注册为 --text-* 与 --text-*--line-height */
 }
 @theme inline {
@@ -258,30 +268,33 @@ export const darkPalette: Record<Role, string> = {
 
 ### 5.1 Durations（M3 官方）
 
-| Token | 值 | CSS 变量 |
-|-------|----|----------|
-| short1 | 50ms | `--lex-motion-duration-short1` |
-| short2 | 100ms | `--lex-motion-duration-short2` |
+| Token   | 值    | CSS 变量                        |
+| ------- | ----- | ------------------------------- |
+| short1  | 50ms  | `--lex-motion-duration-short1`  |
+| short2  | 100ms | `--lex-motion-duration-short2`  |
 | medium1 | 250ms | `--lex-motion-duration-medium1` |
 | medium2 | 300ms | `--lex-motion-duration-medium2` |
-| long1 | 450ms | `--lex-motion-duration-long1` |
-| long2 | 500ms | `--lex-motion-duration-long2` |
+| long1   | 450ms | `--lex-motion-duration-long1`   |
+| long2   | 500ms | `--lex-motion-duration-long2`   |
 
 ### 5.2 Easings（M3 官方 cubic-bezier）
 
-| Token | 值 | CSS 变量 |
-|-------|----|----------|
-| standard | `cubic-bezier(0.2, 0, 0, 1)` | `--lex-motion-easing-standard` |
-| standard-decelerate | `cubic-bezier(0, 0, 0, 1)` | `--lex-motion-easing-standard-decelerate` |
-| standard-accelerate | `cubic-bezier(0.3, 0, 1, 1)` | `--lex-motion-easing-standard-accelerate` |
+| Token                 | 值                                | CSS 变量                                    |
+| --------------------- | --------------------------------- | ------------------------------------------- |
+| standard              | `cubic-bezier(0.2, 0, 0, 1)`      | `--lex-motion-easing-standard`              |
+| standard-decelerate   | `cubic-bezier(0, 0, 0, 1)`        | `--lex-motion-easing-standard-decelerate`   |
+| standard-accelerate   | `cubic-bezier(0.3, 0, 1, 1)`      | `--lex-motion-easing-standard-accelerate`   |
 | emphasized-decelerate | `cubic-bezier(0.05, 0.7, 0.1, 1)` | `--lex-motion-easing-emphasized-decelerate` |
 | emphasized-accelerate | `cubic-bezier(0.3, 0, 0.8, 0.15)` | `--lex-motion-easing-emphasized-accelerate` |
 
 ```css
 :root {
-  --lex-motion-duration-short1: 50ms; --lex-motion-duration-short2: 100ms;
-  --lex-motion-duration-medium1: 250ms; --lex-motion-duration-medium2: 300ms;
-  --lex-motion-duration-long1: 450ms; --lex-motion-duration-long2: 500ms;
+  --lex-motion-duration-short1: 50ms;
+  --lex-motion-duration-short2: 100ms;
+  --lex-motion-duration-medium1: 250ms;
+  --lex-motion-duration-medium2: 300ms;
+  --lex-motion-duration-long1: 450ms;
+  --lex-motion-duration-long2: 500ms;
   --lex-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
   --lex-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
   --lex-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
@@ -294,7 +307,9 @@ export const darkPalette: Record<Role, string> = {
 
 ```css
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -310,12 +325,12 @@ export const darkPalette: Record<Role, string> = {
 
 > 不设固定色，统一规则：`color-mix(in srgb, currentColor <opacity>, transparent)` 叠于容器色之上；`currentColor` 取前景色（通常为 `on-*`），与 M3 state layer 语义一致。
 
-| 状态 | 透明度 | CSS 变量 | 用法 |
-|------|--------|----------|------|
-| hover | 8% | `--lex-state-hover-opacity: 8%` | `background: color-mix(in srgb, currentColor 8%, transparent)` |
-| focus | 10% | `--lex-state-focus-opacity: 10%` | 键盘聚焦环内层 |
-| pressed | 12% | `--lex-state-pressed-opacity: 12%` | 按下态 |
-| dragged | 16% | `--lex-state-dragged-opacity: 16%` | 拖拽态 |
+| 状态    | 透明度 | CSS 变量                           | 用法                                                           |
+| ------- | ------ | ---------------------------------- | -------------------------------------------------------------- |
+| hover   | 8%     | `--lex-state-hover-opacity: 8%`    | `background: color-mix(in srgb, currentColor 8%, transparent)` |
+| focus   | 10%    | `--lex-state-focus-opacity: 10%`   | 键盘聚焦环内层                                                 |
+| pressed | 12%    | `--lex-state-pressed-opacity: 12%` | 按下态                                                         |
+| dragged | 16%    | `--lex-state-dragged-opacity: 16%` | 拖拽态                                                         |
 
 ```css
 :root {
@@ -325,7 +340,9 @@ export const darkPalette: Record<Role, string> = {
   --lex-state-dragged-opacity: 16%;
 }
 /* 组件示例：按钮 hover */
-.lex-button:hover { background: color-mix(in srgb, currentColor var(--lex-state-hover-opacity), transparent); }
+.lex-button:hover {
+  background: color-mix(in srgb, currentColor var(--lex-state-hover-opacity), transparent);
+}
 ```
 
 > 颜色本身由角色决定（如 `primary` 上的状态层用 `on-primary` 的 `currentColor`），不新增角色；与日夜间模式自动适配。
@@ -338,20 +355,20 @@ export const darkPalette: Record<Role, string> = {
 
 > 现存 `tokens.css` 中的旧语义 token（`--lex-bg` 等）将保留为已弃用别名，指向新角色，避免一次性全量替换导致回归风险。
 
-| 旧 Token | 指向新角色 | 说明 |
-|----------|-----------|------|
-| `--lex-bg` | `--lex-background` | 页面背景（旧 `#fafaf9` → 新 `#fcf8ff`） |
-| `--lex-surface` | `--lex-surface` | 表面（旧 `#ffffff` → 新 `#fcf8ff`，别名自指但保留兼容） |
-| `--lex-surface-raised` | `--lex-surface-container` | 抬升表面 |
-| `--lex-border` | `--lex-outline-variant` | 边框 |
-| `--lex-text` | `--lex-on-surface` | 主文本（旧 `#1c1917` → 新 `#1b1b21`） |
-| `--lex-text-muted` | `--lex-on-surface-variant` | 次要文本 |
-| `--lex-primary` | `--lex-primary` | 主色自指（旧 `#4f46e5` → 新 `#313066` / `#dbd8ff`，别名保留） |
-| `--lex-primary-contrast` | `--lex-on-primary` | 主色对比文字 |
-| `--lex-accent` | `--lex-tertiary` | 强调色 → 三级色 |
-| `--lex-danger` | `--lex-error` | 危险 → 错误 |
-| `--lex-success` | `--lex-success` | 成功（旧 `#16a34a` → 新 `#1b5c1a`） |
-| `--lex-focus-ring` | `--lex-outline` | 聚焦环 |
+| 旧 Token                 | 指向新角色                 | 说明                                                          |
+| ------------------------ | -------------------------- | ------------------------------------------------------------- |
+| `--lex-bg`               | `--lex-background`         | 页面背景（旧 `#fafaf9` → 新 `#fcf8ff`）                       |
+| `--lex-surface`          | `--lex-surface`            | 表面（旧 `#ffffff` → 新 `#fcf8ff`，别名自指但保留兼容）       |
+| `--lex-surface-raised`   | `--lex-surface-container`  | 抬升表面                                                      |
+| `--lex-border`           | `--lex-outline-variant`    | 边框                                                          |
+| `--lex-text`             | `--lex-on-surface`         | 主文本（旧 `#1c1917` → 新 `#1b1b21`）                         |
+| `--lex-text-muted`       | `--lex-on-surface-variant` | 次要文本                                                      |
+| `--lex-primary`          | `--lex-primary`            | 主色自指（旧 `#4f46e5` → 新 `#313066` / `#dbd8ff`，别名保留） |
+| `--lex-primary-contrast` | `--lex-on-primary`         | 主色对比文字                                                  |
+| `--lex-accent`           | `--lex-tertiary`           | 强调色 → 三级色                                               |
+| `--lex-danger`           | `--lex-error`              | 危险 → 错误                                                   |
+| `--lex-success`          | `--lex-success`            | 成功（旧 `#16a34a` → 新 `#1b5c1a`）                           |
+| `--lex-focus-ring`       | `--lex-outline`            | 聚焦环                                                        |
 
 ```css
 /* tokens.css — 别名层（deprecated，迁移期保留） */
@@ -366,13 +383,13 @@ export const darkPalette: Record<Role, string> = {
 
 ### 7.2 删除计划（按批，独立 PR，Oscar 13 条评审）
 
-| 批次 | 范围 | 依赖 | 截图对照 | 目标 |
-|------|------|------|----------|------|
-| **Batch 1** | `App` / `Header` / `Home` | Token 扩展 + 本文档 | 迁移前后真机/浏览器截图对比，外观不变 | 将三处旧别名替换为新 `--lex-*`，验证主题切换 |
-| **Batch 2** | `Review` / `Quiz`（含 `MultipleChoiceCard` / `RatingButtons`） | Batch 1 | 同上，仅结构收敛 | 复习动效容器色、按钮色收敛 |
-| **Batch 3** | `Settings` / `Search` / `Stats` / `Notebook` | Batch 2 | 同上 | 设置页、搜索、统计、生词本 |
-| **Batch 4** | `Dialogs`（`FirstOpenDialog` / `AddToListsDialog` / `DeveloperPanel` 等） | Batch 3 | 同上 | 弹窗/抽屉的 `xl` 与遮罩 `scrim` |
-| **Batch 5 — 删别名** | 全量组件迁完后 | Batch 4 | `scan-hardcoded-colors.mjs` + `tokens-consistency` 双绿 | 删除上表别名层，仅保留 M3 角色；PR 打标签 `BREAKING: remove deprecated --lex-* aliases` |
+| 批次                 | 范围                                                                      | 依赖                | 截图对照                                                | 目标                                                                                    |
+| -------------------- | ------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **Batch 1**          | `App` / `Header` / `Home`                                                 | Token 扩展 + 本文档 | 迁移前后真机/浏览器截图对比，外观不变                   | 将三处旧别名替换为新 `--lex-*`，验证主题切换                                            |
+| **Batch 2**          | `Review` / `Quiz`（含 `MultipleChoiceCard` / `RatingButtons`）            | Batch 1             | 同上，仅结构收敛                                        | 复习动效容器色、按钮色收敛                                                              |
+| **Batch 3**          | `Settings` / `Search` / `Stats` / `Notebook`                              | Batch 2             | 同上                                                    | 设置页、搜索、统计、生词本                                                              |
+| **Batch 4**          | `Dialogs`（`FirstOpenDialog` / `AddToListsDialog` / `DeveloperPanel` 等） | Batch 3             | 同上                                                    | 弹窗/抽屉的 `xl` 与遮罩 `scrim`                                                         |
+| **Batch 5 — 删别名** | 全量组件迁完后                                                            | Batch 4             | `scan-hardcoded-colors.mjs` + `tokens-consistency` 双绿 | 删除上表别名层，仅保留 M3 角色；PR 打标签 `BREAKING: remove deprecated --lex-* aliases` |
 
 > 每批独立 PR，外观不变（行为/布局零变化），仅 token 收敛；风险控制：行为不变 + 截图对照，与 Alpha 0.10.1 并行迭代无冲突。
 
@@ -380,12 +397,12 @@ export const darkPalette: Record<Role, string> = {
 
 ## 8. 校验与文件清单
 
-| 校验项 | 文件 | 口径 |
-|--------|------|------|
-| 颜色/形状/排版/动效同源 | `tokens-consistency.test.ts` | 本文 ↔ `tokens.css` ↔ `palette.ts` 三处同值 |
-| 对比度 ≥ 4.5:1 | `token-contrast.test.ts` | 读取 `tokens.css` 两套色板，WCAG 计算，失败拦截 CI |
-| 禁止裸色值 | `scripts/scan-hardcoded-colors.mjs` | 源码禁 `#[0-9a-f]{3,8}` / `rgb(` 硬编码（白名单：测试/文档示例） |
-| 主题切换 | `theme/resolve.ts` + `index.html` 内联脚本 | `light / dark / system` 三档，跟随系统 `prefers-color-scheme` |
+| 校验项                  | 文件                                       | 口径                                                             |
+| ----------------------- | ------------------------------------------ | ---------------------------------------------------------------- |
+| 颜色/形状/排版/动效同源 | `tokens-consistency.test.ts`               | 本文 ↔ `tokens.css` ↔ `palette.ts` 三处同值                      |
+| 对比度 ≥ 4.5:1          | `token-contrast.test.ts`                   | 读取 `tokens.css` 两套色板，WCAG 计算，失败拦截 CI               |
+| 禁止裸色值              | `scripts/scan-hardcoded-colors.mjs`        | 源码禁 `#[0-9a-f]{3,8}` / `rgb(` 硬编码（白名单：测试/文档示例） |
+| 主题切换                | `theme/resolve.ts` + `index.html` 内联脚本 | `light / dark / system` 三档，跟随系统 `prefers-color-scheme`    |
 
 **交付物：**
 
@@ -405,28 +422,88 @@ export const darkPalette: Record<Role, string> = {
   "platform": "phone",
   "contrastLevel": 0.5,
   "light": {
-    "primary": "#313066", "onPrimary": "#ffffff", "primaryContainer": "#6867a1", "onPrimaryContainer": "#ffffff",
-    "secondary": "#5e5c71", "onSecondary": "#ffffff", "secondaryContainer": "#e3e0f9", "onSecondaryContainer": "#1a1a2c",
-    "tertiary": "#7a5368", "onTertiary": "#ffffff", "tertiaryContainer": "#ffd8ea", "onTertiaryContainer": "#2f1123",
-    "error": "#ba1a1a", "onError": "#ffffff", "errorContainer": "#ffdad6", "onErrorContainer": "#410002",
-    "success": "#1b5c1a", "onSuccess": "#ffffff", "successContainer": "#a6f2a5", "onSuccessContainer": "#00210a",
-    "background": "#fcf8ff", "onBackground": "#1b1b21", "surface": "#fcf8ff", "onSurface": "#1b1b21",
-    "surfaceDim": "#dcd9e0", "surfaceBright": "#fcf8ff", "surfaceContainerLowest": "#ffffff",
-    "surfaceContainerLow": "#f6f2fa", "surfaceContainer": "#eae7ef", "surfaceContainerHigh": "#dfdbe3", "surfaceContainerHighest": "#d4d0d8",
-    "surfaceVariant": "#e4e1ec", "onSurfaceVariant": "#47464f", "outline": "#787680", "outlineVariant": "#c8c5d0",
-    "scrim": "#000000", "shadow": "#000000", "inverseSurface": "#313036", "inverseOnSurface": "#f3eff7", "inversePrimary": "#c3c0ff"
+    "primary": "#313066",
+    "onPrimary": "#ffffff",
+    "primaryContainer": "#6867a1",
+    "onPrimaryContainer": "#ffffff",
+    "secondary": "#5e5c71",
+    "onSecondary": "#ffffff",
+    "secondaryContainer": "#e3e0f9",
+    "onSecondaryContainer": "#1a1a2c",
+    "tertiary": "#7a5368",
+    "onTertiary": "#ffffff",
+    "tertiaryContainer": "#ffd8ea",
+    "onTertiaryContainer": "#2f1123",
+    "error": "#ba1a1a",
+    "onError": "#ffffff",
+    "errorContainer": "#ffdad6",
+    "onErrorContainer": "#410002",
+    "success": "#1b5c1a",
+    "onSuccess": "#ffffff",
+    "successContainer": "#a6f2a5",
+    "onSuccessContainer": "#00210a",
+    "background": "#fcf8ff",
+    "onBackground": "#1b1b21",
+    "surface": "#fcf8ff",
+    "onSurface": "#1b1b21",
+    "surfaceDim": "#dcd9e0",
+    "surfaceBright": "#fcf8ff",
+    "surfaceContainerLowest": "#ffffff",
+    "surfaceContainerLow": "#f6f2fa",
+    "surfaceContainer": "#eae7ef",
+    "surfaceContainerHigh": "#dfdbe3",
+    "surfaceContainerHighest": "#d4d0d8",
+    "surfaceVariant": "#e4e1ec",
+    "onSurfaceVariant": "#47464f",
+    "outline": "#787680",
+    "outlineVariant": "#c8c5d0",
+    "scrim": "#000000",
+    "shadow": "#000000",
+    "inverseSurface": "#313036",
+    "inverseOnSurface": "#f3eff7",
+    "inversePrimary": "#c3c0ff"
   },
   "dark": {
-    "primary": "#dbd8ff", "onPrimary": "#2b2a60", "primaryContainer": "#8c8bc8", "onPrimaryContainer": "#16134a",
-    "secondary": "#c7c4dd", "onSecondary": "#2f2e42", "secondaryContainer": "#464559", "onSecondaryContainer": "#e3e0f9",
-    "tertiary": "#eab9d1", "onTertiary": "#472639", "tertiaryContainer": "#603c50", "onTertiaryContainer": "#ffd8ea",
-    "error": "#ffb4ab", "onError": "#690005", "errorContainer": "#93000a", "onErrorContainer": "#ffdad6",
-    "success": "#76db7a", "onSuccess": "#00390a", "successContainer": "#005313", "onSuccessContainer": "#a6f2a5",
-    "background": "#131318", "onBackground": "#e5e1e9", "surface": "#131318", "onSurface": "#e5e1e9",
-    "surfaceDim": "#131318", "surfaceBright": "#39383f", "surfaceContainerLowest": "#0e0e13",
-    "surfaceContainerLow": "#1a1c22", "surfaceContainer": "#1f1f2a", "surfaceContainerHigh": "#2a2a33", "surfaceContainerHighest": "#35343d",
-    "surfaceVariant": "#47464f", "onSurfaceVariant": "#c8c5d0", "outline": "#928f9a", "outlineVariant": "#47464f",
-    "scrim": "#000000", "shadow": "#000000", "inverseSurface": "#e5e1e9", "inverseOnSurface": "#313036", "inversePrimary": "#5a5892"
+    "primary": "#dbd8ff",
+    "onPrimary": "#2b2a60",
+    "primaryContainer": "#8c8bc8",
+    "onPrimaryContainer": "#16134a",
+    "secondary": "#c7c4dd",
+    "onSecondary": "#2f2e42",
+    "secondaryContainer": "#464559",
+    "onSecondaryContainer": "#e3e0f9",
+    "tertiary": "#eab9d1",
+    "onTertiary": "#472639",
+    "tertiaryContainer": "#603c50",
+    "onTertiaryContainer": "#ffd8ea",
+    "error": "#ffb4ab",
+    "onError": "#690005",
+    "errorContainer": "#93000a",
+    "onErrorContainer": "#ffdad6",
+    "success": "#76db7a",
+    "onSuccess": "#00390a",
+    "successContainer": "#005313",
+    "onSuccessContainer": "#a6f2a5",
+    "background": "#131318",
+    "onBackground": "#e5e1e9",
+    "surface": "#131318",
+    "onSurface": "#e5e1e9",
+    "surfaceDim": "#131318",
+    "surfaceBright": "#39383f",
+    "surfaceContainerLowest": "#0e0e13",
+    "surfaceContainerLow": "#1a1c22",
+    "surfaceContainer": "#1f1f2a",
+    "surfaceContainerHigh": "#2a2a33",
+    "surfaceContainerHighest": "#35343d",
+    "surfaceVariant": "#47464f",
+    "onSurfaceVariant": "#c8c5d0",
+    "outline": "#928f9a",
+    "outlineVariant": "#47464f",
+    "scrim": "#000000",
+    "shadow": "#000000",
+    "inverseSurface": "#e5e1e9",
+    "inverseOnSurface": "#313036",
+    "inversePrimary": "#5a5892"
   }
 }
 ```
