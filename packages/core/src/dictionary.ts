@@ -11,6 +11,7 @@
 import type { LanguageCode, Sense } from "./domain";
 import { createId, toSenseId } from "./id";
 import type { DictionarySense, LexiiDatabase } from "./persistence";
+import { convertPresetEntry } from "./presets/convertEntry";
 import type { PresetWordEntry } from "./presets/types";
 
 // ─── 常量 ────────────────────────────────────────────────────────────────────
@@ -119,6 +120,10 @@ function toDictionarySense(
     term: entry.term,
     definitions: entry.definitions,
     ...(entry.pos ? { pos: entry.pos } : {}),
+    // RAY-487：逐条词性（RAY-349 的元组第 6 位）此前在扩展包装载路径被丢弃，
+    // 卡片只能退回按 pos 汇总串推断（见 definitionPos.ts），与内置词表口径
+    // 不一致。这里与 importWords.ts 的 toSense 同口径落库。
+    ...(hasPosByDefinition(entry) ? { posByDefinition: entry.posByDefinition } : {}),
     ...(entry.ipa ? { ipa: entry.ipa } : {}),
     tags: entry.tags ?? [],
     examples: [],
@@ -325,6 +330,11 @@ export async function installDictionaryPackage(
   };
 }
 
+/** 词条是否带逐条词性（全空数组按未提供处理，与 convertEntry.ts 同口径） */
+function hasPosByDefinition(entry: PresetWordEntry): boolean {
+  return entry.posByDefinition?.some((item) => item !== "") ?? false;
+}
+
 /** 比较 PresetWordEntry 与 DictionarySense 的内容是否一致（轻量比较） */
 function isEntryContentEqual(entry: PresetWordEntry, sense: DictionarySense): boolean {
   // definitions 逐条比较
@@ -336,6 +346,14 @@ function isEntryContentEqual(entry: PresetWordEntry, sense: DictionarySense): bo
   // pos / ipa
   if ((entry.pos ?? "") !== (sense.pos ?? "")) return false;
   if ((entry.ipa ?? "") !== (sense.ipa ?? "")) return false;
+  // posByDefinition（逐条词性，RAY-487）：按索引比较；旧装义项无此字段
+  // （长度 0）与新词条不等，升级时走更新分支补齐。
+  const entryDefPos = entry.posByDefinition ?? [];
+  const senseDefPos = sense.posByDefinition ?? [];
+  if (entryDefPos.length !== senseDefPos.length) return false;
+  for (let i = 0; i < entryDefPos.length; i++) {
+    if (entryDefPos[i] !== senseDefPos[i]) return false;
+  }
   // tags
   const entryTags = entry.tags ?? [];
   if (entryTags.length !== sense.tags.length) return false;
@@ -462,8 +480,14 @@ async function upgradeDictionaryPackage(
                 definitions: entry.definitions,
                 ...(entry.pos !== undefined ? { pos: entry.pos } : {}),
                 ...(entry.ipa !== undefined ? { ipa: entry.ipa } : {}),
+                ...(hasPosByDefinition(entry) ? { posByDefinition: entry.posByDefinition } : {}),
                 tags: entry.tags ?? [],
               };
+              // 新词条无逐条词性时清掉旧值，避免升级后残留失效的对齐信息
+              // （否则 isEntryContentEqual 每次升级都判不等，反复重写同一条）
+              if (!hasPosByDefinition(entry)) {
+                delete updated.posByDefinition;
+              }
               await db.dictionarySenses.put(updated);
               updatedCount += 1;
             }
@@ -668,41 +692,17 @@ export function invalidateDictionaryCache(_packageId?: string): void {
   dictionaryCache.clear();
 }
 
-// ─── 词条元组转换（与 convertEntry.ts 口径一致） ─────────────────────────────
+// ─── 词条元组转换（复用 convertEntry.ts，装载校验唯一口径） ──────────────────
 
 /**
- * 紧凑元组 → 类型化词条。
- *
- * 打包侧（build.mjs）生成格式为 [term, definitions, pos, ipa, tags]，
- * definitions 以 "\n" 连接多条释义。与 tier0.ts / books.ts 的
- * convertPresetEntry 口径一致，本处内联避免跨模块依赖。
+ * 从 variant URL 提取文件名作为错误信息前缀（定位到具体产物文件）。
+ * URL 可能带 query/hash（托管端缓存参数），一并剥离。
  */
-function tupleToPresetWordEntry(raw: unknown[], index: number): PresetWordEntry {
-  if (raw.length !== 5) {
-    throw new Error(`词条 #${index} 元组长度非法：${raw.length}`);
-  }
-  const [term = "", defs = "", pos = "", ipa = "", tags = ""] = raw as string[];
-  if (!term) {
-    throw new Error(`词条 #${index} 词条为空`);
-  }
-  const definitions = (defs as string)
-    .split("\n")
-    .map((p) => p.trim())
-    .filter((p) => p !== "");
-  if (definitions.length === 0) {
-    throw new Error(`词条 #${index}（${term}）缺少释义`);
-  }
-  const tagList = (tags as string)
-    .split(/\s+/)
-    .map((p) => p.trim())
-    .filter((p) => p !== "");
-  return {
-    term,
-    definitions,
-    ...(pos !== "" ? { pos } : {}),
-    ...(ipa !== "" ? { ipa } : {}),
-    tags: tagList,
-  };
+function variantSourceName(url: string): string {
+  const withoutQuery = url.split(/[?#]/)[0] ?? "";
+  const segments = withoutQuery.split("/");
+  const last = segments[segments.length - 1];
+  return last && last !== "" ? last : "扩展词包";
 }
 
 // ─── manifest 与解压 ──────────────────────────────────────────────────────────
@@ -844,7 +844,7 @@ export async function downloadAndVerifyPackage(
   }
 
   // 解析 JSON：打包侧（build.mjs）生成结构化对象
-  // { id, version, name, ..., entries: [[term, definitions, pos, ipa, tags], ...] }
+  // { id, version, name, ..., entries: [[term, definitions, pos, ipa, tags, posByDefinition], ...] }
   // 需从 entries 字段提取元组数组并转换为 PresetWordEntry 对象。
   // 兼容裸数组格式（测试 / 旧版产物）。
   const text = new TextDecoder().decode(decompressed);
@@ -865,9 +865,13 @@ export async function downloadAndVerifyPackage(
     throw new Error("包文件格式非法：顶层不是数组且不含 entries 字段");
   }
 
+  // 元组转换走 convertEntry.ts 的唯一实现（RAY-487）：此前本文件内联了一份
+  // 同名转换，RAY-349 把元组从 5 项扩到 6 项时只改了 convertEntry.ts，
+  // 内联副本仍卡在 5 项，导致线上 6 项词包首条即抛「元组长度非法」。
+  const sourceName = variantSourceName(variant.url);
   return rawEntries.map((entry, index) => {
     if (Array.isArray(entry)) {
-      return tupleToPresetWordEntry(entry, index);
+      return convertPresetEntry(entry as string[], index, sourceName);
     }
     // 兼容对象格式（未来可能切换）
     return entry as PresetWordEntry;
