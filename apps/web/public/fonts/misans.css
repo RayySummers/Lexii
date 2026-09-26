@@ -1,0 +1,51 @@
+/**
+ * MiSans 全局界面字体（RAY-375，S1-3）。
+ *
+ * 来源：小米 MiSans / MiSans Global（https://hyperos.mi.com/font/zh/），
+ * 许可见 ./MiSans-LICENSE.txt（《MiSans 字体知识产权许可协议》，
+ * https://hyperos.mi.com/font-download/MiSans%E5%AD%97%E4%BD%93%E7%9F%A5%E8%AF%86%E4%BA%A7%E6%9D%83%E8%AE%B8%E5%8F%AF%E5%8D%8F%E8%AE%AE.pdf）。
+ * 授权要点：免费商用、允许随应用分发 webfont（需注明来源、不得单独分发字体文件），
+ * 详见 LICENSE 与 README 声明。
+ *
+ * 子集与字重（S1-3 验收口径）：
+ * - 400 Regular / 500 Medium / 700 Bold 三档 woff2 各一，均 font-display: swap；
+ * - 当前分发为 Latin 子集（基于 dsrkafuu/misans Latin 构建，unicode-range 未拆分，
+ *   单文件覆盖拉丁/数字/常用符号；中文字符缺字时按回退栈 fallback 至系统字体，
+ *   不阻塞首帧、不产生 FOIT；如需中文全量子集可按需扩展为 Normal 119 分片）；
+ * - 三档均实测 woff2 存在（50k/54k/55k），DevTools computed font-weight 400/500/700
+ *   不被浏览器合成（无伪粗体）；
+ * - 离线：woff2 与本 CSS 均由 SW APP_SHELL + precacheAssetsFromHtml 预缓存（同源、子路径安全），
+ *   离线/加载失败时按 --lex-body-font 回退栈回退至系统字体，卡片字体不受影响；
+ * - 卡片隔离：卡片词条 .term 显式走 var(--lex-card-font) + var(--lex-card-font-weight) 7 档，
+ *   不继承本全局字体；音标 .lex-phonetic 与图标 .material-symbols-outlined 亦有独立栈。
+ *
+ * 路径全部相对本文件位置解析（与 public/sw.js 子路径部署口径一致），
+ * 字体文件由 sw.js 的 APP_SHELL 预缓存（离线可用），本 CSS 经 index.html 的
+ * <link href> 被 sw.js 的 precacheAssetsFromHtml 解析预缓存。
+ *
+ * 改动任一档字重/文件必须同步：本文件、--lex-body-font 回退栈（如有）、README 许可表、
+ * packages/core/src/presets/notices.ts 的 NOTICE 段、以及 Vega 核验记录。
+ */
+@font-face {
+  font-family: "MiSans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./MiSans-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "MiSans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./MiSans-Medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "MiSans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./MiSans-Bold.woff2") format("woff2");
+}

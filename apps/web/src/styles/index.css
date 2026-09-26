@@ -6,12 +6,16 @@
 
 /*
  * 将语义 token 映射为 Tailwind 工具类：
- * --color-* → bg-* / text-* / border-* ...
- * 旧别名保留供渐进迁移；新 M3 角色全量注册，组件应优先使用 M3 命名。
- * 组件中一律使用这些语义工具类，不直接写十六进制颜色。
+ * --color-*          → bg-* / text-* / border-* / fill-* / stroke-*
+ * --radius-*         → rounded-*
+ * --text-*           → text-*（含 line-height）
+ * --font-*           → font-*
+ * 组件中一律使用这些语义工具类，不直接写十六进制颜色/尺寸。
+ * P0 扩展：M3 全量角色 + Type Scale 15 档 + Shape + Motion 均在此注册；
+ * 旧别名（--color-bg 等）保留至迁移完成。
  */
 @theme inline {
-  /* 旧别名（deprecated，兼容存量组件） */
+  /* 旧别名（deprecated，保留至迁移完成） */
   --color-bg: var(--lex-bg);
   --color-surface: var(--lex-surface);
   --color-surface-raised: var(--lex-surface-raised);
@@ -25,19 +29,9 @@
   --color-success: var(--lex-success);
   --color-focus-ring: var(--lex-focus-ring);
 
-  /* M3 颜色角色（浅/深两套，源自 tokens.css --lex-*） */
-  --color-background: var(--lex-background);
-  --color-on-background: var(--lex-on-background);
-  --color-on-surface: var(--lex-on-surface);
-  --color-surface-variant: var(--lex-surface-variant);
-  --color-on-surface-variant: var(--lex-on-surface-variant);
-  --color-surface-container-lowest: var(--lex-surface-container-lowest);
-  --color-surface-container-low: var(--lex-surface-container-low);
-  --color-surface-container: var(--lex-surface-container);
-  --color-surface-container-high: var(--lex-surface-container-high);
-  --color-surface-container-highest: var(--lex-surface-container-highest);
-  --color-on-primary: var(--lex-on-primary);
+  /* M3 颜色角色 · 主/次/三级/错误/成功 */
   --color-primary-container: var(--lex-primary-container);
+  --color-on-primary: var(--lex-on-primary);
   --color-on-primary-container: var(--lex-on-primary-container);
   --color-secondary: var(--lex-secondary);
   --color-on-secondary: var(--lex-on-secondary);
@@ -54,14 +48,34 @@
   --color-success-container: var(--lex-success-container);
   --color-on-success: var(--lex-on-success);
   --color-on-success-container: var(--lex-on-success-container);
+
+  /* M3 中性 + 逆色 */
+  --color-background: var(--lex-background);
+  --color-on-background: var(--lex-on-background);
+  --color-on-surface: var(--lex-on-surface);
+  --color-surface-variant: var(--lex-surface-variant);
+  --color-on-surface-variant: var(--lex-on-surface-variant);
+  --color-surface-dim: var(--lex-surface-dim);
+  --color-surface-bright: var(--lex-surface-bright);
+  --color-surface-container-lowest: var(--lex-surface-container-lowest);
+  --color-surface-container-low: var(--lex-surface-container-low);
+  --color-surface-container: var(--lex-surface-container);
+  --color-surface-container-high: var(--lex-surface-container-high);
+  --color-surface-container-highest: var(--lex-surface-container-highest);
   --color-outline: var(--lex-outline);
   --color-outline-variant: var(--lex-outline-variant);
   --color-scrim: var(--lex-scrim);
+  --color-shadow: var(--lex-shadow);
   --color-inverse-surface: var(--lex-inverse-surface);
   --color-inverse-on-surface: var(--lex-inverse-on-surface);
   --color-inverse-primary: var(--lex-inverse-primary);
 
-  /* Shape */
+  /* 字体栈 */
+  --font-sans: var(--lex-font-sans);
+  --font-mono: var(--lex-font-mono);
+  --font-phonetic: var(--lex-phonetic-font);
+
+  /* Shape · 圆角 */
   --radius-xs: var(--lex-radius-xs);
   --radius-sm: var(--lex-radius-sm);
   --radius-md: var(--lex-radius-md);
@@ -69,7 +83,7 @@
   --radius-xl: var(--lex-radius-xl);
   --radius-full: var(--lex-radius-full);
 
-  /* Type Scale — 15 档注册为 --text-*（Web 版 sp→rem） */
+  /* Type Scale 15 档 · Tailwind --text-* */
   --text-display-large: var(--lex-typescale-display-large-size);
   --text-display-large--line-height: var(--lex-typescale-display-large-line-height);
   --text-display-medium: var(--lex-typescale-display-medium-size);
@@ -101,16 +115,30 @@
   --text-label-small: var(--lex-typescale-label-small-size);
   --text-label-small--line-height: var(--lex-typescale-label-small-line-height);
 
-  /* 字体栈 */
-  --font-sans: var(--lex-font-sans);
-  --font-mono: var(--lex-font-mono);
-
-  /* Motion */
+  /* Motion · durations/easings（Tailwind 4 暂无官方 --duration-*，此处按 Lexii 语义注册，供组件直接 var() 消费） */
+  --duration-short1: var(--lex-motion-duration-short1);
+  --duration-short2: var(--lex-motion-duration-short2);
+  --duration-medium1: var(--lex-motion-duration-medium1);
+  --duration-medium2: var(--lex-motion-duration-medium2);
+  --duration-long1: var(--lex-motion-duration-long1);
+  --duration-long2: var(--lex-motion-duration-long2);
   --ease-standard: var(--lex-motion-easing-standard);
-  --ease-emphasized-decelerate: var(--lex-motion-easing-emphasized-decelerate);
-  --ease-emphasized-accelerate: var(--lex-motion-easing-emphasized-accelerate);
   --ease-standard-decelerate: var(--lex-motion-easing-standard-decelerate);
   --ease-standard-accelerate: var(--lex-motion-easing-standard-accelerate);
+  --ease-emphasized-decelerate: var(--lex-motion-easing-emphasized-decelerate);
+  --ease-emphasized-accelerate: var(--lex-motion-easing-emphasized-accelerate);
+}
+
+/*
+ * 全局界面字体（RAY-375 S1-3 + RAY-396 收敛）：
+ * - 字体由 public/fonts/misans.css 的 @font-face 提供（400/500/700 woff2，font-display: swap）；
+ * - 回退栈在 tokens.css 的 --lex-font-sans 定义（MiSans 首选，系统中文字体兜底：PingFang SC / Microsoft YaHei / Noto Sans SC）；
+ * - 卡片词条（.term）显式走 var(--lex-card-font) 隔离，不继承此全局字体；
+ * - 音标（.lex-phonetic）与图标（.material-symbols-outlined）各有独立栈，不受影响；
+ * - 离线/加载失败时回退系统字体，不阻塞首帧（swap，无 FOIT）。
+ */
+html {
+  font-family: var(--lex-font-sans);
 }
 
 /*
