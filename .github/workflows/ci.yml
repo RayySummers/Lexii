@@ -44,6 +44,10 @@ jobs:
       - name: Lint presets (繁简回归)
         run: pnpm lint:presets
 
+      # RAY-397：设计令牌硬编码颜色扫描（禁裸 hex/rgb，需引用 --lex-*）
+      - name: Lint tokens (硬编码颜色扫描)
+        run: pnpm lint:tokens
+
       - name: Lint
         run: pnpm lint
 
