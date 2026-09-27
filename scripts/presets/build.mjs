@@ -75,6 +75,22 @@ const LAST_BUILD = path.join(OUTPUT_DIR, "last-build.json");
 const PACKAGE_VERSION = "1.0.0";
 
 /**
+ * RAY-492：Tier 2 数据版本 —— 内容变了（纳入 36 万条短语），版本必须跟着走。
+ *
+ * 运行时以「manifest 的 pkg.version vs 本地 done 标记」判定是否需要安装
+ * （packages/core/src/dictionary.ts:installDictionaryPackage：相等即
+ * already-installed，不等才走增量替换 upgradeDictionaryPackage）；
+ * 设置页也按 compareSemver(installedVersion, manifestVersion) < 0 展示
+ * 「可升级 vX」。若 Tier 2 仍报 1.0.0，**已装 Tier 2 的用户永远拿不到短语**
+ * （静默不升级），故 Tier 2 单独 bump 到 1.1.0。
+ *
+ * Tier 0 / Tier 1 内容零变化（RAY-492 硬条件：内置档逐字节零回归），
+ * 保持 1.0.0 —— 避免 Tier 1 老用户被无意义地触发一次增量替换，
+ * 也保证已提交的 tier0.data.json 逐字节不变。
+ */
+const TIER2_PACKAGE_VERSION = "1.1.0";
+
+/**
  * RAY-492：Tier 0 / Tier 1 只收单词——多词短语只进 Tier 2 全量包。
  *
  * 这层守卫是「不动 Tier 0/Tier 1 入选口径」的实现：TERM_PATTERN 放宽后，
@@ -102,7 +118,7 @@ const TIER_DEFS = {
   2: {
     id: "core-en-tier2",
     name: "全量词表（清洗后全部词条）",
-    version: PACKAGE_VERSION,
+    version: TIER2_PACKAGE_VERSION,
     predicate: () => true,
   },
 };
