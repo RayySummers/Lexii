@@ -10,7 +10,11 @@
  * RAY-253 反馈 6：`DataOverview` / `loadOverview` 已删除（设置页数据概览
  * 与统计页功能重复）。
  */
-import type { DictionaryInstallStatus, PresetInstallStatus } from "@lexii/core";
+import type {
+  DictionaryInstallProgress,
+  DictionaryInstallStatus,
+  PresetInstallStatus,
+} from "@lexii/core";
 import type { LexiiExportData } from "@lexii/core";
 
 /** JSON 备份恢复后的计数（用于成功提示，映射自 LexiiExportData 各表长度） */
@@ -134,10 +138,12 @@ export interface SettingsDataProvider {
    * 下载并安装扩展词包（fetch → 校验 → 解压 → 落库）。
    * 失败抛错（网络/校验/安装错误）。
    * signal 可选，用于取消下载（AbortController）。
+   * onProgress 可选，版本升级的落库阶段进度（RAY-498；首装走 IDB 游标轮询）。
    */
   installDictionaryPackage(
     packageId: string,
     signal?: AbortSignal,
+    onProgress?: (progress: DictionaryInstallProgress) => void,
   ): Promise<DictionaryInstallResult>;
   /** Tier 2 安装完成后标记 Tier 1 为 covered */
   markTier1CoveredByTier2(): Promise<void>;

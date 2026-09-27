@@ -19,6 +19,14 @@ import type { PresetWordEntry } from "./presets/types";
 /** 每块词条数（1 条记录/词条，400 词条 ≈ 400 次 put/事务） */
 export const DICTIONARY_CHUNK_SIZE = 400;
 
+/**
+ * 进度上报节流间隔（毫秒，RAY-498）。
+ *
+ * Tier 2 升级（七十六万条）近两千次块写入，每块都往 UI 推一次会掉帧；
+ * 同一阶段内的上报至少间隔这么久。阶段切换与收尾强制上报，不受此限制。
+ */
+export const DICTIONARY_PROGRESS_THROTTLE_MS = 500;
+
 /** 安装进度标记的 meta 键前缀 */
 export function dictionaryProgressKey(packageId: string): string {
   return `dict:${packageId}:progress`;
@@ -83,6 +91,26 @@ export type DictionaryInstallResult =
     }
   | { status: "already-installed"; installedVersion: string };
 
+/**
+ * 安装/升级阶段（RAY-498，供 UI 展示阶段文案）。
+ *
+ * - `reading`：全量读取旧词包 + 计算 diff（一次 IDB 扫描，无法细分进度）
+ * - `updating`：分块删除旧词条 / 写入新词条，百分比按已处理块数算
+ * - `finalizing`：写完成标记、清进度与升级锁
+ */
+export type DictionaryInstallPhase = "reading" | "updating" | "finalizing";
+
+/** 一次进度上报（阶段 + 块数进度 + 百分比） */
+export interface DictionaryInstallProgress {
+  phase: DictionaryInstallPhase;
+  /** 已处理块数（reading 阶段恒为 0） */
+  processedChunks: number;
+  /** 本阶段总块数（reading 阶段未知，为 0） */
+  totalChunks: number;
+  /** 完成百分比（0–100 整数；总块数未知时为 0） */
+  percent: number;
+}
+
 /** 安装选项 */
 export interface DictionaryInstallOptions {
   /** 导入发生时刻（ISO；默认调用方当前时间，测试可注入） */
@@ -91,6 +119,16 @@ export interface DictionaryInstallOptions {
   yield?: () => Promise<void>;
   /** 取消信号（AbortController）。传入后块间检查 aborted → 抛 AbortError。 */
   signal?: AbortSignal;
+  /**
+   * 版本升级的落库进度回调（RAY-498）。
+   *
+   * 首装路径的进度由 `dict:<id>:progress` 标记 + UI 轮询提供；升级路径没有
+   * 断点游标（diff 幂等，重跑即可），因此经此回调把「阶段 + 百分比」回传给 UI。
+   * 回调可能被节流合并，只保证「阶段切换 + 收尾 + 节流窗口内的最新值」可见。
+   */
+  onProgress?: (progress: DictionaryInstallProgress) => void;
+  /** 进度节流间隔（毫秒；默认 {@link DICTIONARY_PROGRESS_THROTTLE_MS}，测试可注入 0 关闭节流） */
+  progressThrottleMs?: number;
 }
 
 // ─── 内部辅助 ─────────────────────────────────────────────────────────────────
@@ -98,6 +136,43 @@ export interface DictionaryInstallOptions {
 /** 默认让出：把控制权交回事件循环，避免长事务阻塞 UI */
 function yieldToMainThread(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/** 进度上报器（阶段、已处理块数、总块数、是否强制上报） */
+type ProgressReporter = (
+  phase: DictionaryInstallPhase,
+  processedChunks: number,
+  totalChunks: number,
+  force?: boolean,
+) => void;
+
+/**
+ * 构造节流后的进度上报器（RAY-498）。
+ *
+ * - 阶段切换、`force = true`（首帧/收尾/100%）必定上报；
+ * - 同一阶段内两次上报至少间隔 `throttleMs`，避免每块都刷 UI；
+ * - 未传 `onProgress` 时为零开销空实现。
+ */
+function createProgressReporter(
+  onProgress: ((progress: DictionaryInstallProgress) => void) | undefined,
+  throttleMs: number,
+): ProgressReporter {
+  let lastPhase: DictionaryInstallPhase | null = null;
+  let lastEmitAt = Number.NEGATIVE_INFINITY;
+  return (phase, processedChunks, totalChunks, force = false) => {
+    if (!onProgress) return;
+    const now = Date.now();
+    if (!force && phase === lastPhase && now - lastEmitAt < throttleMs) return;
+    lastPhase = phase;
+    lastEmitAt = now;
+    onProgress({
+      phase,
+      processedChunks,
+      totalChunks,
+      percent:
+        totalChunks > 0 ? Math.min(100, Math.round((processedChunks / totalChunks) * 100)) : 0,
+    });
+  };
 }
 
 /** 并发安装检测错误（内部哨兵，用户可见文案见 §3.2） */
@@ -196,6 +271,9 @@ export async function resetDictionaryPackageInstall(
  * 每词条仅写 1 条 dictionarySense 记录（vs installPreset 的 4 条）。
  *
  * 版本升级：done 标记存在但版本不匹配时触发增量替换（不清库）。
+ *
+ * 进度：首装路径写 `dict:<id>:progress` 游标（可恢复 + UI 轮询）；升级路径
+ * 无断点游标，改由 `options.onProgress` 分阶段上报（RAY-498）。
  */
 export async function installDictionaryPackage(
   db: LexiiDatabase,
@@ -205,6 +283,10 @@ export async function installDictionaryPackage(
   const time = options.time ?? new Date().toISOString();
   const yieldFn = options.yield ?? yieldToMainThread;
   const signal = options.signal;
+  const report = createProgressReporter(
+    options.onProgress,
+    options.progressThrottleMs ?? DICTIONARY_PROGRESS_THROTTLE_MS,
+  );
 
   const done = await db.meta.get(dictionaryDoneKey(pkg.id));
   if (done) {
@@ -215,7 +297,7 @@ export async function installDictionaryPackage(
       return { status: "already-installed", installedVersion: done.value };
     }
     // 版本失配 → 增量升级（§3.2）
-    return upgradeDictionaryPackage(db, pkg, done.value, time, yieldFn, signal);
+    return upgradeDictionaryPackage(db, pkg, time, report, yieldFn, signal);
   }
 
   // ─── 首次安装 ────────────────────────────────────────────────────────────────
@@ -368,12 +450,15 @@ function isEntryContentEqual(entry: PresetWordEntry, sense: DictionarySense): bo
  * 不清库（红线）。已晋升到 senses 表的副本不受影响（独立记录）。
  *
  * 并发防线：CAS 升级锁（meta 键），防止两标签页并发升级产生重复记录。
+ *
+ * 进度（RAY-498）：读取旧词包 → 分块删除/写入（按已处理块数上报百分比）
+ * → 写完成标记；经 `report` 节流回传给 UI，块间仍按 `signal` 支持取消。
  */
 async function upgradeDictionaryPackage(
   db: LexiiDatabase,
   pkg: DictionaryPackage,
-  oldVersion: string,
   time: string,
+  report: ProgressReporter,
   yieldFn: () => Promise<void>,
   signal?: AbortSignal,
 ): Promise<DictionaryInstallResult> {
@@ -421,6 +506,8 @@ async function upgradeDictionaryPackage(
   }
 
   try {
+    // ─── 阶段 1：读取旧词包（全量扫描 + diff，无法细分进度）─────────────────────
+    report("reading", 0, 0, true);
     // 读取旧版该包的全部词条（含 id 用于更新）
     const oldEntries = await db.dictionarySenses.where("source").equals(pkg.id).toArray();
     const oldByTerm = new Map<string, DictionarySense>();
@@ -437,6 +524,13 @@ async function upgradeDictionaryPackage(
         removedTerms.push(term);
       }
     }
+
+    // ─── 阶段 2：分块删除 + 写入（百分比 = 已处理块数 / 总块数）─────────────────
+    const totalChunks =
+      Math.ceil(removedTerms.length / DICTIONARY_CHUNK_SIZE) +
+      Math.ceil(pkg.entries.length / DICTIONARY_CHUNK_SIZE);
+    let processedChunks = 0;
+
     for (let i = 0; i < removedTerms.length; i += DICTIONARY_CHUNK_SIZE) {
       if (signal?.aborted) {
         throw new DOMException("安装已取消", "AbortError");
@@ -455,6 +549,8 @@ async function upgradeDictionaryPackage(
         }
       });
       deletedCount += chunk.length;
+      processedChunks += 1;
+      report("updating", processedChunks, totalChunks);
       await yieldFn();
     }
 
@@ -498,10 +594,14 @@ async function upgradeDictionaryPackage(
           }
         }
       });
+      processedChunks += 1;
+      // 最后一块强制上报，保证 UI 能看到 100%（节流窗口可能刚好盖住它）
+      report("updating", processedChunks, totalChunks, processedChunks >= totalChunks);
       await yieldFn();
     }
 
-    // 更新完成标记，清除进度与升级锁
+    // ─── 阶段 3：写完成标记、清进度与升级锁 ─────────────────────────────────────
+    report("finalizing", totalChunks, totalChunks, true);
     await db.transaction("rw", db.meta, async () => {
       await db.meta.put({ key: dictionaryDoneKey(pkg.id), value: pkg.version });
       await db.meta.delete(dictionaryProgressKey(pkg.id));
