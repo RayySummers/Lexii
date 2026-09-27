@@ -6,6 +6,7 @@
  * RAY-253 反馈 6：loadOverview（数据概览）已随设置页概览区删除，无相关用例。
  * RAY-294：扩展词包数据源测试（getDictionaryPackageSummaries /
  * fetchDictionaryManifest / installDictionaryPackage / markTier1CoveredByTier2）。
+ * RAY-498：升级分支的落库进度回调（onProgress）透传到调用方。
  */
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import {
@@ -16,7 +17,7 @@ import {
   openDatabase,
   parseCsvWordlist,
 } from "@lexii/core";
-import type { LexiiDatabase } from "@lexii/core";
+import type { DictionaryInstallProgress, LexiiDatabase } from "@lexii/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createIndexedDbSettingsDataProvider } from "./data";
 
@@ -231,5 +232,64 @@ describe("扩展词包（RAY-294）", () => {
     await expect(provider.installDictionaryPackage("core-en-tier1")).rejects.toThrow(
       /无法获取词包信息/,
     );
+  });
+
+  it("installDictionaryPackage：升级分支把 core 落库进度回传给调用方（RAY-498）", async () => {
+    // 预置旧版安装标记 → 版本失配 → 走升级分支
+    await db!.meta.put({ key: dictionaryDoneKey("core-en-tier1"), value: "0.9.0" });
+
+    const payload = {
+      id: "core-en-tier1",
+      version: "1.0.0",
+      name: "Tier 1 标准词包",
+      // 元组 6 项：[term, definitions(换行连接), pos, ipa, tags(空格连接), posByDefinition]
+      entries: [
+        ["apple", "苹果", "n.", "", "", ""],
+        ["banana", "香蕉", "n.", "", "", ""],
+      ],
+    };
+    const bytes = new TextEncoder().encode(JSON.stringify(payload));
+    const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
+    const sha256 = Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    // 无 .br/.gz 后缀 → 落库前不做解压（只走 raw 下载 + SHA-256 校验）
+    const variantUrl = "https://example.test/core-en-tier1.json";
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === variantUrl) {
+        return new Response(bytes, { status: 200 });
+      }
+      throw new TypeError("network error");
+    });
+
+    try {
+      const provider = createIndexedDbSettingsDataProvider(db!);
+      // manifest 直接给出（本用例只验证「下载 → 落库」链路上的进度回调透传，
+      // manifest 获取与解压能力探测已在 RAY-294 用例覆盖）
+      vi.spyOn(provider, "fetchDictionaryManifest").mockResolvedValue([
+        {
+          id: "core-en-tier1",
+          version: "1.0.0",
+          sourceCommit: "abc123",
+          bestVariant: { url: variantUrl, size: bytes.length, sha256 },
+        },
+      ]);
+
+      const events: DictionaryInstallProgress[] = [];
+      const result = await provider.installDictionaryPackage(
+        "core-en-tier1",
+        undefined,
+        (progress) => events.push(progress),
+      );
+
+      expect(result.status).toBe("installed");
+      // 阶段序列：读取旧词包 → 更新词条（含 100%）→ 完成校验
+      expect(events[0]?.phase).toBe("reading");
+      expect(events.some((event) => event.phase === "updating")).toBe(true);
+      expect(events[events.length - 1]?.phase).toBe("finalizing");
+      expect(events[events.length - 1]?.percent).toBe(100);
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });

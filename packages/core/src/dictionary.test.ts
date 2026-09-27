@@ -28,7 +28,7 @@ import {
   resetDictionaryPackageInstall,
   searchDictionarySenses,
 } from "./dictionary";
-import type { DictionaryPackage, ManifestVariant } from "./dictionary";
+import type { DictionaryInstallProgress, DictionaryPackage, ManifestVariant } from "./dictionary";
 import type { PresetWordEntry } from "./presets/types";
 import { toSenseId } from "./id";
 import { searchAllSenses } from "./search";
@@ -482,6 +482,142 @@ describe("版本升级（增量替换）", () => {
     if (result.status === "already-installed") {
       expect(result.installedVersion).toBe("2.0.0");
     }
+  });
+});
+
+describe("升级进度上报（RAY-498）", () => {
+  it("升级分支按阶段上报：读取旧词包 → 更新词条 N% → 完成校验", async () => {
+    const database = freshDatabase();
+
+    // 旧版 510 条
+    await installDictionaryPackage(
+      database,
+      makePackage(makeEntries(DICTIONARY_CHUNK_SIZE + 110), "core-en-tier1", "1.0.0"),
+      { yield: async () => {} },
+    );
+
+    // 新版 500 条：word500–509 被移除，word0 释义变更
+    const newEntries = makeEntries(DICTIONARY_CHUNK_SIZE + 100).map((entry, index) =>
+      index === 0 ? { ...entry, definitions: ["改过的释义"] } : entry,
+    );
+    const events: DictionaryInstallProgress[] = [];
+    const result = await installDictionaryPackage(
+      database,
+      makePackage(newEntries, "core-en-tier1", "2.0.0"),
+      {
+        yield: async () => {},
+        progressThrottleMs: 0,
+        onProgress: (progress) => events.push(progress),
+      },
+    );
+
+    expect(result.status).toBe("installed");
+    if (result.status !== "installed") throw new Error("unreachable");
+    expect(result.updatedCount).toBe(1);
+    expect(result.deletedCount).toBe(10);
+
+    // 首帧：读取旧词包（此时还不知道总块数）
+    expect(events[0]).toEqual({
+      phase: "reading",
+      processedChunks: 0,
+      totalChunks: 0,
+      percent: 0,
+    });
+
+    // 更新阶段：删除 10 条 = 1 块，写入 500 条 = 2 块，共 3 块
+    const updating = events.filter((event) => event.phase === "updating");
+    expect(updating.map((event) => [event.processedChunks, event.totalChunks])).toEqual([
+      [1, 3],
+      [2, 3],
+      [3, 3],
+    ]);
+    expect(updating.map((event) => event.percent)).toEqual([33, 67, 100]);
+
+    // 收尾帧
+    expect(events[events.length - 1]).toEqual({
+      phase: "finalizing",
+      processedChunks: 3,
+      totalChunks: 3,
+      percent: 100,
+    });
+  });
+
+  it("落库阶段按 progressThrottleMs 节流：中间块合并，首帧与 100% 仍可见", async () => {
+    const database = freshDatabase();
+
+    await installDictionaryPackage(
+      database,
+      makePackage(makeEntries(DICTIONARY_CHUNK_SIZE + 10), "core-en-tier1", "1.0.0"),
+      { yield: async () => {} },
+    );
+
+    const events: DictionaryInstallProgress[] = [];
+    await installDictionaryPackage(
+      database,
+      // 1200 条 = 3 块写入（无删除块）
+      makePackage(makeEntries(DICTIONARY_CHUNK_SIZE * 3), "core-en-tier1", "2.0.0"),
+      {
+        yield: async () => {},
+        // 节流窗口远大于用例耗时：同阶段内只应留首帧 + 收尾帧
+        progressThrottleMs: 60_000,
+        onProgress: (progress) => events.push(progress),
+      },
+    );
+
+    expect(events.map((event) => event.phase)).toEqual([
+      "reading",
+      "updating",
+      "updating",
+      "finalizing",
+    ]);
+    const updating = events.filter((event) => event.phase === "updating");
+    expect(updating.map((event) => event.processedChunks)).toEqual([1, 3]);
+    expect(updating[updating.length - 1]!.percent).toBe(100);
+  });
+
+  it("升级中途取消：抛 AbortError、释放升级锁、不再上报后续阶段", async () => {
+    const database = freshDatabase();
+
+    await installDictionaryPackage(
+      database,
+      makePackage(makeEntries(DICTIONARY_CHUNK_SIZE * 2), "core-en-tier1", "1.0.0"),
+      { yield: async () => {} },
+    );
+
+    const controller = new AbortController();
+    const events: DictionaryInstallProgress[] = [];
+    await expect(
+      installDictionaryPackage(
+        database,
+        makePackage(
+          makeEntries(DICTIONARY_CHUNK_SIZE * 2).map((entry) => ({
+            ...entry,
+            definitions: ["改过的释义"],
+          })),
+          "core-en-tier1",
+          "2.0.0",
+        ),
+        {
+          yield: async () => {},
+          progressThrottleMs: 0,
+          signal: controller.signal,
+          onProgress: (progress) => {
+            events.push(progress);
+            // 首个更新块上报后立刻取消（模拟用户点「取消」）
+            if (progress.phase === "updating") {
+              controller.abort();
+            }
+          },
+        },
+      ),
+    ).rejects.toThrow(/安装已取消/);
+
+    expect(events.some((event) => event.phase === "updating")).toBe(true);
+    expect(events.some((event) => event.phase === "finalizing")).toBe(false);
+
+    // 升级锁已释放（可重试），done 标记仍是旧版本
+    expect(await database.meta.get(dictionaryUpgradeLockKey("core-en-tier1"))).toBeUndefined();
+    expect((await database.meta.get(dictionaryDoneKey("core-en-tier1")))?.value).toBe("1.0.0");
   });
 });
 

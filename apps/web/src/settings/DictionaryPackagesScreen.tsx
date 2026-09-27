@@ -5,13 +5,16 @@
  * - 词包列表与状态：未装 / 已装 / 安装中（进度）/ covered（Tier 1 被 Tier 2 覆盖）；
  * - 下载确认界面：体积 + ECDICT MIT 许可展示；
  * - 下载/安装进度条（fetch + 落库两阶段）；
+ * - 升级进度（RAY-498）：阶段文案 + 百分比（core `onProgress` 回调，节流上报），
+ *   长耗时无进展超过约 10 秒补「仍在处理，请勿关闭页面」安抚文案；
  * - 取消与错误提示（并发错误映射文档 §3.2 可读文案）；
  * - Tier 2 安装完成回调 markTier1CoveredByTier2。
  *
- * 文案：Vega 产出（RAY-326）；联网下载 / 离线可用口径与 RAY-304 一致。
+ * 文案：Vega 产出（RAY-326）；联网下载 / 离线可用口径与 RAY-304 一致；
+ * RAY-498 的阶段文案沿用同一口径（读取旧词包… / 更新词条 N% / 完成校验…）。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DictionaryInstallStatus } from "@lexii/core";
+import type { DictionaryInstallProgress, DictionaryInstallStatus } from "@lexii/core";
 import { ScreenHeader } from "../components/ScreenHeader";
 // RAY-494：semver 比较（支持 `-alpha` 这类 pre-release）抽到独立模块，单测直测纯函数
 import { compareSemver } from "./semver";
@@ -23,6 +26,28 @@ import type {
 
 /** 安装状态轮询间隔（安装进行中时刷新进度） */
 const POLL_INTERVAL_MS = 800;
+
+/**
+ * 无进展多久算「长耗时」（RAY-498）。
+ * Ray 的诉求是「能否判断卡住」：超过这个时长没有新进展就给一句安抚文案，
+ * 而不是让界面一直静默。
+ */
+const STALL_HINT_MS = 10_000;
+
+/** 「是否卡住」的检查间隔（比阈值小一个量级，提示最多晚 1 秒出现） */
+const STALL_CHECK_INTERVAL_MS = 1_000;
+
+/** 阶段文案（RAY-498；沿用 RAY-326 文案口径，不新增措辞） */
+function progressLabel(progress: DictionaryInstallProgress): string {
+  switch (progress.phase) {
+    case "reading":
+      return "读取旧词包…";
+    case "updating":
+      return `更新词条 ${progress.percent}%`;
+    case "finalizing":
+      return "完成校验…";
+  }
+}
 
 /** 包体积格式化（字节 → MB） */
 function formatSize(bytes: number | undefined): string {
@@ -147,8 +172,18 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
   const [notice, setNotice] = useState<string | null>(null);
   // 正在安装的包 id（按钮态 + 轮询续命）
   const [pendingInstalls, setPendingInstalls] = useState<ReadonlySet<string>>(new Set());
+  // 升级落库阶段进度（RAY-498；core onProgress 回调，仅当前标签页的安装有值）
+  const [installProgress, setInstallProgress] = useState<Record<string, DictionaryInstallProgress>>(
+    {},
+  );
+  // 长耗时无进展的包 id（展示「仍在处理，请勿关闭页面」）
+  const [stalledPackages, setStalledPackages] = useState<ReadonlySet<string>>(new Set());
   // 每个 pending install 的 AbortController（用于取消）
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  // 每个包最近一次「有进展」的时刻（安装开始 / 进度回调 / 轮询游标推进）
+  const lastActivityRef = useRef<Map<string, number>>(new Map());
+  // 轮询到的每包已处理词条数（游标推进 = 首装路径仍在正常落库）
+  const polledCountRef = useRef<Map<string, number>>(new Map());
   // 下载确认对话框（null = 不显示）
   const [confirmTarget, setConfirmTarget] = useState<DictionaryPackageSummary | null>(null);
   // manifest 加载中
@@ -166,12 +201,24 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
     };
   }, []);
 
+  /** 记录一次「有进展」，用于判断长时间无进展 */
+  const markActivity = useCallback((packageId: string) => {
+    lastActivityRef.current.set(packageId, Date.now());
+  }, []);
+
   const refresh = useCallback(async () => {
     const result = await provider.getDictionaryPackageSummaries();
-    if (mountedRef.current) {
-      setSummaries(result);
+    if (!mountedRef.current) return;
+    for (const summary of result) {
+      const previous = polledCountRef.current.get(summary.id);
+      polledCountRef.current.set(summary.id, summary.installedCount);
+      // 游标推进 = 首装路径仍在正常落库（该路径没有进度回调）
+      if (previous !== undefined && previous !== summary.installedCount) {
+        markActivity(summary.id);
+      }
     }
-  }, [provider]);
+    setSummaries(result);
+  }, [provider, markActivity]);
 
   // 首次进入：读本地安装状态 + fetch manifest（用户主动触发口径）
   useEffect(() => {
@@ -227,6 +274,30 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
     return () => clearInterval(timer);
   }, [anyInstalling, pendingInstalls, refresh]);
 
+  // 长耗时期安抚（RAY-498）：pending 期间定期检查「最近一次进展」是否已超时
+  // （安装结束时由 handleConfirmDownload 的 finally 清掉对应标记，此处不写状态）
+  useEffect(() => {
+    if (pendingInstalls.size === 0) {
+      return undefined;
+    }
+    const check = () => {
+      const now = Date.now();
+      const next = new Set<string>();
+      for (const packageId of pendingInstalls) {
+        // 没有任何进展记录时（回调尚未触发）以当前时刻为基准，避免误报
+        const lastActivity = lastActivityRef.current.get(packageId) ?? now;
+        if (now - lastActivity >= STALL_HINT_MS) {
+          next.add(packageId);
+        }
+      }
+      setStalledPackages((current) =>
+        current.size === next.size && [...next].every((id) => current.has(id)) ? current : next,
+      );
+    };
+    const timer = setInterval(check, STALL_CHECK_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [pendingInstalls]);
+
   // 点击「下载」按钮 → 弹出确认对话框
   const handleDownloadClick = useCallback((summary: DictionaryPackageSummary) => {
     setConfirmTarget(summary);
@@ -239,13 +310,25 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
       setError(null);
       setNotice(null);
       setPendingInstalls((current) => new Set(current).add(packageId));
+      markActivity(packageId);
 
       // 创建 AbortController 用于取消
       const controller = new AbortController();
       abortControllersRef.current.set(packageId, controller);
 
+      // 升级落库阶段的进度（core 侧已按块节流，这里只做展示状态）
+      const handleProgress = (progress: DictionaryInstallProgress) => {
+        if (!mountedRef.current) return;
+        markActivity(packageId);
+        setInstallProgress((current) => ({ ...current, [packageId]: progress }));
+      };
+
       try {
-        const result = await provider.installDictionaryPackage(packageId, controller.signal);
+        const result = await provider.installDictionaryPackage(
+          packageId,
+          controller.signal,
+          handleProgress,
+        );
         if (!mountedRef.current) return;
 
         if (result.status === "installed") {
@@ -288,8 +371,22 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
         }
       } finally {
         abortControllersRef.current.delete(packageId);
+        lastActivityRef.current.delete(packageId);
         if (mountedRef.current) {
           setPendingInstalls((current) => {
+            const next = new Set(current);
+            next.delete(packageId);
+            return next;
+          });
+          // 安装结束（成功/取消/失败）后不再保留阶段进度与停滞标记
+          setInstallProgress((current) => {
+            if (!(packageId in current)) return current;
+            const next = { ...current };
+            delete next[packageId];
+            return next;
+          });
+          setStalledPackages((current) => {
+            if (!current.has(packageId)) return current;
             const next = new Set(current);
             next.delete(packageId);
             return next;
@@ -298,7 +395,7 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
         }
       }
     },
-    [provider, refresh],
+    [provider, refresh, markActivity],
   );
 
   // 取消安装（abort 后由 handleConfirmDownload 的 catch 分支清除 IDB 进度）
@@ -349,6 +446,8 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
             sizeBytes={getManifestSize(summary.id)}
             manifestVersion={getManifestVersion(summary.id)}
             installing={pendingInstalls.has(summary.id)}
+            stalled={pendingInstalls.has(summary.id) && stalledPackages.has(summary.id)}
+            {...(installProgress[summary.id] ? { progress: installProgress[summary.id] } : {})}
             onDownload={handleDownloadClick}
             onCancel={handleCancelInstall}
           />
@@ -400,12 +499,63 @@ export function DictionaryPackagesScreen({ provider, onBack }: DictionaryPackage
   );
 }
 
+/** 取消按钮（下载 / 安装 / 升级进行中共用） */
+function CancelInstallButton({ onClick }: { onClick(): void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-fit rounded-full border border-outline-variant bg-surface px-4 py-1.5 text-xs font-medium transition-colors hover:border-error hover:text-error focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+    >
+      取消
+    </button>
+  );
+}
+
+/**
+ * 进度条（§6.4）。
+ *
+ * 不给 `percent` 即不确定进度（阶段无法细分，如「读取旧词包…」的一次性扫描）：
+ * 此时不写 `aria-valuenow`（ARIA 语义即 indeterminate），条内条整条呼吸动画。
+ */
+function ProgressBar({
+  percent,
+  ariaValueMax,
+  ariaValueNow,
+}: {
+  percent?: number;
+  ariaValueMax?: number;
+  ariaValueNow?: number;
+}) {
+  const indeterminate = percent === undefined;
+  return (
+    <div
+      role="progressbar"
+      aria-valuemin={0}
+      {...(ariaValueMax !== undefined ? { "aria-valuemax": ariaValueMax } : {})}
+      {...(ariaValueNow !== undefined ? { "aria-valuenow": ariaValueNow } : {})}
+      className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-container"
+    >
+      <div
+        className={
+          indeterminate
+            ? "h-full w-full animate-pulse rounded-full bg-primary/60"
+            : "h-full rounded-full bg-primary transition-all"
+        }
+        {...(indeterminate ? {} : { style: { width: `${percent}%` } })}
+      />
+    </div>
+  );
+}
+
 /** 单个词包卡片 */
 function DictionaryPackageCard({
   summary,
   sizeBytes,
   manifestVersion,
   installing,
+  stalled,
+  progress,
   onDownload,
   onCancel,
 }: {
@@ -414,6 +564,10 @@ function DictionaryPackageCard({
   /** manifest 中的最新版本（用于判断升级可用） */
   manifestVersion?: string;
   installing: boolean;
+  /** 长耗时无进展（RAY-498，展示安抚文案） */
+  stalled: boolean;
+  /** 升级落库阶段进度（RAY-498；仅升级路径由 core 回调上报） */
+  progress?: DictionaryInstallProgress;
   onDownload(summary: DictionaryPackageSummary): void;
   onCancel(packageId: string): void;
 }) {
@@ -426,6 +580,11 @@ function DictionaryPackageCard({
     installedVersion &&
     manifestVersion &&
     compareSemver(installedVersion, manifestVersion) < 0;
+
+  // 升级进行中：done 标记仍是旧版本，summary.status 保持 installed，靠 pendingInstalls 判断
+  const upgrading = Boolean(isUpgradeAvailable) && installing;
+  // 只有 updating 阶段的进度可细分；reading / finalizing 为一次性操作，用不确定进度
+  const determinateProgress = progress?.phase === "updating" ? progress : undefined;
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-outline-variant p-4">
@@ -455,29 +614,14 @@ function DictionaryPackageCard({
       {status === "installing" ? (
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
-            <div
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={totalCount}
-              aria-valuenow={installedCount}
-              className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-container"
-            >
-              <div
-                className="h-full rounded-full bg-primary transition-all"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
+            <ProgressBar
+              percent={progressPercent}
+              ariaValueMax={totalCount}
+              ariaValueNow={installedCount}
+            />
             <span className="shrink-0 text-xs text-on-surface-variant">{progressPercent}%</span>
           </div>
-          {installing ? (
-            <button
-              type="button"
-              onClick={() => onCancel(summary.id)}
-              className="w-fit rounded-full border border-outline-variant bg-surface px-4 py-1.5 text-xs font-medium transition-colors hover:border-error hover:text-error focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            >
-              取消
-            </button>
-          ) : null}
+          {installing ? <CancelInstallButton onClick={() => onCancel(summary.id)} /> : null}
         </div>
       ) : null}
 
@@ -491,27 +635,45 @@ function DictionaryPackageCard({
           >
             {installing ? "下载中…" : "下载"}
           </button>
-          {installing ? (
-            <button
-              type="button"
-              onClick={() => onCancel(summary.id)}
-              className="rounded-full border border-outline-variant bg-surface px-4 py-1.5 text-xs font-medium transition-colors hover:border-error hover:text-error focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            >
-              取消
-            </button>
-          ) : null}
+          {installing ? <CancelInstallButton onClick={() => onCancel(summary.id)} /> : null}
         </div>
       ) : null}
 
       {isUpgradeAvailable ? (
-        <button
-          type="button"
-          disabled={installing}
-          onClick={() => onDownload(summary)}
-          className="w-fit rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {installing ? "升级中…" : `升级到 v${manifestVersion}`}
-        </button>
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            disabled={installing}
+            onClick={() => onDownload(summary)}
+            className="w-fit rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {installing ? "升级中…" : `升级到 v${manifestVersion}`}
+          </button>
+          {upgrading ? (
+            <div className="flex flex-col gap-2">
+              {/* 阶段文案：core 回调到达前只可能是「下载中…」（先 fetch 再落库） */}
+              <span className="text-xs text-on-surface-variant">
+                {progress ? progressLabel(progress) : "下载中…"}
+              </span>
+              <div className="flex items-center gap-3">
+                <ProgressBar
+                  {...(determinateProgress
+                    ? {
+                        percent: determinateProgress.percent,
+                        ariaValueMax: 100,
+                        ariaValueNow: determinateProgress.percent,
+                      }
+                    : {})}
+                />
+                <CancelInstallButton onClick={() => onCancel(summary.id)} />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {installing && stalled ? (
+        <span className="text-xs text-tertiary">仍在处理，请勿关闭页面</span>
       ) : null}
     </div>
   );

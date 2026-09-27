@@ -442,6 +442,14 @@ async function detectDecompression(): Promise<"brotli" | "gzip" | "raw"> {
 
 **安装中**：进度条（已处理词条数 / 总词条数，从 `installDictionaryPackage` 的 yield 回调获取）+ 取消按钮（中断后可续装）。
 
+**升级中**（RAY-498）：首装路径的进度来自 `dict:<id>:progress` 游标轮询；升级路径没有断点游标（diff 幂等，重跑即可），改由 `installDictionaryPackage` 的 `options.onProgress` 回调上报，UI 展示「阶段 + 百分比」：
+
+- `reading` → `读取旧词包…`（全量扫描旧版 + 算 diff，一次性操作，进度条为不确定态）；
+- `updating` → `更新词条 N%`（百分比 = 已处理块数 / 总块数，删除块与写入块合并计数）；
+- `finalizing` → `完成校验…`（写完成标记、清进度与升级锁）。
+
+回调由 core 侧节流（`DICTIONARY_PROGRESS_THROTTLE_MS`，默认 500ms；阶段切换、首帧与 100% 强制上报），避免 Tier 2 近两千次块写入把 UI 刷到掉帧。升级过程中块间仍检查 `signal`，UI 在升级态同样提供取消按钮。无进展超过约 10 秒（含下载阶段）时补「仍在处理，请勿关闭页面」安抚文案。
+
 **完成**：提示安装成功，可开始搜词。
 
 ---
