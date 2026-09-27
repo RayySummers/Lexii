@@ -335,6 +335,136 @@ describe("DictionaryPackagesScreen", () => {
     expect(screen.queryByText(/升级到/)).not.toBeInTheDocument();
   });
 
+  it("已装 1.0.0、manifest 为 1.0.0-alpha 时不展示升级提示（RAY-494 验收：不误判）", async () => {
+    const provider = makeProvider({
+      getDictionaryPackageSummaries: vi.fn().mockResolvedValue([
+        {
+          id: "core-en-tier1",
+          name: "Tier 1 标准词包",
+          status: "installed",
+          installedCount: 58_244,
+          totalCount: 58_244,
+          installedVersion: "1.0.0",
+        },
+        {
+          id: "core-en-tier2",
+          name: "Tier 2 全量词包",
+          status: "not-installed",
+          installedCount: 0,
+          totalCount: 401_222,
+        },
+      ] satisfies DictionaryPackageSummary[]),
+      fetchDictionaryManifest: vi.fn().mockResolvedValue([
+        {
+          id: "core-en-tier1",
+          version: "1.0.0-alpha",
+          sourceCommit: "abc123",
+          bestVariant: { url: "http://example.com/t1.json.br", size: 1_258_304, sha256: "aaa" },
+        },
+        {
+          id: "core-en-tier2",
+          version: "1.1.0-alpha",
+          sourceCommit: "abc123",
+          bestVariant: { url: "http://example.com/t2.json.br", size: 6_710_886, sha256: "bbb" },
+        },
+      ] satisfies DictionaryManifestInfo[]),
+    });
+    render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
+
+    // 1.0.0 > 1.0.0-alpha：正式版比预发布版新，不该提示升级
+    await waitFor(() => {
+      expect(screen.getByText("已安装 v1.0.0")).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/可升级/)).not.toBeInTheDocument();
+  });
+
+  it("已装 1.1.0-alpha、manifest 为 1.1.1-alpha 时展示「可升级」（RAY-494 回归）", async () => {
+    const provider = makeProvider({
+      getDictionaryPackageSummaries: vi.fn().mockResolvedValue([
+        {
+          id: "core-en-tier1",
+          name: "Tier 1 标准词包",
+          status: "installed",
+          installedCount: 58_244,
+          totalCount: 58_244,
+          installedVersion: "1.1.0-alpha",
+        },
+        {
+          id: "core-en-tier2",
+          name: "Tier 2 全量词包",
+          status: "not-installed",
+          installedCount: 0,
+          totalCount: 401_222,
+        },
+      ] satisfies DictionaryPackageSummary[]),
+      // 旧 compareSemver 对「带 -alpha 的 patch 段」两处比较都不成立 → 返回 0 →
+      // 升级提示静默失效；本用例是修复前会失败的回归点
+      fetchDictionaryManifest: vi.fn().mockResolvedValue([
+        {
+          id: "core-en-tier1",
+          version: "1.1.1-alpha",
+          sourceCommit: "abc123",
+          bestVariant: { url: "http://example.com/t1.json.br", size: 1_258_304, sha256: "aaa" },
+        },
+        {
+          id: "core-en-tier2",
+          version: "1.1.1-alpha",
+          sourceCommit: "abc123",
+          bestVariant: { url: "http://example.com/t2.json.br", size: 6_710_886, sha256: "bbb" },
+        },
+      ] satisfies DictionaryManifestInfo[]),
+    });
+    render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("可升级 v1.1.1-alpha")).toBeInTheDocument();
+    });
+    expect(screen.getByText("升级到 v1.1.1-alpha")).toBeInTheDocument();
+  });
+
+  it("已装 1.1.0、manifest 为 1.1.0-alpha 时不误判为可升级（预发布版小于正式版）", async () => {
+    const provider = makeProvider({
+      getDictionaryPackageSummaries: vi.fn().mockResolvedValue([
+        {
+          id: "core-en-tier1",
+          name: "Tier 1 标准词包",
+          status: "installed",
+          installedCount: 58_244,
+          totalCount: 58_244,
+          installedVersion: "1.1.0",
+        },
+        {
+          id: "core-en-tier2",
+          name: "Tier 2 全量词包",
+          status: "not-installed",
+          installedCount: 0,
+          totalCount: 401_222,
+        },
+      ] satisfies DictionaryPackageSummary[]),
+      fetchDictionaryManifest: vi.fn().mockResolvedValue([
+        {
+          id: "core-en-tier1",
+          version: "1.1.0-alpha",
+          sourceCommit: "abc123",
+          bestVariant: { url: "http://example.com/t1.json.br", size: 1_258_304, sha256: "aaa" },
+        },
+        {
+          id: "core-en-tier2",
+          version: "1.1.0-alpha",
+          sourceCommit: "abc123",
+          bestVariant: { url: "http://example.com/t2.json.br", size: 6_710_886, sha256: "bbb" },
+        },
+      ] satisfies DictionaryManifestInfo[]),
+    });
+    render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("已安装 v1.1.0")).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/可升级/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/升级到/)).not.toBeInTheDocument();
+  });
+
   it("点击升级按钮触发安装流程（复用 installDictionaryPackage）", async () => {
     const provider = makeProvider({
       getDictionaryPackageSummaries: vi.fn().mockResolvedValue([

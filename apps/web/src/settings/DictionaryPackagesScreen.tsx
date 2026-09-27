@@ -13,6 +13,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DictionaryInstallStatus } from "@lexii/core";
 import { ScreenHeader } from "../components/ScreenHeader";
+// RAY-494：semver 比较（支持 `-alpha` 这类 pre-release）抽到独立模块，单测直测纯函数
+import { compareSemver } from "./semver";
 import type {
   DictionaryManifestInfo,
   DictionaryPackageSummary,
@@ -21,22 +23,6 @@ import type {
 
 /** 安装状态轮询间隔（安装进行中时刷新进度） */
 const POLL_INTERVAL_MS = 800;
-
-/**
- * 简单 semver 比较：返回 -1（a < b）、0（a === b）、1（a > b）。
- * 仅处理 major.minor.patch，不含 pre-release/build。
- */
-function compareSemver(a: string, b: string): number {
-  const pa = a.split(".").map(Number);
-  const pb = b.split(".").map(Number);
-  for (let i = 0; i < 3; i++) {
-    const da = pa[i] ?? 0;
-    const db = pb[i] ?? 0;
-    if (da < db) return -1;
-    if (da > db) return 1;
-  }
-  return 0;
-}
 
 /** 包体积格式化（字节 → MB） */
 function formatSize(bytes: number | undefined): string {

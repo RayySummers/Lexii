@@ -87,6 +87,38 @@ node scripts/presets/build-enrichment.mjs
 | Tier 1 标准     | 全考试标签 ∪ collins>0 ∪ oxford>0 ∪ 词频>0     | 58,244   | 1.2 MB                | 扩展包产物（本阶段仅生成） |
 | Tier 2 全量     | 清洗后全部合法词条                             | 401,222  | 6.4 MB                | 扩展包产物（本阶段仅生成） |
 
+## 版本号口径（RAY-494）
+
+**扩展词包版本号一律带 `-alpha`**（发版口径：本项目未到生产可用，凡发版必须带 alpha
+标识）。该口径覆盖三层：应用版本（`apps/web/package.json`）、词包发布 tag
+（`presets-v*`）、以及**词包版本号本身**——RAY-494 之前只有前两层带 alpha，线上
+manifest 里 `core-en-tier1` = `1.0.0`、`core-en-tier2` = `1.1.0`，第三层缺失。
+
+常量唯一定义在 `lib/versions.mjs`；`build-manifest.mjs` 生成 manifest 前 fail-fast
+校验，版本号不带 `-alpha` 直接构建失败。
+
+| 词包                               | 当前版本号    | 递增规则                                           |
+| ---------------------------------- | ------------- | -------------------------------------------------- |
+| Tier 0 / Tier 1（`core-en-tier1`） | `1.0.0-alpha` | **内容变更时递增数字部分**（下一个 `1.0.1-alpha`） |
+| Tier 2（`core-en-tier2`）          | `1.1.0-alpha` | **内容变更时递增数字部分**（下一个 `1.1.1-alpha`） |
+
+- 版本号是**用户可见字段**（设置页「已安装 vX / 可升级 vX」）并驱动升级判定：运行时按
+  「manifest 的 `pkg.version` vs 本地 done 标记」判等（相等即 `already-installed`，
+  不等才走 `upgradeDictionaryPackage` 增量替换），设置页按
+  `compareSemver(installedVersion, manifestVersion) < 0` 展示「可升级」。
+- 预发布语义按 semver 2.0.0：`1.1.0-alpha < 1.1.0`、`1.0.0 < 1.1.0-alpha < 1.1.1-alpha`。
+  所以已装 `1.0.0` 的实例不会被 `1.0.0-alpha` 误判为可升级（正式版更新），而后续
+  `1.1.1-alpha` 会正常提示（比较实现在 `apps/web/src/settings/semver.ts`，RAY-494 修复了
+  旧实现把 `-alpha` 段算成 NaN → 返回 0 → 升级提示静默失效的问题）。
+- 版本号进产物文件名：`core-en-tier2-v1.1.0-alpha-<内容哈希前 8 位>.json`（三种编码
+  同名前缀）——hash 是内容哈希，改版本号后文件名变化属预期。
+- **不在本口径内**：已提交的内置产物 `tier0.data.json` / `books.data.json`（本次不重打，
+  内嵌 `version` 仍是上一版 `1.0.0`，下次重建时才跟随 `PACKAGE_VERSION`），以及富化包
+  `enrichment-tier1`（沿用 `build-enrichment.mjs` 的 `ENRICHMENT_VERSION` 自身版本线）。
+- 回归护栏：`pnpm test:presets`（`scripts/presets/build-manifest.test.mjs`，`node --test`）
+  断言两个词包版本号都带 `-alpha`、文件名随之、体积与 sha256 口径正确；已挂在根
+  `pnpm test` 里，CI 主线一起跑。
+
 ## 富化管线（RAY-268 批次 A）
 
 单条统一管线（RAY-257 计划的富化管线与本批次合并为同一条，无双线并行）：
