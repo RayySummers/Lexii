@@ -846,6 +846,33 @@ describe("downloadAndVerifyPackage（元组转换）", () => {
     expect(defHits[0]!.sense.term).toBe("kaleidoscope");
     expect(defHits[0]!.kind).toBe("definition");
   });
+
+  it("多词短语元组（de jure）转换并安装后可检索（RAY-492 验收路径）", async () => {
+    const database = freshDatabase();
+
+    // Tier 2 全量包纳入短语后的真实形态：
+    // [term, definitions, pos, ipa, tags] —— term 含单个内部空格。
+    const entries = await downloadAndVerifyPackage(
+      await makeVariant([["de jure", "法律上，按照法律的", "ad.", "", ""]]),
+    );
+    expect(entries[0]!.term).toBe("de jure");
+
+    await installDictionaryPackage(database, makePackage(entries, "core-en-tier2", "1.0.0"), {
+      yield: async () => {},
+    });
+    invalidateDictionaryCache();
+
+    // 完整短语命中（用户输入 de jure → 有结果，来源为扩展词典表）
+    const exactHits = await searchDictionarySenses(database, "de jure");
+    expect(exactHits).toHaveLength(1);
+    expect(exactHits[0]!.sense.term).toBe("de jure");
+    expect(exactHits[0]!.kind).toBe("term-prefix");
+
+    // 短语内部子串同样命中（不按空格切词）
+    const substringHits = await searchDictionarySenses(database, "jure");
+    expect(substringHits).toHaveLength(1);
+    expect(substringHits[0]!.sense.term).toBe("de jure");
+  });
 });
 
 describe("元组长度与逐条词性（RAY-487：装载侧只认 5 项，线上已是 6 项）", () => {

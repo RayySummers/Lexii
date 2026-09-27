@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { TERM_PATTERN } from "../csv";
+import { isPhraseTerm } from "../termPattern.js";
 import {
   getWordbookPackage,
   WORDBOOK_CATALOG,
@@ -111,6 +112,15 @@ describe("WORDBOOK_CATALOG（词书目录）", () => {
         seen.add(term.toLowerCase());
       }
     }
+  });
+
+  it("词书只收单词：多词短语只进 Tier 2 全量包（RAY-492 分级口径）", () => {
+    // TERM_PATTERN 放宽后短语能通过形状校验，若没有分级守卫，带考试标签的
+    // 短语（如 ice cream/zk）会漏进词书，改变已发布的词数与共享池体积。
+    const phrases = WORDBOOK_CATALOG.flatMap((book) =>
+      book.terms.filter((term) => isPhraseTerm(term)).map((term) => `${book.id} → ${term}`),
+    );
+    expect(phrases).toEqual([]);
   });
 });
 

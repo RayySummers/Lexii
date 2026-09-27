@@ -18,9 +18,11 @@
  * 口径（RAY-258）：
  *   - Tier 0：ECDICT tag ∈ {zk,gk,cet4,cet6} ∪ NGSL 1.2（join ECDICT 补释义）；
  *   - Tier 1：全考试标签 ∪ collins>0 ∪ oxford>0 ∪ 词频>0（约 5.8 万条，实测）；
- *   - Tier 2：清洗后的全部合法词条（约 40 万条）。
+ *   - Tier 2：清洗后的全部合法词条（RAY-492 起含多词短语，如 `de jure`）。
  *   - 释义清洗：换行 → 全角分号；超长按 500 字符在「；」边界截断；
- *     短语/词缀/非英语词条按 core 侧 TERM_PATTERN 过滤；term 小写去重首现优先。
+ *     词缀/缩略/非英语/形状非法行按 core 侧 TERM_PATTERN 过滤（RAY-492 起
+ *     多词短语放行，但只进 Tier 2——Tier 0/1 与内置词书仍只收单词）；
+ *     term 小写去重首现优先。
  *   - 生成格式为紧凑元组数组 [term, definitions, pos, ipa, tags]，
  *     definitions 以换行符（"\n"）连接——清洗阶段（normalizeTranslation）
  *     已保证释义文本内不含真实换行与字面 "\n"，换行连接是唯一无损分隔符；
@@ -43,6 +45,8 @@
  *     每本词书 term 索引（"\n" 连接，term 无换行、无损往返）；
  *     独立打包 10 本约 6.3 MB，共享池方案约 1.5 MB（省 4.2 倍，实测）；
  *     NOTICE 无新增数据源（词书全部来自已登记的 ECDICT + NGSL 1.2）。
+ *   - RAY-492：词书库仍只收单词（短语只进 Tier 2 全量包）——否则 `ice cream`
+ *     这类带考试标签的短语会漏进词书，改变已发布的词数（判定见 lib/books.mjs）。
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -50,6 +54,7 @@ import path from "node:path";
 import {
   cleanEcdictRow,
   hasExamTag,
+  isPhraseTerm,
   isTier1Core,
   parseCsv,
   parseEcdictRow,
@@ -69,23 +74,51 @@ const LAST_BUILD = path.join(OUTPUT_DIR, "last-build.json");
 /** 打包版本：来源数据固定（ECDICT commit + NGSL 1.2），版本随内容变更递增 */
 const PACKAGE_VERSION = "1.0.0";
 
+/**
+ * RAY-492：Tier 2 数据版本 —— 内容变了（纳入 36 万条短语），版本必须跟着走。
+ *
+ * 运行时以「manifest 的 pkg.version vs 本地 done 标记」判定是否需要安装
+ * （packages/core/src/dictionary.ts:installDictionaryPackage：相等即
+ * already-installed，不等才走增量替换 upgradeDictionaryPackage）；
+ * 设置页也按 compareSemver(installedVersion, manifestVersion) < 0 展示
+ * 「可升级 vX」。若 Tier 2 仍报 1.0.0，**已装 Tier 2 的用户永远拿不到短语**
+ * （静默不升级），故 Tier 2 单独 bump 到 1.1.0。
+ *
+ * Tier 0 / Tier 1 内容零变化（RAY-492 硬条件：内置档逐字节零回归），
+ * 保持 1.0.0 —— 避免 Tier 1 老用户被无意义地触发一次增量替换，
+ * 也保证已提交的 tier0.data.json 逐字节不变。
+ */
+const TIER2_PACKAGE_VERSION = "1.1.0";
+
+/**
+ * RAY-492：Tier 0 / Tier 1 只收单词——多词短语只进 Tier 2 全量包。
+ *
+ * 这层守卫是「不动 Tier 0/Tier 1 入选口径」的实现：TERM_PATTERN 放宽后，
+ * 短语会顺着「考试标签 ∪ 词频」口径漏进内置档（ECDICT 全量实测：`ice cream`
+ * 带 zk 标签、toefl 4 条 / ielts 2 条短语带考试标签、883 条达 Tier 1 词频口径），
+ * 内置词书与 Tier 1 的词数、体积会随之改变。短语判定唯一定义在 core 的
+ * termPattern.js（isPhraseTerm），词书库侧（lib/books.mjs）用同一判定。
+ */
+const isSingleWord = (entry) => !isPhraseTerm(entry.term);
+
 const TIER_DEFS = {
   0: {
     id: "core-en-tier0",
     name: "核心词表（中考/高考/四级/六级 + 高频）",
     version: PACKAGE_VERSION,
-    predicate: (entry) => hasExamTag(entry, TIER0_ECDICT_TAGS),
+    predicate: (entry) => isSingleWord(entry) && hasExamTag(entry, TIER0_ECDICT_TAGS),
   },
   1: {
     id: "core-en-tier1",
     name: "标准词表（全考试 + 核心词频）",
     version: PACKAGE_VERSION,
-    predicate: (entry) => hasExamTag(entry, TIER1_ECDICT_TAGS) || isTier1Core(entry),
+    predicate: (entry) =>
+      isSingleWord(entry) && (hasExamTag(entry, TIER1_ECDICT_TAGS) || isTier1Core(entry)),
   },
   2: {
     id: "core-en-tier2",
     name: "全量词表（清洗后全部词条）",
-    version: PACKAGE_VERSION,
+    version: TIER2_PACKAGE_VERSION,
     predicate: () => true,
   },
 };
