@@ -90,33 +90,38 @@ Tier 0（7,195 条）：可行。Tier 1/2 安装后 senses + dictionarySenses �
 
 **检索策略**（三种命中类型，与 RAY-266 口径完全一致）：
 
-| 命中类型                 | 检索方式                                                       | 数据源         |
-| ------------------------ | -------------------------------------------------------------- | -------------- |
-| `term-prefix`（前缀）    | `where("term").startsWithIgnoreCase(q)` → IDB 索引区间查询     | 各表 term 索引 |
-| `term-substring`（子串） | 全量 `toArray()` → 内存 `term.includes(q)`                     | 各表全量       |
-| `definition`（释义）     | 全量 `toArray()` → 内存 `definitions.some(d => d.includes(q))` | 各表全量       |
+| 命中类型                 | 检索方式                                                   | 数据源         |
+| ------------------------ | ---------------------------------------------------------- | -------------- |
+| `term-prefix`（前缀）    | `where("term").startsWithIgnoreCase(q)` → IDB 索引区间查询 | 各表 term 索引 |
+| `term-substring`（子串） | 分页全表扫描 → 内存 `term.includes(q)`                     | 各表全量       |
+| `definition`（释义）     | 分页全表扫描 → 内存 `definitions.some(d => d.includes(q))` | 各表全量       |
 
 **前缀命中**：Dexie `startsWithIgnoreCase` 底层走 IDB `IDBKeyRange.bound(q.toLowerCase(), q.toLowerCase() + '\uffff')`，O(log N) 索引定位，40 万条毫秒级返回。此路径覆盖最常见用户输入（输入前几个字母）。
 
-**子串命中**：**全量内存扫描，不按首字母裁剪**。按首字母裁剪会丢失词中命中（如搜 `scope` 时 `microscope` / `kaleidoscope` / `telescope` 的首字母 m/k/t 均不匹配——RAY-294 的动机词 `kaleidoscope` 恰是此类）。正确做法：
+**子串命中**：**全量内存扫描，不按首字母裁剪**。按首字母裁剪会丢失词中命中（如搜 `scope` 时 `microscope` / `kaleidoscope` / `telescope` 的首字母 m/k/t 均不匹配——RAY-294 的动机词 `kaleidoscope` 恰是此类）。正确做法（RAY-497 起改为**按主键分页**读回，见下）：
 
 ```typescript
-// 子串命中：全量取回 → 内存 includes（RAY-266 口径：词条任意位置子串）
-const allTerms = await db.dictionarySenses.toArray(); // ~40 万条
-const hits = allTerms.filter((sense) => sense.term.toLowerCase().includes(q));
+// 子串命中：分页取回全表 → 内存 includes（RAY-266 口径：词条任意位置子串）
+// 单次请求 ≤ DICTIONARY_READ_PAGE_SIZE（1000）条：不带 limit 的 toArray() 会走
+// getAll(range, undefined)，把整表塞进一条 IDB 消息，Firefox 上直接超限报错。
+const hits = (await loadAllDictionarySensesPaged(db)).filter((sense) =>
+  sense.term.toLowerCase().includes(q),
+);
 ```
 
-**性能预算**：dictionarySenses 表 40 万条，每条 ~200 字节，全量 `toArray()` ≈ 80 MB 内存、~200–500 ms（IDB 读取）；内存 `includes` 过滤 ~10–50 ms。总耗时 ~300–600 ms，可接受（实测目标 < 500 ms）。
+**性能预算**：dictionarySenses 表 40 万条，每条 ~200 字节，全量读回 ≈ 80 MB 内存、~200–500 ms（IDB 读取）；内存 `includes` 过滤 ~10–50 ms。总耗时 ~300–600 ms，可接受（实测目标 < 500 ms）。
 
-**优化**：采用**模块级单例**缓存（非 `WeakRef`——`WeakRef` 在 GC 不确定时可能导致缓存意外失效，且搜索屏生命周期内缓存应稳定存在）。缓存使用单一键 `_all` 合并所有已装包的全量 `DictionarySense[]`（因子串/释义扫描需全量数据），后续击键查询直接走内存过滤，不重复读 IDB。
+**单条 IDB 消息上限（RAY-497 实测事故）**：Firefox 对**单条** IndexedDB 消息的序列化体积有硬上限（约 246 MiB，`kMaxMessageSize`），超限抛 `UnknownError: The serialized value is too large (size=…, max=…)`。Dexie 的 `toArray()` 不带 limit 时下推成 `getAll(range, undefined)`，整表结果挤在一条消息里：Tier 2 v1.1.0-alpha（761,596 条）序列化 ≈ 279 MB → 升级后搜词页直接报「本地检索暂时不可用」。**故全表/全包读取一律按页读**（`readDictionarySensePage`，1000 条/次 ≈ 0.37 MB），单次请求体积与表规模解耦。
+
+**优化**：采用**模块级单例**缓存（非 `WeakRef`——`WeakRef` 在 GC 不确定时可能导致缓存意外失效，且搜索屏生命周期内缓存应稳定存在）。缓存使用单一键 `_all` 合并所有已装包的全量 `DictionarySense[]`（因子串/释义扫描需全量数据），首次按页加载，后续击键查询直接走内存过滤，不重复读 IDB。
 
 **缓存失效**：扩展包安装/卸载/升级时全量清除缓存（`cache.clear()`）；`invalidateDictionaryCache()` 在安装/升级完成后由内部调用。
 
 **跨标签页限制**：模块级单例是 per-tab 的，另一标签页安装/升级后本页缓存仍旧。刷新后生效。后续可按 focus/版本探测刷新。
 
-**低内存设备降级**：前缀命中路径不依赖缓存（直接走 IDB 索引查询 `startsWithIgnoreCase`，O(log N)），在缓存未加载或被清除时仍可用；子串/释义命中路径在缓存未命中时回退到按需 `toArray()`（首次击键 200–500 ms，与无缓存时一致）。低内存设备可选择不预热缓存（`installDictionaryPackage` 完成后不主动加载），仅在用户输入 ≥ 2 字符时按需加载。
+**低内存设备降级**：前缀命中路径不依赖缓存（直接走 IDB 索引查询 `startsWithIgnoreCase`，O(log N)），在缓存未加载或被清除时仍可用；子串/释义命中路径需要全量数据，缓存未命中时按页加载（首次击键 200–500 ms，与无缓存时一致）。注意缓存本身仍常驻整表对象，分页只约束单次请求体积、不改变缓存驻留量。
 
-**释义命中**：与子串命中同理，全量 `toArray()` → 内存过滤 `definitions.some(d => d.toLowerCase().includes(q))`。释义命中天然走全量扫描（无 IDB 索引可用于释义字段的子串查询），无需辅助索引。
+**释义命中**：与子串命中同理，分页全表扫描 → 内存过滤 `definitions.some(d => d.toLowerCase().includes(q))`。释义命中天然走全量扫描（无 IDB 索引可用于释义字段的子串查询），无需辅助索引。
 
 ### 2.3 跨表合并口径（与 RAY-266 完全一致）
 
@@ -166,7 +171,7 @@ export async function searchAllSenses(
 **预算**（实测目标）：
 
 - 前缀命中（最常见）：< 50 ms（IDB 索引查询，两表各一次）；
-- 子串命中（2+ 字母）：< 500 ms（两表各一次全量 toArray + 内存过滤，含首次缓存加载）；后续击键 < 50 ms（内存缓存命中）；
+- 子串命中（2+ 字母）：< 500 ms（两表各一次分页全表扫描 + 内存过滤，含首次缓存加载）；后续击键 < 50 ms（内存缓存命中）；
 - 释义命中：< 500 ms（同子串命中路径）。
 
 ---
@@ -198,13 +203,19 @@ if (done) {
 2. **升级锁（CAS）**：`dict:<id>:upgrading` meta 键（值为 ISO 时间戳），防止两标签页并发升级产生重复记录。锁存在时：
    - 若锁已过期（> 10 分钟，`UPGRADE_LOCK_TTL_MS`）→ 视为标签页崩溃/被杀，覆盖接管；
    - 若锁未过期 → 重读 done 标记：已等于目标版本则返回 `already-installed`（另一标签页已完成），否则抛 `ConcurrentDictionaryInstallError`（可读文案：「另一标签页正在升级」）；
-3. **增量替换**：读取新包 entries → 按 term 与 dictionarySenses 表 diff → 只写入新增/变更词条（term 相同且内容未变的跳过）；
-4. **删除已移除词条**：新包中不再出现的旧词条，从 dictionarySenses 表删除（仅删该包 source 的条目，不影响其它包）；
+3. **增量替换**：读取新包 entries → **按主键分页扫描** dictionarySenses（≤ `DICTIONARY_CHUNK_SIZE` 条/次），对本包旧记录就地处理 → 只写入新增/变更词条（term 相同且内容未变的跳过）；
+4. **删除已移除词条**：新包中不再出现的旧词条，在同一扫描趟内从 dictionarySenses 表删除（仅删该包 source 的条目，不影响其它包）；扫描趟结束后再按 `DICTIONARY_CHUNK_SIZE` 分块补写新增词条；
 5. **已晋升副本不受影响**：已从 dictionarySenses 晋升到 senses 表的 Sense（通过 `promoteDictionarySense` 生成新 SenseId 写入 senses 表）是独立记录，不因 dictionarySenses 表的删除而受影响——它们已属于学习数据，由用户管理；
 6. **更新 done 标记 + 清除锁**：完成后在同一事务内 `db.meta.put(done)` + `db.meta.delete(progress)` + `db.meta.delete(lockKey)`；
 7. **异常时清除锁**：catch 块中 `db.meta.delete(lockKey)` 允许重试；但锁过期接管场景下锁已覆盖，无需额外清除。
 
-**已移除词条检测策略**：安装前读取旧版 dictionarySenses 中该包 source 的全部 term 集合（`db.dictionarySenses.where("source").equals(packageId).toArray()`），与新包 entries 的 term 集合做差集 → 差集中的 term 即为「已移除词条」→ 从 dictionarySenses 表按 term + source 删除。
+**已移除词条检测策略（RAY-497 重写）**：不再先 `where("source").equals(packageId).toArray()` 把旧版全量读进内存（Tier 2 整包 ≈ 279 MB 挤在一条 IDB 消息里，Firefox 直接超限抛 `UnknownError: The serialized value is too large`），改为**单趟分页扫描 + 标记位**：
+
+- 先由新包 entries 建 `term（小写）→ 下标` 的 Map 与 `Uint8Array` 标记位（键是词条字符串引用，不是词条副本）；
+- 按主键分页扫全表（`where(":id").above(lastId).limit(n)`，走 `getAll(range, n)` 单次请求有界）：该包旧记录里，新包已无此 term → 删除；内容变了 → 原 id 原位更新；内容未变 → 跳过；命中新包的 term 打标；
+- 扫描趟结束后，未打标的词条按 `DICTIONARY_CHUNK_SIZE` 分块插入。
+
+**可重入**：done 标记只在两趟都成功后落库，任一步失败（含标签页崩溃）都保留旧版本号并清锁；重跑时扫描趟判等跳过、补写趟只补缺口、同 term 重复记录顺带清理，最终收敛到与新包一致的表内容。
 
 **版本号格式**：沿用 `PACKAGE_VERSION`（`build.mjs` 中定义，当前 `"1.0.0"`），随内容变更递增（semver 语义：patch = 构建修复、minor = 新增词条、major = 条目结构变更）。
 
