@@ -19,6 +19,20 @@ import type { PresetWordEntry } from "./presets/types";
 /** 每块词条数（1 条记录/词条，400 词条 ≈ 400 次 put/事务） */
 export const DICTIONARY_CHUNK_SIZE = 400;
 
+/**
+ * 只读全表扫描单次请求的最大条数（RAY-497）。
+ *
+ * Firefox 对**单条** IndexedDB 消息的序列化体积有硬上限（约 246 MiB），超限抛
+ * `UnknownError: The serialized value is too large (size=…, max=…)`。Dexie 的
+ * `toArray()` 不带 limit 时会走 `getAll(range, undefined)`，把**整表**结果装进
+ * 一条消息：Tier 2（761,596 条 × ~366 B）≈ 279 MB，正好顶穿上限，搜词页因此
+ * 报「本地检索暂时不可用」。
+ *
+ * 故全表/全包读取一律按主键分页：单次请求体积与表规模解耦，1000 条 ≈ 0.37 MB，
+ * 距上限两个数量级。
+ */
+export const DICTIONARY_READ_PAGE_SIZE = 1000;
+
 /** 安装进度标记的 meta 键前缀 */
 export function dictionaryProgressKey(packageId: string): string {
   return `dict:${packageId}:progress`;
@@ -98,6 +112,90 @@ export interface DictionaryInstallOptions {
 /** 默认让出：把控制权交回事件循环，避免长事务阻塞 UI */
 function yieldToMainThread(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/**
+ * 按主键分页读取一页 dictionarySenses（≤ pageSize 条，RAY-497）。
+ *
+ * 走主键区间 `above(lastId)` + `limit(n)`：Dexie 会下推成 `getAll(range, n)`，
+ * 单次请求条数有界。不用 `offset()`——它底层是游标 `advance()`，逐页翻表是 O(n²)。
+ */
+async function readDictionarySensePage(
+  db: LexiiDatabase,
+  lastId: string | undefined,
+  pageSize: number,
+): Promise<DictionarySense[]> {
+  return lastId === undefined
+    ? db.dictionarySenses.toCollection().limit(pageSize).toArray()
+    : db.dictionarySenses.where(":id").above(lastId).limit(pageSize).toArray();
+}
+
+/**
+ * 分页遍历 dictionarySenses 全表。
+ *
+ * 回调返回 `false` 时提前结束（用于已知总量的早退）。单次请求 ≤ pageSize 条，
+ * 内存只持有当页——不像 `toArray()` 那样把整表塞进一条 IDB 消息。
+ * 返回实际扫描到的记录数。
+ */
+async function forEachDictionarySensePage(
+  db: LexiiDatabase,
+  pageSize: number,
+  onPage: (page: DictionarySense[]) => boolean | void,
+): Promise<number> {
+  let lastId: string | undefined;
+  let scanned = 0;
+  for (;;) {
+    const page = await readDictionarySensePage(db, lastId, pageSize);
+    if (page.length === 0) {
+      break;
+    }
+    scanned += page.length;
+    lastId = page[page.length - 1]!.id;
+    if (onPage(page) === false || page.length < pageSize) {
+      break;
+    }
+  }
+  return scanned;
+}
+
+/**
+ * 收集某包在 dictionarySenses 中已落库的全部 term（小写集合）。
+ *
+ * `expectedCount` 为该包记录数（`count()` 索引查询，本身不搬数据）：收齐即提前
+ * 结束，避免续装时为凑齐集合白扫全表。
+ */
+async function collectPackageTerms(
+  db: LexiiDatabase,
+  packageId: string,
+  expectedCount: number,
+): Promise<Set<string>> {
+  const terms = new Set<string>();
+  await forEachDictionarySensePage(db, DICTIONARY_READ_PAGE_SIZE, (page) => {
+    for (const sense of page) {
+      if (sense.source === packageId) {
+        terms.add(sense.term.toLowerCase());
+      }
+    }
+    // 已扫描到的记录数 = 该包记录数 → 集合已完整（无重复 term 时成立；
+    // 有重复时 Set 尺寸上不去，最多退化为扫完全表，不影响正确性）
+    return terms.size < expectedCount;
+  });
+  return terms;
+}
+
+/**
+ * 读回该包已落库的 term 集合（分页读，单次请求有界）。
+ *
+ * 先 `count()` 探一次：为 0（首次安装）直接返回空集，不扫表。旧实现在这里
+ * 直接 `where("source").equals(id).toArray()`，续装时把已提交的几十万条
+ * 一次性读回，同样会顶穿 Firefox 单条消息上限（RAY-497）。
+ */
+async function loadCommittedTerms(db: LexiiDatabase, packageId: string): Promise<Set<string>> {
+  const existing = await db.dictionarySenses.where("source").equals(packageId).count();
+  if (existing === 0) {
+    return new Set();
+  }
+  return collectPackageTerms(db, packageId, existing);
 }
 
 /** 并发安装检测错误（内部哨兵，用户可见文案见 §3.2） */
@@ -238,14 +336,10 @@ export async function installDictionaryPackage(
   let skipped = 0;
 
   // ─── term 去重优化（O(n)） ─────────────────────────────────────────────────
-  // 首次安装：该包在 dictionarySenses 中无记录，committedTerms 初始为空。
-  // 升级/续装：一次性读取该包已有全部 term（source 索引查询，O(n)），
+  // 首次安装：该包在 dictionarySenses 中无记录（count = 0），committedTerms 初始为空。
+  // 续装（中断后重试）：按主键分页读回该包已提交的 term（单次请求有界，RAY-497），
   // 后续每块提交后追加新 term，避免在 while 循环内重复全量读取（O(n²)）。
-  const committedTerms = new Set(
-    (await db.dictionarySenses.where("source").equals(pkg.id).toArray()).map((s) =>
-      s.term.toLowerCase(),
-    ),
-  );
+  let committedTerms = await loadCommittedTerms(db, pkg.id);
 
   while (cursor < total) {
     // 块间取消检查（§6.4 AbortController）
@@ -295,15 +389,8 @@ export async function installDictionaryPackage(
         throw new ConcurrentDictionaryInstallError(pkg.id);
       }
       // CAS 重试：另一标签页已推进进度，重读已提交的 term 集合
-      const reloaded = new Set(
-        (await db.dictionarySenses.where("source").equals(pkg.id).toArray()).map((s) =>
-          s.term.toLowerCase(),
-        ),
-      );
-      committedTerms.clear();
-      for (const t of reloaded) {
-        committedTerms.add(t);
-      }
+      // （分页读，单次请求有界；RAY-497）
+      committedTerms = await loadCommittedTerms(db, pkg.id);
       cursor = advancedCursor;
       continue;
     }
@@ -421,87 +508,11 @@ async function upgradeDictionaryPackage(
   }
 
   try {
-    // 读取旧版该包的全部词条（含 id 用于更新）
-    const oldEntries = await db.dictionarySenses.where("source").equals(pkg.id).toArray();
-    const oldByTerm = new Map<string, DictionarySense>();
-    for (const e of oldEntries) {
-      oldByTerm.set(e.term.toLowerCase(), e);
-    }
-    const newTermSet = new Set(pkg.entries.map((e) => e.term.toLowerCase()));
-
-    // 删除已移除词条
-    let deletedCount = 0;
-    const removedTerms: string[] = [];
-    for (const [term] of oldByTerm) {
-      if (!newTermSet.has(term)) {
-        removedTerms.push(term);
-      }
-    }
-    for (let i = 0; i < removedTerms.length; i += DICTIONARY_CHUNK_SIZE) {
-      if (signal?.aborted) {
-        throw new DOMException("安装已取消", "AbortError");
-      }
-      const chunk = removedTerms.slice(i, i + DICTIONARY_CHUNK_SIZE);
-      await db.transaction("rw", db.dictionarySenses, async () => {
-        for (const term of chunk) {
-          const toDelete = await db.dictionarySenses
-            .where("term")
-            .equalsIgnoreCase(term)
-            .filter((s) => s.source === pkg.id)
-            .toArray();
-          for (const s of toDelete) {
-            await db.dictionarySenses.delete(s.id);
-          }
-        }
-      });
-      deletedCount += chunk.length;
-      await yieldFn();
-    }
-
-    // 写入新增/变更词条，跳过内容未变的
-    let installedCount = 0;
-    let updatedCount = 0;
-    let skipped = 0;
-    for (let i = 0; i < pkg.entries.length; i += DICTIONARY_CHUNK_SIZE) {
-      if (signal?.aborted) {
-        throw new DOMException("安装已取消", "AbortError");
-      }
-      const chunk = pkg.entries.slice(i, i + DICTIONARY_CHUNK_SIZE);
-      await db.transaction("rw", db.dictionarySenses, async () => {
-        for (const entry of chunk) {
-          const old = oldByTerm.get(entry.term.toLowerCase());
-          if (old) {
-            if (isEntryContentEqual(entry, old)) {
-              skipped += 1;
-            } else {
-              // 内容变更：保留原 id，更新字段
-              const updated: DictionarySense = {
-                ...old,
-                definitions: entry.definitions,
-                ...(entry.pos !== undefined ? { pos: entry.pos } : {}),
-                ...(entry.ipa !== undefined ? { ipa: entry.ipa } : {}),
-                ...(hasPosByDefinition(entry) ? { posByDefinition: entry.posByDefinition } : {}),
-                tags: entry.tags ?? [],
-              };
-              // 新词条无逐条词性时清掉旧值，避免升级后残留失效的对齐信息
-              // （否则 isEntryContentEqual 每次升级都判不等，反复重写同一条）
-              if (!hasPosByDefinition(entry)) {
-                delete updated.posByDefinition;
-              }
-              await db.dictionarySenses.put(updated);
-              updatedCount += 1;
-            }
-          } else {
-            const sense = toDictionarySense(entry, pkg.lang, pkg.id);
-            await db.dictionarySenses.put(sense);
-            installedCount += 1;
-          }
-        }
-      });
-      await yieldFn();
-    }
+    const counts = await diffAndWriteDictionaryPackage(db, pkg, yieldFn, signal);
 
     // 更新完成标记，清除进度与升级锁
+    // （done 只在这里落成新版本号：两趟 diff/写入任一步失败都不会走到这，
+    //   重新点升级即从头跑通——幂等，RAY-497）
     await db.transaction("rw", db.meta, async () => {
       await db.meta.put({ key: dictionaryDoneKey(pkg.id), value: pkg.version });
       await db.meta.delete(dictionaryProgressKey(pkg.id));
@@ -512,16 +523,159 @@ async function upgradeDictionaryPackage(
 
     return {
       status: "installed",
-      installedCount,
-      skippedCount: skipped,
-      updatedCount,
-      deletedCount,
+      installedCount: counts.installedCount,
+      skippedCount: counts.skippedCount,
+      updatedCount: counts.updatedCount,
+      deletedCount: counts.deletedCount,
     };
   } catch (err) {
     // 清除升级锁（允许重试）
     await db.meta.delete(lockKey);
     throw err;
   }
+}
+
+/** 升级写入统计（不含 done 标记落库） */
+interface DictionaryUpgradeCounts {
+  installedCount: number;
+  skippedCount: number;
+  updatedCount: number;
+  deletedCount: number;
+}
+
+/**
+ * 增量升级主体：diff 新旧词条，只写新增/变更，删已移除（RAY-497 重写）。
+ *
+ * 旧实现先把该包旧版**全量** `where("source").equals(id).toArray()` 读进内存建
+ * Map，再与新包全量比对。Dexie 的 `toArray()` 不带 limit → `getAll(range,
+ * undefined)`：整包结果（Tier 2 约 76 万条 / ~279 MB）挤在**一条** IDB 消息里，
+ * Firefox 直接以 `UnknownError: The serialized value is too large` 拒绝。
+ *
+ * 新实现读写都按固定批量，单次请求体积与包规模无关：
+ * 1. **扫描趟**：按主键分页（≤ DICTIONARY_CHUNK_SIZE 条/次，与写批同宽）扫全表，
+ *    对本包旧记录就地处理——新包已无此 term → 删除；内容变了 → 原 id 原位更新；
+ *    内容未变 → 跳过；命中新包的 term 打标。
+ * 2. **补写趟**：新包中未打标的词条即新增，按 DICTIONARY_CHUNK_SIZE 分块插入。
+ *
+ * 内存：只额外持有 term → 新包下标 的 Map（键是词条字符串引用，不是词条副本）
+ * 和一个 Uint8Array 标记位；不再持有旧版全量对象，也没有任何单次超大请求。
+ *
+ * 可重入：扫描趟对已写入内容判等即跳过、补写趟只补缺口、同 term 重复记录顺带
+ * 清理——任一步中断后重跑都收敛到与新包一致的表内容。
+ */
+async function diffAndWriteDictionaryPackage(
+  db: LexiiDatabase,
+  pkg: DictionaryPackage,
+  yieldFn: () => Promise<void>,
+  signal?: AbortSignal,
+): Promise<DictionaryUpgradeCounts> {
+  const entries = pkg.entries;
+  const total = entries.length;
+
+  // term（小写）→ 新包词条下标；打包侧已去重，这里只做防御性保留首个
+  const newIndexByTerm = new Map<string, number>();
+  for (let i = 0; i < total; i += 1) {
+    const key = entries[i]!.term.toLowerCase();
+    if (!newIndexByTerm.has(key)) {
+      newIndexByTerm.set(key, i);
+    }
+  }
+  // 0 = 旧表未见（待插入），1 = 旧表已有
+  const seenInTable = new Uint8Array(total);
+
+  const counts: DictionaryUpgradeCounts = {
+    installedCount: 0,
+    skippedCount: 0,
+    updatedCount: 0,
+    deletedCount: 0,
+  };
+
+  // ─── 扫描趟：逐页处理该包旧记录 ─────────────────────────────────────────────
+  let lastId: string | undefined;
+  for (;;) {
+    if (signal?.aborted) {
+      throw new DOMException("安装已取消", "AbortError");
+    }
+    const page = await readDictionarySensePage(db, lastId, DICTIONARY_CHUNK_SIZE);
+    if (page.length === 0) {
+      break;
+    }
+    lastId = page[page.length - 1]!.id;
+
+    await db.transaction("rw", db.dictionarySenses, async () => {
+      for (const old of page) {
+        if (old.source !== pkg.id) {
+          continue; // 其它包的记录不动
+        }
+        const index = newIndexByTerm.get(old.term.toLowerCase());
+        if (index === undefined) {
+          // 新包已移除
+          await db.dictionarySenses.delete(old.id);
+          counts.deletedCount += 1;
+          continue;
+        }
+        if (seenInTable[index] === 1) {
+          // 同 term 重复记录（旧版半途失败 / 历史脏数据）→ 顺带清理
+          await db.dictionarySenses.delete(old.id);
+          counts.deletedCount += 1;
+          continue;
+        }
+        seenInTable[index] = 1;
+        const entry = entries[index]!;
+        if (isEntryContentEqual(entry, old)) {
+          counts.skippedCount += 1;
+          continue;
+        }
+        await db.dictionarySenses.put(mergeUpdatedSense(old, entry));
+        counts.updatedCount += 1;
+      }
+    });
+
+    if (page.length < DICTIONARY_CHUNK_SIZE) {
+      break;
+    }
+    await yieldFn();
+  }
+
+  // ─── 补写趟：新增词条按 DICTIONARY_CHUNK_SIZE 分块写入 ──────────────────────
+  for (let start = 0; start < total; start += DICTIONARY_CHUNK_SIZE) {
+    if (signal?.aborted) {
+      throw new DOMException("安装已取消", "AbortError");
+    }
+    const end = Math.min(start + DICTIONARY_CHUNK_SIZE, total);
+    await db.transaction("rw", db.dictionarySenses, async () => {
+      for (let i = start; i < end; i += 1) {
+        if (seenInTable[i] === 1) {
+          continue;
+        }
+        await db.dictionarySenses.put(toDictionarySense(entries[i]!, pkg.lang, pkg.id));
+        counts.installedCount += 1;
+      }
+    });
+    if (end < total) {
+      await yieldFn();
+    }
+  }
+
+  return counts;
+}
+
+/** 内容变更时构造更新记录：保留原 id（含晋升引用）与原 source，覆盖新包字段 */
+function mergeUpdatedSense(old: DictionarySense, entry: PresetWordEntry): DictionarySense {
+  const updated: DictionarySense = {
+    ...old,
+    definitions: entry.definitions,
+    ...(entry.pos !== undefined ? { pos: entry.pos } : {}),
+    ...(entry.ipa !== undefined ? { ipa: entry.ipa } : {}),
+    ...(hasPosByDefinition(entry) ? { posByDefinition: entry.posByDefinition } : {}),
+    tags: entry.tags ?? [],
+  };
+  // 新词条无逐条词性时清掉旧值，避免升级后残留失效的对齐信息
+  // （否则 isEntryContentEqual 每次升级都判不等，反复重写同一条）
+  if (!hasPosByDefinition(entry)) {
+    delete updated.posByDefinition;
+  }
+  return updated;
 }
 
 // ─── Tier 1 ⊆ Tier 2 覆盖标记 ────────────────────────────────────────────────
@@ -614,8 +768,8 @@ export async function searchDictionarySenses(
     }
   }
 
-  // 子串 + 释义命中：全量 toArray → 内存过滤
-  // 使用缓存（模块级单例）避免重复读 IDB
+  // 子串 + 释义命中：缓存（模块级单例）全表扫描 → 内存过滤
+  // 缓存首次加载按页读取，避免单条 getAll 顶穿 Firefox 消息上限（RAY-497）
   const allSenses = await getDictionarySensesCached(db);
 
   for (const sense of allSenses) {
@@ -659,8 +813,10 @@ export async function searchDictionarySenses(
  * - 使用单一键 "_all" 合并所有包（而非 packageId:version 独立键），
  *   因为 searchDictionarySenses 需要全量数据做子串/释义扫描。
  * - 缓存失效：安装/升级/卸载时调用 invalidateDictionaryCache() 全量清除。
- * - 低内存降级：前缀命中不依赖缓存（IDB 索引查询），子串/释义命中在缓存
- *   未命中时回退到按需 toArray。
+ * - 低内存降级：前缀命中不依赖缓存（IDB 索引查询）；子串/释义命中需要全量
+ *   数据，缓存未命中时按 DICTIONARY_READ_PAGE_SIZE 分页加载（RAY-497）。
+ *   注意：缓存本身常驻整表对象（Tier 2 约 76 万条），属既有设计；分页只约束
+ *   单次 IDB 请求体积，不改变缓存驻留量。
  *
  * 跨标签页限制：模块级单例是 per-tab 的，另一标签页安装/升级后本页缓存
  * 仍旧。刷新后生效。后续可按 focus/版本探测刷新。
@@ -669,7 +825,8 @@ const dictionaryCache = new Map<string, DictionarySense[]>();
 
 /**
  * 获取缓存的全量词典数据（合并所有已装包）。
- * 首次调用时从 IDB 加载，后续走缓存。
+ * 首次调用时从 IDB 分页加载（单次请求 ≤ DICTIONARY_READ_PAGE_SIZE 条，
+ * 不把整表塞进一条 `getAll` —— 见该常量注释，RAY-497），后续走缓存。
  */
 async function getDictionarySensesCached(db: LexiiDatabase): Promise<DictionarySense[]> {
   // 使用单一缓存键 "_all" 合并所有包的数据
@@ -677,7 +834,12 @@ async function getDictionarySensesCached(db: LexiiDatabase): Promise<DictionaryS
   const cached = dictionaryCache.get(CACHE_KEY);
   if (cached) return cached;
 
-  const all = await db.dictionarySenses.toArray();
+  const all: DictionarySense[] = [];
+  await forEachDictionarySensePage(db, DICTIONARY_READ_PAGE_SIZE, (page) => {
+    for (const sense of page) {
+      all.push(sense);
+    }
+  });
   dictionaryCache.set(CACHE_KEY, all);
   return all;
 }
