@@ -11,10 +11,12 @@
  * - Tier 2 安装完成后调用 markTier1CoveredByTier2；
  * - 错误态展示（并发错误映射可读文案）；
  * - 安装中展示取消按钮（§6.4 AbortController）；
- * - manifest 不可用时降级展示（体积缺失 fallback）。
+ * - manifest 不可用时降级展示（体积缺失 fallback）；
+ * - 升级进度（RAY-498）：阶段文案 + 百分比、升级中可取消、长时间无进展的安抚文案。
  */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import type { DictionaryInstallProgress } from "@lexii/core";
 import { DictionaryPackagesScreen } from "./DictionaryPackagesScreen";
 import type {
   DictionaryInstallResult,
@@ -71,6 +73,67 @@ function makeProvider(overrides: Partial<SettingsDataProvider> = {}): SettingsDa
     resetDictionaryPackageInstall: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
+}
+
+/** 升级场景（RAY-498 用例共用）：Tier 1 已装 1.0.0、manifest 提供 2.0.0，Tier 2 未安装 */
+function makeUpgradeProvider(overrides: Partial<SettingsDataProvider> = {}): SettingsDataProvider {
+  return makeProvider({
+    getDictionaryPackageSummaries: vi.fn().mockResolvedValue([
+      {
+        id: "core-en-tier1",
+        name: "Tier 1 标准词包",
+        status: "installed",
+        installedCount: 58_244,
+        totalCount: 58_244,
+        installedVersion: "1.0.0",
+      },
+      {
+        id: "core-en-tier2",
+        name: "Tier 2 全量词包",
+        status: "not-installed",
+        installedCount: 0,
+        totalCount: 401_222,
+      },
+    ] satisfies DictionaryPackageSummary[]),
+    fetchDictionaryManifest: vi.fn().mockResolvedValue([
+      {
+        id: "core-en-tier1",
+        version: "2.0.0",
+        sourceCommit: "abc123",
+        bestVariant: { url: "http://example.com/t1.json.br", size: 1_258_304, sha256: "aaa" },
+      },
+      {
+        id: "core-en-tier2",
+        version: "1.0.0",
+        sourceCommit: "abc123",
+        bestVariant: { url: "http://example.com/t2.json.br", size: 6_710_886, sha256: "bbb" },
+      },
+    ] satisfies DictionaryManifestInfo[]),
+    ...overrides,
+  });
+}
+
+/** 点「升级到 v2.0.0」→ 确认对话框 → 确认（RAY-498 用例共用） */
+async function startUpgradeFromUi() {
+  await waitFor(() => {
+    expect(screen.getByText("升级到 v2.0.0")).toBeInTheDocument();
+  });
+  fireEvent.click(screen.getByText("升级到 v2.0.0"));
+  await waitFor(() => {
+    expect(screen.getByText("确认下载")).toBeInTheDocument();
+  });
+  fireEvent.click(screen.getByText("确认下载"));
+}
+
+/**
+ * 推 fake 时钟并等微任务（含 Promise resolve）落地。
+ * 与 useStats.test.ts 同款：二次包 act 是为了把 setInterval 回调里的 setState
+ * 纳入 React 的 act 边界，规避 "not wrapped in act(...)" 警告。
+ */
+async function tick(ms: number) {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
 }
 
 describe("DictionaryPackagesScreen", () => {
@@ -204,6 +267,8 @@ describe("DictionaryPackagesScreen", () => {
       expect(provider.installDictionaryPackage).toHaveBeenCalledWith(
         "core-en-tier2",
         expect.any(AbortSignal),
+        // RAY-498：第三个参数是升级落库阶段进度回调
+        expect.any(Function),
       );
     });
 
@@ -517,8 +582,168 @@ describe("DictionaryPackagesScreen", () => {
       expect(provider.installDictionaryPackage).toHaveBeenCalledWith(
         "core-en-tier1",
         expect.any(AbortSignal),
+        expect.any(Function),
       );
     });
+  });
+
+  it("升级进行中展示阶段文案与百分比（RAY-498）", async () => {
+    // 捕获 core → UI 的进度回调（安装挂起，模拟长时间升级）
+    let emitProgress: ((progress: DictionaryInstallProgress) => void) | undefined;
+    const installSpy = vi
+      .fn()
+      .mockImplementation(
+        (
+          _id: string,
+          _signal?: AbortSignal,
+          onProgress?: (progress: DictionaryInstallProgress) => void,
+        ) => {
+          emitProgress = onProgress;
+          return new Promise<DictionaryInstallResult>(() => {
+            // 不 resolve，保持升级中
+          });
+        },
+      );
+    const provider = makeUpgradeProvider({ installDictionaryPackage: installSpy });
+    render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
+
+    await startUpgradeFromUi();
+    await waitFor(() => {
+      expect(installSpy).toHaveBeenCalledOnce();
+    });
+    expect(emitProgress).toBeDefined();
+
+    // 回调到达前（下载阶段）：只有「下载中…」+ 不确定进度条（无 aria-valuenow）
+    expect(screen.getByText("下载中…")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).not.toHaveAttribute("aria-valuenow");
+
+    // 阶段 1：读取旧词包（一次性全量扫描，不确定进度）
+    act(() => {
+      emitProgress!({ phase: "reading", processedChunks: 0, totalChunks: 0, percent: 0 });
+    });
+    expect(screen.getByText("读取旧词包…")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).not.toHaveAttribute("aria-valuenow");
+
+    // 阶段 2：更新词条 N%（按块数确定百分比）
+    act(() => {
+      emitProgress!({ phase: "updating", processedChunks: 2, totalChunks: 5, percent: 40 });
+    });
+    expect(screen.getByText("更新词条 40%")).toBeInTheDocument();
+    const bar = screen.getByRole("progressbar");
+    expect(bar).toHaveAttribute("aria-valuenow", "40");
+    expect(bar).toHaveAttribute("aria-valuemax", "100");
+
+    // 阶段 3：完成校验
+    act(() => {
+      emitProgress!({ phase: "finalizing", processedChunks: 5, totalChunks: 5, percent: 100 });
+    });
+    expect(screen.getByText("完成校验…")).toBeInTheDocument();
+  });
+
+  it("升级进行中提供取消按钮，点击后 signal aborted（RAY-498）", async () => {
+    let capturedSignal: AbortSignal | undefined;
+    const installSpy = vi.fn().mockImplementation((_id: string, signal?: AbortSignal) => {
+      capturedSignal = signal;
+      return new Promise<DictionaryInstallResult>(() => {
+        // 不 resolve，保持升级中
+      });
+    });
+    const provider = makeUpgradeProvider({ installDictionaryPackage: installSpy });
+    render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
+
+    await startUpgradeFromUi();
+    await waitFor(() => {
+      expect(installSpy).toHaveBeenCalledOnce();
+    });
+    expect(capturedSignal?.aborted).toBe(false);
+
+    // 升级进行中：按钮禁用 + 可取消（此前升级分支没有取消入口）
+    await waitFor(() => {
+      expect(screen.getByText("升级中…")).toBeDisabled();
+      expect(screen.getByText("取消")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("取消"));
+
+    expect(capturedSignal?.aborted).toBe(true);
+  });
+
+  it("升级长时间无进展 → 展示「仍在处理，请勿关闭页面」（RAY-498）", async () => {
+    vi.useFakeTimers();
+    try {
+      const installSpy = vi.fn().mockImplementation(() => {
+        return new Promise<DictionaryInstallResult>(() => {
+          // 不 resolve，也不上报进度：模拟落库阶段静默很久
+        });
+      });
+      const provider = makeUpgradeProvider({ installDictionaryPackage: installSpy });
+      render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
+
+      await tick(0);
+      fireEvent.click(screen.getByText("升级到 v2.0.0"));
+      fireEvent.click(screen.getByText("确认下载"));
+      await tick(0);
+      expect(installSpy).toHaveBeenCalledOnce();
+
+      // 刚点下升级：还没有安抚文案
+      expect(screen.queryByText("仍在处理，请勿关闭页面")).not.toBeInTheDocument();
+
+      // 10 秒无任何进展 → 出现安抚文案
+      await tick(10_000);
+      expect(screen.getByText("仍在处理，请勿关闭页面")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("首装轮询有进展时不误报卡住，停滞后才提示（RAY-498）", async () => {
+    vi.useFakeTimers();
+    try {
+      let installedCount = 0;
+      const provider = makeProvider({
+        // 与真实 IDB 口径一致：进度游标 > 0 才算 installing（首装从 not-installed 起步）
+        getDictionaryPackageSummaries: vi.fn().mockImplementation(async () => [
+          {
+            id: "core-en-tier1",
+            name: "Tier 1 标准词包",
+            status: installedCount > 0 ? "installing" : "not-installed",
+            installedCount,
+            totalCount: 58_244,
+          },
+          {
+            id: "core-en-tier2",
+            name: "Tier 2 全量词包",
+            status: "not-installed",
+            installedCount: 0,
+            totalCount: 401_222,
+          },
+        ]),
+        installDictionaryPackage: vi.fn().mockImplementation(() => {
+          return new Promise<DictionaryInstallResult>(() => {
+            // 不 resolve：模拟长时间落库
+          });
+        }),
+      });
+      render(<DictionaryPackagesScreen provider={provider} onBack={() => {}} />);
+
+      // 首装：进度游标由 IDB 轮询驱动
+      await tick(0);
+      fireEvent.click(screen.getAllByText("下载")[0]!);
+      fireEvent.click(screen.getByText("确认下载"));
+      await tick(0);
+
+      // 每 2 秒推进一块（400 词）→ 始终有进展，不应提示卡住
+      for (let i = 0; i < 6; i += 1) {
+        installedCount += 400;
+        await tick(2_000);
+      }
+      expect(screen.queryByText("仍在处理，请勿关闭页面")).not.toBeInTheDocument();
+
+      // 游标停住 10 秒 → 提示
+      await tick(10_000);
+      expect(screen.getByText("仍在处理，请勿关闭页面")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("安装进行中传递 AbortSignal，取消后 signal aborted", async () => {

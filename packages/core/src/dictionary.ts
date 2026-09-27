@@ -20,6 +20,14 @@ import type { PresetWordEntry } from "./presets/types";
 export const DICTIONARY_CHUNK_SIZE = 400;
 
 /**
+ * 进度上报节流间隔（毫秒，RAY-498）。
+ *
+ * Tier 2 升级（七十六万条）近两千次块写入，每块都往 UI 推一次会掉帧；
+ * 同一阶段内的上报至少间隔这么久。阶段切换与收尾强制上报，不受此限制。
+ */
+export const DICTIONARY_PROGRESS_THROTTLE_MS = 500;
+
+/**
  * 只读全表扫描单次请求的最大条数（RAY-497）。
  *
  * Firefox 对**单条** IndexedDB 消息的序列化体积有硬上限（约 246 MiB），超限抛
@@ -97,6 +105,27 @@ export type DictionaryInstallResult =
     }
   | { status: "already-installed"; installedVersion: string };
 
+/**
+ * 安装/升级阶段（RAY-498，供 UI 展示阶段文案）。
+ *
+ * - `reading`：读入新包、建 term → 下标索引（一次性建表，无法细分进度）
+ * - `updating`：扫描趟（删旧 / 原位更新 / 打标）+ 补写趟（插入新增），
+ *   百分比按已处理页数算
+ * - `finalizing`：写完成标记、清进度与升级锁
+ */
+export type DictionaryInstallPhase = "reading" | "updating" | "finalizing";
+
+/** 一次进度上报（阶段 + 块数进度 + 百分比） */
+export interface DictionaryInstallProgress {
+  phase: DictionaryInstallPhase;
+  /** 已处理页数（reading 阶段恒为 0） */
+  processedChunks: number;
+  /** 本阶段总页数（reading 阶段未知，为 0） */
+  totalChunks: number;
+  /** 完成百分比（0–100 整数；总块数未知时为 0） */
+  percent: number;
+}
+
 /** 安装选项 */
 export interface DictionaryInstallOptions {
   /** 导入发生时刻（ISO；默认调用方当前时间，测试可注入） */
@@ -105,6 +134,16 @@ export interface DictionaryInstallOptions {
   yield?: () => Promise<void>;
   /** 取消信号（AbortController）。传入后块间检查 aborted → 抛 AbortError。 */
   signal?: AbortSignal;
+  /**
+   * 版本升级的落库进度回调（RAY-498）。
+   *
+   * 首装路径的进度由 `dict:<id>:progress` 标记 + UI 轮询提供；升级路径没有
+   * 断点游标（diff 幂等，重跑即可），因此经此回调把「阶段 + 百分比」回传给 UI。
+   * 回调可能被节流合并，只保证「阶段切换 + 收尾 + 节流窗口内的最新值」可见。
+   */
+  onProgress?: (progress: DictionaryInstallProgress) => void;
+  /** 进度节流间隔（毫秒；默认 {@link DICTIONARY_PROGRESS_THROTTLE_MS}，测试可注入 0 关闭节流） */
+  progressThrottleMs?: number;
 }
 
 // ─── 内部辅助 ─────────────────────────────────────────────────────────────────
@@ -196,6 +235,43 @@ async function loadCommittedTerms(db: LexiiDatabase, packageId: string): Promise
     return new Set();
   }
   return collectPackageTerms(db, packageId, existing);
+}
+
+/** 进度上报器（阶段、已处理块数、总块数、是否强制上报） */
+type ProgressReporter = (
+  phase: DictionaryInstallPhase,
+  processedChunks: number,
+  totalChunks: number,
+  force?: boolean,
+) => void;
+
+/**
+ * 构造节流后的进度上报器（RAY-498）。
+ *
+ * - 阶段切换、`force = true`（首帧/收尾/100%）必定上报；
+ * - 同一阶段内两次上报至少间隔 `throttleMs`，避免每块都刷 UI；
+ * - 未传 `onProgress` 时为零开销空实现。
+ */
+function createProgressReporter(
+  onProgress: ((progress: DictionaryInstallProgress) => void) | undefined,
+  throttleMs: number,
+): ProgressReporter {
+  let lastPhase: DictionaryInstallPhase | null = null;
+  let lastEmitAt = Number.NEGATIVE_INFINITY;
+  return (phase, processedChunks, totalChunks, force = false) => {
+    if (!onProgress) return;
+    const now = Date.now();
+    if (!force && phase === lastPhase && now - lastEmitAt < throttleMs) return;
+    lastPhase = phase;
+    lastEmitAt = now;
+    onProgress({
+      phase,
+      processedChunks,
+      totalChunks,
+      percent:
+        totalChunks > 0 ? Math.min(100, Math.round((processedChunks / totalChunks) * 100)) : 0,
+    });
+  };
 }
 
 /** 并发安装检测错误（内部哨兵，用户可见文案见 §3.2） */
@@ -294,6 +370,9 @@ export async function resetDictionaryPackageInstall(
  * 每词条仅写 1 条 dictionarySense 记录（vs installPreset 的 4 条）。
  *
  * 版本升级：done 标记存在但版本不匹配时触发增量替换（不清库）。
+ *
+ * 进度：首装路径写 `dict:<id>:progress` 游标（可恢复 + UI 轮询）；升级路径
+ * 无断点游标，改由 `options.onProgress` 分阶段上报（RAY-498）。
  */
 export async function installDictionaryPackage(
   db: LexiiDatabase,
@@ -303,6 +382,10 @@ export async function installDictionaryPackage(
   const time = options.time ?? new Date().toISOString();
   const yieldFn = options.yield ?? yieldToMainThread;
   const signal = options.signal;
+  const report = createProgressReporter(
+    options.onProgress,
+    options.progressThrottleMs ?? DICTIONARY_PROGRESS_THROTTLE_MS,
+  );
 
   const done = await db.meta.get(dictionaryDoneKey(pkg.id));
   if (done) {
@@ -313,7 +396,7 @@ export async function installDictionaryPackage(
       return { status: "already-installed", installedVersion: done.value };
     }
     // 版本失配 → 增量升级（§3.2）
-    return upgradeDictionaryPackage(db, pkg, done.value, time, yieldFn, signal);
+    return upgradeDictionaryPackage(db, pkg, time, report, yieldFn, signal);
   }
 
   // ─── 首次安装 ────────────────────────────────────────────────────────────────
@@ -455,12 +538,16 @@ function isEntryContentEqual(entry: PresetWordEntry, sense: DictionarySense): bo
  * 不清库（红线）。已晋升到 senses 表的副本不受影响（独立记录）。
  *
  * 并发防线：CAS 升级锁（meta 键），防止两标签页并发升级产生重复记录。
+ *
+ * 进度（RAY-498）：读取新包建索引（`reading`）→ 扫描趟 + 补写趟按已处理页数
+ * 上报百分比（`updating`）→ 写完成标记（`finalizing`）；经 `report` 节流回传给 UI，
+ * 块间仍按 `signal` 支持取消。
  */
 async function upgradeDictionaryPackage(
   db: LexiiDatabase,
   pkg: DictionaryPackage,
-  oldVersion: string,
   time: string,
+  report: ProgressReporter,
   yieldFn: () => Promise<void>,
   signal?: AbortSignal,
 ): Promise<DictionaryInstallResult> {
@@ -508,11 +595,21 @@ async function upgradeDictionaryPackage(
   }
 
   try {
-    const counts = await diffAndWriteDictionaryPackage(db, pkg, yieldFn, signal);
+    // 阶段 1（reading）+ 阶段 2（updating，扫描趟 + 补写趟）都在 diffAndWrite 内推进：
+    // RAY-497 把升级改成按主键分页的扫描趟 + 补写趟后，没有「先全量读旧版」这一步，
+    // 读取与写入是同一趟，故按「已处理页数 / 总页数」上报（RAY-498）。
+    const { counts, totalChunks } = await diffAndWriteDictionaryPackage(
+      db,
+      pkg,
+      report,
+      yieldFn,
+      signal,
+    );
 
-    // 更新完成标记，清除进度与升级锁
+    // 阶段 3：写完成标记、清除进度与升级锁
     // （done 只在这里落成新版本号：两趟 diff/写入任一步失败都不会走到这，
     //   重新点升级即从头跑通——幂等，RAY-497）
+    report("finalizing", totalChunks, totalChunks, true);
     await db.transaction("rw", db.meta, async () => {
       await db.meta.put({ key: dictionaryDoneKey(pkg.id), value: pkg.version });
       await db.meta.delete(dictionaryProgressKey(pkg.id));
@@ -543,6 +640,12 @@ interface DictionaryUpgradeCounts {
   deletedCount: number;
 }
 
+/** 升级写入结果：统计 + 本次上报用的总页数（收尾阶段复用，RAY-498） */
+interface DictionaryUpgradeWriteResult {
+  counts: DictionaryUpgradeCounts;
+  totalChunks: number;
+}
+
 /**
  * 增量升级主体：diff 新旧词条，只写新增/变更，删已移除（RAY-497 重写）。
  *
@@ -562,15 +665,22 @@ interface DictionaryUpgradeCounts {
  *
  * 可重入：扫描趟对已写入内容判等即跳过、补写趟只补缺口、同 term 重复记录顺带
  * 清理——任一步中断后重跑都收敛到与新包一致的表内容。
+ *
+ * 进度（RAY-498）：读取新包建索引为 `reading`（无法细分）；扫描趟与补写趟合并
+ * 为 `updating`，百分比 = 已处理页数 / 总页数（扫描趟分母按当前表行数估算）。
  */
 async function diffAndWriteDictionaryPackage(
   db: LexiiDatabase,
   pkg: DictionaryPackage,
+  report: ProgressReporter,
   yieldFn: () => Promise<void>,
   signal?: AbortSignal,
-): Promise<DictionaryUpgradeCounts> {
+): Promise<DictionaryUpgradeWriteResult> {
   const entries = pkg.entries;
   const total = entries.length;
+
+  // ─── 阶段 1：读入新包、建 term 索引（一次性建表，无法细分进度）──────────────
+  report("reading", 0, 0, true);
 
   // term（小写）→ 新包词条下标；打包侧已去重，这里只做防御性保留首个
   const newIndexByTerm = new Map<string, number>();
@@ -589,6 +699,16 @@ async function diffAndWriteDictionaryPackage(
     updatedCount: 0,
     deletedCount: 0,
   };
+
+  // ─── 阶段 2：扫描趟 + 补写趟，按已处理页数上报 ──────────────────────────────
+  // 扫描趟页数按当前表行数估算（`count()` 只走计数，不搬记录）。分母在开始时
+  // 取一次：扫描趟边删边扫、页数只会比估算少，保证百分比单调不倒退。
+  const tableRows = await db.dictionarySenses.count();
+  const scanChunks = Math.ceil(tableRows / DICTIONARY_CHUNK_SIZE);
+  const fillChunks = Math.ceil(total / DICTIONARY_CHUNK_SIZE);
+  const totalChunks = scanChunks + fillChunks;
+  let processedChunks = 0;
+  report("updating", 0, totalChunks, true);
 
   // ─── 扫描趟：逐页处理该包旧记录 ─────────────────────────────────────────────
   let lastId: string | undefined;
@@ -631,6 +751,8 @@ async function diffAndWriteDictionaryPackage(
       }
     });
 
+    processedChunks += 1;
+    report("updating", processedChunks, totalChunks);
     if (page.length < DICTIONARY_CHUNK_SIZE) {
       break;
     }
@@ -652,12 +774,20 @@ async function diffAndWriteDictionaryPackage(
         counts.installedCount += 1;
       }
     });
+    processedChunks += 1;
+    report("updating", processedChunks, totalChunks, processedChunks >= totalChunks);
     if (end < total) {
       await yieldFn();
     }
   }
 
-  return counts;
+  // 扫描趟页数是估算值（扫描中删除旧记录会让表变小，实际页数可能略少），
+  // 收尾补一次 100%，避免进度条停在 99% 后直接跳「完成校验」。
+  if (processedChunks < totalChunks) {
+    report("updating", totalChunks, totalChunks, true);
+  }
+
+  return { counts, totalChunks };
 }
 
 /** 内容变更时构造更新记录：保留原 id（含晋升引用）与原 source，覆盖新包字段 */
