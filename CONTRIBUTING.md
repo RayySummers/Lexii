@@ -152,6 +152,9 @@ PR 描述使用下方模板，并自行对照「13 条评审标准」在描述�
 3. **合入 main**：版本 bump 与功能变更一起走 PR（禁止绕过 PR 直推 `main`），CI 全绿后合并。CI 已内置 `check-release-version` 自检（tag 推送时强校验一致性）。
 4. **打 tag**：在包含该版本 bump 的 main 合并提交上打 tag，格式为 `v<版本号>`（与 package.json 完全一致，如 `v0.1.0-alpha.2`），并推送 tag。打 tag 前本地复核：`node scripts/check-release-version.mjs --tag v<版本号>`。
 5. **部署验证**（RAY-297 双通道）：推送 tag 自动触发 Release 通道部署（`.github/workflows/deploy-release.yml`，发布到 `rayysummers.github.io/Lexii/` 根路径，部署前自动执行 `check-release-version` 一致性门禁，不一致则 fail-fast）；`main` 每次合入自动触发 Dev 通道部署（`.github/workflows/deploy-dev.yml`，发布到 `/Lexii/dev/` 子路径，保留 RAY-241 以来的 main push 预览行为）。两通道每次部署都发布自洽的完整站点（互相携带对方快照），任一通道的部署不会把另一通道冲成 404。部署完成后：在根路径真机确认设置页底部版本号与 tag 一致；在 `/Lexii/dev/` 确认开发预览正常。两个通道均可经 `workflow_dispatch` 手动触发。
+
+   **根路径新鲜度护栏（RAY-491）**：`concurrency: pages` 只保证两条 workflow 按队列顺序落盘，不保证后落盘的内容更新——2026-09-26 的 `v0.10.2-alpha` 就是被更晚落盘的 `Deploy Dev` 用旧 tag 快照覆盖回 `v0.10.1-alpha` 的。现在三道护栏：① `deploy-dev.yml` 写根路径前重新解析最新 `v*`（`git fetch --tags` + `git ls-remote`）并与线上已部署的 `build-info.json` 比对，构建后、上传前再复检一次（必要时重建），根路径只落最新快照、绝不降级；② `deploy-release.yml` 部署后断言根路径 `build-info.json` 的 `branch` ＝ 本次 tag、`releaseTags` 含它，不符则重发同一 artifact 重写一次，仍不符直接 fail；③ 巡检 workflow `.github/workflows/check-pages-channels.yml` 每日比对线上双通道构建信息。检查脚本入口 `scripts/check-pages-channels.mjs`（`pnpm check:pages-channels`，判定内核 `scripts/pages-channel-lib.mjs`，单测 `scripts/test-pages-channels.mjs` 随 `pnpm test` 运行）；线上锚点是构建时随产物写出的 `build-info.json`（根路径与 `/dev/` 各一份，与 `__APP_BUILD__` 同源）。
+
 6. **从本地对内版同步对外版**：从 Mell 维护的本地对内版文件 `release-pipeline-archive.internal.md`（带状态标注的完整版；所在目录非 git 仓库、不上云端）按「对外版」口径同步到 `docs/archive/release-pipeline-archive.md`——保留版本 / 波次分组、事项标题与父子依赖缩进；去掉状态标注（✅🔵🟡 等）、内部排期备注与 RAY 编号（对外版不带状态）。
 7. **提炼 CHANGELOG**：由 Vega 从本地对内版文件提炼 CHANGELOG，以对外版档案为骨架、按实际合入版本归类，随 GitHub Release 公开。
 
