@@ -33,6 +33,7 @@ import {
   TIER0_PRESET,
 } from "@lexii/core";
 import type {
+  DictionaryInstallProgress,
   DictionaryManifest,
   LexiiDatabase,
   LexiiExportData,
@@ -274,6 +275,7 @@ export function createIndexedDbSettingsDataProvider(db: LexiiDatabase): Settings
     async installDictionaryPackage(
       packageId: string,
       signal?: AbortSignal,
+      onProgress?: (progress: DictionaryInstallProgress) => void,
     ): Promise<DictionaryInstallResult> {
       // 查找包定义
       const pkgDef = DICTIONARY_PACKAGES.find((p) => p.id === packageId);
@@ -309,7 +311,8 @@ export function createIndexedDbSettingsDataProvider(db: LexiiDatabase): Settings
         throw new DOMException("安装已取消", "AbortError");
       }
 
-      // 安装到 dictionarySenses 表（signal 传递给安装循环，块间可中止）
+      // 安装到 dictionarySenses 表（signal 传递给安装循环，块间可中止；
+      // onProgress 上报版本升级的落库阶段进度，RAY-498）
       const result = await coreInstallDictionaryPackage(
         db,
         {
@@ -319,7 +322,7 @@ export function createIndexedDbSettingsDataProvider(db: LexiiDatabase): Settings
           lang: "en",
           entries,
         },
-        { signal },
+        { signal, onProgress },
       );
 
       if (result.status === "already-installed") {

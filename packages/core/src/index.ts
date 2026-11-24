@@ -236,6 +236,7 @@ export { DEFAULT_SEARCH_LIMIT, searchAllSenses, searchLexiiSenses, searchSenses 
 export type { SenseSearchHit, SenseSearchHitKind, SenseSearchOptions } from "./search";
 export {
   DICTIONARY_CHUNK_SIZE,
+  DICTIONARY_PROGRESS_THROTTLE_MS,
   detectDecompression,
   dictionaryDoneKey,
   dictionaryProgressKey,
@@ -252,6 +253,8 @@ export {
 } from "./dictionary";
 export type {
   DictionaryInstallOptions,
+  DictionaryInstallPhase,
+  DictionaryInstallProgress,
   DictionaryInstallResult,
   DictionaryInstallStatus,
   DictionaryManifest,
