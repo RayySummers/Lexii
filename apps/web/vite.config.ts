@@ -2,7 +2,10 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import type { Plugin } from "vite";
 import { defineConfig } from "vitest/config";
+
+import type { AppBuildInfo } from "./src/settings/devPanel/buildInfo";
 
 // 构建时注入版本号（RAY-251）：以 apps/web/package.json 的 version 为唯一来源，
 // 设置页底部展示 `__APP_VERSION__`。发版时只需改 package.json，UI 自动跟随，
@@ -52,6 +55,39 @@ const releaseTags = [
     .filter((tag) => tag.length > 0 && tag !== currentVersionTag),
 ].slice(0, 21);
 
+const appBuildInfo = {
+  channel: buildChannel,
+  sha: buildSha,
+  time: buildTime,
+  branch: buildBranch,
+  releaseTags,
+} satisfies AppBuildInfo;
+
+/**
+ * 构建信息另存一份机器可读的 `build-info.json`（RAY-491）：
+ * 同样的字段、同样的构建，落到 dist 根目录 → 随 Pages 发布到
+ * `/Lexii/build-info.json`（稳定通道）与 `/Lexii/dev/build-info.json`（dev 通道）。
+ *
+ * 为什么需要它：RAY-491 的事故是「dev 用旧 tag 快照覆盖了根路径」，要修就得
+ * 在部署链路里**机器可读地**比对「线上根路径当前是哪个 tag」。而 `__APP_BUILD__`
+ * 只注入在 JS bundle 里，CI 想读它必须下载并正则解析 1.4 MB 的 minified bundle
+ * ——既脆弱又慢。build-info.json 与 `__APP_BUILD__` 同源同一份数据，不存在
+ * 漂移，`scripts/pages-channel-lib.mjs` 直接解析它做新鲜度判定与发版后断言。
+ */
+function buildInfoPlugin(): Plugin {
+  return {
+    name: "lexii-build-info",
+    apply: "build",
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "build-info.json",
+        source: `${JSON.stringify(appBuildInfo, null, 2)}\n`,
+      });
+    },
+  };
+}
+
 export default defineConfig({
   // 相对 base：产物可部署在任意子路径下（如 GitHub Pages 的 /Lexii/），
   // 也兼容根路径与自定义域名。PWA 的 manifest / sw.js / 图标路径均已按
@@ -59,16 +95,11 @@ export default defineConfig({
   // 双通道（RAY-297）下同样成立：稳定版在根路径、dev 在 /dev/ 子路径，
   // 相对 base 无需按通道改写。
   base: "./",
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), buildInfoPlugin()],
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
-    __APP_BUILD__: JSON.stringify({
-      channel: buildChannel,
-      sha: buildSha,
-      time: buildTime,
-      branch: buildBranch,
-      releaseTags,
-    }),
+    // 与 dist/build-info.json 同一份数据（RAY-491），两处永远一致
+    __APP_BUILD__: JSON.stringify(appBuildInfo),
   },
   // 体积告警阈值：词书数据惰性 chunk（约 1.99 MB，仅打开词书库时加载）
   // 是拆包后的固有体积，持续触发默认 500 KB 告警属噪声。主 bundle 回退

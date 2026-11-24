@@ -1,0 +1,58 @@
+# RAY-491 — Pages 双通道回归巡检（根路径绝不被旧快照降级）
+#
+# 事故背景：v0.10.2-alpha 的 `Deploy Release` 报 success，但根路径实际仍是
+# v0.10.1-alpha 的快照（被更晚落盘的 `Deploy Dev` 覆盖），而部署本身没有任何
+# 断言，所以「success 但发版没发出去」静默了好几个小时。修复分三层：
+#   1. deploy-dev.yml：写根路径前做新鲜度判定（远端最新 tag / 线上已部署 tag /
+#      候选 tag 三方取最新），根路径只构建最新快照；
+#   2. deploy-release.yml：部署后断言根路径构建信息 ＝ 本次 tag，不符则重写一次；
+#   3. 本 workflow：每日巡检 + 可手动触发，兜住前两层都没覆盖到的情况
+#      （例如人工跳步、CDN 长尾缓存、其它流程改坏了根路径）。
+#
+# 断言内容（scripts/check-pages-channels.mjs）：
+#   - <base>/build-info.json      channel=release，branch=最新 v* tag，
+#                                 releaseTags 含该 tag（RAY-491 验收口径）
+#   - <base>/dev/build-info.json  channel=dev（dev 通道没被冲成 404 / 串通道）
+#
+# 为什么共用 concurrency group `pages`：与两条部署 workflow 串行。否则巡检可能
+# 正好撞上部署进行中（Pages 整站替换途中 / 刚推完 tag 还没落盘），把「正在部署」
+# 误报成「稳定通道被降级」。
+
+name: Check Pages channels（RAY-491 巡检）
+
+on:
+  schedule:
+    # 每天 06:17（UTC+8）巡检一次：cron 用 UTC，22:17 UTC = 次日 06:17 CST
+    - cron: "17 22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  check-channels:
+    name: 校验线上根路径 / dev 通道构建信息
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # 需要用 git ls-remote 解析「最新 v* tag」，浅克隆足够（脚本自己走远端）
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 不需要 pnpm install：脚本零依赖（只用 node 内置模块 + fetch）
+      - name: 断言线上构建信息
+        run: |
+          node scripts/check-pages-channels.mjs \
+            --only both \
+            --wait-seconds 240 \
+            --poll-interval 20

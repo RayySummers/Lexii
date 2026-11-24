@@ -9,6 +9,11 @@ name: Deploy Release（稳定通道）
 #   产物，dev/ 子目录为 main 当前快照的 dev 构建。两通道互相携带对方快照，
 #   任何一次部署都不会把另一个通道冲成 404。
 #
+# RAY-491（发版后断言）：部署完成后校验线上根路径 build-info.json 的 branch 是否
+# 就是本次 tag（releaseTags 含它）；不符则重发同一 artifact 重写一次，仍不符直接
+# fail —— 不让「Deploy 成功但稳定通道还是旧版本」静默通过。concurrency: pages
+# 保留（它仍然有用，只是不足以单独保证内容新鲜，见 deploy-dev.yml 的新鲜度判定）。
+#
 # 构建信息注入（RAY-297 任务 B）：两次构建分别设置 LEXII_CHANNEL 与
 # BUILD_BRANCH，vite.config.ts 在构建时收集 SHA/时间/分支/通道/历史 tag，
 # 运行时零网络请求。
@@ -74,6 +79,8 @@ jobs:
         run: |
           ref="${{ github.event.inputs.ref }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # RAY-491：自动解析前先刷新 tag，避免脚踩 checkout 时刻的旧快照
+            git fetch --tags --force origin
             # 留空或解析为 main 都视为 auto-resolve 到最新 v* tag
             if [ -z "$ref" ] || [ "$ref" = "main" ]; then
               ref="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
@@ -177,3 +184,32 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # ── RAY-491：发版后断言（根路径 branch 必须就是本次 tag） ──────────────
+      # 读取线上 <base>/build-info.json（构建时随产物写出，与 __APP_BUILD__ 同源），
+      # 校验 channel=release、branch=本次 tag、releaseTags 含该 tag。Pages CDN 有
+      # 传播延迟，故带 --wait-seconds 轮询；URL 追加时间戳查询参数绕过缓存。
+      # 不符时先重发同一 artifact 重写一次（很可能是一次迟到的旧快照覆盖），
+      # 复验仍不符则 fail —— 稳定通道的正确性不允许「静默成功」。
+      - name: 发版后断言（根路径构建信息 ＝ 本次 tag）
+        id: assert-root
+        continue-on-error: true
+        run: |
+          node scripts/check-pages-channels.mjs \
+            --only root \
+            --expect-branch "$BUILD_BRANCH" \
+            --wait-seconds 180
+
+      - name: 断言不符 → 重发同一 artifact 重写根路径
+        if: steps.assert-root.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: 发版后复验（重写后仍不符 → fail）
+        if: steps.assert-root.outcome == 'failure'
+        run: |
+          echo "::warning::根路径首次断言不符，已重发同一 artifact 重写一次，开始复验"
+          node scripts/check-pages-channels.mjs \
+            --only root \
+            --expect-branch "$BUILD_BRANCH" \
+            --wait-seconds 180
